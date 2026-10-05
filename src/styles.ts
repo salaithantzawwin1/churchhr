@@ -59,16 +59,20 @@ tbody tr:hover { background: #fafbfe; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 .btn {
-  display: inline-block; border: 0; border-radius: 8px; cursor: pointer;
+  display: inline-block; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
   background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14.5px;
   font-family: inherit; text-decoration: none;
+  line-height: 1.35; min-height: 40px;
+  /* .btn is also used inside flex forms (inline label + Edit). Without this the
+     button stretches to the input's height and unaligns the row. */
+  align-self: center;
 }
 .btn:hover { filter: brightness(1.08); }
 .btn.secondary { background: #eef1f6; color: var(--ink); border: 1px solid var(--line); }
 .btn.secondary:hover { filter: none; background: #e3e8f0; }
 .btn.danger { background: #b42318; }
 .btn.danger:hover { filter: brightness(1.1); }
-.btn.sm { padding: 5px 10px; font-size: 13px; }
+.btn.sm { padding: 5px 10px; font-size: 13px; min-height: 0; }
 .btn.full { width: 100%; text-align: center; }
 :focus-visible { outline: 2px solid #7aa7e0; outline-offset: 2px; }
 .topbar :focus-visible { outline-color: #fff; }
@@ -84,6 +88,10 @@ input[type=file], select, textarea {
 input:focus, select:focus, textarea:focus { outline: 2px solid #bcd2f0; border-color: var(--brand); }
 textarea { min-height: 84px; resize: vertical; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+/* Button rows often wrap a button in a bare <form> (delete/confirm). A block-level
+   form inherits the UA margin-bottom, which stretches the flex row and knocks the
+   button out of alignment — reset it and let the button size itself. */
+.actions form { display: inline-flex; margin: 0; align-items: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
 .filters label.field { min-width: 150px; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: #eef1f6; }
