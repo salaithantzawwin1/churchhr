@@ -294,13 +294,14 @@ type OptionsProps = Common & {
   type: string;
   typeLabel: string;
   types: { key: string; label: string; active: boolean }[];
-  options: OptionUsage[];
+  options?: OptionUsage[];
+  regionRows?: { id: number; name: string; name_en: string; used: number }[];
   addErrors: string[];
   editError: string | null;
 };
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options, addErrors, editError, lang } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], addErrors, editError, lang } = props;
   const t = getDict(lang ?? "mm");
   const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   return (
@@ -313,7 +314,7 @@ export function AdminOptionsPage(props: OptionsProps) {
       <div class="actions" style="margin-top:0;margin-bottom:14px">
         {types.map((t2) => (
           <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
-            {TL[t2.key as OptionType] ?? t2.label}{t2.active ? "" : ` (${t("adm.offShort")})`}
+            {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}{t2.active ? "" : ` (${t("adm.offShort")})`}
           </a>
         ))}
       </div>
@@ -323,6 +324,59 @@ export function AdminOptionsPage(props: OptionsProps) {
         <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
       )}
 
+      {type === "region" ? (
+        <>
+          <div class="card">
+            <h2>{t("adm.regionTab")} — {t("adm.addOption")}</h2>
+            <form method="post" action="/admin/regions">
+              <div class="form-grid">
+                <label class="field">
+                  <span class="lbl">{t("adm.regionNameMm")} *</span>
+                  <input type="text" name="name" required />
+                </label>
+                <label class="field">
+                  <span class="lbl">{t("adm.regionNameEn")}</span>
+                  <input type="text" name="name_en" />
+                </label>
+              </div>
+              <div class="actions">
+                <button class="btn" type="submit">{t("form.add")}</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th>{t("adm.usage")}</th><th></th></tr>
+              </thead>
+              <tbody>
+                {regionRows.length === 0 && <tr><td colSpan={5} class="muted">{t("dash.none")}</td></tr>}
+                {regionRows.map((r) => (
+                  <tr>
+                    <td>{r.id}</td>
+                    <td colSpan={2}>
+                      <form method="post" action={`/admin/regions/${r.id}`} style="display:flex;gap:6px;flex-wrap:wrap">
+                        <input type="text" name="name" value={r.name} style="flex:1 1 150px" required />
+                        <input type="text" name="name_en" value={r.name_en} style="flex:1 1 150px" />
+                        <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
+                      </form>
+                    </td>
+                    <td>{r.used} {t("members.count")}</td>
+                    <td style="white-space:nowrap">
+                      <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
+                        <button class="btn sm danger" type="submit" disabled={r.used > 0}>{t("members.delete")}</button>
+                      </form>
+                      {r.used > 0 && <div class="muted small">{t("adm.inUse")}</div>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
       <div class="card">
         <h2>{typeLabel} — {t("adm.addOption")}</h2>
         <form method="post" action="/admin/options">
@@ -375,6 +429,8 @@ export function AdminOptionsPage(props: OptionsProps) {
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </Layout>
   );
 }

@@ -3,13 +3,13 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
-  lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, rolePermissions, roles,
+  lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions, rolePermissions, roles,
   userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
-import { findOption, loadAllOptions, OPTION_RAW_COLUMN, isOptionType } from "../lookup";
+import { findOption, loadAllOptions, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
@@ -304,10 +304,7 @@ async function optionsPage(c: any, type: string, opts: {
   );
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
   const options: OptionUsage[] = list.map((o) => ({ id: o.id, label: o.label, active: o.active, used: usage.get(o.id) ?? 0 }));
-  const types = OPTION_TYPES.map((k) => {
-    const entry = all.filter((o) => o.type === k);
-    return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1) };
-  });
+  const types = optionTabs(all);
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -318,8 +315,22 @@ async function optionsPage(c: any, type: string, opts: {
   );
 }
 
+type Tab = { key: string; label: string; active: boolean };
+
+/** Option page tabs — State/Region (regions table) first, then lookup option types. */
+function optionTabs(all: OptionRow[]): Tab[] {
+  return [
+    { key: "region", label: "", active: true },
+    ...OPTION_TYPES.map((k) => {
+      const entry = all.filter((o) => o.type === k);
+      return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1) };
+    }),
+  ];
+}
+
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   const type = c.req.query("type") ?? OPTION_TYPES[0]!;
+  if (type === "region") return regionOptionsPage(c);
   return optionsPage(c, type);
 });
 
@@ -382,4 +393,97 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   }
   await db.delete(lookupOptions).where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-deleted`, 302);
+});
+
+// ---------- State/Region management (Options > State/Region tab) ----------
+
+type RegionRow = { id: number; name: string; name_en: string; used: number };
+
+async function loadRegionRows(db: DB): Promise<RegionRow[]> {
+  const rows = await db.all<{ id: number; name: string; name_en: string | null; used: number }>(sql`
+    SELECT r.id, r.name, r.name_en,
+      (SELECT COUNT(*) FROM members m WHERE m.region_id = r.id)
+      + (SELECT COUNT(*) FROM user_state_assignments sa WHERE sa.region_id = r.id) AS used
+    FROM regions r ORDER BY r.id`);
+  return rows.map((r) => ({ id: r.id, name: r.name, name_en: r.name_en ?? "", used: Number(r.used) }));
+}
+
+function regionBack(): string {
+  return "/admin/options?type=region";
+}
+
+function slugify(v: string): string {
+  const base = v.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+  return base || "region";
+}
+
+async function uniqueRegionSlug(db: DB, base: string): Promise<string> {
+  const rows = await db.select({ slug: regions.slug }).from(regions);
+  const taken = new Set(rows.map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+}
+
+async function regionOptionsPage(c: any) {
+  const db = getDb(c.env);
+  const lang: "mm" | "en" = c.get("lang");
+  const all = await loadAllOptions(db);
+  return c.html(
+    <AdminOptionsPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
+      type="region" typeLabel={getDict(lang)("adm.regionTab")} types={optionTabs(all)}
+      regionRows={await loadRegionRows(db)}
+      addErrors={[]} editError={null}
+      lang={lang}
+    />,
+  );
+}
+
+adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const back = regionBack();
+  const body = await c.req.parseBody();
+  const name = s(body.name);
+  const nameEn = s(body.name_en);
+  if (name.length < 1 || name.length > 120) return c.redirect(errRedirect(back, t("adm.errRegionName")), 302);
+  const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
+  if (dup[0]) return c.redirect(errRedirect(back, t("adm.errRegionDup")), 302);
+  const slug = await uniqueRegionSlug(db, slugify(nameEn || name));
+  await db.insert(regions).values({ name, nameEn: nameEn || name, slug });
+  return c.redirect(`${back}&ok=region-added`, 302);
+});
+
+adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const back = regionBack();
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect(`${back}&err=err-notfound`, 302);
+  const rows = await db.select().from(regions).where(eq(regions.id, id)).limit(1);
+  if (!rows[0]) return c.redirect(`${back}&err=err-notfound`, 302);
+  const body = await c.req.parseBody();
+  const name = s(body.name);
+  const nameEn = s(body.name_en);
+  if (name.length < 1 || name.length > 120) return c.redirect(errRedirect(back, t("adm.errRegionName")), 302);
+  const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
+  if (dup[0] && dup[0].id !== id) return c.redirect(errRedirect(back, t("adm.errRegionDup")), 302);
+  await db.update(regions).set({ name, nameEn: nameEn || name }).where(eq(regions.id, id));
+  return c.redirect(`${back}&ok=region-updated`, 302);
+});
+
+adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const back = regionBack();
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect(`${back}&err=err-notfound`, 302);
+  const rows = await db.select().from(regions).where(eq(regions.id, id)).limit(1);
+  if (!rows[0]) return c.redirect(`${back}&err=err-notfound`, 302);
+  const usedMembers = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members WHERE region_id = ${id}`);
+  const usedUsers = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM user_state_assignments WHERE region_id = ${id}`);
+  if ((usedMembers[0]?.n ?? 0) + (usedUsers[0]?.n ?? 0) > 0) {
+    return c.redirect(`${back}&err=err-region-used`, 302);
+  }
+  await db.delete(regions).where(eq(regions.id, id));
+  return c.redirect(`${back}&ok=region-deleted`, 302);
 });

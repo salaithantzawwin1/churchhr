@@ -36,6 +36,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
         </title>
         <link rel="icon" type="image/png" href="/logo.png" />
         <link rel="stylesheet" href="/styles.css" />
+        <script src="/app.js" defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
@@ -78,22 +79,24 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
           {children}
         </main>
         <footer class="footer">{t("app.name")} — {t("app.tagline")}</footer>
-        <script>{`document.addEventListener("submit", function (e) {
-            var f = e.target;
-            if (f && f.getAttribute("data-confirm") && !window.confirm(f.getAttribute("data-confirm"))) {
-              e.preventDefault();
-            }
-          });
-          (function () {
-            var links = document.querySelectorAll(".langswitch a");
-            if (!links.length) return;
-            var params = new URLSearchParams(window.location.search);
-            links.forEach(function (a) {
-              var to = a.getAttribute("href").replace("?", "").split("=")[1];
-              params.set("lang", to);
-              a.setAttribute("href", window.location.pathname + "?" + params.toString());
-            });
-          })();`}</script>
+        <div
+          id="app-modal"
+          class="modal"
+          hidden
+          data-confirm-title={t("modal.confirmTitle")}
+          data-yes={t("modal.confirmYes")}
+          data-cancel={t("form.cancel")}
+          data-loading={t("modal.loading")}
+        >
+          <div class="modal-backdrop" data-close="1"></div>
+          <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="app-modal-title">
+            <div class="modal-head">
+              <h3 id="app-modal-title"></h3>
+              <button class="modal-x" type="button" data-close="1" aria-label={t("modal.close")}>×</button>
+            </div>
+            <div class="modal-body" id="app-modal-body"></div>
+          </div>
+        </div>
       </body>
     </html>
   );

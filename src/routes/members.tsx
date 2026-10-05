@@ -14,7 +14,7 @@ import {
 import { BLOOD_TYPES, GENDERS, MARITAL_STATUSES, STATUSES, normEnum } from "../enums";
 import { getDict } from "../i18n";
 import {
-  ImportPage, MemberDetailPage, MemberFormPage, MembersListPage,
+  ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MembersListPage,
   type Filters, type FormValues, type ImportReport, type MemberDetail,
 } from "../views/members";
 
@@ -785,17 +785,17 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
   if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
   const allRegions = await loadRegions(db);
   const options = await loadAllOptions(db);
-  return c.html(
-    <MemberFormPage
-      user={c.get("user")} perms={c.get("perms")} values={rowToValues(row)} errors={[]}
-      member={{ id }} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-      options={Object.fromEntries(
-        ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-          .map((t) => [t, options.filter((o) => o.type === t && (o.active === 1 || o.id === (row as any)[`${t}_id`]))]),
-      )}
-      lang={c.get("lang")}
-    />,
-  );
+  const formProps = {
+    user: c.get("user"), perms: c.get("perms"), values: rowToValues(row), errors: [] as string[],
+    member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
+    options: Object.fromEntries(
+      ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
+        .map((t) => [t, options.filter((o) => o.type === t && (o.active === 1 || o.id === (row as any)[`${t}_id`]))]),
+    ),
+    lang: c.get("lang"),
+  };
+  if (c.req.query("modal") === "1") return c.html(<MemberFormFragment {...formProps} modal />);
+  return c.html(<MemberFormPage {...formProps} />);
 });
 
 membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
@@ -807,28 +807,29 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   if (!existing || !inScope(existing, scope)) return c.redirect("/members?err=err-notfound", 302);
 
   const body = await c.req.parseBody();
+  const fromModal = s(body.from_modal) === "1";
   const options = await loadAllOptions(db);
   const { values, errors, data } = readAndValidate(body, scope, options);
   const allRegions = await loadRegions(db);
   if (!data) {
-    return c.html(
-      <MemberFormPage
-        user={c.get("user")} perms={c.get("perms")} values={values}
-        errors={errors.map((e) => renderMsg(e, c.get("lang")))}
-        member={{ id }} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-        options={Object.fromEntries(
-          ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-            .map((t) => [t, options.filter((o) => o.type === t && o.active === 1)]),
-        )}
-        lang={c.get("lang")}
-      />,
-      400,
-    );
+    const formProps = {
+      user: c.get("user"), perms: c.get("perms"), values,
+      errors: errors.map((e) => renderMsg(e, c.get("lang"))),
+      member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
+      options: Object.fromEntries(
+        ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
+          .map((t) => [t, options.filter((o) => o.type === t && (o.active === 1 || o.id === (existing as any)[`${t}_id`]))]),
+      ),
+      lang: c.get("lang"),
+    };
+    if (fromModal) return c.html(<MemberFormFragment {...formProps} modal />, 400);
+    return c.html(<MemberFormPage {...formProps} />, 400);
   }
   await db
     .update(members)
     .set({ ...toDrizzleValues(data), updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) } as typeof members.$inferInsert)
     .where(eq(members.id, id));
+  if (fromModal) return c.redirect("/members?ok=member-updated", 303);
   return c.redirect(`/members/${id}?ok=member-updated`, 302);
 });
 

@@ -137,7 +137,7 @@ export function MembersListPage(props: ListProps) {
       </form>
 
       <div class="tbl-wrap">
-        <table>
+        <table class="list-tbl">
           <thead>
             <tr>
               <th>{t("members.thId")}</th><th>{t("members.thName")}</th><th>{t("members.gender")}</th><th>{t("members.thPhone")}</th><th>{t("members.state")}</th>
@@ -163,7 +163,9 @@ export function MembersListPage(props: ListProps) {
                 <td><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
                 <td style="white-space:nowrap">
                   <a class="btn sm secondary" href={`/members/${m.id}`}>{t("members.open")}</a>{" "}
-                  {perms.has("members.update") && <a class="btn sm secondary" href={`/members/${m.id}/edit`}>{t("members.edit")}</a>}{" "}
+                  {perms.has("members.update") && (
+                    <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
+                  )}{" "}
                   {canDelete && (
                     <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
                      >
@@ -220,7 +222,23 @@ function select(name: string, map: Record<string, string>, selected: string, bla
 }
 
 export function MemberFormPage(props: FormProps) {
-  const { user, perms, values: v, errors, member, regions, options, lang } = props;
+  const { user, perms, member, lang } = props;
+  const t = getDict(lang ?? "mm");
+  const edit = member !== null;
+  return (
+    <Layout title={edit ? t("form.editTitle") : t("form.newTitle")} lang={lang} user={user} perms={perms} active="/members">
+      <div class="page-head">
+        <h1>{edit ? t("form.editHeading") : t("form.newHeading")}</h1>
+        <a class="btn secondary" href={edit ? `/members/${member.id}` : "/members"}>{t("members.back")}</a>
+      </div>
+      <MemberFormFragment {...props} />
+    </Layout>
+  );
+}
+
+/** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
+export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
+  const { values: v, errors, member, regions, options, lang, modal } = props;
   const t = getDict(lang ?? "mm");
   const isEn = (lang ?? "mm") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
@@ -230,18 +248,15 @@ export function MemberFormPage(props: FormProps) {
   const edit = member !== null;
   const dob = v.date_of_birth || "";
   return (
-    <Layout title={edit ? t("form.editTitle") : t("form.newTitle")} lang={lang} user={user} perms={perms} active="/members">
-      <div class="page-head">
-        <h1>{edit ? t("form.editHeading") : t("form.newHeading")}</h1>
-        <a class="btn secondary" href={edit ? `/members/${member.id}` : "/members"}>{t("members.back")}</a>
-      </div>
+    <>
       {errors.length > 0 && (
         <div class="flash err">
           <strong>{t("form.invalid")}</strong>
           <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
         </div>
       )}
-      <form method="post" action={action}>
+      <form method="post" action={action} data-flash-ok="member-updated">
+        {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="form-grid">
@@ -317,10 +332,12 @@ export function MemberFormPage(props: FormProps) {
 
         <div class="actions">
           <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
-          <a class="btn secondary" href={edit ? `/members/${member.id}` : "/members"}>{t("form.cancel")}</a>
+          {modal
+            ? <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+            : <a class="btn secondary" href={edit ? `/members/${member!.id}` : "/members"}>{t("form.cancel")}</a>}
         </div>
       </form>
-    </Layout>
+    </>
   );
 }
 
@@ -407,7 +424,9 @@ export function MemberDetailPage(props: Common & { m: MemberDetail }) {
         <h1>{m.name_myanmar || m.name_english || `#${m.id}`} <span class="muted small">{m.member_code}</span></h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href="/members">{t("members.toList")}</a>
-          {perms.has("members.update") && <a class="btn" href={`/members/${m.id}/edit`}>{t("members.edit")}</a>}
+          {perms.has("members.update") && (
+            <a class="btn js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
+          )}
           {perms.has("members.delete") && (
             <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
              >
