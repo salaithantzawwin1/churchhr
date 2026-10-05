@@ -356,7 +356,7 @@ export function AdminOptionsPage(props: OptionsProps) {
                   <tr>
                     <td>{r.id}</td>
                     <td colSpan={2}>
-                      <form method="post" action={`/admin/regions/${r.id}`} style="display:flex;gap:6px;flex-wrap:wrap">
+                      <form method="post" action={`/admin/regions/${r.id}`} class="inline-edit" style="flex-wrap:wrap">
                         <input type="text" name="name" value={r.name} style="flex:1 1 150px" required />
                         <input type="text" name="name_en" value={r.name_en} style="flex:1 1 150px" />
                         <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
@@ -402,7 +402,7 @@ export function AdminOptionsPage(props: OptionsProps) {
               <tr>
                 <td>{o.id}</td>
                 <td>
-                  <form method="post" action={`/admin/options/${o.id}`} style="display:flex;gap:6px">
+                  <form method="post" action={`/admin/options/${o.id}`} class="inline-edit">
                     <input type="text" name="label" value={o.label} />
                     <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
                   </form>

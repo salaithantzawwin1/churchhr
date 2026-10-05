@@ -63,9 +63,6 @@ tbody tr:hover { background: #fafbfe; }
   background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14.5px;
   font-family: inherit; text-decoration: none;
   line-height: 1.35; min-height: 40px;
-  /* .btn is also used inside flex forms (inline label + Edit). Without this the
-     button stretches to the input's height and unaligns the row. */
-  align-self: center;
 }
 .btn:hover { filter: brightness(1.08); }
 .btn.secondary { background: #eef1f6; color: var(--ink); border: 1px solid var(--line); }
@@ -92,6 +89,9 @@ textarea { min-height: 84px; resize: vertical; }
    form inherits the UA margin-bottom, which stretches the flex row and knocks the
    button out of alignment — reset it and let the button size itself. */
 .actions form { display: inline-flex; margin: 0; align-items: center; }
+/* Inline-edit forms put a full-height input next to an "Edit" button. Center the
+   button against the input instead of letting flex stretch it. */
+.inline-edit { display: flex; gap: 6px; align-items: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
 .filters label.field { min-width: 150px; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: #eef1f6; }
