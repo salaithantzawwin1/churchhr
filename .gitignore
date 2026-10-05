@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.freebuff/
+dist/
+*.log
+.dev.vars

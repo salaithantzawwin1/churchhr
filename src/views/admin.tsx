@@ -1,0 +1,380 @@
+import { Layout } from "./layout";
+import type { Flash } from "./layout";
+import type { SessionUser } from "../session";
+import { PERMISSIONS, PERMISSION_LABELS, PERMISSION_LABELS_EN } from "../rbac";
+import { getDict, type Lang } from "../i18n";
+import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, type OptionType } from "../db/schema";
+import { qs } from "../util";
+
+type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
+
+// ---------- Users ----------
+
+export type AdminUserRow = {
+  id: number;
+  username: string;
+  active: number;
+  must_change_password: number;
+  created_at: number;
+  role_names: string;
+  state_ids: number[];
+};
+
+type UsersProps = Common & {
+  users: (AdminUserRow & { state_names?: string })[];
+  roles: { id: number; name: string; description: string | null }[];
+  regions: { id: number; name: string }[];
+  editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[] }) | null;
+  createErrors: string[];
+  editErrors: string[];
+};
+
+function stateSummary(u: AdminUserRow & { state_names?: string }, regions: { id: number; name: string }[], allLabel: string): string {
+  if (u.state_ids.includes(0)) return allLabel;
+  if (u.state_names) return u.state_names;
+  const names = u.state_ids.map((id) => regions.find((r) => r.id === id)?.name ?? `#${id}`);
+  return names.join(", ") || "—";
+}
+
+function userForm(v: {
+  id?: number;
+  username: string;
+  allStates: boolean;
+  selectedRoles: number[];
+  selectedStates: number[];
+  active: number;
+  mustChange: number;
+}, props: { roles: { id: number; name: string }[]; regions: { id: number; name: string }[] }, t: (k: string) => string) {
+  const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
+  return (
+    <form method="post" action={action}>
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">Username {v.id === undefined && "*"}</span>
+          <input type="text" name="username" value={v.username} required={v.id === undefined}
+            pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
+        </label>
+        <label class="field">
+          <span class="lbl">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</span>
+          <input type="text" name={v.id === undefined ? "password" : "new_password"}
+            placeholder={v.id === undefined ? t("adm.min8") : t("adm.leaveBlank")} />
+        </label>
+      </div>
+      <div style="margin-top:12px">
+        <strong class="small">Roles:</strong>
+        <div class="form-grid" style="margin-top:6px">
+          {props.roles.map((r) => (
+            <label class="field" style="font-size:14px">
+              <input type="checkbox" name="roles" value={String(r.id)}
+                checked={v.selectedRoles.includes(r.id)} /> {r.name}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <strong class="small">{t("adm.stateScope")}:</strong>
+        <label class="field" style="font-size:14px;margin-top:4px">
+          <input type="checkbox" name="all_states" value="1" checked={v.allStates} /> {t("adm.allStates")}
+        </label>
+        <div class="form-grid" style="margin-top:4px">
+          {props.regions.map((r) => (
+            <label class="field" style="font-size:14px">
+              <input type="checkbox" name="states" value={String(r.id)}
+                checked={v.selectedStates.includes(r.id)} /> {r.name}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div class="actions">
+        <label class="field" style="font-size:14px">
+          <input type="checkbox" name="active" value="1" checked={v.active === 1} /> {t("adm.active")}
+        </label>
+        <label class="field" style="font-size:14px">
+          <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> {t("adm.mustChange")}
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{v.id ? t("form.save") : t("adm.create")}</button>
+      </div>
+    </form>
+  );
+}
+
+export function AdminUsersPage(props: UsersProps) {
+  const { user, perms, flash, users, roles, regions, editUser, createErrors, editErrors, lang } = props;
+  const t = getDict(lang ?? "mm");
+  return (
+    <Layout title={t("adm.usersTitle")} lang={lang} user={user} perms={perms} active="/admin/users" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.usersTitle")}</h1>
+        <a class="btn secondary" href="/">← Dashboard</a>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Username</th><th>Roles</th><th>State Scope</th><th>{t("members.status")}</th><th></th></tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr>
+                <td>{u.id}</td>
+                <td>
+                  {u.username}
+                  {u.id === user.id && <span class="badge" style="margin-left:6px">{t("adm.you")}</span>}
+                </td>
+                <td>{u.role_names || "—"}</td>
+                <td class="small">{stateSummary(u, regions, t("adm.allStates"))}</td>
+                <td>
+                  {u.active === 1
+                    ? <span class="badge active">active</span>
+                    : <span class="badge inactive">{t("adm.off")}</span>}
+                  {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
+                </td>
+                <td>
+                  {u.id !== user.id
+                    ? <a class="btn sm secondary" href={`/admin/users/${u.id}/edit`}>{t("members.edit")}</a>
+                    : <span class="muted small">{t("adm.selfEdit")}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!editUser && (
+        <div class="card" style="margin-top:18px">
+          <h2>{t("adm.createHeading")}</h2>
+          {createErrors.length > 0 && (
+            <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
+          )}
+          {userForm({ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }, { roles, regions }, t)}
+        </div>
+      )}
+    </Layout>
+  );
+}
+
+export function AdminUserEditPage(props: Common & {
+  editUser: AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[] };
+  roles: { id: number; name: string; description: string | null }[];
+  regions: { id: number; name: string }[];
+  editErrors: string[];
+}) {
+  const { user, perms, flash, editUser: u, roles, regions, editErrors, lang } = props;
+  const t = getDict(lang ?? "mm");
+  return (
+    <Layout title={`${t("members.edit")}: ${u.username}`} lang={lang} user={user} perms={perms} active="/admin/users" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.editHeading")}: {u.username}</h1>
+        <a class="btn secondary" href="/admin/users">{t("members.toList")}</a>
+      </div>
+      <div class="card">
+        {editErrors.length > 0 && (
+          <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
+        )}
+        {userForm({ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }, { roles, regions }, t)}
+      </div>
+    </Layout>
+  );
+}
+
+// ---------- Roles ----------
+
+export type AdminRoleRow = {
+  id: number;
+  name: string;
+  description: string | null;
+  is_system: number;
+  permissions: string[];
+};
+
+type RolesProps = Common & {
+  roles: AdminRoleRow[];
+  createErrors: string[];
+  saveErrors: string[];
+};
+
+function permCheckboxes(role: { id: number; permissions: string[] } | null, labels: Record<string, string>) {
+  return (
+    <div class="form-grid" style="margin-top:8px">
+      {PERMISSIONS.map((p) => (
+        <label class="field" style="font-size:14px">
+          <input type="checkbox" name="permissions" value={p}
+            checked={role !== null && role.permissions.includes(p)} /> {labels[p]}
+          <span class="hint"> ({p})</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export function AdminRolesPage(props: RolesProps) {
+  const { user, perms, flash, roles, createErrors, saveErrors, lang } = props;
+  const t = getDict(lang ?? "mm");
+  const PL = (lang ?? "mm") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  return (
+    <Layout title="Roles" lang={lang} user={user} perms={perms} active="/admin/roles" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.rolesHeading")}</h1>
+        <a class="btn secondary" href="/">← Dashboard</a>
+      </div>
+      {saveErrors.length > 0 && (
+        <div class="flash err"><ul class="err-list">{saveErrors.map((e) => <li>{e}</li>)}</ul></div>
+      )}
+
+      {roles.map((r) => (
+        <div class="card">
+          <div class="page-head" style="margin-bottom:4px">
+            <h2 style="margin:0">
+              {r.name}
+              {r.is_system === 1 && <span class="badge" style="margin-left:8px">system</span>}
+            </h2>
+            {r.is_system !== 1 && (
+              <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}
+               >
+                <button class="btn sm danger" type="submit">{t("members.delete")}</button>
+              </form>
+            )}
+          </div>
+          {r.description && <p class="muted small">{r.description}</p>}
+          {r.is_system === 1 ? (
+            <div class="form-grid" style="margin-top:8px">
+              {PERMISSIONS.map((p) => (
+                <span class="small" style={r.permissions.includes(p) ? "" : "opacity:.35;text-decoration:line-through"}>
+                  {r.permissions.includes(p) ? "✓" : "✗"} {PL[p]}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <form method="post" action={`/admin/roles/${r.id}`}>
+              <input type="hidden" name="name" value={r.name} />
+              <input type="hidden" name="description" value={r.description ?? ""} />
+              {permCheckboxes(r, PL)}
+              <div class="actions">
+                <button class="btn" type="submit">{t("adm.savePerms")}</button>
+              </div>
+            </form>
+          )}
+        </div>
+      ))}
+
+      <div class="card">
+        <h2>{t("adm.newRole")}</h2>
+        {createErrors.length > 0 && (
+          <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
+        )}
+
+        <form method="post" action="/admin/roles">
+          <div class="form-grid">
+            <label class="field">
+              <span class="lbl">Role name *</span>
+              <input type="text" name="name" required />
+            </label>
+            <label class="field">
+              <span class="lbl">{t("adm.desc")}</span>
+              <input type="text" name="description" />
+            </label>
+          </div>
+          {permCheckboxes(null, PL)}
+          <div class="actions">
+            <button class="btn" type="submit">{t("adm.createRole")}</button>
+          </div>
+        </form>
+      </div>
+    </Layout>
+  );
+}
+
+// ---------- Lookup options ----------
+
+export type OptionUsage = { id: number; label: string; active: number; used: number };
+
+type OptionsProps = Common & {
+  type: string;
+  typeLabel: string;
+  types: { key: string; label: string; active: boolean }[];
+  options: OptionUsage[];
+  addErrors: string[];
+  editError: string | null;
+};
+
+export function AdminOptionsPage(props: OptionsProps) {
+  const { user, perms, flash, type, typeLabel, types, options, addErrors, editError, lang } = props;
+  const t = getDict(lang ?? "mm");
+  const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
+  return (
+    <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.optionsHeading")}</h1>
+        <a class="btn secondary" href="/">← Dashboard</a>
+      </div>
+
+      <div class="actions" style="margin-top:0;margin-bottom:14px">
+        {types.map((t2) => (
+          <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
+            {TL[t2.key as OptionType] ?? t2.label}{t2.active ? "" : ` (${t("adm.offShort")})`}
+          </a>
+        ))}
+      </div>
+
+      {editError && <div class="flash err">{editError}</div>}
+      {addErrors.length > 0 && (
+        <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
+      )}
+
+      <div class="card">
+        <h2>{typeLabel} — {t("adm.addOption")}</h2>
+        <form method="post" action="/admin/options">
+          <input type="hidden" name="type" value={type} />
+          <div class="form-grid">
+            <label class="field">
+              <span class="lbl">Label *</span>
+              <input type="text" name="label" required />
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit">{t("form.add")}</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Label</th><th>{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
+          <tbody>
+            {options.length === 0 && <tr><td colSpan={5} class="muted">{t("dash.none")}</td></tr>}
+            {options.map((o) => (
+              <tr>
+                <td>{o.id}</td>
+                <td>
+                  <form method="post" action={`/admin/options/${o.id}`} style="display:flex;gap:6px">
+                    <input type="text" name="label" value={o.label} />
+                    <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
+                  </form>
+                </td>
+                <td>{o.used} {t("members.count")}</td>
+                <td>
+                  {o.active === 1
+                    ? <span class="badge active">active</span>
+                    : <span class="badge inactive">{t("adm.off")}</span>}
+                </td>
+                <td style="white-space:nowrap">
+                  <form method="post" action={`/admin/options/${o.id}`} style="display:inline">
+                    <input type="hidden" name="toggle" value="1" />
+                    <input type="hidden" name="label" value={o.label} />
+                    <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.offShort") : t("adm.onShort")}</button>
+                  </form>{" "}
+                  <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
+                   >
+                    <button class="btn sm danger" type="submit">{t("members.delete")}</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Layout>
+  );
+}

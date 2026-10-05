@@ -1,0 +1,385 @@
+import { Hono } from "hono";
+import { and, eq, sql } from "drizzle-orm";
+import type { AppEnv } from "../env";
+import { getDb, type DB } from "../db/client";
+import {
+  lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, rolePermissions, roles,
+  userRoles, userStateAssignments, users, type OptionType,
+} from "../db/schema";
+import { requirePermission } from "../middleware";
+import { flashFromQuery } from "../flash";
+import { hashPassword, parseIterations } from "../auth";
+import { findOption, loadAllOptions, OPTION_RAW_COLUMN, isOptionType } from "../lookup";
+import { PERMISSIONS, type Permission } from "../rbac";
+import { getDict } from "../i18n";
+import { s } from "../util";
+import {
+  AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
+  type AdminRoleRow, type AdminUserRow, type OptionUsage,
+} from "../views/admin";
+
+export const adminRoutes = new Hono<AppEnv>();
+
+/** Maps a dictionary key (e.g. adm.errRoleBad) pushed by validateAssignments to its text. */
+function renderKey(t: (k: string) => string) {
+  return (key: string) => (key.startsWith("adm.") ? t(key) : key);
+}
+
+function multi(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return typeof v === "string" ? [v] : [];
+}
+
+function ints(vals: string[]): number[] {
+  return vals.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0);
+}
+
+const errRedirect = (to: string, msg: string) =>
+  `${to}${to.includes("?") ? "&" : "?"}err=${encodeURIComponent(msg)}`;
+
+type RoleInfo = { id: number; name: string; description: string | null; is_system: number; permissions: string[] };
+
+async function loadRoles(db: DB): Promise<RoleInfo[]> {
+  const roleRows = await db
+    .select({ id: roles.id, name: roles.name, description: roles.description, isSystem: roles.isSystem })
+    .from(roles)
+    .orderBy(roles.id);
+  const permRows = await db.select({ roleId: rolePermissions.roleId, permission: rolePermissions.permission })
+    .from(rolePermissions);
+  return roleRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    is_system: r.isSystem,
+    permissions: permRows.filter((p) => p.roleId === r.id).map((p) => p.permission),
+  }));
+}
+
+async function loadAdminUsers(db: DB, lang: "mm" | "en"): Promise<AdminUserRow[]> {
+  const stateCol = lang === "en" ? "r3.name_en" : "r3.name";
+  const rows = await db.all<AdminUserRow & { state_ids: string | null }>(
+    sql.raw(`
+    SELECT u.id, u.username, u.active, u.must_change_password, u.created_at,
+      COALESCE((
+        SELECT group_concat(r2.name, ', ')
+        FROM user_roles ur JOIN roles r2 ON r2.id = ur.role_id
+        WHERE ur.user_id = u.id
+      ), '') AS role_names,
+      COALESCE((
+        SELECT group_concat(${stateCol}, ', ')
+        FROM user_state_assignments sa JOIN regions r3 ON r3.id = sa.region_id
+        WHERE sa.user_id = u.id
+      ), '') AS state_names_raw,
+      (SELECT group_concat(sa.region_id) FROM user_state_assignments sa WHERE sa.user_id = u.id) AS state_ids
+    FROM users u ORDER BY u.id`),
+  );
+  return rows.map((r: any) => ({
+    ...r,
+    state_names: r.state_names_raw || "",
+    state_ids: r.state_ids ? String(r.state_ids).split(",").map((x) => Number(x)) : [],
+  }));
+}
+
+async function userAssignments(db: DB, userId: number) {
+  const roleRows = await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, userId));
+  const stateRows = await db.select({ regionId: userStateAssignments.regionId })
+    .from(userStateAssignments).where(eq(userStateAssignments.userId, userId));
+  return {
+    selectedRoles: roleRows.map((r) => r.roleId),
+    selectedStates: stateRows.filter((r) => r.regionId !== 0).map((r) => r.regionId),
+    allStates: stateRows.some((r) => r.regionId === 0),
+  };
+}
+
+// ---------- Users ----------
+
+adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  const [usersList, roleList, regionsList] = [await loadAdminUsers(db, c.get("lang")), await loadRoles(db), await loadRegionsLite(db, c.get("lang"))];
+  return c.html(
+    <AdminUsersPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      users={usersList} roles={roleList} regions={regionsList}
+      editUser={null} createErrors={[]} editErrors={[]}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+async function loadRegionsLite(db: DB, lang: "mm" | "en" = "mm"): Promise<{ id: number; name: string }[]> {
+  const rows = await db.all<{ id: number; name: string; name_en: string }>(sql`SELECT id, name, name_en FROM regions ORDER BY id`);
+  return rows.map((r) => ({ id: r.id, name: lang === "en" && r.name_en ? r.name_en : r.name }));
+}
+
+adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const t = getDict(c.get("lang"));
+  if (!Number.isInteger(id) || id < 1 || id === c.get("user").id) {
+    return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
+  }
+  const usersList = await loadAdminUsers(db, c.get("lang"));
+  const target = usersList.find((u) => u.id === id);
+  if (!target) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
+  const assignments = await userAssignments(db, id);
+  return c.html(
+    <AdminUserEditPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      editUser={{ ...target, ...assignments }}
+      roles={await loadRoles(db)} regions={await loadRegionsLite(db, c.get("lang"))} editErrors={[]}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) {
+  const username = s(body.username);
+  const password = s(body.password);
+  const newPassword = s(body.new_password);
+  const roleIds = ints(multi(body.roles));
+  const statesRaw = ints(multi(body.states));
+  const allStates = s(body.all_states) === "1";
+  const active = s(body.active) === "1" ? 1 : 0;
+  const mustChange = s(body.must_change) === "1" ? 1 : 0;
+  const errors: string[] = [];
+  if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
+  return { username, password, newPassword, roleIds, statesRaw, allStates, active, mustChange, errors };
+}
+
+async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[], allStates: boolean, errors: string[], _t: (k: string) => string) {
+  const roleList = await loadRoles(db);
+  if (roleIds.length === 0) errors.push("adm.errRoleRequired");
+  if (roleIds.some((id) => !roleList.some((r) => r.id === id))) errors.push("adm.errRoleBad");
+  if (!allStates && statesRaw.length === 0) errors.push("adm.errStateRequired");
+  if (statesRaw.length > 0) {
+    const regionIds = new Set((await loadRegionsLite(db)).map((r) => r.id));
+    if (statesRaw.some((id) => !regionIds.has(id))) errors.push("adm.errStateBad");
+  }
+  return errors.length === 0;
+}
+
+adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const body = await c.req.parseBody();
+  const p = parseUserBody(body, t);
+  if (p.password.length < 8) p.errors.push(t("adm.errPw8"));
+  const dup = await db.select({ id: users.id }).from(users).where(eq(users.username, p.username)).limit(1);
+  if (dup.length > 0) p.errors.push(t("adm.errDupUser"));
+  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t))) {
+    return c.redirect(errRedirect("/admin/users", p.errors.map(renderKey(t)).join(" ")), 302);
+  }
+  if (p.errors.length > 0) return c.redirect(errRedirect("/admin/users", p.errors.join(" ")), 302);
+
+  const passwordHash = await hashPassword(p.password, parseIterations(c.env.PBKDF2_ITERATIONS));
+  const created = await db.insert(users)
+    .values({ username: p.username, passwordHash, active: p.active, mustChangePassword: p.mustChange })
+    .returning({ id: users.id });
+  const newId = created[0]!.id;
+  for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: newId, roleId });
+  const stateIds = p.allStates ? [0] : p.statesRaw;
+  for (const regionId of stateIds) await db.insert(userStateAssignments).values({ userId: newId, regionId });
+  return c.redirect("/admin/users?ok=user-created", 302);
+});
+
+adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const me = c.get("user").id;
+  const t = getDict(c.get("lang"));
+  if (!Number.isInteger(id) || id < 1 || id === me) {
+    return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
+  }
+  const body = await c.req.parseBody();
+  const p = parseUserBody(body, t);
+  const target = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, id)).limit(1);
+  if (!target[0]) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
+  const dup = await db.select({ id: users.id }).from(users)
+    .where(eq(users.username, p.username)).limit(1);
+  if (dup[0] && dup[0].id !== id) p.errors.push(t("adm.errDupUser"));
+  if (p.newPassword && p.newPassword.length < 8) p.errors.push(t("adm.errPw8New"));
+  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
+    return c.redirect(errRedirect("/admin/users", p.errors.map(renderKey(t)).join(" ")), 302);
+  }
+
+  const updates: Record<string, string | number> = {
+    username: p.username, active: p.active, mustChangePassword: p.mustChange,
+  };
+  if (p.newPassword) {
+    updates.passwordHash = await hashPassword(p.newPassword, parseIterations(c.env.PBKDF2_ITERATIONS));
+    updates.mustChangePassword = 1;
+  }
+  await db.update(users).set(updates).where(eq(users.id, id));
+
+  await db.delete(userRoles).where(eq(userRoles.userId, id));
+  for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: id, roleId });
+  await db.delete(userStateAssignments).where(eq(userStateAssignments.userId, id));
+  for (const regionId of p.allStates ? [0] : p.statesRaw) {
+    await db.insert(userStateAssignments).values({ userId: id, regionId });
+  }
+  return c.redirect("/admin/users?ok=user-updated", 302);
+});
+
+// ---------- Roles ----------
+
+function validPerms(vals: string[]): Permission[] {
+  const set = new Set(PERMISSIONS as readonly string[]);
+  return vals.filter((v): v is Permission => set.has(v));
+}
+
+adminRoutes.get("/roles", requirePermission("roles.manage"), async (c) => {
+  const db = getDb(c.env);
+  return c.html(
+    <AdminRolesPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      roles={(await loadRoles(db)) as AdminRoleRow[]} createErrors={[]} saveErrors={[]}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
+  const db = getDb(c.env);
+  const body = await c.req.parseBody();
+  const name = s(body.name);
+  const description = s(body.description);
+  const perms = validPerms(multi(body.permissions));
+  const t = getDict(c.get("lang"));
+  const fail = (msg: string) => c.redirect(errRedirect("/admin/roles", msg), 302);
+  if (name.length < 2) return fail(t("adm.errRoleName"));
+  const dup = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, name)).limit(1);
+  if (dup[0]) return fail(t("adm.errRoleDup"));
+  const created = await db.insert(roles)
+    .values({ name, description: description || null, isSystem: 0 })
+    .returning({ id: roles.id });
+  const roleId = created[0]!.id;
+  for (const p of perms) await db.insert(rolePermissions).values({ roleId, permission: p });
+  return c.redirect("/admin/roles?ok=role-created", 302);
+});
+
+async function loadRoleOrRedirect(db: DB, rawId: string) {
+  const id = Number(rawId);
+  if (!Number.isInteger(id) || id < 1) return null;
+  const rows = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const role = await loadRoleOrRedirect(db, c.req.param("id"));
+  if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
+  if (role.isSystem === 1) return c.redirect(errRedirect("/admin/roles", "err-systemrole"), 302);
+  const body = await c.req.parseBody();
+  const perms = validPerms(multi(body.permissions));
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+  for (const p of perms) await db.insert(rolePermissions).values({ roleId: role.id, permission: p });
+  return c.redirect("/admin/roles?ok=role-updated", 302);
+});
+
+adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (c) => {
+  const db = getDb(c.env);
+  const role = await loadRoleOrRedirect(db, c.req.param("id"));
+  if (!role) return c.redirect(errRedirect("/admin/roles", getDict(c.get("lang"))("adm.errNoRole")), 302);
+  if (role.isSystem === 1) return c.redirect(errRedirect("/admin/roles", "err-systemrole"), 302);
+  await db.delete(roles).where(eq(roles.id, role.id));
+  return c.redirect("/admin/roles?ok=role-deleted", 302);
+});
+
+// ---------- Lookup options ----------
+
+async function optionsPage(c: any, type: string, opts: {
+  addErrors?: string[];
+  editError?: string | null;
+} = {}) {
+  const db = getDb(c.env);
+  const lang: "mm" | "en" = c.get("lang");
+  if (!isOptionType(type)) type = OPTION_TYPES[0]!;
+  const all = await loadAllOptions(db);
+  const list = all.filter((o) => o.type === type);
+  const column = OPTION_RAW_COLUMN[type as OptionType];
+  const usageRows = await db.all<{ oid: number; n: number }>(
+    sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
+  );
+  const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
+  const options: OptionUsage[] = list.map((o) => ({ id: o.id, label: o.label, active: o.active, used: usage.get(o.id) ?? 0 }));
+  const types = OPTION_TYPES.map((k) => {
+    const entry = all.filter((o) => o.type === k);
+    return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1) };
+  });
+  return c.html(
+    <AdminOptionsPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
+      options={options} addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
+      lang={c.get("lang")}
+    />,
+  );
+}
+
+adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
+  const type = c.req.query("type") ?? OPTION_TYPES[0]!;
+  return optionsPage(c, type);
+});
+
+adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const body = await c.req.parseBody();
+  const type = s(body.type);
+  const label = s(body.label);
+  const back = `/admin/options${type ? `?type=${encodeURIComponent(type)}` : ""}`;
+  if (!isOptionType(type)) return c.redirect(errRedirect(back, t("adm.errOptionType")), 302);
+  if (label.length < 1 || label.length > 120) return c.redirect(errRedirect(back, t("adm.errLabelRequired")), 302);
+  const all = await loadAllOptions(db);
+  if (findOption(all, type, label)) return c.redirect(errRedirect(back, t("adm.errLabelDup")), 302);
+  await db.insert(lookupOptions).values({ type, label });
+  return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
+});
+
+adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
+  const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
+  const current = rows[0];
+  if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
+  const body = await c.req.parseBody();
+
+  if (s(body.toggle) === "1") {
+    await db.update(lookupOptions).set({ active: current.active === 1 ? 0 : 1 }).where(eq(lookupOptions.id, id));
+    return c.redirect(`${back}&ok=option-updated`, 302);
+  }
+
+  const t = getDict(c.get("lang"));
+  const label = s(body.label);
+  if (label.length < 1 || label.length > 120) return c.redirect(errRedirect(back, t("adm.errLabelRequired")), 302);
+  const all = await loadAllOptions(db);
+  const clash = findOption(all, current.type, label);
+  if (clash && clash.id !== id) return c.redirect(errRedirect(back, t("adm.errLabelDup")), 302);
+  await db.update(lookupOptions).set({ label }).where(eq(lookupOptions.id, id));
+  return c.redirect(`${back}&ok=option-updated`, 302);
+});
+
+adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
+  const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
+  const current = rows[0];
+  if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
+
+  const column = OPTION_RAW_COLUMN[current.type as OptionType];
+  const used = column
+    ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
+    : [{ n: 0 }];
+  if ((used[0]?.n ?? 0) > 0) {
+    await db.update(lookupOptions).set({ active: 0 }).where(eq(lookupOptions.id, id));
+    return c.redirect(`${back}&err=${encodeURIComponent("err-used")}`, 302);
+  }
+  await db.delete(lookupOptions).where(eq(lookupOptions.id, id));
+  return c.redirect(`${back}&ok=option-deleted`, 302);
+});
