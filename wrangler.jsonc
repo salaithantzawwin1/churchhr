@@ -16,5 +16,11 @@
   ],
   "vars": {
     "PBKDF2_ITERATIONS": "10000"
-  }
+  },
+  "routes": [
+    {
+      "pattern": "www.mmgoodnewshr.online",
+      "custom_domain": true
+    }
+  ]
 }
