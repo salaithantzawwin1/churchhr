@@ -16,5 +16,13 @@
   ],
   "vars": {
     "PBKDF2_ITERATIONS": "10000"
-  }
+  },
+  // Apex (zone root) is served via a Worker route, not a custom domain —
+  // custom domains cannot attach to a zone root on the Workers Free plan.
+  "routes": [
+    {
+      "pattern": "mmgoodnewshr.online",
+      "zone_name": "mmgoodnewshr.online"
+    }
+  ]
 }
