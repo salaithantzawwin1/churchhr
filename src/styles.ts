@@ -46,9 +46,19 @@ a { color: var(--brand); }
 .card h2 { font-size: 16px; }
 .page-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .page-head h1 { margin: 0; font-size: 21px; }
-/* Toolbar: tab pills left, primary page action right. */
-.page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+/* Toolbar: tab pills left; the primary action keeps to the right edge even when
+   the tabs wrap onto their own line. */
+.page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
 .page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.page-toolbar > .btn:last-child { margin-left: auto; }
+.page-toolbar .count {
+  display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px;
+  border-radius: 999px; font-size: 11.5px; line-height: 16px; text-align: center;
+  background: rgba(28,35,51,.08); color: var(--ink); font-weight: 600;
+}
+.btn:not(.secondary) .count { background: rgba(255,255,255,.28); color: #fff; }
+.field-hint { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+th.num, td.num { text-align: right; }
 td.empty-state { text-align: center; padding: 30px 12px; color: var(--muted); }
 td.empty-state .small { margin-top: 4px; }
 .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
@@ -60,7 +70,7 @@ table { width: 100%; border-collapse: collapse; background: var(--card); }
 th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
 th { background: #f8f9fc; font-weight: 600; white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
-tbody tr:hover { background: #fafbfe; }
+tbody tr:hover { background: #f4f6fb; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 .btn {

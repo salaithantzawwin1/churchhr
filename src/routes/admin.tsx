@@ -311,7 +311,8 @@ async function optionsPage(c: any, type: string, opts: {
   );
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
   const options: OptionUsage[] = list.map((o) => ({ id: o.id, label: o.label, active: o.active, used: usage.get(o.id) ?? 0 }));
-  const types = optionTabs(all);
+  const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
+  const types = optionTabs(all, Number(regionCount[0]?.n ?? 0));
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -322,15 +323,16 @@ async function optionsPage(c: any, type: string, opts: {
   );
 }
 
-type Tab = { key: string; label: string; active: boolean };
+type Tab = { key: string; label: string; active: boolean; count?: number | null };
 
-/** Option page tabs — State/Region (regions table) first, then lookup option types. */
-function optionTabs(all: OptionRow[]): Tab[] {
+/** Option page tabs — State/Region (regions table) first, then lookup option types.
+ * count = items per tab, shown as a small badge (wayfinding). */
+function optionTabs(all: OptionRow[], regionsCount: number | null = null): Tab[] {
   return [
-    { key: "region", label: "", active: true },
+    { key: "region", label: "", active: true, count: regionsCount },
     ...OPTION_TYPES.map((k) => {
       const entry = all.filter((o) => o.type === k);
-      return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1) };
+      return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1), count: entry.length };
     }),
   ];
 }
@@ -470,11 +472,12 @@ async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: 
   const lang: "mm" | "en" = c.get("lang");
   if (opts.modal) return c.html(<AddRegionForm lang={lang} modal />);
   const all = await loadAllOptions(db);
+  const regionRows = await loadRegionRows(db);
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
-      type="region" typeLabel={getDict(lang)("adm.regionTab")} types={optionTabs(all)}
-      regionRows={await loadRegionRows(db)}
+      type="region" typeLabel={getDict(lang)("adm.regionTab")} types={optionTabs(all, regionRows.length)}
+      regionRows={regionRows}
       addErrors={[]} editError={null} showAddForm={opts.showAddForm}
       lang={lang}
     />,

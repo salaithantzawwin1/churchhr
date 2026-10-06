@@ -293,7 +293,7 @@ export type OptionUsage = { id: number; label: string; active: number; used: num
 type OptionsProps = Common & {
   type: string;
   typeLabel: string;
-  types: { key: string; label: string; active: boolean }[];
+  types: { key: string; label: string; active: boolean; count?: number | null }[];
   options?: OptionUsage[];
   regionRows?: { id: number; name: string; name_en: string; used: number }[];
   addErrors: string[];
@@ -317,6 +317,7 @@ export function AddOptionForm(props: { type: string; lang?: Lang; errors?: strin
       <label class="field">
         <span class="lbl">{t("adm.optionLabel")}</span>
         <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
+        <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
@@ -372,6 +373,7 @@ export function EditOptionForm(props: { id: number; lang?: Lang; errors?: string
       <label class="field">
         <span class="lbl">{t("adm.optionLabel")}</span>
         <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
+        <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
@@ -442,6 +444,7 @@ export function AdminOptionsPage(props: OptionsProps) {
             <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
               {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}
               {t2.active ? "" : <span class="dim"> ({t("adm.offShort")})</span>}
+              {t2.count != null && <span class="count">{t2.count}</span>}
             </a>
           ))}
         </div>
@@ -467,15 +470,15 @@ export function AdminOptionsPage(props: OptionsProps) {
           <div class="tbl-wrap">
             <table>
               <thead>
-                <tr><th>ID</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th>{t("adm.usage")}</th><th></th></tr>
+                <tr><th>ID</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th class="num">{t("adm.usage")}</th><th></th></tr>
               </thead>
               <tbody>
                 {regionRows.length === 0 ? emptyStateRow(5, t) : regionRows.map((r) => (
                   <tr>
-                    <td>{r.id}</td>
+                    <td class="muted">{r.id}</td>
                     <td>{r.name}</td>
                     <td>{r.name_en || "—"}</td>
-                    <td>{r.used} {t("members.count")}</td>
+                    <td class={`num${r.used === 0 ? " muted" : ""}`}>{r.used} {t("members.count")}</td>
                     <td style="white-space:nowrap">
                       <a class="btn sm secondary js-edit-modal" href={`/admin/regions/${r.id}/edit`}
                          data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
@@ -494,13 +497,13 @@ export function AdminOptionsPage(props: OptionsProps) {
         <>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Label</th><th>{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>{t("adm.labelCol")}</th><th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
           <tbody>
             {options.length === 0 ? emptyStateRow(5, t) : options.map((o) => (
               <tr>
-                <td>{o.id}</td>
+                <td class="muted">{o.id}</td>
                 <td>{o.label}</td>
-                <td>{o.used} {t("members.count")}</td>
+                <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used} {t("members.count")}</td>
                 <td>
                   {o.active === 1
                     ? <span class="badge active">active</span>
