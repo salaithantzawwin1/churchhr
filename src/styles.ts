@@ -150,7 +150,9 @@ textarea { min-height: 84px; resize: vertical; }
   .topbar { padding: 8px 12px; gap: 8px 10px; }
   .topbar .brand { font-size: 14.5px; }
   .topbar .brand img { width: 28px; height: 28px; }
-  .topbar nav { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .topbar nav { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; }
+  .topbar nav::-webkit-scrollbar { display: none; }
   .topbar nav a, .topbar nav .sep { white-space: nowrap; }
   .container { margin: 16px auto; }
   .form-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
@@ -167,6 +169,8 @@ textarea { min-height: 84px; resize: vertical; }
   .page-head h1 { font-size: 18px; }
   .page-head .actions { width: 100%; margin: 0; }
   .page-head .actions .btn { flex: 1 1 auto; text-align: center; }
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1 1 auto; text-align: center; }
   .filters { gap: 8px; }
   .filters label.field { flex: 1 1 46%; min-width: 0; }
   .filters .actions { width: 100%; margin-top: 2px; }
@@ -179,9 +183,12 @@ textarea { min-height: 84px; resize: vertical; }
   .btn.sm { min-height: 34px; }
   .actions { gap: 8px; }
   .stat .n { font-size: 22px; }
-  .modal { padding: 0; align-items: stretch; }
-  .modal-card { width: 100%; max-height: none; height: 100dvh; border-radius: 0; }
+  .modal { padding: 10px; align-items: stretch; }
+  .modal-card { width: 100%; max-height: none; height: calc(100dvh - 20px); border-radius: 12px; }
   .modal-head { position: sticky; top: 0; background: var(--card); z-index: 2; }
+  /* Keep the sheet inside the viewport even when the underlying scrollbar removal
+     relayouts the page (iOS Safari body-lock quirk). */
+  .modal-card { max-width: calc(100vw - 20px); }
 }
 @media (max-width: 400px) {
   .filters label.field { flex: 1 1 100%; }
