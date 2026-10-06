@@ -544,7 +544,7 @@ export function AdminOptionsPage(props: OptionsProps) {
       {type === "age_group" ? (
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>ID</th><th>{t("adm.ageName")}</th><th class="num">{t("adm.ageRange")}</th><th></th></tr></thead>
+            <thead><tr><th>ID</th><th>{t("adm.ageNameCol")}</th><th class="num">{t("adm.ageRange")}</th><th></th></tr></thead>
             <tbody>
               {ageGroupRows.length === 0 ? emptyStateRow(4, t) : ageGroupRows.map((g) => (
                 <tr>
