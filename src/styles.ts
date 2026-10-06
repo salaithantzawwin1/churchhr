@@ -178,6 +178,10 @@ textarea { min-height: 84px; resize: vertical; }
   th, td { padding: 8px 10px; font-size: 13px; }
   table.list-tbl { min-width: 760px; }
   .tbl-wrap { -webkit-overflow-scrolling: touch; }
+  /* Keep cell content on one line inside the horizontal scroller — wrapping a
+     name one syllable per line is unreadable. */
+  .tbl-wrap td:not(.empty-state) { white-space: nowrap; }
+  .tbl-wrap td:nth-child(2) { min-width: 130px; }
   .form-grid { grid-template-columns: 1fr; gap: 12px; }
   .btn { min-height: 40px; }
   .btn.sm { min-height: 34px; }
