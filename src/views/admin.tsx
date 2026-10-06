@@ -480,9 +480,9 @@ export function AdminOptionsPage(props: OptionsProps) {
                       <a class="btn sm secondary js-edit-modal" href={`/admin/regions/${r.id}/edit`}
                          data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
                       <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
-                        <button class="btn sm danger" type="submit" disabled={r.used > 0}>{t("members.delete")}</button>
+                        <button class="btn sm danger" type="submit" disabled={r.used > 0}
+                         title={r.used > 0 ? t("flash.errRegionUsed") : undefined}>{t("members.delete")}</button>
                       </form>
-                      {r.used > 0 && <div class="muted small">{t("adm.inUse")}</div>}
                     </td>
                   </tr>
                 ))}

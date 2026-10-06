@@ -74,6 +74,8 @@ tbody tr:hover { background: #fafbfe; }
 .btn.secondary:hover { filter: none; background: #e3e8f0; }
 .btn.danger { background: #b42318; }
 .btn.danger:hover { filter: brightness(1.1); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled:hover { filter: none; }
 .btn.sm { padding: 5px 10px; font-size: 13px; min-height: 0; }
 .btn .dim { opacity: .78; font-weight: 400; }
 .btn.full { width: 100%; text-align: center; }
