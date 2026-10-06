@@ -350,7 +350,7 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const back = `/admin/options${type ? `?type=${encodeURIComponent(type)}` : ""}`;
   const fail = (msg: string) =>
     fromModal
-      ? c.html(<AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} modal />, 400)
+      ? c.html(<AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label} modal />, 400)
       : c.redirect(errRedirect(back, msg), 302);
   if (!isOptionType(type)) return fail(t("adm.errOptionType"));
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
@@ -457,7 +457,7 @@ adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
   const fromModal = c.req.header("X-Requested-With") === "modal";
   const fail = (msg: string) =>
     fromModal
-      ? c.html(<AddRegionForm lang={c.get("lang")} errors={[msg]} modal />, 400)
+      ? c.html(<AddRegionForm lang={c.get("lang")} errors={[msg]} values={{ name, name_en: nameEn }} modal />, 400)
       : c.redirect(errRedirect(regionBack(), msg), 302);
   const body = await c.req.parseBody();
   const name = s(body.name);

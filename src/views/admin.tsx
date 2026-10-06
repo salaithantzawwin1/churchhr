@@ -302,7 +302,7 @@ type OptionsProps = Common & {
 };
 
 /** Add form for a lookup option — bare fragment for the modal (and the no-JS ?add=1 fallback). */
-export function AddOptionForm(props: { type: string; lang?: Lang; errors?: string[]; modal?: boolean }) {
+export function AddOptionForm(props: { type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string }) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
   return (
@@ -316,7 +316,7 @@ export function AddOptionForm(props: { type: string; lang?: Lang; errors?: strin
       <input type="hidden" name="type" value={props.type} />
       <label class="field">
         <span class="lbl">{t("adm.optionLabel")}</span>
-        <input type="text" name="label" required maxLength={120} />
+        <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
       </label>
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
@@ -327,9 +327,10 @@ export function AddOptionForm(props: { type: string; lang?: Lang; errors?: strin
 }
 
 /** Add form for State/Region rows — bare fragment for the modal (and the no-JS ?add=1 fallback). */
-export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean }) {
+export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string } }) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
+  const v = props.values ?? {};
   return (
     <form method="post" action="/admin/regions" data-flash-ok="region-added">
       {errors.length > 0 && (
@@ -341,11 +342,11 @@ export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: b
       <div class="form-grid">
         <label class="field">
           <span class="lbl">{t("adm.regionNameMm")} *</span>
-          <input type="text" name="name" required maxLength={120} />
+          <input type="text" name="name" value={v.name ?? ""} required maxLength={120} />
         </label>
         <label class="field">
           <span class="lbl">{t("adm.regionNameEn")}</span>
-          <input type="text" name="name_en" maxLength={120} />
+          <input type="text" name="name_en" value={v.name_en ?? ""} maxLength={120} />
         </label>
       </div>
       <div class="actions">
