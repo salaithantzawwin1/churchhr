@@ -92,6 +92,14 @@ textarea { min-height: 84px; resize: vertical; }
 /* Inline-edit forms put a full-height input next to an "Edit" button. Center the
    button against the input instead of letting flex stretch it. */
 .inline-edit { display: flex; gap: 6px; align-items: center; }
+/* Myanmar fonts give line-height:normal a ~31px line box, so table-row inputs
+   were ~51px tall and the centered Edit button sat visibly below the Off/Delete
+   buttons in the same row. Match the small-button metrics instead. */
+.inline-edit input[type=text] { padding: 5px 10px; line-height: 1.35; }
+/* In table cells, inline buttons sit on the text baseline, which tall Myanmar
+   line boxes push down; top-align them so every button in a row shares one
+   centre line with the inline-edit input. */
+.tbl-wrap td .btn.sm { vertical-align: top; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
 .filters label.field { min-width: 150px; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: #eef1f6; }
