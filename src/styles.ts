@@ -175,7 +175,7 @@ textarea { min-height: 84px; resize: vertical; }
   .page-actions { width: 100%; }
   .page-actions .btn { flex: 1 1 auto; text-align: center; }
   .filters { gap: 8px; }
-  .filters label.field { flex: 1 1 46%; min-width: 0; }
+  .filters label.field { flex: 1 1 46%; min-width: 0; max-width: none; }
   .filters .actions { width: 100%; margin-top: 2px; }
   .filters .actions .btn { flex: 1; }
   th, td { padding: 8px 10px; font-size: 13px; }
