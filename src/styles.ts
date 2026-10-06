@@ -95,16 +95,8 @@ textarea { min-height: 84px; resize: vertical; }
    form inherits the UA margin-bottom, which stretches the flex row and knocks the
    button out of alignment — reset it and let the button size itself. */
 .actions form { display: inline-flex; margin: 0; align-items: center; }
-/* Inline-edit forms put a full-height input next to an "Edit" button. Center the
-   button against the input instead of letting flex stretch it. */
-.inline-edit { display: flex; gap: 6px; align-items: center; }
-/* Myanmar fonts give line-height:normal a ~31px line box, so table-row inputs
-   were ~51px tall and the centered Edit button sat visibly below the Off/Delete
-   buttons in the same row. Match the small-button metrics instead. */
-.inline-edit input[type=text] { padding: 5px 10px; line-height: 1.35; }
 /* In table cells, inline buttons sit on the text baseline, which tall Myanmar
-   line boxes push down; top-align them so every button in a row shares one
-   centre line with the inline-edit input. */
+   line boxes push down; top-align them so buttons in a row share one line. */
 .tbl-wrap td .btn.sm { vertical-align: top; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
 .filters label.field { min-width: 150px; }

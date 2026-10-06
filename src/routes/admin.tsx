@@ -13,8 +13,10 @@ import { findOption, loadAllOptions, OPTION_RAW_COLUMN, isOptionType, type Optio
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
+import { Layout } from "../views/layout";
 import {
   AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
+  EditOptionForm, EditRegionForm,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 
@@ -360,6 +362,29 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 
+adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const lang = c.get("lang");
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
+  const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
+  const current = rows[0];
+  if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  if (c.req.query("modal") === "1") return c.html(<EditOptionForm id={id} label={current.label} lang={lang} modal />);
+  const t = getDict(lang);
+  return c.html(
+    <Layout title={t("adm.optionsTitle")} lang={lang} user={c.get("user")} perms={c.get("perms")} active="/admin/options" flash={null}>
+      <div class="page-head">
+        <h1>{t("adm.optionsTitle")}: {current.label}</h1>
+        <a class="btn secondary" href={`/admin/options?type=${encodeURIComponent(current.type)}`}>{t("members.toList")}</a>
+      </div>
+      <div class="card">
+        <EditOptionForm id={id} label={current.label} lang={lang} />
+      </div>
+    </Layout>,
+  );
+});
+
 adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const id = Number(c.req.param("id"));
@@ -377,10 +402,15 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
 
   const t = getDict(c.get("lang"));
   const label = s(body.label);
-  if (label.length < 1 || label.length > 120) return c.redirect(errRedirect(back, t("adm.errLabelRequired")), 302);
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<EditOptionForm id={id} label={label} lang={c.get("lang")} errors={[msg]} modal />, 400)
+      : c.redirect(errRedirect(back, msg), 302);
+  if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
   const all = await loadAllOptions(db);
   const clash = findOption(all, current.type, label);
-  if (clash && clash.id !== id) return c.redirect(errRedirect(back, t("adm.errLabelDup")), 302);
+  if (clash && clash.id !== id) return fail(t("adm.errLabelDup"));
   await db.update(lookupOptions).set({ label }).where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
@@ -470,6 +500,31 @@ adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
   return c.redirect(`${regionBack()}&ok=region-added`, 302);
 });
 
+adminRoutes.get("/regions/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const lang = c.get("lang");
+  const back = regionBack();
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect(`${back}&err=err-notfound`, 302);
+  const rows = await db.select().from(regions).where(eq(regions.id, id)).limit(1);
+  const current = rows[0];
+  if (!current) return c.redirect(`${back}&err=err-notfound`, 302);
+  const values = { name: current.name, name_en: current.nameEn ?? "" };
+  if (c.req.query("modal") === "1") return c.html(<EditRegionForm id={id} values={values} lang={lang} modal />);
+  const t = getDict(lang);
+  return c.html(
+    <Layout title={t("adm.optionsTitle")} lang={lang} user={c.get("user")} perms={c.get("perms")} active="/admin/options" flash={null}>
+      <div class="page-head">
+        <h1>{t("adm.optionsTitle")}: {current.name}</h1>
+        <a class="btn secondary" href={back}>{t("members.toList")}</a>
+      </div>
+      <div class="card">
+        <EditRegionForm id={id} values={values} lang={lang} />
+      </div>
+    </Layout>,
+  );
+});
+
 adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
@@ -481,9 +536,14 @@ adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) 
   const body = await c.req.parseBody();
   const name = s(body.name);
   const nameEn = s(body.name_en);
-  if (name.length < 1 || name.length > 120) return c.redirect(errRedirect(back, t("adm.errRegionName")), 302);
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<EditRegionForm id={id} lang={c.get("lang")} values={{ name, name_en: nameEn }} errors={[msg]} modal />, 400)
+      : c.redirect(errRedirect(back, msg), 302);
+  if (name.length < 1 || name.length > 120) return fail(t("adm.errRegionName"));
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
-  if (dup[0] && dup[0].id !== id) return c.redirect(errRedirect(back, t("adm.errRegionDup")), 302);
+  if (dup[0] && dup[0].id !== id) return fail(t("adm.errRegionDup"));
   await db.update(regions).set({ name, nameEn: nameEn || name }).where(eq(regions.id, id));
   return c.redirect(`${back}&ok=region-updated`, 302);
 });

@@ -357,6 +357,61 @@ export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: b
   );
 }
 
+/** Edit form for one lookup option — bare fragment for the modal (and full-page no-JS fallback). */
+export function EditOptionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string }) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  return (
+    <form method="post" action={`/admin/options/${props.id}`} data-flash-ok="option-updated">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <label class="field">
+        <span class="lbl">{t("adm.optionLabel")}</span>
+        <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
+      </label>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.save")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
+/** Edit form for one State/Region row — bare fragment for the modal (and full-page no-JS fallback). */
+export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string } }) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  const v = props.values ?? {};
+  return (
+    <form method="post" action={`/admin/regions/${props.id}`} data-flash-ok="region-updated">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.regionNameMm")} *</span>
+          <input type="text" name="name" value={v.name ?? ""} required maxLength={120} />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.regionNameEn")}</span>
+          <input type="text" name="name_en" value={v.name_en ?? ""} maxLength={120} />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.save")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
 function emptyStateRow(cols: number, t: (k: string) => string) {
   return (
     <tr>
@@ -418,15 +473,12 @@ export function AdminOptionsPage(props: OptionsProps) {
                 {regionRows.length === 0 ? emptyStateRow(5, t) : regionRows.map((r) => (
                   <tr>
                     <td>{r.id}</td>
-                    <td colSpan={2}>
-                      <form method="post" action={`/admin/regions/${r.id}`} class="inline-edit" style="flex-wrap:wrap">
-                        <input type="text" name="name" value={r.name} style="flex:1 1 150px" required />
-                        <input type="text" name="name_en" value={r.name_en} style="flex:1 1 150px" />
-                        <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
-                      </form>
-                    </td>
+                    <td>{r.name}</td>
+                    <td>{r.name_en || "—"}</td>
                     <td>{r.used} {t("members.count")}</td>
                     <td style="white-space:nowrap">
+                      <a class="btn sm secondary js-edit-modal" href={`/admin/regions/${r.id}/edit`}
+                         data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
                       <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
                         <button class="btn sm danger" type="submit" disabled={r.used > 0}>{t("members.delete")}</button>
                       </form>
@@ -447,12 +499,7 @@ export function AdminOptionsPage(props: OptionsProps) {
             {options.length === 0 ? emptyStateRow(5, t) : options.map((o) => (
               <tr>
                 <td>{o.id}</td>
-                <td>
-                  <form method="post" action={`/admin/options/${o.id}`} class="inline-edit">
-                    <input type="text" name="label" value={o.label} />
-                    <button class="btn sm secondary" type="submit">{t("members.edit")}</button>
-                  </form>
-                </td>
+                <td>{o.label}</td>
                 <td>{o.used} {t("members.count")}</td>
                 <td>
                   {o.active === 1
@@ -460,6 +507,8 @@ export function AdminOptionsPage(props: OptionsProps) {
                     : <span class="badge inactive">{t("adm.off")}</span>}
                 </td>
                 <td style="white-space:nowrap">
+                  <a class="btn sm secondary js-edit-modal" href={`/admin/options/${o.id}/edit`}
+                     data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
                   <form method="post" action={`/admin/options/${o.id}`} style="display:inline">
                     <input type="hidden" name="toggle" value="1" />
                     <input type="hidden" name="label" value={o.label} />
