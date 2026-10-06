@@ -46,11 +46,11 @@ a { color: var(--brand); }
 .card h2 { font-size: 16px; }
 .page-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .page-head h1 { margin: 0; font-size: 21px; }
-/* Toolbar: tab pills left; the primary action keeps to the right edge even when
-   the tabs wrap onto their own line. */
+/* Toolbar: tab pills with count badges. The page's primary action lives in the
+   page head (top right), keeping this row to the tabs alone. */
 .page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
 .page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.page-toolbar > .btn:last-child { margin-left: auto; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .page-toolbar .count {
   display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px;
   border-radius: 999px; font-size: 11.5px; line-height: 16px; text-align: center;

@@ -435,7 +435,12 @@ export function AdminOptionsPage(props: OptionsProps) {
     <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>
       <div class="page-head">
         <h1>{t("adm.optionsHeading")}</h1>
-        <a class="btn secondary" href="/">← Dashboard</a>
+        <div class="page-actions">
+          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
+            + {t("adm.addOption")}
+          </a>
+        </div>
       </div>
 
       <div class="page-toolbar">
@@ -448,9 +453,6 @@ export function AdminOptionsPage(props: OptionsProps) {
             </a>
           ))}
         </div>
-        <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
-          + {t("adm.addOption")}
-        </a>
       </div>
 
       {editError && <div class="flash err">{editError}</div>}
