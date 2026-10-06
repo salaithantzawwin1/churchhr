@@ -74,7 +74,7 @@ export function MembersListPage(props: ListProps) {
       <form class="card filters" method="get" action="/members">
         <label class="field">
           <span class="lbl">{t("members.search")}</span>
-          <input type="text" name="q" value={f.q} placeholder={t("members.searchPlaceholder")} />
+          <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")} />
         </label>
         <label class="field">
           <span class="lbl">{t("members.state")}</span>
@@ -122,7 +122,7 @@ export function MembersListPage(props: ListProps) {
           </select>
         </label>
         <label class="field">
-          <span class="lbl">Fellowship</span>
+          <span class="lbl">{t("form.fellowship")}</span>
           <select name="fellowship">
             <option value="">{t("members.all")}</option>
             {fellowships.map((o) => (
@@ -146,7 +146,12 @@ export function MembersListPage(props: ListProps) {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={9} class="muted">{t("members.empty")}</td></tr>
+              <tr>
+                <td colSpan={9} class="empty-state">
+                  <strong>{t("members.empty")}</strong>
+                  {canCreate && <div class="small">{t("members.emptyHint")}</div>}
+                </td>
+              </tr>
             )}
             {rows.map((m) => (
               <tr>
@@ -162,7 +167,6 @@ export function MembersListPage(props: ListProps) {
                 <td>{m.group_label ?? ""}</td>
                 <td><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
                 <td style="white-space:nowrap">
-                  <a class="btn sm secondary" href={`/members/${m.id}`}>{t("members.open")}</a>{" "}
                   {perms.has("members.update") && (
                     <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
                   )}{" "}

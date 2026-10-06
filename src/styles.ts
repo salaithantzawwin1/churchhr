@@ -67,7 +67,7 @@ td.empty-state .small { margin-top: 4px; }
 .flash.warn { background: var(--warn-bg); color: var(--warn-ink); }
 table { width: 100%; border-collapse: collapse; background: var(--card); }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
-th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; font-variant-numeric: tabular-nums; }
 th { background: #f8f9fc; font-weight: 600; white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #f4f6fb; }
