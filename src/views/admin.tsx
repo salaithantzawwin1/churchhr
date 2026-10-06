@@ -298,12 +298,81 @@ type OptionsProps = Common & {
   regionRows?: { id: number; name: string; name_en: string; used: number }[];
   addErrors: string[];
   editError: string | null;
+  showAddForm?: boolean;
 };
 
+/** Add form for a lookup option — bare fragment for the modal (and the no-JS ?add=1 fallback). */
+export function AddOptionForm(props: { type: string; lang?: Lang; errors?: string[]; modal?: boolean }) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  return (
+    <form method="post" action="/admin/options" data-flash-ok="option-added">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <input type="hidden" name="type" value={props.type} />
+      <label class="field">
+        <span class="lbl">{t("adm.optionLabel")}</span>
+        <input type="text" name="label" required maxLength={120} />
+      </label>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.add")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
+/** Add form for State/Region rows — bare fragment for the modal (and the no-JS ?add=1 fallback). */
+export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean }) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  return (
+    <form method="post" action="/admin/regions" data-flash-ok="region-added">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.regionNameMm")} *</span>
+          <input type="text" name="name" required maxLength={120} />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.regionNameEn")}</span>
+          <input type="text" name="name_en" maxLength={120} />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.add")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
+function emptyStateRow(cols: number, t: (k: string) => string) {
+  return (
+    <tr>
+      <td colSpan={cols} class="empty-state">
+        <strong>{t("dash.none")}</strong>
+        <div class="small">{t("adm.addHint")}</div>
+      </td>
+    </tr>
+  );
+}
+
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], addErrors, editError, lang } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], addErrors, editError, lang, showAddForm } = props;
   const t = getDict(lang ?? "mm");
   const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
+  const isRegion = type === "region";
+  const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
   return (
     <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>
       <div class="page-head">
@@ -311,48 +380,41 @@ export function AdminOptionsPage(props: OptionsProps) {
         <a class="btn secondary" href="/">← Dashboard</a>
       </div>
 
-      <div class="actions" style="margin-top:0;margin-bottom:14px">
-        {types.map((t2) => (
-          <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
-            {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}{t2.active ? "" : ` (${t("adm.offShort")})`}
-          </a>
-        ))}
+      <div class="page-toolbar">
+        <div class="tabs">
+          {types.map((t2) => (
+            <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
+              {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}
+              {t2.active ? "" : <span class="dim"> ({t("adm.offShort")})</span>}
+            </a>
+          ))}
+        </div>
+        <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
+          + {t("adm.addOption")}
+        </a>
       </div>
 
       {editError && <div class="flash err">{editError}</div>}
-      {addErrors.length > 0 && (
-        <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
+
+      {showAddForm && (
+        <div class="card">
+          <h2>{addTitle}</h2>
+          {addErrors.length > 0 && (
+            <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
+          )}
+          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} />}
+        </div>
       )}
 
       {type === "region" ? (
         <>
-          <div class="card">
-            <h2>{t("adm.regionTab")} — {t("adm.addOption")}</h2>
-            <form method="post" action="/admin/regions">
-              <div class="form-grid">
-                <label class="field">
-                  <span class="lbl">{t("adm.regionNameMm")} *</span>
-                  <input type="text" name="name" required />
-                </label>
-                <label class="field">
-                  <span class="lbl">{t("adm.regionNameEn")}</span>
-                  <input type="text" name="name_en" />
-                </label>
-              </div>
-              <div class="actions">
-                <button class="btn" type="submit">{t("form.add")}</button>
-              </div>
-            </form>
-          </div>
-
           <div class="tbl-wrap">
             <table>
               <thead>
                 <tr><th>ID</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th>{t("adm.usage")}</th><th></th></tr>
               </thead>
               <tbody>
-                {regionRows.length === 0 && <tr><td colSpan={5} class="muted">{t("dash.none")}</td></tr>}
-                {regionRows.map((r) => (
+                {regionRows.length === 0 ? emptyStateRow(5, t) : regionRows.map((r) => (
                   <tr>
                     <td>{r.id}</td>
                     <td colSpan={2}>
@@ -377,28 +439,11 @@ export function AdminOptionsPage(props: OptionsProps) {
         </>
       ) : (
         <>
-      <div class="card">
-        <h2>{typeLabel} — {t("adm.addOption")}</h2>
-        <form method="post" action="/admin/options">
-          <input type="hidden" name="type" value={type} />
-          <div class="form-grid">
-            <label class="field">
-              <span class="lbl">Label *</span>
-              <input type="text" name="label" required />
-            </label>
-          </div>
-          <div class="actions">
-            <button class="btn" type="submit">{t("form.add")}</button>
-          </div>
-        </form>
-      </div>
-
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>ID</th><th>Label</th><th>{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
           <tbody>
-            {options.length === 0 && <tr><td colSpan={5} class="muted">{t("dash.none")}</td></tr>}
-            {options.map((o) => (
+            {options.length === 0 ? emptyStateRow(5, t) : options.map((o) => (
               <tr>
                 <td>{o.id}</td>
                 <td>

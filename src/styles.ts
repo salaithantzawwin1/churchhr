@@ -46,6 +46,11 @@ a { color: var(--brand); }
 .card h2 { font-size: 16px; }
 .page-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .page-head h1 { margin: 0; font-size: 21px; }
+/* Toolbar: tab pills left, primary page action right. */
+.page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+td.empty-state { text-align: center; padding: 30px 12px; color: var(--muted); }
+td.empty-state .small { margin-top: 4px; }
 .flash { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; }
 .flash.ok { background: var(--ok-bg); color: var(--ok-ink); }
 .flash.err { background: var(--err-bg); color: var(--err-ink); }
@@ -70,6 +75,7 @@ tbody tr:hover { background: #fafbfe; }
 .btn.danger { background: #b42318; }
 .btn.danger:hover { filter: brightness(1.1); }
 .btn.sm { padding: 5px 10px; font-size: 13px; min-height: 0; }
+.btn .dim { opacity: .78; font-weight: 400; }
 .btn.full { width: 100%; text-align: center; }
 :focus-visible { outline: 2px solid #7aa7e0; outline-offset: 2px; }
 .topbar :focus-visible { outline-color: #fff; }

@@ -14,7 +14,7 @@ import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
 import {
-  AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
+  AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 
@@ -292,10 +292,15 @@ adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (
 async function optionsPage(c: any, type: string, opts: {
   addErrors?: string[];
   editError?: string | null;
+  /** Bare add form (no layout) for the js-add-modal fetch. */
+  modal?: boolean;
+  /** Inline add card on the full page (no-JS fallback for the + Add button). */
+  showAddForm?: boolean;
 } = {}) {
   const db = getDb(c.env);
   const lang: "mm" | "en" = c.get("lang");
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
+  if (opts.modal) return c.html(<AddOptionForm type={type} lang={lang} modal />);
   const all = await loadAllOptions(db);
   const list = all.filter((o) => o.type === type);
   const column = OPTION_RAW_COLUMN[type as OptionType];
@@ -310,7 +315,7 @@ async function optionsPage(c: any, type: string, opts: {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
       options={options} addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
-      lang={c.get("lang")}
+      showAddForm={opts.showAddForm} lang={c.get("lang")}
     />,
   );
 }
@@ -330,21 +335,27 @@ function optionTabs(all: OptionRow[]): Tab[] {
 
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   const type = c.req.query("type") ?? OPTION_TYPES[0]!;
-  if (type === "region") return regionOptionsPage(c);
-  return optionsPage(c, type);
+  const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
+  if (type === "region") return regionOptionsPage(c, opts);
+  return optionsPage(c, type, opts);
 });
 
 adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
+  const fromModal = c.req.header("X-Requested-With") === "modal";
   const body = await c.req.parseBody();
   const type = s(body.type);
   const label = s(body.label);
   const back = `/admin/options${type ? `?type=${encodeURIComponent(type)}` : ""}`;
-  if (!isOptionType(type)) return c.redirect(errRedirect(back, t("adm.errOptionType")), 302);
-  if (label.length < 1 || label.length > 120) return c.redirect(errRedirect(back, t("adm.errLabelRequired")), 302);
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} modal />, 400)
+      : c.redirect(errRedirect(back, msg), 302);
+  if (!isOptionType(type)) return fail(t("adm.errOptionType"));
+  if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
   const all = await loadAllOptions(db);
-  if (findOption(all, type, label)) return c.redirect(errRedirect(back, t("adm.errLabelDup")), 302);
+  if (findOption(all, type, label)) return fail(t("adm.errLabelDup"));
   await db.insert(lookupOptions).values({ type, label });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
@@ -424,16 +435,17 @@ async function uniqueRegionSlug(db: DB, base: string): Promise<string> {
   for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
 }
 
-async function regionOptionsPage(c: any) {
+async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: boolean } = {}) {
   const db = getDb(c.env);
   const lang: "mm" | "en" = c.get("lang");
+  if (opts.modal) return c.html(<AddRegionForm lang={lang} modal />);
   const all = await loadAllOptions(db);
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       type="region" typeLabel={getDict(lang)("adm.regionTab")} types={optionTabs(all)}
       regionRows={await loadRegionRows(db)}
-      addErrors={[]} editError={null}
+      addErrors={[]} editError={null} showAddForm={opts.showAddForm}
       lang={lang}
     />,
   );
@@ -442,16 +454,20 @@ async function regionOptionsPage(c: any) {
 adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
-  const back = regionBack();
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<AddRegionForm lang={c.get("lang")} errors={[msg]} modal />, 400)
+      : c.redirect(errRedirect(regionBack(), msg), 302);
   const body = await c.req.parseBody();
   const name = s(body.name);
   const nameEn = s(body.name_en);
-  if (name.length < 1 || name.length > 120) return c.redirect(errRedirect(back, t("adm.errRegionName")), 302);
+  if (name.length < 1 || name.length > 120) return fail(t("adm.errRegionName"));
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
-  if (dup[0]) return c.redirect(errRedirect(back, t("adm.errRegionDup")), 302);
+  if (dup[0]) return fail(t("adm.errRegionDup"));
   const slug = await uniqueRegionSlug(db, slugify(nameEn || name));
   await db.insert(regions).values({ name, nameEn: nameEn || name, slug });
-  return c.redirect(`${back}&ok=region-added`, 302);
+  return c.redirect(`${regionBack()}&ok=region-added`, 302);
 });
 
 adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) => {

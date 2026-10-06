@@ -71,15 +71,15 @@
     });
   }
 
-  // Edit-in-modal: any link with class js-edit-modal
+  // Open-in-modal: any link with class js-edit-modal (edit forms) or js-add-modal (add forms)
   document.addEventListener("click", function (e) {
-    var link = e.target && e.target.closest ? e.target.closest("a.js-edit-modal") : null;
+    var link = e.target && e.target.closest ? e.target.closest("a.js-add-modal, a.js-edit-modal") : null;
     if (!link) return;
     e.preventDefault();
     var href = link.getAttribute("href");
     if (!href) return;
     var url = href + (href.indexOf("?") > -1 ? "&" : "?") + "modal=1";
-    openModal(link.getAttribute("data-modal-title") || "", false);
+    openModal(link.getAttribute("data-modal-title") || "", link.getAttribute("data-modal-size") === "sm");
     bodyEl.innerHTML = '<p class="muted">' + (modal.getAttribute("data-loading") || "…") + "</p>";
     fetch(url, { headers: { "X-Requested-With": "modal" } })
       .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.text(); })
