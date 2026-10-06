@@ -95,8 +95,8 @@ tbody tr:hover { background: #f4f6fb; }
 label.field { display: block; font-size: 13.5px; color: var(--muted); }
 label.field span.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 label.field .hint { font-weight: 400; color: var(--muted); }
-input[type=text], input[type=password], input[type=date], input[type=number],
-input[type=file], select, textarea {
+input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=number], input[type=file], select, textarea {
   width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
   font: inherit; background: #fff; color: var(--ink);
 }
@@ -111,7 +111,10 @@ textarea { min-height: 84px; resize: vertical; }
    line boxes push down; top-align them so buttons in a row share one line. */
 .tbl-wrap td .btn.sm { vertical-align: top; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
-.filters label.field { min-width: 150px; }
+/* Uniform filter cells: grow to fill the row, capped so the last line does not
+   stretch one lonely field across the full width. */
+.filters label.field { flex: 1 1 170px; min-width: 150px; max-width: 300px; }
+.filters .actions { margin-left: auto; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: #eef1f6; }
 .badge.active { background: var(--ok-bg); color: var(--ok-ink); }
 .badge.moved { background: var(--warn-bg); color: var(--warn-ink); }
