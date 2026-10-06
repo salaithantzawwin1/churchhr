@@ -10,6 +10,10 @@ export type DashboardData = {
   recent: { id: number; name: string; state_name: string; state_name_en?: string | null }[];
   scopeAll: boolean;
   stateCount: number;
+  /** Active members per admin-defined age group, split by gender. */
+  ageGroups: { id: number; name: string; min_age: number; max_age: number; male: number; female: number }[];
+  /** Active members with a family group assigned + distinct group count. */
+  familyGroup: { members: number; groups: number };
 };
 
 export async function loadDashboard(db: DB, scope: { scopeAll: boolean; stateIds: number[] }): Promise<DashboardData> {
@@ -45,6 +49,30 @@ export async function loadDashboard(db: DB, scope: { scopeAll: boolean; stateIds
     FROM members m JOIN regions r ON r.id = m.region_id
     WHERE ${cond} ORDER BY m.id DESC LIMIT 5`);
 
+  // Active members per admin-defined age group. Age is derived from DOB at query
+  // time so changing a range on the Options page re-buckets instantly.
+  const ageGroupRows = await db.all<{
+    id: number; name: string; min_age: number; max_age: number; male: number | null; female: number | null;
+  }>(sql`
+    SELECT ag.id, ag.name, ag.min_age, ag.max_age,
+      COALESCE(SUM(CASE WHEN m.gender = 'male' THEN 1 ELSE 0 END), 0) AS male,
+      COALESCE(SUM(CASE WHEN m.gender = 'female' THEN 1 ELSE 0 END), 0) AS female
+    FROM age_groups ag
+    LEFT JOIN members m
+      ON m.status = 'active'
+      AND m.gender IN ('male', 'female')
+      AND m.date_of_birth IS NOT NULL AND m.date_of_birth <> ''
+      AND CAST((julianday('now') - julianday(m.date_of_birth)) / 365.25 AS INTEGER)
+        BETWEEN ag.min_age AND ag.max_age
+      AND ${cond}
+    GROUP BY ag.id
+    ORDER BY ag.sort_order, ag.min_age`);
+
+  const familyGroupRow = await db.all<{ members: number; groups: number }>(sql`
+    SELECT COUNT(*) AS members, COUNT(DISTINCT family_group_id) AS groups
+    FROM members
+    WHERE ${cond} AND status = 'active' AND family_group_id IS NOT NULL`);
+
   const byStatus: Record<string, number> = {};
   let total = 0;
   for (const row of statusRows) {
@@ -62,5 +90,13 @@ export async function loadDashboard(db: DB, scope: { scopeAll: boolean; stateIds
     total, byStatus, male, female,
     byState: byState as any, recent: recent as any,
     scopeAll: scope.scopeAll, stateCount: scope.stateIds.length,
+    ageGroups: ageGroupRows.map((g) => ({
+      id: g.id, name: g.name, min_age: Number(g.min_age), max_age: Number(g.max_age),
+      male: Number(g.male ?? 0), female: Number(g.female ?? 0),
+    })),
+    familyGroup: {
+      members: Number(familyGroupRow[0]?.members ?? 0),
+      groups: Number(familyGroupRow[0]?.groups ?? 0),
+    },
   };
 }

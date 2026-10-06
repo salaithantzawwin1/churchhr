@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
-  lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions, rolePermissions, roles,
+  ageGroups, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions, rolePermissions, roles,
   userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
 import { requirePermission } from "../middleware";
@@ -15,8 +15,8 @@ import { getDict } from "../i18n";
 import { s } from "../util";
 import { Layout } from "../views/layout";
 import {
-  AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
-  EditOptionForm, EditRegionForm,
+  AddAgeGroupForm, AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
+  EditAgeGroupForm, EditOptionForm, EditRegionForm,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 
@@ -301,6 +301,7 @@ async function optionsPage(c: any, type: string, opts: {
 } = {}) {
   const db = getDb(c.env);
   const lang: "mm" | "en" = c.get("lang");
+  const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
   if (opts.modal) return c.html(<AddOptionForm type={type} lang={lang} modal />);
   const all = await loadAllOptions(db);
@@ -312,7 +313,10 @@ async function optionsPage(c: any, type: string, opts: {
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
   const options: OptionUsage[] = list.map((o) => ({ id: o.id, label: o.label, active: o.active, used: usage.get(o.id) ?? 0 }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
-  const types = optionTabs(all, Number(regionCount[0]?.n ?? 0));
+  const types = optionTabs(all, {
+    region: Number(regionCount[0]?.n ?? 0),
+    ageGroup: await ageGroupCount(db),
+  }, t("adm.ageTab"));
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -325,11 +329,16 @@ async function optionsPage(c: any, type: string, opts: {
 
 type Tab = { key: string; label: string; active: boolean; count?: number | null };
 
-/** Option page tabs — State/Region (regions table) first, then lookup option types.
+/** Option page tabs — State/Region, Age Groups, then lookup option types.
  * count = items per tab, shown as a small badge (wayfinding). */
-function optionTabs(all: OptionRow[], regionsCount: number | null = null): Tab[] {
+function optionTabs(
+  all: OptionRow[],
+  counts: { region: number | null; ageGroup: number | null },
+  ageTabLabel: string,
+): Tab[] {
   return [
-    { key: "region", label: "", active: true, count: regionsCount },
+    { key: "region", label: "", active: true, count: counts.region },
+    { key: "age_group", label: ageTabLabel, active: true, count: counts.ageGroup },
     ...OPTION_TYPES.map((k) => {
       const entry = all.filter((o) => o.type === k);
       return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1), count: entry.length };
@@ -337,12 +346,48 @@ function optionTabs(all: OptionRow[], regionsCount: number | null = null): Tab[]
   ];
 }
 
+async function ageGroupCount(db: DB): Promise<number> {
+  const rows = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM age_groups`);
+  return Number(rows[0]?.n ?? 0);
+}
+
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   const type = c.req.query("type") ?? OPTION_TYPES[0]!;
   const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
   if (type === "region") return regionOptionsPage(c, opts);
+  if (type === "age_group") return ageGroupsPage(c, opts);
   return optionsPage(c, type, opts);
 });
+
+// ---------- Age groups (dashboard breakdown, admin-adjustable) ----------
+
+type AgeGroupRow = { id: number; name: string; min_age: number; max_age: number };
+
+async function loadAgeGroups(db: DB): Promise<AgeGroupRow[]> {
+  return await db.all<AgeGroupRow>(
+    sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
+  );
+}
+
+async function ageGroupsPage(c: any, opts: { modal?: boolean; showAddForm?: boolean } = {}) {
+  const db = getDb(c.env);
+  const lang: "mm" | "en" = c.get("lang");
+  if (opts.modal) return c.html(<AddAgeGroupForm lang={lang} modal />);
+  const t = getDict(lang);
+  const rows = await loadAgeGroups(db);
+  const all = await loadAllOptions(db);
+  const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
+  return c.html(
+    <AdminOptionsPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
+      type="age_group" typeLabel={t("adm.ageTab")}
+      types={optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: rows.length }, t("adm.ageTab"))}
+      ageGroupRows={rows}
+      addErrors={[]} editError={null} showAddForm={opts.showAddForm}
+      lang={lang}
+    />,
+  );
+}
 
 adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
@@ -438,6 +483,107 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   return c.redirect(`${back}&ok=option-deleted`, 302);
 });
 
+// ---------- Age groups (dashboard breakdown, admin-adjustable) ----------
+
+function parseAgeRange(minRaw: string, maxRaw: string): { min: number; max: number } | null {
+  const min = Number(minRaw);
+  const max = Number(maxRaw);
+  if (!Number.isInteger(min) || !Number.isInteger(max)) return null;
+  if (min < 0 || max > 150 || min > max) return null;
+  return { min, max };
+}
+
+async function ageRangeClash(db: DB, min: number, max: number, excludeId?: number): Promise<boolean> {
+  const rows = await db.select({ id: ageGroups.id, minAge: ageGroups.minAge, maxAge: ageGroups.maxAge }).from(ageGroups);
+  return rows.some((g) => g.id !== excludeId && min <= g.maxAge && g.minAge <= max);
+}
+
+adminRoutes.post("/age-groups", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const body = await c.req.parseBody();
+  const name = s(body.name);
+  const minRaw = s(body.min_age);
+  const maxRaw = s(body.max_age);
+  const back = "/admin/options?type=age_group";
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<AddAgeGroupForm lang={c.get("lang")} errors={[msg]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
+      : c.redirect(errRedirect(back, msg), 302);
+  if (name.length < 1 || name.length > 60) return fail(t("adm.errAgeName"));
+  const range = parseAgeRange(minRaw, maxRaw);
+  if (!range) return fail(t("adm.errAgeRange"));
+  const dup = await db.select({ id: ageGroups.id }).from(ageGroups).where(eq(ageGroups.name, name)).limit(1);
+  if (dup[0]) return fail(t("adm.errAgeNameDup"));
+  if (await ageRangeClash(db, range.min, range.max)) return fail(t("adm.errAgeOverlap"));
+  await db.insert(ageGroups).values({ name, minAge: range.min, maxAge: range.max, sortOrder: range.min });
+  return c.redirect(`${back}&ok=age-group-added`, 302);
+});
+
+adminRoutes.get("/age-groups/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const lang = c.get("lang");
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?type=age_group&err=err-notfound", 302);
+  const rows = await db.select().from(ageGroups).where(eq(ageGroups.id, id)).limit(1);
+  const current = rows[0];
+  if (!current) return c.redirect("/admin/options?type=age_group&err=err-notfound", 302);
+  const values = { name: current.name, min_age: String(current.minAge), max_age: String(current.maxAge) };
+  if (c.req.query("modal") === "1") return c.html(<EditAgeGroupForm id={id} values={values} lang={lang} modal />);
+  const t = getDict(lang);
+  return c.html(
+    <Layout title={t("adm.ageTab")} lang={lang} user={c.get("user")} perms={c.get("perms")} active="/admin/options" flash={null}>
+      <div class="page-head">
+        <h1>{t("adm.ageTab")}: {current.name}</h1>
+        <a class="btn secondary" href="/admin/options?type=age_group">{t("members.toList")}</a>
+      </div>
+      <div class="card">
+        <EditAgeGroupForm id={id} values={values} lang={lang} />
+      </div>
+    </Layout>,
+  );
+});
+
+adminRoutes.post("/age-groups/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const back = "/admin/options?type=age_group";
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect(`${back}&err=err-notfound`, 302);
+  const rows = await db.select().from(ageGroups).where(eq(ageGroups.id, id)).limit(1);
+  if (!rows[0]) return c.redirect(`${back}&err=err-notfound`, 302);
+  const body = await c.req.parseBody();
+  const name = s(body.name);
+  const minRaw = s(body.min_age);
+  const maxRaw = s(body.max_age);
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(<EditAgeGroupForm id={id} lang={c.get("lang")} errors={[msg]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
+      : c.redirect(errRedirect(back, msg), 302);
+  if (name.length < 1 || name.length > 60) return fail(t("adm.errAgeName"));
+  const range = parseAgeRange(minRaw, maxRaw);
+  if (!range) return fail(t("adm.errAgeRange"));
+  const dup = await db.select({ id: ageGroups.id }).from(ageGroups).where(eq(ageGroups.name, name)).limit(1);
+  if (dup[0] && dup[0].id !== id) return fail(t("adm.errAgeNameDup"));
+  if (await ageRangeClash(db, range.min, range.max, id)) return fail(t("adm.errAgeOverlap"));
+  await db.update(ageGroups)
+    .set({ name, minAge: range.min, maxAge: range.max, sortOrder: range.min })
+    .where(eq(ageGroups.id, id));
+  return c.redirect(`${back}&ok=age-group-updated`, 302);
+});
+
+adminRoutes.post("/age-groups/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?type=age_group&err=err-notfound", 302);
+  const rows = await db.select().from(ageGroups).where(eq(ageGroups.id, id)).limit(1);
+  if (!rows[0]) return c.redirect("/admin/options?type=age_group&err=err-notfound", 302);
+  await db.delete(ageGroups).where(eq(ageGroups.id, id));
+  return c.redirect("/admin/options?type=age_group&ok=age-group-deleted", 302);
+});
+
 // ---------- State/Region management (Options > State/Region tab) ----------
 
 type RegionRow = { id: number; name: string; name_en: string; used: number };
@@ -470,13 +616,15 @@ async function uniqueRegionSlug(db: DB, base: string): Promise<string> {
 async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: boolean } = {}) {
   const db = getDb(c.env);
   const lang: "mm" | "en" = c.get("lang");
+  const t = getDict(lang);
   if (opts.modal) return c.html(<AddRegionForm lang={lang} modal />);
   const all = await loadAllOptions(db);
   const regionRows = await loadRegionRows(db);
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
-      type="region" typeLabel={getDict(lang)("adm.regionTab")} types={optionTabs(all, regionRows.length)}
+      type="region" typeLabel={getDict(lang)("adm.regionTab")}
+      types={optionTabs(all, { region: regionRows.length, ageGroup: await ageGroupCount(db) }, t("adm.ageTab"))}
       regionRows={regionRows}
       addErrors={[]} editError={null} showAddForm={opts.showAddForm}
       lang={lang}

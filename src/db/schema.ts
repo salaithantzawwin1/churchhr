@@ -88,6 +88,15 @@ export const userStateAssignments = sqliteTable(
   (t) => ({ pk: primaryKey({ columns: [t.userId, t.regionId] }) }),
 );
 
+/** Dashboard age-group categories; ranges adjustable on /admin/options?type=age_group. */
+export const ageGroups = sqliteTable("age_groups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(),
+  minAge: integer("min_age").notNull(),
+  maxAge: integer("max_age").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 export const lookupOptions = sqliteTable(
   "lookup_options",
   {

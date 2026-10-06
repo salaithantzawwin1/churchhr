@@ -296,6 +296,7 @@ type OptionsProps = Common & {
   types: { key: string; label: string; active: boolean; count?: number | null }[];
   options?: OptionUsage[];
   regionRows?: { id: number; name: string; name_en: string; used: number }[];
+  ageGroupRows?: { id: number; name: string; min_age: number; max_age: number }[];
   addErrors: string[];
   editError: string | null;
   showAddForm?: boolean;
@@ -352,6 +353,79 @@ export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: b
       </div>
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
+/** Add form for an age group — bare fragment for the modal (and the no-JS ?add=1 fallback). */
+export function AddAgeGroupForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; min_age?: string; max_age?: string } }) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  const v = props.values ?? {};
+  return (
+    <form method="post" action="/admin/age-groups" data-flash-ok="age-group-added">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <label class="field">
+        <span class="lbl">{t("adm.ageName")}</span>
+        <input type="text" name="name" value={v.name ?? ""} required maxLength={60} />
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.ageMin")}</span>
+          <input type="number" name="min_age" value={v.min_age ?? ""} min={0} max={150} required />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.ageMax")}</span>
+          <input type="number" name="max_age" value={v.max_age ?? ""} min={0} max={150} required />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.add")}</button>
+        {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+      </div>
+    </form>
+  );
+}
+
+/** Edit form for one age group — bare fragment for the modal (and full-page no-JS fallback). */
+export function EditAgeGroupForm(props: {
+  id: number; lang?: Lang; errors?: string[]; modal?: boolean;
+  values?: { name?: string; min_age?: string; max_age?: string };
+}) {
+  const t = getDict(props.lang ?? "mm");
+  const errors = props.errors ?? [];
+  const v = props.values ?? {};
+  return (
+    <form method="post" action={`/admin/age-groups/${props.id}`} data-flash-ok="age-group-updated">
+      {errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <label class="field">
+        <span class="lbl">{t("adm.ageName")}</span>
+        <input type="text" name="name" value={v.name ?? ""} required maxLength={60} />
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.ageMin")}</span>
+          <input type="number" name="min_age" value={v.min_age ?? ""} min={0} max={150} required />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.ageMax")}</span>
+          <input type="number" name="max_age" value={v.max_age ?? ""} min={0} max={150} required />
+        </label>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
       </div>
     </form>
@@ -426,7 +500,7 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 }
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], addErrors, editError, lang, showAddForm } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], addErrors, editError, lang, showAddForm } = props;
   const t = getDict(lang ?? "mm");
   const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   const isRegion = type === "region";
@@ -467,7 +541,29 @@ export function AdminOptionsPage(props: OptionsProps) {
         </div>
       )}
 
-      {type === "region" ? (
+      {type === "age_group" ? (
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>{t("adm.ageName")}</th><th class="num">{t("adm.ageRange")}</th><th></th></tr></thead>
+            <tbody>
+              {ageGroupRows.length === 0 ? emptyStateRow(4, t) : ageGroupRows.map((g) => (
+                <tr>
+                  <td class="muted">{g.id}</td>
+                  <td>{g.name}</td>
+                  <td class="num">{g.min_age} – {g.max_age}</td>
+                  <td style="white-space:nowrap">
+                    <a class="btn sm secondary js-edit-modal" href={`/admin/age-groups/${g.id}/edit`}
+                       data-modal-title={`${t("adm.ageTab")}: ${g.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
+                    <form method="post" action={`/admin/age-groups/${g.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
+                      <button class="btn sm danger" type="submit">{t("members.delete")}</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : type === "region" ? (
         <>
           <div class="tbl-wrap">
             <table>

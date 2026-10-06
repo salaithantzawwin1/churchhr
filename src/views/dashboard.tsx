@@ -36,6 +36,30 @@ export function DashboardPage(props: {
         </div>
       </div>
 
+      <h2 style="font-size:16px;margin:20px 0 10px">{t("dash.ageGroups")}</h2>
+      <div class="stat-grid">
+        {data.ageGroups.map((g) => (
+          <div class="stat">
+            <div class="n">{g.male} / {g.female}</div>
+            <div class="t">
+              {g.name} <span class="muted small">({g.min_age}–{g.max_age})</span>
+            </div>
+          </div>
+        ))}
+        <div class="stat">
+          <div class="n">{data.familyGroup.members}</div>
+          <div class="t">{t("form.familyGroup")}</div>
+          <div class="t muted small">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+        </div>
+      </div>
+      {data.ageGroups.length === 0 && (
+        <p class="muted small" style="margin-top:6px">
+          {perms.has("options.manage")
+            ? <a href="/admin/options?type=age_group">{t("dash.ageEmpty")}</a>
+            : t("dash.ageEmpty")}
+        </p>
+      )}
+
       <div class="tbl-wrap" style="margin-top:18px">
         <table>
           <thead><tr><th>{t("dash.state")}</th><th>{t("dash.count")}</th></tr></thead>
