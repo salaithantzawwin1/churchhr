@@ -74,6 +74,8 @@ export function DashboardPage(props: {
   const isEn = (lang ?? "mm") === "en";
   const stateName = (r: { name: string; name_en?: string | null }) =>
     isEn && r.name_en ? r.name_en : r.name;
+  /** Widest state count drives the horizontal bars in the by-state table. */
+  const maxState = Math.max(1, ...data.byState.map((r) => r.n));
   return (
     <Layout title="Dashboard" lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
       <div class="page-head">
@@ -131,13 +133,18 @@ export function DashboardPage(props: {
 
       <div class="tbl-wrap" style="margin-top:18px">
         <table>
-          <thead><tr><th>{t("dash.state")}</th><th>{t("dash.count")}</th></tr></thead>
+          <thead><tr><th>{t("dash.state")}</th><th class="bar-col"></th><th class="num">{t("dash.count")}</th></tr></thead>
           <tbody>
-            {data.byState.length === 0 && <tr><td colSpan={2} class="muted">{t("dash.none")}</td></tr>}
+            {data.byState.length === 0 && <tr><td colSpan={3} class="muted">{t("dash.none")}</td></tr>}
             {data.byState.map((r) => (
               <tr>
                 <td>{perms.has("members.view") ? <a href={`/members${qs({ state: r.id })}`}>{stateName(r)}</a> : stateName(r)}</td>
-                <td>{r.n}</td>
+                <td class="bar-cell">
+                  <div class="hbar-track">
+                    <div class="hbar" style={`width:${Math.round((r.n / maxState) * 1000) / 10}%`} />
+                  </div>
+                </td>
+                <td class="num">{r.n}</td>
               </tr>
             ))}
           </tbody>
