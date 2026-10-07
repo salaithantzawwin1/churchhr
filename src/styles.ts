@@ -20,7 +20,9 @@ const DARK_VARS = `
 
 export const CSS = `
 :root {
-  --bg: #f5f6fa; --card: #ffffff; --ink: #1c2333; --muted: #667085;
+  /* Slightly darker page tint than the cards, so the centered content column
+     reads as a deliberate "sheet" on wide desktops instead of dead white space. */
+  --bg: #e9edf4; --card: #ffffff; --ink: #1c2333; --muted: #667085;
   --line: #e4e7ec; --line-strong: #ccd6e6; --brand: #1f4e8c; --brand-ink: #ffffff;
   --link: #1f4e8c;
   --ok-bg: #e7f6ec; --ok-ink: #14683a; --err-bg: #fdecec; --err-ink: #a11b1b;
@@ -244,7 +246,7 @@ th.bar-col { width: 42%; }
 }
 /* ---------- responsive: large desktop (≥1400px) ---------- */
 @media (min-width: 1400px) {
-  .container { max-width: 1240px; }
+  .container { max-width: 1360px; }
 }
 /* ---------- responsive: phones (≤640px) ---------- */
 @media (max-width: 640px) {
