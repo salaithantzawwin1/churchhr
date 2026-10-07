@@ -173,7 +173,7 @@ const FORM_KEYS = [
   "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
   "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
   "family_group_id", "ethnicity_id", "education_id", "job", "work_skills", "income",
-  "region_id", "home_cell_id", "group_id", "fellowship_category_id",
+  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id",
   "salvation_date", "status", "notes",
 ] as const;
 
@@ -241,6 +241,7 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
       nrc_number: v.nrc_number || null,
       languages: v.languages || null,
       address: v.address || null,
+      township: v.township || null,
       father_name: v.father_name || null,
       mother_name: v.mother_name || null,
       job: v.job || null,
@@ -267,7 +268,7 @@ const EXPORT_HEADER = [
   "ID", "Name English", "Name Myanmar", "Gender", "Married Status", "Date of Birth", "Age",
   "Blood Type", "Phone Number", "NRC Number", "Ethnicity", "Language", "Education", "Job",
   "Work Skills", "Income", "Address", "Father's Name", "Mother's Name", "Salvation Date",
-  "Family Group", "Fellowship Categories", "Group", "Home Cell", "State", "Status",
+  "Family Group", "Fellowship Categories", "Group", "Home Cell", "Township", "State", "Status",
 ];
 
 membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
@@ -296,7 +297,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     r.date_of_birth ?? "", ageFromDate(r.date_of_birth) ?? "", r.blood_type,
     r.phone, r.nrc_number, r.ethnicity, r.languages, r.education, r.job, r.work_skills,
     r.income, r.address, r.father_name, r.mother_name, r.salvation_date,
-    r.family_group, r.fellowship, r.group_label, r.home_cell, r.state_name,
+    r.family_group, r.fellowship, r.group_label, r.home_cell, r.township, r.state_name,
     r.status ? STATUSES[r.status]?.split(" (")[0] ?? r.status : "",
   ]);
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, ...body]);
@@ -318,7 +319,7 @@ membersRoutes.get("/import/template", requirePermission("members.import"), (c) =
     "", "Aung Aung", "မောင်အောင်", "male", "married", "1990-05-12", "", "O+", "0912345678",
     "12/abc(N)123456", "ဗမာ", "မြန်မာ", "Bachelor", "ဆရာဝန်", "", "300000", "ရန်ကုန်",
     "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Group 1", "Cell 1",
-    "ရန်ကုန်တိုင်း", "active",
+    "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active",
   ];
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, sample]);
   return c.body(csv, 200, {
@@ -353,6 +354,7 @@ const IMPORT_ALIASES: Record<string, string> = {
   "group": "group",
   "home cell": "home_cell",
   "state": "state", "region": "state",
+  "township": "township", "township (မြို့နယ်)": "township",
   "status": "status",
   "notes": "notes", "note": "notes",
 };
@@ -517,6 +519,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
         nrc_number: rec("nrc") || null,
         languages: rec("language") || null,
         address: rec("address") || null,
+        township: rec("township") || null,
         father_name: rec("father") || null,
         mother_name: rec("mother") || null,
         job: rec("job") || null,
@@ -695,6 +698,7 @@ function rowToValues(row: MemberDetail): FormValues {
     nrc_number: row.nrc_number ?? "",
     languages: row.languages ?? "",
     address: row.address ?? "",
+    township: row.township ?? "",
     father_name: row.father_name ?? "",
     mother_name: row.mother_name ?? "",
     job: row.job ?? "",

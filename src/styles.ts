@@ -169,6 +169,9 @@ textarea { min-height: 84px; resize: vertical; }
 /* Uniform filter cells: grow to fill the row, capped so the last line does not
    stretch one lonely field across the full width. */
 .filters label.field { flex: 1 1 170px; min-width: 150px; max-width: 300px; }
+/* One fixed control height so inputs, selects and buttons on the same line
+   never disagree (Chromium renders a bare select ~10px taller than an input). */
+.filters input, .filters select { height: 40px; padding: 0 10px; }
 .filters .actions { margin-left: auto; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: var(--chip-bg); }
 .badge.active { background: var(--ok-bg); color: var(--ok-ink); }

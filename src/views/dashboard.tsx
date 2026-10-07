@@ -3,6 +3,7 @@ import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { DashboardData } from "../dashboard";
 import { getDict, type Lang } from "../i18n";
+import { GENDERS, GENDERS_EN } from "../enums";
 import { qs } from "../util";
 
 /** Inline stroke icons (lucide-style, 24×24 viewBox) for the stat cards. */
@@ -82,6 +83,51 @@ export function DashboardPage(props: {
         <h1>Dashboard</h1>
         {perms.has("members.view") && <a class="btn" href="/members">{t("dash.membersLink")}</a>}
       </div>
+
+      <form class="card filters" method="get" action="/">
+        <label class="field">
+          <span class="lbl">{t("members.state")}</span>
+          <select name="state">
+            <option value="">{t("members.all")}</option>
+            {data.filterRegions.map((r) => (
+              <option value={String(r.id)} selected={data.filters.state === r.id}>
+                {isEn && r.name_en ? r.name_en : r.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("members.gender")}</span>
+          <select name="gender">
+            <option value="">{t("members.all")}</option>
+            {Object.entries(isEn ? GENDERS_EN : GENDERS).map(([k, v]) => (
+              <option value={k} selected={data.filters.gender === k}>{v}</option>
+            ))}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("members.thHomeCell")}</span>
+          <select name="home_cell">
+            <option value="">{t("members.all")}</option>
+            {data.homeCells.map((o) => (
+              <option value={String(o.id)} selected={data.filters.homeCell === o.id}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("members.township")}</span>
+          <select name="township">
+            <option value="">{t("members.all")}</option>
+            {data.townships.map((x) => (
+              <option value={x} selected={data.filters.township === x}>{x}</option>
+            ))}
+          </select>
+        </label>
+        <div class="actions" style="margin:0">
+          <button class="btn" type="submit">{t("dash.filterBtn")}</button>
+          <a class="btn secondary" href="/">{t("members.clear")}</a>
+        </div>
+      </form>
 
       <div class="stat-grid">
         <Stat icon="users" tone="brand" label={t("dash.total")} n={data.total} />

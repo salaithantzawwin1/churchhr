@@ -325,6 +325,10 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                 ))}
               </select>
             </label>
+            <label class="field">
+              <span class="lbl">{t("form.township")}</span>
+              <input type="text" name="township" value={v.township ?? ""} />
+            </label>
             <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
@@ -358,6 +362,7 @@ export type MemberDetail = {
   nrc_number: string | null;
   languages: string | null;
   address: string | null;
+  township: string | null;
   father_name: string | null;
   mother_name: string | null;
   job: string | null;
@@ -418,6 +423,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail }) {
     ["Group", m.group_label ?? ""],
     ["Home Cell", m.home_cell ?? ""],
     [t("detail.state"), isEn && m.state_name_en ? m.state_name_en : m.state_name],
+    [t("detail.township"), m.township ?? ""],
     [t("detail.status"), S[m.status] ?? m.status],
     [t("detail.notes"), m.notes ?? ""],
     [t("detail.updatedAt"), new Date(m.updated_at * 1000).toLocaleString("en-GB")],

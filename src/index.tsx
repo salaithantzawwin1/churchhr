@@ -6,8 +6,10 @@ import { profileRoutes, publicAuthRoutes } from "./routes/auth";
 import { membersRoutes } from "./routes/members";
 import { adminRoutes } from "./routes/admin";
 import { getDb } from "./db/client";
-import { loadDashboard } from "./dashboard";
+import { loadDashboard, type DashboardFilter } from "./dashboard";
 import { flashFromQuery } from "./flash";
+import { GENDERS } from "./enums";
+import { intParam } from "./util";
 import { getDict, langFromQuery, normalizeLang, LANG_COOKIE } from "./i18n";
 import { DashboardPage } from "./views/dashboard";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
@@ -56,10 +58,17 @@ app.route("/", profileRoutes);
 
 app.get("/", requirePermission("dashboard.view"), async (c) => {
   const db = getDb(c.env);
+  const q = c.req.query();
+  const filters: DashboardFilter = {
+    state: intParam(q.state),
+    gender: q.gender && q.gender in GENDERS ? q.gender : "",
+    homeCell: intParam(q.home_cell),
+    township: (q.township ?? "").trim().slice(0, 80),
+  };
   const data = await loadDashboard(db, {
     scopeAll: c.get("scopeAll"),
     stateIds: c.get("stateIds"),
-  });
+  }, filters);
   return c.html(
     <DashboardPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}

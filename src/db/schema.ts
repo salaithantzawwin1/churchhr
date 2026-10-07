@@ -160,6 +160,7 @@ export const members = sqliteTable(
     workSkills: text("work_skills"),
     income: integer("income"),
     address: text("address"),
+    township: text("township"),
     fatherName: text("father_name"),
     motherName: text("mother_name"),
     salvationDate: text("salvation_date"),
@@ -182,5 +183,6 @@ export const members = sqliteTable(
     statusIdx: index("members_status_idx").on(t.status),
     groupIdx: index("members_group_idx").on(t.groupId),
     homeCellIdx: index("members_home_cell_idx").on(t.homeCellId),
+    townshipIdx: index("members_township_idx").on(t.township),
   }),
 );
