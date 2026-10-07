@@ -1,5 +1,26 @@
-/* Client-side enhancements: language switch links, edit-in-modal, delete confirm modal. */
+/* Client-side enhancements: theme toggle, language switch links, edit-in-modal, delete confirm modal. */
 (function () {
+  // Manual dark/light toggle — persists the explicit choice; without one the
+  // CSS media query follows the OS preference.
+  var themeBtn = document.querySelector(".theme-toggle");
+  if (themeBtn) {
+    var t = null;
+    try { t = localStorage.getItem("theme"); } catch (e) {}
+    var eff = t === "dark" || t === "light"
+      ? t
+      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var title = themeBtn.getAttribute(eff === "dark" ? "data-to-light" : "data-to-dark");
+    if (title) themeBtn.setAttribute("title", title);
+    themeBtn.addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || eff;
+      var next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      var nt = themeBtn.getAttribute(next === "dark" ? "data-to-light" : "data-to-dark");
+      if (nt) themeBtn.setAttribute("title", nt);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+    });
+  }
+
   // Preserve current query params on language switch links
   var links = document.querySelectorAll(".langswitch a");
   if (links.length) {

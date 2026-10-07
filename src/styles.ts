@@ -1,4 +1,23 @@
 /** Single-file stylesheet served at /styles.css (no bundler needed). */
+
+/* Dark palette, defined once and emitted under both the OS-preference media query
+   (no-JS fallback) and the explicit [data-theme] attribute (user toggle). */
+const DARK_VARS = `
+    --bg: #10151f; --card: #1a2030; --ink: #e7eaf3; --muted: #98a1b6;
+    --line: #2a3245; --line-strong: #3d4763; --brand: #1f4e8c; --brand-ink: #ffffff;
+    --link: #8ab0f0;
+    --ok-bg: #14301f; --ok-ink: #82d8a4; --err-bg: #3a161a; --err-ink: #f0a3a3;
+    --warn-bg: #38280f; --warn-ink: #eec27e;
+    --male: #6da0e0; --female: #d989b1;
+    --th-bg: #202839; --row-hover: #222b3f;
+    --chip-bg: #253048; --chip-brand-bg: #223350;
+    --chip-purple-bg: #332b4d; --chip-purple-ink: #b79aec;
+    --track: #263149; --sep: #5b6783;
+    --btn2-bg: #253048; --btn2-hover: #2d3952;
+    --field-bg: #131a29; --count-bg: rgba(231,234,243,.12);
+    --hover-shadow: 0 4px 14px rgba(0,0,0,.45);
+  `;
+
 export const CSS = `
 :root {
   --bg: #f5f6fa; --card: #ffffff; --ink: #1c2333; --muted: #667085;
@@ -15,24 +34,12 @@ export const CSS = `
   --field-bg: #ffffff; --count-bg: rgba(28,35,51,.08);
   --hover-shadow: 0 4px 14px rgba(28,35,51,.07);
 }
-/* Dark palette follows the OS preference; every component reads the vars above,
-   so flipping them re-themes the whole app (cards, tables, forms, flash). */
+/* Dark palette: default follows the OS preference; a saved manual choice on <html>
+   data-theme wins (see the inline script in layout.tsx and public/app.js). Every
+   component reads the vars above, so flipping them re-themes the whole app. */
+:root[data-theme="dark"] {${DARK_VARS}}
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #10151f; --card: #1a2030; --ink: #e7eaf3; --muted: #98a1b6;
-    --line: #2a3245; --line-strong: #3d4763; --brand: #1f4e8c; --brand-ink: #ffffff;
-    --link: #8ab0f0;
-    --ok-bg: #14301f; --ok-ink: #82d8a4; --err-bg: #3a161a; --err-ink: #f0a3a3;
-    --warn-bg: #38280f; --warn-ink: #eec27e;
-    --male: #6da0e0; --female: #d989b1;
-    --th-bg: #202839; --row-hover: #222b3f;
-    --chip-bg: #253048; --chip-brand-bg: #223350;
-    --chip-purple-bg: #332b4d; --chip-purple-ink: #b79aec;
-    --track: #263149; --sep: #5b6783;
-    --btn2-bg: #253048; --btn2-hover: #2d3952;
-    --field-bg: #131a29; --count-bg: rgba(231,234,243,.12);
-    --hover-shadow: 0 4px 14px rgba(0,0,0,.45);
-  }
+  :root:not([data-theme="light"]) {${DARK_VARS}}
 }
 * { box-sizing: border-box; }
 body {
@@ -41,6 +48,24 @@ body {
   font-size: 15px; line-height: 1.6;
 }
 a { color: var(--link); }
+/* Manual theme toggle (topbar): moon icon while light, sun while dark —
+   appearance driven purely by the effective theme so no extra JS state. */
+.topbar .theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; min-height: 32px; padding: 0;
+  border: 1px solid rgba(255,255,255,.45); border-radius: 999px;
+  background: transparent; color: var(--brand-ink); cursor: pointer; flex: none;
+}
+.topbar .theme-toggle:hover { background: rgba(255,255,255,.14); }
+.topbar .theme-toggle svg { width: 14px; height: 14px; display: block; }
+.topbar .theme-toggle .ico-sun { display: none; }
+.topbar .theme-toggle .ico-moon { display: inline-block; }
+:root[data-theme="dark"] .topbar .theme-toggle .ico-sun { display: inline-block; }
+:root[data-theme="dark"] .topbar .theme-toggle .ico-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .topbar .theme-toggle .ico-sun { display: inline-block; }
+  :root:not([data-theme="light"]) .topbar .theme-toggle .ico-moon { display: none; }
+}
 .topbar {
   background: var(--brand); color: var(--brand-ink);
   display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
@@ -256,6 +281,8 @@ th.bar-col { width: 42%; }
   /* Keep the sheet inside the viewport even when the underlying scrollbar removal
      relayouts the page (iOS Safari body-lock quirk). */
   .modal-card { max-width: calc(100vw - 20px); }
+  .topbar .theme-toggle { width: 34px; min-height: 34px; }
+  .topbar .theme-toggle svg { width: 15px; height: 15px; }
 }
 @media (max-width: 400px) {
   .filters label.field { flex: 1 1 100%; }
