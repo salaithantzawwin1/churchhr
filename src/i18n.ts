@@ -70,6 +70,8 @@ const MM: Dict = {
   "dash.ageGroups": "အသက်အပိုင်းအခြား အုပ်စုများ",
   "dash.groupUnit": "အုပ်စု",
   "dash.ageEmpty": "Options page မှာ အသက်အပိုင်းအခြား သတ်မှတ်ပါ။",
+  "dash.maleShort": "ကျား",
+  "dash.femaleShort": "မ",
   // members list
   "members.title": "Member စာရင်း",
   "members.count": "ယောက်",
@@ -371,6 +373,8 @@ const EN: Dict = {
   "dash.ageGroups": "Age groups",
   "dash.groupUnit": "groups",
   "dash.ageEmpty": "Define age ranges on the Options page.",
+  "dash.maleShort": "M",
+  "dash.femaleShort": "F",
   "members.title": "Members",
   "members.count": "",
   "members.addNew": "+ New member",

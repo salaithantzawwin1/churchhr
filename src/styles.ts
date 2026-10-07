@@ -5,6 +5,7 @@ export const CSS = `
   --line: #e4e7ec; --brand: #1f4e8c; --brand-ink: #ffffff;
   --ok-bg: #e7f6ec; --ok-ink: #14683a; --err-bg: #fdecec; --err-ink: #a11b1b;
   --warn-bg: #fff4e0; --warn-ink: #8a5300;
+  --male: #2f6fb5; --female: #c2558f;
 }
 * { box-sizing: border-box; }
 body {
@@ -124,10 +125,35 @@ textarea { min-height: 84px; resize: vertical; }
 .login-logo img { width: 84px; height: 84px; border-radius: 16px; background: #fff; border: 1px solid var(--line); padding: 6px; }
 .login-logo .t1 { font-size: 19px; font-weight: 700; }
 .login-logo .t2 { color: var(--muted); font-size: 13px; margin-top: 2px; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
-.stat .n { font-size: 26px; font-weight: 700; }
-.stat .t { color: var(--muted); font-size: 13px; }
+/* ---------- dashboard / KPI stat cards ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; }
+.stat {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;
+}
+.stat:hover { border-color: #ccd6e6; box-shadow: 0 4px 14px rgba(28,35,51,.07); }
+@media (prefers-reduced-motion: no-preference) {
+  .stat { transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+  .stat:hover { transform: translateY(-2px); }
+}
+.stat .n { font-size: 27px; font-weight: 700; line-height: 1.15; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stat .n .sep { color: #a8b3c4; font-weight: 400; padding: 0 2px; }
+.stat .t { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.stat .t .rng { font-size: 12px; opacity: .85; }
+.stat .sub { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stat .ico { width: 30px; height: 30px; border-radius: 8px; flex: none; display: inline-flex; align-items: center; justify-content: center; background: #eef1f6; color: var(--brand); }
+.stat .ico svg { width: 16px; height: 16px; }
+.stat .ico.brand { background: #e8effa; color: var(--brand); }
+.stat .ico.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.stat .ico.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.stat .ico.err { background: var(--err-bg); color: var(--err-ink); }
+.stat .ico.purple { background: #f1e9fb; color: #6d3fb4; }
+/* male/female proportion bar (gender + age-group cards) */
+.splitbar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: #eef1f6; }
+.splitbar .m { background: var(--male); }
+.splitbar .f { background: var(--female); }
+.gm { color: var(--male); }
+.gf { color: var(--female); }
 .matrix td, .matrix th { text-align: center; }
 .matrix td:first-child, .matrix th:first-child { text-align: left; }
 .err-list { color: var(--err-ink); margin: 6px 0; padding-left: 18px; }
@@ -189,7 +215,10 @@ textarea { min-height: 84px; resize: vertical; }
   .btn { min-height: 40px; }
   .btn.sm { min-height: 34px; }
   .actions { gap: 8px; }
+  .stat { padding: 12px 13px; gap: 6px; }
   .stat .n { font-size: 22px; }
+  .stat .ico { width: 26px; height: 26px; }
+  .stat .ico svg { width: 14px; height: 14px; }
   .modal { padding: 10px; align-items: stretch; }
   .modal-card { width: 100%; max-height: none; height: calc(100dvh - 20px); border-radius: 12px; }
   .modal-head { position: sticky; top: 0; background: var(--card); z-index: 2; }

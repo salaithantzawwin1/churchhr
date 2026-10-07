@@ -5,6 +5,63 @@ import type { DashboardData } from "../dashboard";
 import { getDict, type Lang } from "../i18n";
 import { qs } from "../util";
 
+/** Inline stroke icons (lucide-style, 24×24 viewBox) for the stat cards. */
+const ICONS: Record<string, any> = {
+  users: [
+    <circle cx="9" cy="8" r="3.5" />,
+    <path d="M2.5 19.5a6.5 6.5 0 0 1 13 0" />,
+    <path d="M16 5.3a3.5 3.5 0 0 1 0 5.4" />,
+    <path d="M17.8 13.9a6.5 6.5 0 0 1 3.7 5.6" />,
+  ],
+  check: [<circle cx="12" cy="12" r="9" />, <path d="m8.3 12.4 2.5 2.5 4.9-5.4" />],
+  out: [<circle cx="12" cy="12" r="9" />, <path d="M7.5 12h8.5" />, <path d="m12.8 8.7 3.3 3.3-3.3 3.3" />],
+  pause: [<circle cx="12" cy="12" r="9" />, <path d="M8.7 12h6.6" />],
+  gender: [<circle cx="9.2" cy="9.2" r="5.4" />, <circle cx="14.8" cy="14.8" r="5.4" />],
+  pin: [
+    <path d="M19.5 10.2c0 5.4-7.5 10.8-7.5 10.8S4.5 15.6 4.5 10.2a7.5 7.5 0 0 1 15 0Z" />,
+    <circle cx="12" cy="10.2" r="2.7" />,
+  ],
+};
+
+function Ico(props: { name: string; tone?: string }) {
+  return (
+    <span class={"ico" + (props.tone ? ` ${props.tone}` : "")} aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">{ICONS[props.name]}</svg>
+    </span>
+  );
+}
+
+/** KPI card: optional tinted icon, headline number, label, optional male/female
+ *  sub-line + proportion bar. The number comes first so a wrapped label can
+ *  never push numbers out of alignment across a grid row. */
+function Stat(props: {
+  label: any;
+  icon?: string;
+  tone?: string;
+  n: any;
+  sub?: any;
+  split?: { male: number; female: number };
+}) {
+  const { label, icon, tone, n, sub, split } = props;
+  const tot = split ? split.male + split.female : 0;
+  const pct = (v: number) => (tot > 0 ? Math.round((v / tot) * 1000) / 10 : 0);
+  return (
+    <div class="stat">
+      {icon && <Ico name={icon} tone={tone} />}
+      <div class="n">{n}</div>
+      <div class="t">{label}</div>
+      {sub && <div class="sub">{sub}</div>}
+      {split && (
+        <div class="splitbar" role="img" aria-label={`${split.male} / ${split.female}`}>
+          {tot > 0 && <span class="m" style={`width:${pct(split.male)}%`} />}
+          {tot > 0 && <span class="f" style={`width:${pct(split.female)}%`} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DashboardPage(props: {
   user: SessionUser;
   perms: Set<string>;
@@ -25,32 +82,44 @@ export function DashboardPage(props: {
       </div>
 
       <div class="stat-grid">
-        <div class="stat"><div class="n">{data.total}</div><div class="t">{t("dash.total")}</div></div>
-        <div class="stat"><div class="n">{data.byStatus.active ?? 0}</div><div class="t">{t("dash.active")}</div></div>
-        <div class="stat"><div class="n">{data.byStatus.moved ?? 0}</div><div class="t">{t("dash.moved")}</div></div>
-        <div class="stat"><div class="n">{data.byStatus.inactive ?? 0}</div><div class="t">{t("dash.inactive")}</div></div>
-        <div class="stat"><div class="n">{data.male} / {data.female}</div><div class="t">{t("dash.gender")}</div></div>
-        <div class="stat">
-          <div class="n">{data.scopeAll ? t("dash.allStates") : data.stateCount}</div>
-          <div class="t">{t("dash.stateScope")}</div>
-        </div>
+        <Stat icon="users" tone="brand" label={t("dash.total")} n={data.total} />
+        <Stat icon="check" tone="ok" label={t("dash.active")} n={data.byStatus.active ?? 0} />
+        <Stat icon="out" tone="warn" label={t("dash.moved")} n={data.byStatus.moved ?? 0} />
+        <Stat icon="pause" tone="err" label={t("dash.inactive")} n={data.byStatus.inactive ?? 0} />
+        <Stat
+          icon="gender" tone="purple" label={t("dash.gender")}
+          n={[
+            <span class="gm">{data.male}</span>,
+            <span class="sep">/</span>,
+            <span class="gf">{data.female}</span>,
+          ]}
+          split={{ male: data.male, female: data.female }}
+        />
+        <Stat
+          icon="pin" label={t("dash.stateScope")}
+          n={data.scopeAll ? t("dash.allStates") : data.stateCount}
+        />
       </div>
 
       <h2 style="font-size:16px;margin:20px 0 10px">{t("dash.ageGroups")}</h2>
       <div class="stat-grid">
         {data.ageGroups.map((g) => (
-          <div class="stat">
-            <div class="n">{g.male} / {g.female}</div>
-            <div class="t">
-              {g.name} <span class="muted small">({g.min_age}–{g.max_age})</span>
-            </div>
-          </div>
+          <Stat
+            label={[g.name, <span class="rng"> ({g.min_age}–{g.max_age})</span>]}
+            n={g.male + g.female}
+            sub={[
+              <span class="gm">{t("dash.maleShort")} {g.male}</span>,
+              <span>·</span>,
+              <span class="gf">{t("dash.femaleShort")} {g.female}</span>,
+            ]}
+            split={{ male: g.male, female: g.female }}
+          />
         ))}
-        <div class="stat">
-          <div class="n">{data.familyGroup.members}</div>
-          <div class="t">{t("form.familyGroup")}</div>
-          <div class="t muted small">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
-        </div>
+        <Stat
+          label={t("form.familyGroup")}
+          n={data.familyGroup.members}
+          sub={<span>{data.familyGroup.groups} {t("dash.groupUnit")}</span>}
+        />
       </div>
       {data.ageGroups.length === 0 && (
         <p class="muted small" style="margin-top:6px">
