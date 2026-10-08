@@ -87,7 +87,7 @@ export function DashboardPage(props: {
       <form class="card filters" method="get" action="/">
         <label class="field">
           <span class="lbl">{t("members.state")}</span>
-          <select name="state">
+          <select name="state" data-region-select="1">
             <option value="">{t("members.all")}</option>
             {data.filterRegions.map((r) => (
               <option value={String(r.id)} selected={data.filters.state === r.id}>
@@ -107,10 +107,11 @@ export function DashboardPage(props: {
         </label>
         <label class="field">
           <span class="lbl">{t("members.thHomeCell")}</span>
-          <select name="home_cell">
+          <select name="home_cell" data-region-filter="1">
             <option value="">{t("members.all")}</option>
             {data.homeCells.map((o) => (
-              <option value={String(o.id)} selected={data.filters.homeCell === o.id}>{o.label}</option>
+              <option value={String(o.id)} selected={data.filters.homeCell === o.id}
+                data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
             ))}
           </select>
         </label>

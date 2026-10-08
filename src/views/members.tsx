@@ -78,7 +78,7 @@ export function MembersListPage(props: ListProps) {
         </label>
         <label class="field">
           <span class="lbl">{t("members.state")}</span>
-          <select name="state">
+          <select name="state" data-region-select="1">
             <option value="">{t("members.all")}</option>
             {regions.map((r) => (
               <option value={String(r.id)} selected={f.state === r.id}>{r.name}</option>
@@ -105,19 +105,21 @@ export function MembersListPage(props: ListProps) {
         </label>
         <label class="field">
           <span class="lbl">{t("members.thHomeCell")}</span>
-          <select name="home_cell">
+          <select name="home_cell" data-region-filter="1">
             <option value="">{t("members.all")}</option>
             {homeCells.map((o) => (
-              <option value={String(o.id)} selected={f.homeCell === o.id}>{o.label}</option>
+              <option value={String(o.id)} selected={f.homeCell === o.id}
+                data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
             ))}
           </select>
         </label>
         <label class="field">
           <span class="lbl">{t("members.thGroup")}</span>
-          <select name="group">
+          <select name="group" data-region-filter="1">
             <option value="">{t("members.all")}</option>
             {groups.map((o) => (
-              <option value={String(o.id)} selected={f.group === o.id}>{o.label}</option>
+              <option value={String(o.id)} selected={f.group === o.id}
+                data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
             ))}
           </select>
         </label>
@@ -355,6 +357,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                   <option value={String(r.id)} selected={v.region_id === String(r.id)}>{r.name}</option>
                 ))}
               </select>
+              <span class="hint">{t("form.stateHint")}</span>
             </label>
             <label class="field">
               <span class="lbl">{t("form.township")}</span>

@@ -33,8 +33,8 @@ export type DashboardData = {
   filters: DashboardFilter;
   /** Scope-visible states for the State/Region filter. */
   filterRegions: { id: number; name: string; name_en?: string | null }[];
-  /** Active home cells for the Home Cell filter. */
-  homeCells: { id: number; label: string }[];
+  /** Active home cells for the Home Cell filter (region_id drives the state cascade). */
+  homeCells: { id: number; label: string; region_id: number }[];
   /** Distinct townships on record (scope-wide, unaffected by the other filters). */
   townships: string[];
 };
@@ -125,8 +125,8 @@ export async function loadDashboard(
   const filterRegions = await db.all<{ id: number; name: string; name_en: string | null }>(
     sql`SELECT id, name, name_en FROM regions WHERE ${scopeR} ORDER BY id`,
   );
-  const homeCellRows = await db.all<{ id: number; label: string }>(sql`
-    SELECT id, label FROM lookup_options
+  const homeCellRows = await db.all<{ id: number; label: string; region_id: number }>(sql`
+    SELECT id, label, region_id FROM lookup_options
     WHERE type = 'home_cell' AND active = 1
     ORDER BY sort_order, label`);
   const townshipRows = await db.all<{ t: string }>(sql`
