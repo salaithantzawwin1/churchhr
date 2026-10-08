@@ -301,10 +301,12 @@ async function parseRegionId(db: DB, raw: unknown): Promise<number | false> {
   return rows[0] ? n : false;
 }
 
-/** ""/absent -> null (no parent); a valid option id of the expected parent type -> itself; else false. */
+/** ""/absent -> null (no parent); a valid option id of the expected parent type -> itself; else false.
+ * Types without a parent chain (group, ethnicity, ...) always have no parent. */
 async function parseParentId(db: DB, raw: unknown, parentType: string | undefined): Promise<number | null | false> {
+  if (!parentType) return null;
   const v = s(raw);
-  if (v === "" || !parentType) return parentType ? null : false;
+  if (v === "") return null;
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1) return false;
   const rows = await db.select({ id: lookupOptions.id }).from(lookupOptions)
