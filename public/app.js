@@ -32,6 +32,41 @@
     });
   }
 
+  // State/Region cascade: Township / Home Cell / Group dropdowns only show
+  // options that belong to the selected state (no data-region = all states).
+  function applyRegionFilters(form, keepSelection) {
+    var regionSel = form.querySelector("select[data-region-select]");
+    if (!regionSel) return;
+    var region = regionSel.value;
+    var filtered = form.querySelectorAll("select[data-region-filter]");
+    Array.prototype.forEach.call(filtered, function (sel) {
+      var current = sel.value;
+      var matched = false;
+      Array.prototype.forEach.call(sel.options, function (o) {
+        if (!o.value) return; // blank "choose" option always stays
+        var r = o.getAttribute("data-region");
+        // On load, keep the saved selection visible even if its region differs;
+        // on a state change, hide it so the value gets reset below.
+        var show = !r || !region || r === region || (o.value === current && !keepSelection);
+        o.hidden = !show;
+        if (show && o.value === current) matched = true;
+      });
+      // Reset a selection that no longer belongs to the chosen state.
+      if (keepSelection && current && !matched) sel.value = "";
+    });
+  }
+
+  function initRegionCascade(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("select[data-region-select]"), function (regionSel) {
+      var form = regionSel.form;
+      if (!form || form.getAttribute("data-cascade")) return;
+      form.setAttribute("data-cascade", "1");
+      applyRegionFilters(form, false);
+      regionSel.addEventListener("change", function () { applyRegionFilters(form, true); });
+    });
+  }
+  initRegionCascade(document);
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
@@ -90,6 +125,7 @@
     Array.prototype.forEach.call(doc.body.children, function (n) {
       bodyEl.appendChild(document.importNode(n, true));
     });
+    initRegionCascade(bodyEl);
   }
 
   // Open-in-modal: any link with class js-edit-modal (edit forms) or js-add-modal (add forms)

@@ -208,7 +208,19 @@ function opts(options: OptionRow[], selected: string, blank: string) {
     <>
       <option value="">{blank}</option>
       {options.map((o) => (
-        <option value={String(o.id)} selected={selected === String(o.id)}>{o.label}</option>
+        <option value={String(o.id)} selected={selected === String(o.id)} data-region={o.regionId ?? ""}>{o.label}</option>
+      ))}
+    </>
+  );
+}
+
+/** Township select — stores the label as free text (members.township is TEXT). */
+function townshipOpts(options: OptionRow[], selected: string, blank: string) {
+  return (
+    <>
+      <option value="">{blank}</option>
+      {options.map((o) => (
+        <option value={o.label} selected={selected === o.label} data-region={o.regionId ?? ""}>{o.label}</option>
       ))}
     </>
   );
@@ -318,7 +330,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           <div class="form-grid">
             <label class="field">
               <span class="lbl">{t("form.state")}</span>
-              <select name="region_id" required>
+              <select name="region_id" required data-region-select="1">
                 <option value="">{t("form.choose")}</option>
                 {regions.map((r) => (
                   <option value={String(r.id)} selected={v.region_id === String(r.id)}>{r.name}</option>
@@ -327,10 +339,15 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             </label>
             <label class="field">
               <span class="lbl">{t("form.township")}</span>
-              <input type="text" name="township" value={v.township ?? ""} />
+              <select name="township" data-region-filter="1">
+                {townshipOpts(options.township ?? [], v.township ?? "", t("form.choose"))}
+                {v.township && !(options.township ?? []).some((o) => o.label === v.township) && (
+                  <option value={v.township} selected>{v.township}</option>
+                )}
+              </select>
             </label>
-            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"))}</select></label>
-            <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id" data-region-filter="1">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>{select("status", S, v.status || "active", "")}</label>

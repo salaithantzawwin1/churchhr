@@ -565,7 +565,7 @@ async function ensureOption(db: DB, cache: OptionRow[], type: string, label: str
     const rows = await db
       .insert(lookupOptions)
       .values({ type, label })
-      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder });
+      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId });
     cache.push(rows[0]!);
     return rows[0]!.id;
   } catch {
@@ -719,6 +719,15 @@ function rowToValues(row: MemberDetail): FormValues {
 
 // ---------- create ----------
 
+// Option types rendered on the member form (Family + Church cards).
+const FORM_OPTION_TYPES = ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell", "township"];
+
+function formOptions(all: OptionRow[], keep?: (o: OptionRow) => boolean) {
+  return Object.fromEntries(
+    FORM_OPTION_TYPES.map((t) => [t, all.filter((o) => o.type === t && (o.active === 1 || (keep?.(o) ?? false)))]),
+  );
+}
+
 membersRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -728,10 +737,7 @@ membersRoutes.get("/new", requirePermission("members.create"), async (c) => {
     <MemberFormPage
       user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope, allRegions)}
       errors={[]} member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-      options={Object.fromEntries(
-        ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-          .map((t) => [t, options.filter((o) => o.type === t && o.active === 1)]),
-      )}
+      options={formOptions(options)}
       lang={c.get("lang")}
     />,
   );
@@ -750,10 +756,7 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
         user={c.get("user")} perms={c.get("perms")} values={values}
         errors={errors.map((e) => renderMsg(e, c.get("lang")))}
         member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-        options={Object.fromEntries(
-          ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-            .map((t) => [t, options.filter((o) => o.type === t && o.active === 1)]),
-        )}
+        options={formOptions(options)}
         lang={c.get("lang")}
       />,
       status,
@@ -792,10 +795,7 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
   const formProps = {
     user: c.get("user"), perms: c.get("perms"), values: rowToValues(row), errors: [] as string[],
     member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
-    options: Object.fromEntries(
-      ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-        .map((t) => [t, options.filter((o) => o.type === t && (o.active === 1 || o.id === (row as any)[`${t}_id`]))]),
-    ),
+    options: formOptions(options, (o) => o.type === "township" ? o.label === row.township : o.id === (row as any)[`${o.type}_id`]),
     lang: c.get("lang"),
   };
   if (c.req.query("modal") === "1") return c.html(<MemberFormFragment {...formProps} modal />);
@@ -820,10 +820,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
       user: c.get("user"), perms: c.get("perms"), values,
       errors: errors.map((e) => renderMsg(e, c.get("lang"))),
       member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
-      options: Object.fromEntries(
-        ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell"]
-          .map((t) => [t, options.filter((o) => o.type === t && (o.active === 1 || o.id === (existing as any)[`${t}_id`]))]),
-      ),
+      options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
       lang: c.get("lang"),
     };
     if (fromModal) return c.html(<MemberFormFragment {...formProps} modal />, 400);

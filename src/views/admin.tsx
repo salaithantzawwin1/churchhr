@@ -3,7 +3,7 @@ import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { PERMISSIONS, PERMISSION_LABELS, PERMISSION_LABELS_EN } from "../rbac";
 import { getDict, type Lang } from "../i18n";
-import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, type OptionType } from "../db/schema";
+import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, isRegionScopedType, type OptionType } from "../db/schema";
 import { qs } from "../util";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -288,7 +288,14 @@ export function AdminRolesPage(props: RolesProps) {
 
 // ---------- Lookup options ----------
 
-export type OptionUsage = { id: number; label: string; active: number; used: number };
+export type OptionUsage = {
+  id: number;
+  label: string;
+  active: number;
+  used: number;
+  /** State/Region name for region-scoped options; null/undefined = all states. */
+  state?: string | null;
+};
 
 type OptionsProps = Common & {
   type: string;
@@ -297,13 +304,40 @@ type OptionsProps = Common & {
   options?: OptionUsage[];
   regionRows?: { id: number; name: string; name_en: string; used: number }[];
   ageGroupRows?: { id: number; name: string; min_age: number; max_age: number }[];
+  /** States for the State/Region picker on region-scoped option types. */
+  regions?: { id: number; name: string }[];
   addErrors: string[];
   editError: string | null;
   showAddForm?: boolean;
 };
 
+/** State/Region picker for region-scoped option types (blank = every state). */
+function optionStateField(
+  regions: { id: number; name: string }[] | undefined,
+  type: string,
+  selected: string,
+  t: (k: string) => string,
+) {
+  if (!isRegionScopedType(type) || !regions || regions.length === 0) return null;
+  return (
+    <label class="field">
+      <span class="lbl">{t("adm.optionState")}</span>
+      <select name="region_id">
+        <option value="">{t("adm.allStates")}</option>
+        {regions.map((r) => (
+          <option value={String(r.id)} selected={selected === String(r.id)}>{r.name}</option>
+        ))}
+      </select>
+      <span class="field-hint">{t("adm.optionStateHint")}</span>
+    </label>
+  );
+}
+
 /** Add form for a lookup option — bare fragment for the modal (and the no-JS ?add=1 fallback). */
-export function AddOptionForm(props: { type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string }) {
+export function AddOptionForm(props: {
+  type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string;
+  regions?: { id: number; name: string }[]; regionId?: string;
+}) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
   return (
@@ -320,6 +354,7 @@ export function AddOptionForm(props: { type: string; lang?: Lang; errors?: strin
         <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
+      {optionStateField(props.regions, props.type, props.regionId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -433,7 +468,10 @@ export function EditAgeGroupForm(props: {
 }
 
 /** Edit form for one lookup option — bare fragment for the modal (and full-page no-JS fallback). */
-export function EditOptionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string }) {
+export function EditOptionForm(props: {
+  id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string;
+  type?: string; regions?: { id: number; name: string }[]; regionId?: string;
+}) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
   return (
@@ -449,6 +487,7 @@ export function EditOptionForm(props: { id: number; lang?: Lang; errors?: string
         <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
+      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -500,10 +539,11 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 }
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], addErrors, editError, lang, showAddForm } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, addErrors, editError, lang, showAddForm } = props;
   const t = getDict(lang ?? "mm");
   const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   const isRegion = type === "region";
+  const scoped = isRegionScopedType(type);
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
   return (
     <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>
@@ -537,7 +577,7 @@ export function AdminOptionsPage(props: OptionsProps) {
           {addErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} />}
+          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} regions={regions} />}
         </div>
       )}
 
@@ -595,12 +635,13 @@ export function AdminOptionsPage(props: OptionsProps) {
         <>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>ID</th><th>{t("adm.labelCol")}</th><th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
           <tbody>
-            {options.length === 0 ? emptyStateRow(5, t) : options.map((o) => (
+            {options.length === 0 ? emptyStateRow(scoped ? 6 : 5, t) : options.map((o) => (
               <tr>
                 <td class="muted">{o.id}</td>
                 <td>{o.label}</td>
+                {scoped && <td>{o.state || <span class="muted small">{t("adm.allStates")}</span>}</td>}
                 <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used} {t("members.count")}</td>
                 <td>
                   {o.active === 1

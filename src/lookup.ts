@@ -2,11 +2,22 @@ import { asc, eq } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { lookupOptions, members, OPTION_TYPES, type OptionType } from "./db/schema";
 
-export type OptionRow = { id: number; type: string; label: string; active: number; sortOrder: number };
+export type OptionRow = {
+  id: number;
+  type: string;
+  label: string;
+  active: number;
+  sortOrder: number;
+  /** null = available in every State/Region. */
+  regionId: number | null;
+};
 
 export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
   return (await db
-    .select({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder })
+    .select({
+      id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label,
+      active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId,
+    })
     .from(lookupOptions)
     .orderBy(asc(lookupOptions.type), asc(lookupOptions.sortOrder), asc(lookupOptions.label))) as OptionRow[];
 }
@@ -32,6 +43,9 @@ export const OPTION_COLUMN: Record<OptionType, keyof typeof members._.columns> =
   family_group: "familyGroupId",
   fellowship_category: "fellowshipCategoryId",
   group: "groupId",
+  // members.township stores the option *label* (text), not an id — usage counts
+  // and delete guards for 'township' compare labels (see admin routes).
+  township: "township",
 };
 
 export function isOptionType(v: string): v is OptionType {
@@ -46,4 +60,5 @@ export const OPTION_RAW_COLUMN: Record<OptionType, string> = {
   family_group: "family_group_id",
   fellowship_category: "fellowship_category_id",
   group: "group_id",
+  township: "township",
 };

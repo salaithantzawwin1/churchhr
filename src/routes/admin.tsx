@@ -291,6 +291,16 @@ adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (
 
 // ---------- Lookup options ----------
 
+/** "" -> null (all states); a region id -> itself; anything else -> false (invalid). */
+async function parseRegionId(db: DB, raw: unknown): Promise<number | null | false> {
+  const v = s(raw);
+  if (v === "") return null;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1) return false;
+  const rows = await db.select({ id: regions.id }).from(regions).where(eq(regions.id, n)).limit(1);
+  return rows[0] ? n : false;
+}
+
 async function optionsPage(c: any, type: string, opts: {
   addErrors?: string[];
   editError?: string | null;
@@ -303,15 +313,30 @@ async function optionsPage(c: any, type: string, opts: {
   const lang: "mm" | "en" = c.get("lang");
   const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
-  if (opts.modal) return c.html(<AddOptionForm type={type} lang={lang} modal />);
+  if (opts.modal) {
+    const stateList = await loadRegionsLite(db, lang);
+    return c.html(<AddOptionForm type={type} lang={lang} regions={stateList} modal />);
+  }
   const all = await loadAllOptions(db);
   const list = all.filter((o) => o.type === type);
   const column = OPTION_RAW_COLUMN[type as OptionType];
-  const usageRows = await db.all<{ oid: number; n: number }>(
-    sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
-  );
+  // 'township' stores its label in members.township (no id), so usage is counted by label.
+  const usageRows: { oid: string | number; n: number }[] = type === "township"
+    ? await db.all<{ oid: string; n: number }>(
+        sql`SELECT township AS oid, COUNT(*) AS n FROM members WHERE township IS NOT NULL AND township <> '' GROUP BY township`,
+      )
+    : await db.all<{ oid: number; n: number }>(
+        sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
+      );
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
-  const options: OptionUsage[] = list.map((o) => ({ id: o.id, label: o.label, active: o.active, used: usage.get(o.id) ?? 0 }));
+  const stateNames = await loadRegionsLite(db, lang);
+  const stateName = (id: number | null) =>
+    id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;
+  const options: OptionUsage[] = list.map((o) => ({
+    id: o.id, label: o.label, active: o.active,
+    used: usage.get(type === "township" ? o.label : o.id) ?? 0,
+    state: stateName(o.regionId ?? null),
+  }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
   const types = optionTabs(all, {
     region: Number(regionCount[0]?.n ?? 0),
@@ -321,7 +346,8 @@ async function optionsPage(c: any, type: string, opts: {
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
-      options={options} addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
+      options={options} regions={stateNames}
+      addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
       showAddForm={opts.showAddForm} lang={c.get("lang")}
     />,
   );
@@ -397,15 +423,22 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const type = s(body.type);
   const label = s(body.label);
   const back = `/admin/options${type ? `?type=${encodeURIComponent(type)}` : ""}`;
+  const stateList = await loadRegionsLite(db, c.get("lang"));
   const fail = (msg: string) =>
     fromModal
-      ? c.html(<AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label} modal />, 400)
+      ? c.html(
+          <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
+            regions={stateList} regionId={s(body.region_id)} modal />,
+          400,
+        )
       : c.redirect(errRedirect(back, msg), 302);
   if (!isOptionType(type)) return fail(t("adm.errOptionType"));
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
+  const regionId = await parseRegionId(db, body.region_id);
+  if (regionId === false) return fail(t("adm.errStateBad"));
   const all = await loadAllOptions(db);
   if (findOption(all, type, label)) return fail(t("adm.errLabelDup"));
-  await db.insert(lookupOptions).values({ type, label });
+  await db.insert(lookupOptions).values({ type, label, regionId });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 
@@ -417,7 +450,12 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
-  if (c.req.query("modal") === "1") return c.html(<EditOptionForm id={id} label={current.label} lang={lang} modal />);
+  const stateList = await loadRegionsLite(db, lang);
+  const formProps = {
+    id, label: current.label, lang,
+    type: current.type, regions: stateList, regionId: current.regionId == null ? "" : String(current.regionId),
+  };
+  if (c.req.query("modal") === "1") return c.html(<EditOptionForm {...formProps} modal />);
   const t = getDict(lang);
   return c.html(
     <Layout title={t("adm.optionsTitle")} lang={lang} user={c.get("user")} perms={c.get("perms")} active="/admin/options" flash={null}>
@@ -426,7 +464,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
         <a class="btn secondary" href={`/admin/options?type=${encodeURIComponent(current.type)}`}>{t("members.toList")}</a>
       </div>
       <div class="card">
-        <EditOptionForm id={id} label={current.label} lang={lang} />
+        <EditOptionForm {...formProps} />
       </div>
     </Layout>,
   );
@@ -449,16 +487,24 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
 
   const t = getDict(c.get("lang"));
   const label = s(body.label);
+  const regionId = await parseRegionId(db, body.region_id);
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const fail = (msg: string) =>
-    fromModal
-      ? c.html(<EditOptionForm id={id} label={label} lang={c.get("lang")} errors={[msg]} modal />, 400)
+  const stateList = await loadRegionsLite(db, c.get("lang"));
+  const fail = (msg: string) => {
+    const fp = {
+      id, label, lang: c.get("lang"), type: current.type, regions: stateList,
+      regionId: regionId === false ? s(body.region_id) : regionId == null ? "" : String(regionId),
+    };
+    return fromModal
+      ? c.html(<EditOptionForm {...fp} errors={[msg]} modal />, 400)
       : c.redirect(errRedirect(back, msg), 302);
+  };
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
+  if (regionId === false) return fail(t("adm.errStateBad"));
   const all = await loadAllOptions(db);
   const clash = findOption(all, current.type, label);
   if (clash && clash.id !== id) return fail(t("adm.errLabelDup"));
-  await db.update(lookupOptions).set({ label }).where(eq(lookupOptions.id, id));
+  await db.update(lookupOptions).set({ label, regionId }).where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 
@@ -472,9 +518,12 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
 
   const column = OPTION_RAW_COLUMN[current.type as OptionType];
-  const used = column
-    ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
-    : [{ n: 0 }];
+  // 'township' lives on members as a text label, not an id — count by label.
+  const used = current.type === "township"
+    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members WHERE township = ${current.label}`)
+    : column
+      ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
+      : [{ n: 0 }];
   if ((used[0]?.n ?? 0) > 0) {
     await db.update(lookupOptions).set({ active: 0 }).where(eq(lookupOptions.id, id));
     return c.redirect(`${back}&err=${encodeURIComponent("err-used")}`, 302);

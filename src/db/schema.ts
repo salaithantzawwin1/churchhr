@@ -105,10 +105,13 @@ export const lookupOptions = sqliteTable(
     label: text("label").notNull(),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Limit this option to one State/Region; null = available everywhere. */
+    regionId: integer("region_id").references(() => regions.id),
   },
   (t) => ({
     typeIdx: index("lookup_options_type_idx").on(t.type),
     typeLabelUq: uniqueIndex("lookup_options_type_label_uq").on(t.type, t.label),
+    regionIdx: index("lookup_options_region_idx").on(t.regionId),
   }),
 );
 
@@ -119,8 +122,15 @@ export const OPTION_TYPES = [
   "family_group",
   "fellowship_category",
   "group",
+  "township",
 ] as const;
 export type OptionType = (typeof OPTION_TYPES)[number];
+
+/** Option types that can be limited to one State/Region (member form cascade). */
+export const REGION_SCOPED_TYPES = ["township", "home_cell", "group"] as const;
+export function isRegionScopedType(type: string): boolean {
+  return (REGION_SCOPED_TYPES as readonly string[]).includes(type);
+}
 
 export const OPTION_TYPE_LABELS: Record<OptionType, string> = {
   ethnicity: "လူမျိုး (Ethnicity)",
@@ -129,6 +139,7 @@ export const OPTION_TYPE_LABELS: Record<OptionType, string> = {
   family_group: "Family Group",
   fellowship_category: "Fellowship Categories",
   group: "Group",
+  township: "မြို့နယ် (Township)",
 };
 
 export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
@@ -138,6 +149,7 @@ export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
   family_group: "Family Group",
   fellowship_category: "Fellowship Categories",
   group: "Group",
+  township: "Township",
 };
 
 export const members = sqliteTable(
