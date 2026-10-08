@@ -102,6 +102,40 @@
   }
   initRegionCascade(document);
 
+  // Member list column chooser: each checkbox shows/hides the matching th+td
+  // (data-col) and the choice persists in localStorage so it survives reloads.
+  (function initColChooser() {
+    var table = document.querySelector("table.list-tbl");
+    var chooser = document.querySelector(".col-chooser");
+    if (!table || !chooser) return;
+    var KEY = "member-cols";
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+    var boxes = chooser.querySelectorAll("input[data-col]");
+    function apply() {
+      var off = {};
+      Array.prototype.forEach.call(boxes, function (b) {
+        off[b.getAttribute("data-col")] = !b.checked;
+      });
+      Array.prototype.forEach.call(table.querySelectorAll("[data-col]"), function (cell) {
+        cell.style.display = off[cell.getAttribute("data-col")] ? "none" : "";
+      });
+      var st = {};
+      Array.prototype.forEach.call(boxes, function (b) {
+        st[b.getAttribute("data-col")] = b.checked;
+      });
+      try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+    }
+    Array.prototype.forEach.call(boxes, function (b) {
+      var k = b.getAttribute("data-col");
+      // Restore the saved choice when there is one; otherwise the markup default
+      // (everything except ID visible) applies.
+      b.checked = saved[k] === undefined ? k !== "id" : !!saved[k];
+      b.addEventListener("change", apply);
+    });
+    apply();
+  })();
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");

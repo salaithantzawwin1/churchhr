@@ -189,6 +189,18 @@ textarea { min-height: 84px; resize: vertical; }
 .login-logo .t2 { color: var(--muted); font-size: 13px; margin-top: 2px; }
 /* ---------- dashboard / KPI stat cards ---------- */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 12px; }
+/* ---------- member list column chooser ---------- */
+.col-chooser { position: relative; display: inline-block; margin-bottom: 10px; }
+.col-chooser summary { list-style: none; }
+.col-chooser summary::-webkit-details-marker { display: none; }
+.col-menu {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 330px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 6px 16px; box-shadow: var(--hover-shadow);
+}
+.col-menu label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink); white-space: nowrap; cursor: pointer; }
+.col-menu input { width: auto; }
 .stat {
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
   padding: 14px 16px; display: flex; flex-direction: column; gap: 7px;
@@ -254,7 +266,8 @@ th.bar-col { width: 42%; }
 }
 /* ---------- responsive: large desktop (≥1400px) ---------- */
 @media (min-width: 1400px) {
-  .container { max-width: 1360px; }
+  /* 1600px so the 14-column member list fits without horizontal scrolling. */
+  .container { max-width: 1600px; }
 }
 /* ---------- responsive: phones (≤640px) ---------- */
 @media (max-width: 640px) {

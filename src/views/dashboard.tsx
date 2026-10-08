@@ -117,10 +117,11 @@ export function DashboardPage(props: {
         </label>
         <label class="field">
           <span class="lbl">{t("members.township")}</span>
-          <select name="township">
+          <select name="township" data-region-filter="1">
             <option value="">{t("members.all")}</option>
-            {data.townships.map((x) => (
-              <option value={x} selected={data.filters.township === x}>{x}</option>
+            {data.townships.map((o) => (
+              <option value={o.label} selected={data.filters.township === o.label}
+                data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
             ))}
           </select>
         </label>

@@ -55,6 +55,23 @@ function filterQs(f: Filters, page?: number): string {
   });
 }
 
+/** Member list columns (data-col keys shared by <th>/<td> and the chooser JS). */
+const LIST_COLS = (t: (k: string) => string) => [
+  { key: "id", label: t("members.thId") },
+  { key: "name", label: t("members.thName") },
+  { key: "gender", label: t("members.gender") },
+  { key: "age", label: t("members.thAge") },
+  { key: "phone", label: t("members.thPhone") },
+  { key: "state", label: t("members.state") },
+  { key: "township", label: t("members.township") },
+  { key: "marital", label: t("members.thMarital") },
+  { key: "homeCell", label: t("members.thHomeCell") },
+  { key: "group", label: t("members.thGroup") },
+  { key: "familyGroup", label: t("members.thFamilyGroup") },
+  { key: "fellowship", label: t("form.fellowship") },
+  { key: "status", label: t("members.status") },
+];
+
 export function MembersListPage(props: ListProps) {
   const { user, perms, flash, rows, total, page, pages, filters: f, regions, homeCells, groups, fellowships, lang } = props;
   const t = getDict(lang ?? "mm");
@@ -66,6 +83,7 @@ export function MembersListPage(props: ListProps) {
   const canDelete = perms.has("members.delete");
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
+  const cols = LIST_COLS(t);
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
@@ -144,12 +162,25 @@ export function MembersListPage(props: ListProps) {
         </div>
       </form>
 
+      <div class="col-chooser">
+        <details>
+          <summary class="btn secondary sm">{t("members.cols")}</summary>
+          <div class="col-menu">
+            {cols.map((c) => (
+              <label>
+                <input type="checkbox" data-col={c.key} checked={c.key !== "id"} /> {c.label}
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
+
       <div class="tbl-wrap">
         <table class="list-tbl">
           <thead>
             <tr>
-              <th>{t("members.thId")}</th><th>{t("members.thName")}</th><th>{t("members.gender")}</th><th>{t("members.thAge")}</th><th>{t("members.thPhone")}</th><th>{t("members.state")}</th>
-              <th>{t("members.township")}</th><th>{t("members.thMarital")}</th><th>{t("members.thHomeCell")}</th><th>{t("members.thGroup")}</th><th>{t("members.thFamilyGroup")}</th><th>{t("form.fellowship")}</th><th>{t("members.status")}</th><th></th>
+              {cols.map((c) => <th data-col={c.key}>{c.label}</th>)}
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -163,23 +194,23 @@ export function MembersListPage(props: ListProps) {
             )}
             {rows.map((m) => (
               <tr>
-                <td>{m.member_code ?? `#${m.id}`}</td>
-                <td class="cell-wrap">
+                <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
+                <td data-col="name">
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
-                  {m.name_myanmar && m.name_english && <div class="muted small">{m.name_english}</div>}
+                  {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
                 </td>
-                <td>{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
-                <td>{ageFromDate(m.date_of_birth) ?? ""}</td>
-                <td>{m.phone ?? ""}</td>
-                <td>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
-                <td>{m.township ?? ""}</td>
-                <td>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
-                <td>{m.home_cell ?? ""}</td>
-                <td>{m.group_label ?? ""}</td>
-                <td>{m.family_group ?? ""}</td>
-                <td>{m.fellowship ?? ""}</td>
-                <td><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
-                <td>
+                <td data-col="gender">{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
+                <td data-col="age">{ageFromDate(m.date_of_birth) ?? ""}</td>
+                <td data-col="phone">{m.phone ?? ""}</td>
+                <td data-col="state">{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
+                <td data-col="township">{m.township ?? ""}</td>
+                <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
+                <td data-col="homeCell">{m.home_cell ?? ""}</td>
+                <td data-col="group">{m.group_label ?? ""}</td>
+                <td data-col="familyGroup">{m.family_group ?? ""}</td>
+                <td data-col="fellowship">{m.fellowship ?? ""}</td>
+                <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
+                <td style="white-space:nowrap">
                   {perms.has("members.update") && (
                     <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
                   )}{" "}
