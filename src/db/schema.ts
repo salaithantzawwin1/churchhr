@@ -105,13 +105,16 @@ export const lookupOptions = sqliteTable(
     label: text("label").notNull(),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
-    /** Limit this option to one State/Region; null = available everywhere. */
-    regionId: integer("region_id").references(() => regions.id),
+    /** State this option belongs to; 0 = available in every state (all-states wildcard, no FK). */
+    regionId: integer("region_id").notNull().default(0),
+    /** Optional parent option: Home Cell -> Township, Family Group -> Home Cell. */
+    parentId: integer("parent_id"),
   },
   (t) => ({
     typeIdx: index("lookup_options_type_idx").on(t.type),
-    typeLabelUq: uniqueIndex("lookup_options_type_label_uq").on(t.type, t.label),
+    typeLabelUq: uniqueIndex("lookup_options_type_label_uq").on(t.type, t.label, t.regionId),
     regionIdx: index("lookup_options_region_idx").on(t.regionId),
+    parentIdx: index("lookup_options_parent_idx").on(t.parentId),
   }),
 );
 
@@ -127,7 +130,7 @@ export const OPTION_TYPES = [
 export type OptionType = (typeof OPTION_TYPES)[number];
 
 /** Option types that can be limited to one State/Region (member form cascade). */
-export const REGION_SCOPED_TYPES = ["township", "home_cell", "group"] as const;
+export const REGION_SCOPED_TYPES = ["township", "home_cell", "group", "family_group"] as const;
 export function isRegionScopedType(type: string): boolean {
   return (REGION_SCOPED_TYPES as readonly string[]).includes(type);
 }

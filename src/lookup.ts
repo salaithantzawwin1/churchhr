@@ -1,6 +1,9 @@
-import { asc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { lookupOptions, members, OPTION_TYPES, type OptionType } from "./db/schema";
+
+/** region_id wildcard: the option is available in every State/Region. */
+export const ALL_STATES = 0;
 
 export type OptionRow = {
   id: number;
@@ -8,15 +11,18 @@ export type OptionRow = {
   label: string;
   active: number;
   sortOrder: number;
-  /** null = available in every State/Region. */
-  regionId: number | null;
+  /** State this option belongs to; 0 = available in every state. */
+  regionId: number;
+  /** Optional parent option id (Home Cell -> Township, Family Group -> Home Cell). */
+  parentId: number | null;
 };
 
 export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
   return (await db
     .select({
       id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label,
-      active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId,
+      active: lookupOptions.active, sortOrder: lookupOptions.sortOrder,
+      regionId: lookupOptions.regionId, parentId: lookupOptions.parentId,
     })
     .from(lookupOptions)
     .orderBy(asc(lookupOptions.type), asc(lookupOptions.sortOrder), asc(lookupOptions.label))) as OptionRow[];
@@ -26,13 +32,39 @@ export function optionsOfType(all: OptionRow[], type: OptionType): OptionRow[] {
   return all.filter((o) => o.type === type);
 }
 
-/** Case-insensitive label match within a type (for form/import resolution). */
-export function findOption(all: OptionRow[], type: string, label: string): OptionRow | undefined {
-  const want = norm(label);
-  return all.find((o) => o.type === type && norm(o.label) === want);
-}
-function norm(v: string): string {
+/** lookup type of the parent option for a child type (null = no parent chain). */
+export const PARENT_TYPE: Partial<Record<string, string>> = {
+  home_cell: "township",
+  family_group: "home_cell",
+};
+
+export function normLabel(v: string): string {
   return v.trim().toLowerCase().replace(/\s+/g, " ");
+}
+const norm = normLabel;
+
+/**
+ * Case-insensitive label match within a type. Region-aware: an option scoped to
+ * one state only resolves for that state; 0 (all-states) options match anywhere.
+ * Used by the member form and CSV import — `regionId` 0/undefined = don't care.
+ */
+export function findOption(
+  all: OptionRow[],
+  type: string,
+  label: string,
+  regionId?: number,
+): OptionRow | undefined {
+  const want = norm(label);
+  const matches = all.filter((o) => o.type === type && norm(o.label) === want);
+  if (regionId === undefined || regionId === null || regionId === ALL_STATES) {
+    // No region context: prefer an exact-state option if labels collide,
+    // otherwise fall back to an all-states option.
+    return matches.find((o) => o.regionId !== ALL_STATES) ?? matches.find((o) => o.regionId === ALL_STATES);
+  }
+  return (
+    matches.find((o) => o.regionId === regionId) ??
+    matches.find((o) => o.regionId === ALL_STATES)
+  );
 }
 
 /** member column for each lookup type (used for usage counts / delete guards). */

@@ -484,7 +484,8 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
     for (const [field, type] of Object.entries(IMPORT_OPTION_FIELDS)) {
       const label = rec(field);
       if (!label) continue;
-      const found = findOption(allOptions, type, label);
+      // Resolve within the row's state first; all-states options match anywhere.
+      const found = findOption(allOptions, type, label, regionId ?? 0);
       if (found) optionLabels[field] = String(found.id);
       else {
         optionLabels[field] = `new:${type}:${normKey(label)}`;
@@ -558,14 +559,18 @@ const TYPE_TO_COLUMN: Record<string, string> = {
   home_cell: "home_cell_id",
 };
 
-async function ensureOption(db: DB, cache: OptionRow[], type: string, label: string, lang: "mm" | "en"): Promise<number> {
-  const hit = findOption(cache, type, label);
+/** Find or create an import option. Rows without a state fall back to the
+ * all-states (regionId 0) option; rows with a state resolve/create region-scoped. */
+async function ensureOption(
+  db: DB, cache: OptionRow[], type: string, label: string, lang: "mm" | "en", regionId = 0,
+): Promise<number> {
+  const hit = findOption(cache, type, label, regionId);
   if (hit) return hit.id;
   try {
     const rows = await db
       .insert(lookupOptions)
-      .values({ type, label })
-      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId });
+      .values({ type, label, regionId })
+      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId });
     cache.push(rows[0]!);
     return rows[0]!.id;
   } catch {
@@ -615,7 +620,11 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
           if (!col) continue;
           if (val.startsWith("new:")) {
             const p = pending.get(val.slice(4));
-            if (p) data[col] = await ensureOption(db, optionCache, p.type, p.label, lang);
+            if (p) {
+              // Create the option in the member's state (0 when the row has no state).
+              const rowRegion = Number(data.region_id ?? 0) || 0;
+              data[col] = await ensureOption(db, optionCache, p.type, p.label, lang, rowRegion);
+            }
           } else {
             data[col] = Number(val);
           }

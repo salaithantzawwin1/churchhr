@@ -34,6 +34,8 @@
 
   // State/Region cascade: Township / Home Cell / Group dropdowns only show
   // options that belong to the selected state (no data-region = all states).
+  // Chained pickers (data-parent-filter) additionally narrow by the selected
+  // parent option: Home Cell under Township, Family Group under Home Cell.
   function applyRegionFilters(form, keepSelection) {
     var regionSel = form.querySelector("select[data-region-select]");
     if (!regionSel) return;
@@ -54,6 +56,34 @@
       // Reset a selection that no longer belongs to the chosen state.
       if (keepSelection && current && !matched) sel.value = "";
     });
+    applyParentFilters(form, keepSelection);
+  }
+
+  /** Narrow data-parent-filter selects by the currently visible parent selection,
+   * while respecting the state filter so region-hidden options stay hidden. */
+  function applyParentFilters(form, keepSelection) {
+    var regionSel = form.querySelector("select[data-region-select]");
+    var region = regionSel ? regionSel.value : "";
+    Array.prototype.forEach.call(form.querySelectorAll("select[data-parent-filter]"), function (sel) {
+      var parentType = sel.getAttribute("data-parent-filter");
+      var parentSel = form.querySelector('select[name="' + parentType + '"]');
+      var parentId = parentSel ? parentSel.value : "";
+      var current = sel.value;
+      var matched = false;
+      Array.prototype.forEach.call(sel.options, function (o) {
+        if (!o.value) return;
+        var p = o.getAttribute("data-parent");
+        var r = o.getAttribute("data-region");
+        // State filter: data-region="" = all states. Parent filter: data-parent=""
+        // = unassigned -> always visible; otherwise matches the picked parent.
+        var regionOk = !r || !region || r === region;
+        var parentOk = !p || !parentId || p === parentId;
+        var show = regionOk && parentOk;
+        o.hidden = !show;
+        if (show && o.value === current) matched = true;
+      });
+      if (keepSelection && current && !matched) sel.value = "";
+    });
   }
 
   function initRegionCascade(root) {
@@ -63,6 +93,11 @@
       form.setAttribute("data-cascade", "1");
       applyRegionFilters(form, false);
       regionSel.addEventListener("change", function () { applyRegionFilters(form, true); });
+      // Chained pickers re-filter when their parent changes.
+      var township = form.querySelector('select[name="township"]');
+      if (township) township.addEventListener("change", function () { applyParentFilters(form, true); });
+      var cell = form.querySelector('select[name="home_cell_id"]');
+      if (cell) cell.addEventListener("change", function () { applyParentFilters(form, true); });
     });
   }
   initRegionCascade(document);

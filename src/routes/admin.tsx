@@ -9,7 +9,7 @@ import {
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
-import { findOption, loadAllOptions, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
+import { findOption, loadAllOptions, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
@@ -291,13 +291,24 @@ adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (
 
 // ---------- Lookup options ----------
 
-/** "" -> null (all states); a region id -> itself; anything else -> false (invalid). */
-async function parseRegionId(db: DB, raw: unknown): Promise<number | null | false> {
+/** ""/absent -> 0 (all states); a region id -> itself; anything else -> false (invalid). */
+async function parseRegionId(db: DB, raw: unknown): Promise<number | false> {
   const v = s(raw);
-  if (v === "") return null;
+  if (v === "") return 0;
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1) return false;
   const rows = await db.select({ id: regions.id }).from(regions).where(eq(regions.id, n)).limit(1);
+  return rows[0] ? n : false;
+}
+
+/** ""/absent -> null (no parent); a valid option id of the expected parent type -> itself; else false. */
+async function parseParentId(db: DB, raw: unknown, parentType: string | undefined): Promise<number | null | false> {
+  const v = s(raw);
+  if (v === "" || !parentType) return parentType ? null : false;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1) return false;
+  const rows = await db.select({ id: lookupOptions.id }).from(lookupOptions)
+    .where(and(eq(lookupOptions.id, n), eq(lookupOptions.type, parentType))).limit(1);
   return rows[0] ? n : false;
 }
 
@@ -315,7 +326,12 @@ async function optionsPage(c: any, type: string, opts: {
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
   if (opts.modal) {
     const stateList = await loadRegionsLite(db, lang);
-    return c.html(<AddOptionForm type={type} lang={lang} regions={stateList} modal />);
+    const all = await loadAllOptions(db);
+    const parentType = PARENT_TYPE[type];
+    return c.html(
+      <AddOptionForm type={type} lang={lang} regions={stateList} modal
+        parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1) : []} />,
+    );
   }
   const all = await loadAllOptions(db);
   const list = all.filter((o) => o.type === type);
@@ -332,10 +348,12 @@ async function optionsPage(c: any, type: string, opts: {
   const stateNames = await loadRegionsLite(db, lang);
   const stateName = (id: number | null) =>
     id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;
+  const labelById = new Map(all.map((o) => [o.id, o.label] as const));
   const options: OptionUsage[] = list.map((o) => ({
     id: o.id, label: o.label, active: o.active,
     used: usage.get(type === "township" ? o.label : o.id) ?? 0,
     state: stateName(o.regionId ?? null),
+    parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
   }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
   const types = optionTabs(all, {
@@ -347,6 +365,9 @@ async function optionsPage(c: any, type: string, opts: {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
       options={options} regions={stateNames}
+      parentOptions={PARENT_TYPE[type]
+        ? all.filter((o) => o.type === PARENT_TYPE[type] && o.active === 1)
+        : []}
       addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
       showAddForm={opts.showAddForm} lang={c.get("lang")}
     />,
@@ -428,7 +449,7 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
     fromModal
       ? c.html(
           <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
-            regions={stateList} regionId={s(body.region_id)} modal />,
+            regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)} modal />,
           400,
         )
       : c.redirect(errRedirect(back, msg), 302);
@@ -436,9 +457,21 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
   const regionId = await parseRegionId(db, body.region_id);
   if (regionId === false) return fail(t("adm.errStateBad"));
+  const parentType = PARENT_TYPE[type];
+  const parentId = await parseParentId(db, body.parent_id, parentType);
+  if (parentId === false) return fail(t("adm.errParentBad"));
   const all = await loadAllOptions(db);
-  if (findOption(all, type, label)) return fail(t("adm.errLabelDup"));
-  await db.insert(lookupOptions).values({ type, label, regionId });
+  // Same label may exist per state (or once as an all-states option), so the
+  // duplicate check is scoped to this region.
+  if (findOption(all, type, label, regionId)) return fail(t("adm.errLabelDup"));
+  // A parented option inherits its parent's state; an all-states parent means
+  // the child is all-states too unless a state was picked explicitly.
+  let effectiveRegion = regionId;
+  if (parentId != null) {
+    const parent = all.find((o) => o.id === parentId);
+    if (parent && parent.regionId !== 0) effectiveRegion = parent.regionId;
+  }
+  await db.insert(lookupOptions).values({ type, label, regionId: effectiveRegion, parentId });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 
@@ -451,9 +484,16 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
   const stateList = await loadRegionsLite(db, lang);
+  const allOpts = await loadAllOptions(db);
+  const parentType = PARENT_TYPE[current.type];
   const formProps = {
     id, label: current.label, lang,
-    type: current.type, regions: stateList, regionId: current.regionId == null ? "" : String(current.regionId),
+    type: current.type, regions: stateList,
+    regionId: current.regionId === 0 ? "" : String(current.regionId),
+    parentId: current.parentId == null ? "" : String(current.parentId),
+    parentOptions: parentType
+      ? allOpts.filter((o) => o.type === parentType && o.active === 1)
+      : [],
   };
   if (c.req.query("modal") === "1") return c.html(<EditOptionForm {...formProps} modal />);
   const t = getDict(lang);
@@ -488,12 +528,19 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   const t = getDict(c.get("lang"));
   const label = s(body.label);
   const regionId = await parseRegionId(db, body.region_id);
+  const parentType = PARENT_TYPE[current.type];
+  const parentId = await parseParentId(db, body.parent_id, parentType);
   const fromModal = c.req.header("X-Requested-With") === "modal";
   const stateList = await loadRegionsLite(db, c.get("lang"));
+  const allOpts = await loadAllOptions(db);
+  const parentOptions = parentType
+    ? allOpts.filter((o) => o.type === parentType && o.active === 1)
+    : [];
   const fail = (msg: string) => {
     const fp = {
-      id, label, lang: c.get("lang"), type: current.type, regions: stateList,
-      regionId: regionId === false ? s(body.region_id) : regionId == null ? "" : String(regionId),
+      id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions,
+      regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
+      parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
     };
     return fromModal
       ? c.html(<EditOptionForm {...fp} errors={[msg]} modal />, 400)
@@ -501,10 +548,15 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   };
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
   if (regionId === false) return fail(t("adm.errStateBad"));
-  const all = await loadAllOptions(db);
-  const clash = findOption(all, current.type, label);
+  if (parentId === false) return fail(t("adm.errParentBad"));
+  const clash = findOption(allOpts, current.type, label, regionId);
   if (clash && clash.id !== id) return fail(t("adm.errLabelDup"));
-  await db.update(lookupOptions).set({ label, regionId }).where(eq(lookupOptions.id, id));
+  let effectiveRegion = regionId;
+  if (parentId != null) {
+    const parent = allOpts.find((o) => o.id === parentId);
+    if (parent && parent.regionId !== 0) effectiveRegion = parent.regionId;
+  }
+  await db.update(lookupOptions).set({ label, regionId: effectiveRegion, parentId }).where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 

@@ -203,13 +203,27 @@ type FormProps = Common & {
   options: Record<string, OptionRow[]>;
 };
 
-function opts(options: OptionRow[], selected: string, blank: string) {
+function opts(
+  options: OptionRow[], selected: string, blank: string,
+  /** township id -> label, so Home Cell options carry their township's label. */
+  townshipLabelById?: Map<number, string>,
+) {
   return (
     <>
       <option value="">{blank}</option>
-      {options.map((o) => (
-        <option value={String(o.id)} selected={selected === String(o.id)} data-region={o.regionId ?? ""}>{o.label}</option>
-      ))}
+      {options.map((o) => {
+        // Home Cell parents are townships, whose select value is the label —
+        // store the label so the client-side cascade can compare directly.
+        let parent = o.parentId ?? "";
+        if (o.type === "home_cell" && parent && townshipLabelById && o.parentId !== null) {
+          parent = townshipLabelById.get(o.parentId) ?? "";
+        }
+        return (
+          <option value={String(o.id)} selected={selected === String(o.id)}
+            data-region={o.regionId === 0 ? "" : String(o.regionId)}
+            data-parent={parent}>{o.label}</option>
+        );
+      })}
     </>
   );
 }
@@ -220,7 +234,9 @@ function townshipOpts(options: OptionRow[], selected: string, blank: string) {
     <>
       <option value="">{blank}</option>
       {options.map((o) => (
-        <option value={o.label} selected={selected === o.label} data-region={o.regionId ?? ""}>{o.label}</option>
+        <option value={o.label} selected={selected === o.label}
+          data-region={o.regionId === 0 ? "" : String(o.regionId)}
+          data-parent="">{o.label}</option>
       ))}
     </>
   );
@@ -263,6 +279,9 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const action = member ? `/members/${member.id}` : "/members";
   const edit = member !== null;
   const dob = v.date_of_birth || "";
+  const townshipLabelById = new Map(
+    (options.township ?? []).map((o) => [o.id, o.label] as const),
+  );
   return (
     <>
       {errors.length > 0 && (
@@ -346,8 +365,9 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                 )}
               </select>
             </label>
-            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById)}</select></label>
             <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id" data-region-filter="1">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>{select("status", S, v.status || "active", "")}</label>
