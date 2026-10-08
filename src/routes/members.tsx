@@ -134,11 +134,16 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const rows = await db.all(sql`
     SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.phone, m.status,
-           r.name AS state_name, r.name_en AS state_name_en, hc.label AS home_cell, gr.label AS group_label
+           m.date_of_birth, m.marital_status, m.township,
+           r.name AS state_name, r.name_en AS state_name_en,
+           hc.label AS home_cell, gr.label AS group_label,
+           fg.label AS family_group, fc.label AS fellowship
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
+    LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
+    LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
     WHERE ${cond}
     ORDER BY m.id DESC
     LIMIT ${PER_PAGE} OFFSET ${offset}`);

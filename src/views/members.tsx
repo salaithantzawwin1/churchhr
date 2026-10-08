@@ -2,9 +2,9 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
+import { ageFromDate, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, MARITAL_STATUSES, MARITAL_STATUSES_EN, STATUSES, STATUSES_EN } from "../enums";
 import { getDict, type Lang } from "../i18n";
-import { ageFromDate, qs } from "../util";
 
 export type MemberListItem = {
   id: number;
@@ -18,6 +18,11 @@ export type MemberListItem = {
   home_cell: string | null;
   group_label: string | null;
   status: string;
+  date_of_birth: string | null;
+  marital_status: string;
+  township: string | null;
+  family_group: string | null;
+  fellowship: string | null;
 };
 
 export type Filters = {
@@ -56,6 +61,7 @@ export function MembersListPage(props: ListProps) {
   const isEn = (lang ?? "mm") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
   const S = isEn ? STATUSES_EN : STATUSES;
+  const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
   const canCreate = perms.has("members.create");
   const canDelete = perms.has("members.delete");
   const canExport = perms.has("members.export");
@@ -142,14 +148,14 @@ export function MembersListPage(props: ListProps) {
         <table class="list-tbl">
           <thead>
             <tr>
-              <th>{t("members.thId")}</th><th>{t("members.thName")}</th><th>{t("members.gender")}</th><th>{t("members.thPhone")}</th><th>{t("members.state")}</th>
-              <th>{t("members.thHomeCell")}</th><th>{t("members.thGroup")}</th><th>{t("members.status")}</th><th></th>
+              <th>{t("members.thId")}</th><th>{t("members.thName")}</th><th>{t("members.gender")}</th><th>{t("members.thAge")}</th><th>{t("members.thPhone")}</th><th>{t("members.state")}</th>
+              <th>{t("members.township")}</th><th>{t("members.thMarital")}</th><th>{t("members.thHomeCell")}</th><th>{t("members.thGroup")}</th><th>{t("members.thFamilyGroup")}</th><th>{t("form.fellowship")}</th><th>{t("members.status")}</th><th></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} class="empty-state">
+                <td colSpan={14} class="empty-state">
                   <strong>{t("members.empty")}</strong>
                   {canCreate && <div class="small">{t("members.emptyHint")}</div>}
                 </td>
@@ -163,10 +169,15 @@ export function MembersListPage(props: ListProps) {
                   {m.name_myanmar && m.name_english && <div class="muted small">{m.name_english}</div>}
                 </td>
                 <td>{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
+                <td>{ageFromDate(m.date_of_birth) ?? ""}</td>
                 <td>{m.phone ?? ""}</td>
                 <td>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
+                <td>{m.township ?? ""}</td>
+                <td>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td>{m.home_cell ?? ""}</td>
                 <td>{m.group_label ?? ""}</td>
+                <td>{m.family_group ?? ""}</td>
+                <td>{m.fellowship ?? ""}</td>
                 <td><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
                 <td style="white-space:nowrap">
                   {perms.has("members.update") && (
