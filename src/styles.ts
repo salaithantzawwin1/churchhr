@@ -124,6 +124,11 @@ table { width: 100%; border-collapse: collapse; background: var(--card); }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
 th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; font-variant-numeric: tabular-nums; }
 th { background: var(--th-bg); font-weight: 600; white-space: nowrap; }
+/* Wide tables (member list has 14 columns): keep short values on one line so a
+   row's height is driven by the name column, not by township/status labels
+   wrapping mid-syllable. Long text columns opt out via .cell-wrap. */
+.list-tbl td { white-space: nowrap; }
+.list-tbl td.cell-wrap { white-space: normal; }
 tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row-hover); }
 .muted { color: var(--muted); }
@@ -269,8 +274,10 @@ th.bar-col { width: 42%; }
   table.list-tbl { min-width: 760px; }
   .tbl-wrap { -webkit-overflow-scrolling: touch; }
   /* Keep cell content on one line inside the horizontal scroller — wrapping a
-     name one syllable per line is unreadable. */
+     name one syllable per line is unreadable. (Wide-table nowrap now lives in
+     the base .list-tbl rules; only the name column needs a floor here.) */
   .tbl-wrap td:not(.empty-state) { white-space: nowrap; }
+  .tbl-wrap td.cell-wrap { white-space: normal; }
   .tbl-wrap td:nth-child(2) { min-width: 130px; }
   .form-grid { grid-template-columns: 1fr; gap: 12px; }
   .btn { min-height: 40px; }

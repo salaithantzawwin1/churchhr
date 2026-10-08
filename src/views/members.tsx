@@ -164,7 +164,7 @@ export function MembersListPage(props: ListProps) {
             {rows.map((m) => (
               <tr>
                 <td>{m.member_code ?? `#${m.id}`}</td>
-                <td>
+                <td class="cell-wrap">
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
                   {m.name_myanmar && m.name_english && <div class="muted small">{m.name_english}</div>}
                 </td>
@@ -179,7 +179,7 @@ export function MembersListPage(props: ListProps) {
                 <td>{m.family_group ?? ""}</td>
                 <td>{m.fellowship ?? ""}</td>
                 <td><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
-                <td style="white-space:nowrap">
+                <td>
                   {perms.has("members.update") && (
                     <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
                   )}{" "}
