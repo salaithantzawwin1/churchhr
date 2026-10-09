@@ -47,6 +47,12 @@ const validMsgKeys: Record<string, string> = {
   "imp.badDob": "imp.badDob",
   "imp.badSalvation": "imp.badSalvation",
   "imp.badIncome": "imp.badIncome",
+  "imp.noFile": "imp.noFile",
+  "imp.noCsvData": "imp.noCsvData",
+  "imp.fileTooBig": "imp.fileTooBig",
+  "imp.tooLarge": "imp.tooLarge",
+  "imp.failed": "imp.failed",
+  "imp.cannotAddOption": "imp.cannotAddOption",
 };
 
 /** Marks a message as a translate-at-render key (called from sync validators). */
