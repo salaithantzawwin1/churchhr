@@ -124,6 +124,11 @@ table { width: 100%; border-collapse: collapse; background: var(--card); }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
 th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; font-variant-numeric: tabular-nums; }
 th { background: var(--th-bg); font-weight: 600; white-space: nowrap; }
+/* Sortable list headers: the whole label is the link; arrow marks the active sort. */
+th .th-sort { color: inherit; text-decoration: none; }
+th .th-sort:hover { text-decoration: underline; }
+th.sorted { color: var(--link); }
+th .sort-ind { font-size: 11px; }
 /* Wide tables (member list has 14 columns): keep short values on one line so a
    row's height is driven by the name column, not by township/status labels
    wrapping mid-syllable. Long text columns opt out via .cell-wrap. */

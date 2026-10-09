@@ -117,7 +117,34 @@ function scopedRegions(all: Region[], scope: Scope, lang: "mm" | "en"): { id: nu
     .map((r) => ({ id: r.id, name: lang === "en" && r.nameEn ? r.nameEn : r.name }));
 }
 
-// ---------- GET /members (list + search + filter + pagination) ----------
+// ---------- GET /members (list + search + filter + sort + pagination) ----------
+
+/** Whitelisted ORDER BY expressions per sortable column key. Fixed strings
+ *  only — the key comes from the query string but the SQL never does. */
+const SORT_EXPR: Record<string, string> = {
+  id: "m.id",
+  name: "COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '')",
+  gender: "m.gender",
+  age: "m.date_of_birth",
+  phone: "m.phone",
+  state: "r.name",
+  township: "m.township",
+  marital: "m.marital_status",
+  homeCell: "hc.label",
+  group: "gr.label",
+  familyGroup: "fg.label",
+  fellowship: "fc.label",
+  status: "m.status",
+};
+
+/** Resolve the query-string sort into an ORDER BY fragment (default: newest first). */
+function orderByFrom(q: Record<string, string | undefined>): string {
+  const key = q.sort && SORT_EXPR[q.sort] ? q.sort : "";
+  const dir = q.dir === "desc" ? "DESC" : "ASC";
+  if (!key) return "m.id DESC";
+  // Empty values sort last regardless of direction, then a stable id tiebreak.
+  return `(COALESCE(${SORT_EXPR[key]}, '') = '') ASC, ${SORT_EXPR[key]} ${dir}, m.id DESC`;
+}
 
 membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
@@ -145,7 +172,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
     WHERE ${cond}
-    ORDER BY m.id DESC
+    ORDER BY ${sql.raw(orderByFrom(c.req.query()))}
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
 
   const allRegions = await loadRegions(db);
@@ -154,6 +181,8 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       rows={rows as any} total={total} page={currentPage} pages={pages} filters={f}
+      sort={SORT_EXPR[c.req.query("sort") ?? ""] ? (c.req.query("sort") as string) : ""}
+      dir={c.req.query("dir") === "desc" ? "desc" : "asc"}
       regions={scopedRegions(allRegions, scope, c.get("lang"))}
       homeCells={optionsOfType(allOptions, "home_cell")}
       groups={optionsOfType(allOptions, "group")}

@@ -42,6 +42,8 @@ type ListProps = Common & {
   page: number;
   pages: number;
   filters: Filters;
+  sort: string;
+  dir: "asc" | "desc";
   regions: { id: number; name: string }[];
   homeCells: OptionRow[];
   groups: OptionRow[];
@@ -55,7 +57,18 @@ function filterQs(f: Filters, page?: number): string {
   });
 }
 
+/** Filter/pagination query plus the current sort, for header sort links. */
+function sortQs(f: Filters, sort: string, dir: string): string {
+  const base = filterQs(f);
+  const extra = `sort=${sort}&dir=${dir}`;
+  return base ? `${base}&${extra}` : `?${extra}`;
+}
+
 /** Member list columns (data-col keys shared by <th>/<td> and the chooser JS). */
+const SORTABLE = new Set([
+  "id", "name", "gender", "age", "phone", "state", "township", "marital",
+  "homeCell", "group", "familyGroup", "fellowship", "status",
+]);
 const LIST_COLS = (t: (k: string) => string) => [
   { key: "id", label: t("members.thId") },
   { key: "name", label: t("members.thName") },
@@ -73,7 +86,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, regions, homeCells, groups, fellowships, lang } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, groups, fellowships, lang } = props;
   const t = getDict(lang ?? "mm");
   const isEn = (lang ?? "mm") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
@@ -179,7 +192,19 @@ export function MembersListPage(props: ListProps) {
         <table class="list-tbl">
           <thead>
             <tr>
-              {cols.map((c) => <th data-col={c.key}>{c.label}</th>)}
+              {cols.map((c) => {
+                // Server-side sort: header links toggle asc/desc and keep the
+                // filters; the active column shows a direction arrow.
+                const active = sort === c.key;
+                const nextDir: "asc" | "desc" = active && dir === "asc" ? "desc" : "asc";
+                return (
+                  <th data-col={c.key} class={active ? "sorted" : ""}>
+                    <a class="th-sort" href={`/members${sortQs(f, c.key, nextDir)}`}>
+                      {c.label}{active && <span class="sort-ind">{dir === "asc" ? " ▲" : " ▼"}</span>}
+                    </a>
+                  </th>
+                );
+              })}
               <th></th>
             </tr>
           </thead>
@@ -229,9 +254,9 @@ export function MembersListPage(props: ListProps) {
 
       {pages > 1 && (
         <div class="actions" style="justify-content:center">
-          {page > 1 && <a class="btn secondary" href={`/members${filterQs(f, page - 1)}`}>{t("members.prev")}</a>}
+          {page > 1 && <a class="btn secondary" href={`/members${filterQs(f, page - 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.prev")}</a>}
           <span class="muted">{t("members.page")} {page} / {pages}</span>
-          {page < pages && <a class="btn secondary" href={`/members${filterQs(f, page + 1)}`}>{t("members.next")}</a>}
+          {page < pages && <a class="btn secondary" href={`/members${filterQs(f, page + 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.next")}</a>}
         </div>
       )}
     </Layout>
