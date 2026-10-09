@@ -283,10 +283,15 @@ th.bar-col { width: 42%; }
   .container { margin: 16px auto; }
   .form-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 }
-/* ---------- responsive: large desktop (≥1400px) ---------- */
-@media (min-width: 1400px) {
-  /* 1600px so the 14-column member list fits without horizontal scrolling. */
+/* ---------- responsive: large desktop (≥1200px) ---------- */
+@media (min-width: 1200px) {
+  /* 1600px so the 14-column member list fits without horizontal scrolling.
+     Breakpoint lowered from 1400px: common 1366px laptops were stuck with the
+     1100px container and wide dead margins either side of the table. Cells
+     tighten a little so all columns fit inside a 1366px viewport. */
   .container { max-width: 1600px; }
+  .list-tbl th, .list-tbl td { padding: 8px 7px; font-size: 13.5px; }
+  .list-tbl td:nth-child(2) { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
 }
 /* ---------- responsive: phones (≤640px) ---------- */
 @media (max-width: 640px) {
