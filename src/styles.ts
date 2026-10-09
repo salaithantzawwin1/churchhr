@@ -165,6 +165,19 @@ input[type=number], input[type=file], select, textarea {
   width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
   font: inherit; background: var(--field-bg); color: var(--ink);
 }
+/* Uniform control height everywhere (forms + filters): Chromium sizes a bare
+   select ~10px taller than a text input, and date inputs have their own
+   intrinsic height, so fields in one .form-grid row end up uneven. A fixed
+   height with vertical centering keeps inputs, selects and date pickers equal. */
+input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=number], select {
+  height: 40px; padding: 0 10px; box-sizing: border-box; vertical-align: middle;
+}
+input[type=file] { padding: 6px 10px; }
+input[type=file]::file-selector-button {
+  height: 28px; margin: 0 10px 0 0; padding: 0 10px; border: none; border-radius: 6px;
+  background: var(--btn2-bg); color: var(--ink); border: 1px solid var(--line); font: inherit; font-size: 13px;
+}
 input:focus, select:focus, textarea:focus { outline: 2px solid #bcd2f0; border-color: var(--brand); }
 textarea { min-height: 84px; resize: vertical; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
@@ -181,6 +194,7 @@ textarea { min-height: 84px; resize: vertical; }
 .filters label.field { flex: 1 1 170px; min-width: 150px; max-width: 300px; }
 /* One fixed control height so inputs, selects and buttons on the same line
    never disagree (Chromium renders a bare select ~10px taller than an input). */
+/* Kept for the filters row: same fixed height as the global form rule above. */
 .filters input, .filters select { height: 40px; padding: 0 10px; }
 .filters .actions { margin-left: auto; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: var(--chip-bg); }
