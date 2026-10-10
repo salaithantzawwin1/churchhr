@@ -316,7 +316,6 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   const t = getDict(c.get("lang"));
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
   if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
-  if (role.isSystem === 1) return c.redirect(errRedirect("/admin/roles", "err-systemrole"), 302);
   const body = await c.req.parseBody();
   const perms = validPerms(multi(body.permissions));
   await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));

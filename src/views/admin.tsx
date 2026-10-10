@@ -239,24 +239,14 @@ export function AdminRolesPage(props: RolesProps) {
             )}
           </div>
           {r.description && <p class="muted small">{r.description}</p>}
-          {r.is_system === 1 ? (
-            <div class="form-grid" style="margin-top:8px">
-              {PERMISSIONS.map((p) => (
-                <span class="small" style={r.permissions.includes(p) ? "" : "opacity:.35;text-decoration:line-through"}>
-                  {r.permissions.includes(p) ? "✓" : "✗"} {PL[p]}
-                </span>
-              ))}
+          <form method="post" action={`/admin/roles/${r.id}`}>
+            <input type="hidden" name="name" value={r.name} />
+            <input type="hidden" name="description" value={r.description ?? ""} />
+            {permCheckboxes(r, PL)}
+            <div class="actions">
+              <button class="btn" type="submit">{t("adm.savePerms")}</button>
             </div>
-          ) : (
-            <form method="post" action={`/admin/roles/${r.id}`}>
-              <input type="hidden" name="name" value={r.name} />
-              <input type="hidden" name="description" value={r.description ?? ""} />
-              {permCheckboxes(r, PL)}
-              <div class="actions">
-                <button class="btn" type="submit">{t("adm.savePerms")}</button>
-              </div>
-            </form>
-          )}
+          </form>
         </div>
       ))}
 
