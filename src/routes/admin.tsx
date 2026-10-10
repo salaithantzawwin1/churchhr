@@ -208,7 +208,7 @@ async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[
 adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const p = parseUserBody(body, t);
   if (p.password.length < 8) p.errors.push(t("adm.errPw8"));
   const dup = await db.select({ id: users.id }).from(users).where(eq(users.username, p.username)).limit(1);
@@ -237,7 +237,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   if (!Number.isInteger(id) || id < 1 || id === me) {
     return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
   }
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const p = parseUserBody(body, t);
   const target = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, id)).limit(1);
   if (!target[0]) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
@@ -287,7 +287,7 @@ adminRoutes.get("/roles", requirePermission("roles.manage"), async (c) => {
 
 adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
   const db = getDb(c.env);
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const name = s(body.name);
   const description = s(body.description);
   const perms = validPerms(multi(body.permissions));
@@ -316,7 +316,7 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   const t = getDict(c.get("lang"));
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
   if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const perms = validPerms(multi(body.permissions));
   await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
   for (const p of perms) await db.insert(rolePermissions).values({ roleId: role.id, permission: p });
