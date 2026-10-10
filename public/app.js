@@ -1,5 +1,56 @@
-/* Client-side enhancements: theme toggle, language switch links, edit-in-modal, delete confirm modal. */
+/* Client-side enhancements: theme toggle, language switch links, password strength meter, edit-in-modal, delete confirm modal. */
 (function () {
+  // Password strength meter — attaches to any input[data-strength]. Scores
+  // length + character classes + penalties for repeats/common sequences and
+  // renders a 4-bar meter with a label from the input's data-labels attribute.
+  var COMMON_CHUNKS = ["password", "123456", "qwerty", "abc123", "letmein", "admin", "welcome", "church", "password1", "iloveyou", "sunshine", "princess", "football", "monkey", "dragon"];
+  function scorePassword(v) {
+    if (!v) return { score: -1, ratio: 0, label: null, cls: "" };
+    var score = 0;
+    if (v.length >= 8) score++;
+    if (v.length >= 12) score++;
+    var classes = 0;
+    if (/[a-z]/.test(v)) classes++;
+    if (/[A-Z]/.test(v)) classes++;
+    if (/[0-9]/.test(v)) classes++;
+    if (/[^A-Za-z0-9]/.test(v)) classes++;
+    score += classes >= 3 ? 1 : 0;          // variety bonus
+    if (classes === 1 && v.length < 20) score = Math.max(0, score - 1); // single class is weak
+    var lower = v.toLowerCase();
+    for (var i = 0; i < COMMON_CHUNKS.length; i++) {
+      if (lower.indexOf(COMMON_CHUNKS[i]) !== -1) { score = 0; break; }
+    }
+    if (/^(.)\\1+$/.test(v)) score = 0;      // all same char
+    if (/(0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf|zxcv)/.test(lower)) score = Math.min(score, 1);
+    score = Math.max(0, Math.min(4, score));  // 0..4 -> 4 bars (3 filled max)
+    var bars = Math.max(1, Math.min(4, score));
+    return { score: score, ratio: bars / 4, label: null, cls: "s" + bars };
+  }
+  function attachStrength(input) {
+    var wrap = input.closest(".field") || input.parentNode;
+    var meter = document.createElement("div");
+    meter.className = "pw-strength";
+    var labels = [];
+    var raw = input.getAttribute("data-labels") || "";
+    try { labels = JSON.parse(raw); } catch (e) { labels = raw ? raw.split(",") : []; }
+    meter.innerHTML = '<div class="pw-bars"><span></span><span></span><span></span><span></span></div>' +
+      '<span class="pw-label"></span>';
+    wrap.appendChild(meter);
+    var labelsEl = meter.querySelector(".pw-label");
+    function update() {
+      var r = scorePassword(input.value);
+      meter.className = "pw-strength" + (r.cls ? " " + r.cls : "");
+      var txt = input.value ? (labels[r.score] || "") : "";
+      labelsEl.textContent = txt;
+    }
+    input.addEventListener("input", update);
+    update();
+  }
+  function initStrengthMeters(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll("input[data-strength]"), attachStrength);
+  }
+  initStrengthMeters(document);
+
   // Manual dark/light toggle — persists the explicit choice; without one the
   // CSS media query follows the OS preference.
   var themeBtn = document.querySelector(".theme-toggle");
@@ -195,6 +246,7 @@
       bodyEl.appendChild(document.importNode(n, true));
     });
     initRegionCascade(bodyEl);
+    initStrengthMeters(bodyEl);
   }
 
   // Open-in-modal: any link with class js-edit-modal (edit forms) or js-add-modal (add forms)

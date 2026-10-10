@@ -336,4 +336,22 @@ th.bar-col { width: 42%; }
 @media (max-width: 400px) {
   .filters label.field { flex: 1 1 100%; }
 }
-`;
+/* Password strength meter under a password input (public/app.js fills bars). */
+.pw-strength {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+}
+.pw-strength .pw-bars {
+  display: flex; gap: 3px; flex: 0 0 auto;
+}
+.pw-strength .pw-bars span {
+  width: 26px; height: 5px; border-radius: 3px;
+  background: var(--line, #e4e7ec); transition: background .15s ease;
+}
+.pw-strength.s1 .pw-bars span:nth-child(-n+1) { background: var(--err-ink, #a11b1b); }
+.pw-strength.s2 .pw-bars span:nth-child(-n+2) { background: var(--warn-ink, #8a5300); }
+.pw-strength.s3 .pw-bars span:nth-child(-n+3) { background: var(--ok-ink, #14683a); }
+.pw-strength.s4 .pw-bars span { background: var(--ok-ink, #14683a); }
+.pw-strength .pw-label {
+  font-size: 12px; color: var(--muted, #667085); line-height: 1.2; min-width: 0;
+}
+`; // end of stylesheet

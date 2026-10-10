@@ -57,8 +57,11 @@ function userForm(v: {
         </label>
         <label class="field">
           <span class="lbl">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</span>
-          <input type="text" name={v.id === undefined ? "password" : "new_password"}
-            placeholder={v.id === undefined ? t("adm.min8") : t("adm.leaveBlank")} />
+          <input type="password" name={v.id === undefined ? "password" : "new_password"}
+            placeholder={v.id === undefined ? t("adm.min8") : t("adm.leaveBlank")}
+            autocomplete="new-password"
+            data-strength="1"
+            data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} /> 
         </label>
       </div>
       <div style="margin-top:12px">

@@ -67,7 +67,9 @@ export function ProfilePage({
           </label>
           <label class="field" style="margin-top:12px">
             <span class="lbl">{t("profile.newPassword")}</span>
-            <input type="password" name="new_password" autocomplete="new-password" minlength={8} required />
+            <input type="password" name="new_password" autocomplete="new-password" minlength={8} required
+              data-strength="1"
+              data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
           </label>
           <label class="field" style="margin-top:12px">
             <span class="lbl">{t("profile.confirmPassword")}</span>
