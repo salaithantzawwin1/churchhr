@@ -455,9 +455,13 @@ async function ageGroupCount(db: DB): Promise<number> {
 }
 
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
-  const type = c.req.query("type") ?? OPTION_TYPES[0]!;
-  const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
   const scope = optionScopeOf(c);
+  const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
+  // Default tab differs by scope: admins start on the first lookup type, state
+  // managers start on Township (their first manageable type) instead of
+  // bouncing off ethnicity with a confusing 403.
+  const rawType = c.req.query("type") ?? (isOptionsAdmin(scope) ? OPTION_TYPES[0]! : "township");
+  const type = rawType;
   // State managers only get the four region-scoped types, in their own states.
   if (!isOptionsAdmin(scope)) {
     if (!isRegionScopedType(type)) return forbidden(c);
