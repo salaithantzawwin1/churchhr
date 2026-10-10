@@ -79,8 +79,9 @@ function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
 function scopeCond(scope: Scope) {
   if (scope.scopeAll) return sql`1=1`;
   if (scope.stateIds.length === 0) return sql`1=0`;
-  // unqualified: raw queries alias members as "m", so "members"."region_id" would fail
-  return sql`region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`))})`;
+  // Qualified: /members joins regions + lookup tables, so a bare region_id
+  // would be ambiguous (members and regions both have that column).
+  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`))})`;
 }
 
 function parseFilters(q: Record<string, string | undefined>): Filters {
