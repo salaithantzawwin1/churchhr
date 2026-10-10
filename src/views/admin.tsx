@@ -179,13 +179,6 @@ export function AdminUsersPage(props: UsersProps) {
         </div>
       )}
 
-      <div class="card" style="margin-top:18px">
-        <h2>{t("adm.createHeading")}</h2>
-        {createErrors.length > 0 && (
-          <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
-        )}
-        {userForm({ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }, { roles, regions }, t)}
-      </div>
     </Layout>
   );
 }
@@ -358,16 +351,6 @@ export function AdminRolesPage(props: RolesProps) {
           </tbody>
         </table>
       </div>
-      <div class="card" style="margin-top:18px">
-        <h2>{t("adm.newRole")}</h2>
-        {createErrors.length > 0 && (
-          <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
-        )}
-        <RoleFormFragment lang={lang} errors={[]} />
-      </div>
-      {saveErrors.length > 0 && (
-        <div class="flash err" style="margin-top:18px"><ul class="err-list">{saveErrors.map((e) => <li>{e}</li>)}</ul></div>
-      )}
     </Layout>
   );
 }
