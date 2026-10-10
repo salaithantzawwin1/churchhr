@@ -309,6 +309,8 @@ type OptionsProps = Common & {
   ageGroupRows?: { id: number; name: string; min_age: number; max_age: number }[];
   /** States for the State/Region picker on region-scoped option types. */
   regions?: { id: number; name: string }[];
+  /** Pin the State/Region picker to the single allowed state (state managers). */
+  lockRegion?: boolean;
   /** Parent options for chained types (Home Cell -> Township, Family Group -> Home Cell). */
   parentOptions?: { id: number; label: string; regionId: number }[];
   addErrors: string[];
@@ -316,21 +318,23 @@ type OptionsProps = Common & {
   showAddForm?: boolean;
 };
 
-/** State/Region picker for region-scoped option types (blank = every state). */
+/** State/Region picker for region-scoped option types (blank = every state).
+ * lockRegion pins the select to a single state (state managers with one state). */
 function optionStateField(
   regions: { id: number; name: string }[] | undefined,
   type: string,
   selected: string,
   t: (k: string) => string,
+  lockRegion = false,
 ) {
   if (!isRegionScopedType(type) || !regions || regions.length === 0) return null;
   return (
     <label class="field">
       <span class="lbl">{t("adm.optionState")}</span>
-      <select name="region_id">
-        <option value="">{t("adm.allStates")}</option>
+      <select name="region_id" disabled={lockRegion ? true : undefined}>
+        {!lockRegion && <option value="">{t("adm.allStates")}</option>}
         {regions.map((r) => (
-          <option value={String(r.id)} selected={selected === String(r.id)}>{r.name}</option>
+          <option value={String(r.id)} selected={lockRegion || selected === String(r.id)}>{r.name}</option>
         ))}
       </select>
       <span class="field-hint">{t("adm.optionStateHint")}</span>
@@ -365,7 +369,7 @@ function optionParentField(
 /** Add form for a lookup option — bare fragment for the modal (and the no-JS ?add=1 fallback). */
 export function AddOptionForm(props: {
   type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string;
-  regions?: { id: number; name: string }[]; regionId?: string;
+  regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
 }) {
   const t = getDict(props.lang ?? "mm");
@@ -384,7 +388,7 @@ export function AddOptionForm(props: {
         <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
-      {optionStateField(props.regions, props.type, props.regionId ?? "", t)}
+      {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion)}
       {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
@@ -501,7 +505,7 @@ export function EditAgeGroupForm(props: {
 /** Edit form for one lookup option — bare fragment for the modal (and full-page no-JS fallback). */
 export function EditOptionForm(props: {
   id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string;
-  type?: string; regions?: { id: number; name: string }[]; regionId?: string;
+  type?: string; regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
 }) {
   const t = getDict(props.lang ?? "mm");
@@ -519,7 +523,7 @@ export function EditOptionForm(props: {
         <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
-      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t)}
+      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion)}
       {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
@@ -572,7 +576,7 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 }
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion } = props;
   const t = getDict(lang ?? "mm");
   const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   const isRegion = type === "region";
@@ -610,7 +614,7 @@ export function AdminOptionsPage(props: OptionsProps) {
           {addErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} regions={regions} parentOptions={parentOptions} />}
+          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} regions={regions} lockRegion={lockRegion} parentOptions={parentOptions} />}
         </div>
       )}
 

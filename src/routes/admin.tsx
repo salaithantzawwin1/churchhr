@@ -3,10 +3,11 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
-  ageGroups, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions, rolePermissions, roles,
-  userRoles, userStateAssignments, users, type OptionType,
+  ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions,
+  rolePermissions, roles, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
 import { requirePermission } from "../middleware";
+import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { findOption, loadAllOptions, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
@@ -39,6 +40,49 @@ function ints(vals: string[]): number[] {
 
 const errRedirect = (to: string, msg: string) =>
   `${to}${to.includes("?") ? "&" : "?"}err=${encodeURIComponent(msg)}`;
+
+// ---------- State-scoped option management ----------
+// A user with options.manage but without the all-states wildcard is a State
+// Manager: they may add/update/deactivate the four region-scoped option types
+// (Township, Home Cell, Group, Family Group) inside their own assigned states
+// only — never global options (regionId 0), other states' options, the
+// State/Region tab, or Age Groups.
+
+type OptionScope = { scopeAll: boolean; stateIds: number[] };
+
+function optionScopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): OptionScope {
+  return { scopeAll: !!c.get("scopeAll"), stateIds: (c.get("stateIds") ?? []) as number[] };
+}
+
+/** True when the user manages options across every state (global admin). */
+function isOptionsAdmin(scope: OptionScope): boolean {
+  return scope.scopeAll;
+}
+
+/** Can this scope manage the given option type at all? */
+function canManageType(scope: OptionScope, type: string): boolean {
+  return isOptionsAdmin(scope) || isRegionScopedType(type);
+}
+
+/** Effective state an option is anchored to: parent's state wins (Home Cell
+ * inherits its Township's state, Family Group its Home Cell's). */
+function effectiveRegion(row: { regionId: number; parentId: number | null }, byId: Map<number, { regionId: number; parentId: number | null }>): number {
+  if (row.parentId != null) {
+    const parent = byId.get(row.parentId);
+    if (parent && parent.regionId !== 0) return parent.regionId;
+  }
+  return row.regionId;
+}
+
+/** May this scope manage the option (by its effective region)? */
+function canManageOption(scope: OptionScope, effectiveRegionId: number): boolean {
+  return isOptionsAdmin(scope) || effectiveRegionId !== 0 && scope.stateIds.includes(effectiveRegionId);
+}
+
+/** 403 for state managers touching admin-only option areas. */
+function forbidden(c: any) {
+  return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
+}
 
 type RoleInfo = { id: number; name: string; description: string | null; is_system: number; permissions: string[] };
 
@@ -321,22 +365,30 @@ async function optionsPage(c: any, type: string, opts: {
   modal?: boolean;
   /** Inline add card on the full page (no-JS fallback for the + Add button). */
   showAddForm?: boolean;
-} = {}) {
+} = {}, scope: OptionScope = { scopeAll: true, stateIds: [] }) {
   const db = getDb(c.env);
   const lang: "mm" | "en" = c.get("lang");
   const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
+  const admin = isOptionsAdmin(scope);
+  const stateListAll = await loadRegionsLite(db, lang);
+  // State managers pick only among their own states; no "all states" choice.
+  const stateList = admin ? stateListAll : stateListAll.filter((r) => scope.stateIds.includes(r.id));
   if (opts.modal) {
-    const stateList = await loadRegionsLite(db, lang);
     const all = await loadAllOptions(db);
     const parentType = PARENT_TYPE[type];
     return c.html(
-      <AddOptionForm type={type} lang={lang} regions={stateList} modal
-        parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1) : []} />,
+      <AddOptionForm type={type} lang={lang} regions={stateList} modal lockRegion={!admin && stateList.length === 1}
+        parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId === 0 ? 0 : o.regionId)) : []} />,
     );
   }
   const all = await loadAllOptions(db);
-  const list = all.filter((o) => o.type === type);
+  const byId = new Map(all.map((o) => [o.id, o] as const));
+  const list = all
+    .filter((o) => o.type === type)
+    // State managers see only options anchored inside their states (all-states
+    // options belong to the global admin and are hidden from them).
+    .filter((o) => admin || canManageOption(scope, effectiveRegion(o, byId)));
   const column = OPTION_RAW_COLUMN[type as OptionType];
   // 'township' stores its label in members.township (no id), so usage is counted by label.
   const usageRows: { oid: string | number; n: number }[] = type === "township"
@@ -347,7 +399,7 @@ async function optionsPage(c: any, type: string, opts: {
         sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
       );
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
-  const stateNames = await loadRegionsLite(db, lang);
+  const stateNames = stateListAll;
   const stateName = (id: number | null) =>
     id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;
   const labelById = new Map(all.map((o) => [o.id, o.label] as const));
@@ -358,17 +410,20 @@ async function optionsPage(c: any, type: string, opts: {
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
   }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
-  const types = optionTabs(all, {
-    region: Number(regionCount[0]?.n ?? 0),
-    ageGroup: await ageGroupCount(db),
-  }, t("adm.ageTab"));
+  const types = admin
+    ? optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: await ageGroupCount(db) }, t("adm.ageTab"))
+    : OPTION_TYPES.filter((k) => isRegionScopedType(k)).map((k) => {
+        const entry = all.filter((o) => o.type === k && canManageOption(scope, effectiveRegion(o, byId)));
+        return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1), count: entry.length };
+      });
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
-      options={options} regions={stateNames}
+      options={options} regions={stateList}
+      lockRegion={!admin && stateList.length === 1}
       parentOptions={PARENT_TYPE[type]
-        ? all.filter((o) => o.type === PARENT_TYPE[type] && o.active === 1)
+        ? all.filter((o) => o.type === PARENT_TYPE[type] && o.active === 1 && canManageOption(scope, o.regionId))
         : []}
       addErrors={opts.addErrors ?? []} editError={opts.editError ?? null}
       showAddForm={opts.showAddForm} lang={c.get("lang")}
@@ -403,9 +458,15 @@ async function ageGroupCount(db: DB): Promise<number> {
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   const type = c.req.query("type") ?? OPTION_TYPES[0]!;
   const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
+  const scope = optionScopeOf(c);
+  // State managers only get the four region-scoped types, in their own states.
+  if (!isOptionsAdmin(scope)) {
+    if (!isRegionScopedType(type)) return forbidden(c);
+    return optionsPage(c, type, opts, scope);
+  }
   if (type === "region") return regionOptionsPage(c, opts);
   if (type === "age_group") return ageGroupsPage(c, opts);
-  return optionsPage(c, type, opts);
+  return optionsPage(c, type, opts, scope);
 });
 
 // ---------- Age groups (dashboard breakdown, admin-adjustable) ----------
@@ -441,20 +502,25 @@ async function ageGroupsPage(c: any, opts: { modal?: boolean; showAddForm?: bool
 adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
+  const scope = optionScopeOf(c);
   const fromModal = c.req.header("X-Requested-With") === "modal";
   const body = await c.req.parseBody();
   const type = s(body.type);
   const label = s(body.label);
   const back = `/admin/options${type ? `?type=${encodeURIComponent(type)}` : ""}`;
-  const stateList = await loadRegionsLite(db, c.get("lang"));
+  const allRegions = await loadRegionsLite(db, c.get("lang"));
+  // State managers pick only among their own states.
+  const stateList = isOptionsAdmin(scope) ? allRegions : allRegions.filter((r) => scope.stateIds.includes(r.id));
   const fail = (msg: string) =>
     fromModal
       ? c.html(
           <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
-            regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)} modal />,
+            regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)}
+            lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} modal />,
           400,
         )
       : c.redirect(errRedirect(back, msg), 302);
+  if (!canManageType(scope, type)) return forbidden(c);
   if (!isOptionType(type)) return fail(t("adm.errOptionType"));
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
   const regionId = await parseRegionId(db, body.region_id);
@@ -468,33 +534,43 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   if (findOption(all, type, label, regionId)) return fail(t("adm.errLabelDup"));
   // A parented option inherits its parent's state; an all-states parent means
   // the child is all-states too unless a state was picked explicitly.
-  let effectiveRegion = regionId;
+  let anchorRegion = regionId;
   if (parentId != null) {
     const parent = all.find((o) => o.id === parentId);
-    if (parent && parent.regionId !== 0) effectiveRegion = parent.regionId;
+    if (parent && parent.regionId !== 0) anchorRegion = parent.regionId;
   }
-  await db.insert(lookupOptions).values({ type, label, regionId: effectiveRegion, parentId });
+  // State managers may only anchor options inside their own states. When a
+  // parent is chosen its state wins — verify that state, not the picked one.
+  if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
+  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 
 adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const lang = c.get("lang");
+  const scope = optionScopeOf(c);
+  const admin = isOptionsAdmin(scope);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
-  const stateList = await loadRegionsLite(db, lang);
+  if (!canManageType(scope, current.type)) return forbidden(c);
   const allOpts = await loadAllOptions(db);
+  const byId = new Map(allOpts.map((o) => [o.id, o] as const));
+  if (!canManageOption(scope, effectiveRegion(current, byId))) return forbidden(c);
+  const allRegions = await loadRegionsLite(db, lang);
+  const stateList = admin ? allRegions : allRegions.filter((r) => scope.stateIds.includes(r.id));
   const parentType = PARENT_TYPE[current.type];
   const formProps = {
     id, label: current.label, lang,
     type: current.type, regions: stateList,
+    lockRegion: !admin && stateList.length === 1,
     regionId: current.regionId === 0 ? "" : String(current.regionId),
     parentId: current.parentId == null ? "" : String(current.parentId),
     parentOptions: parentType
-      ? allOpts.filter((o) => o.type === parentType && o.active === 1)
+      ? allOpts.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId))
       : [],
   };
   if (c.req.query("modal") === "1") return c.html(<EditOptionForm {...formProps} modal />);
@@ -514,11 +590,17 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
 
 adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = optionScopeOf(c);
+  const admin = isOptionsAdmin(scope);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  if (!canManageType(scope, current.type)) return forbidden(c);
+  const allOpts0 = await loadAllOptions(db);
+  const byId = new Map(allOpts0.map((o) => [o.id, o] as const));
+  if (!canManageOption(scope, effectiveRegion(current, byId))) return forbidden(c);
   const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
   const body = await c.req.parseBody();
 
@@ -533,14 +615,16 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   const parentType = PARENT_TYPE[current.type];
   const parentId = await parseParentId(db, body.parent_id, parentType);
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const stateList = await loadRegionsLite(db, c.get("lang"));
-  const allOpts = await loadAllOptions(db);
+  const allRegions = await loadRegionsLite(db, c.get("lang"));
+  const stateList = admin ? allRegions : allRegions.filter((r) => scope.stateIds.includes(r.id));
+  const allOpts = allOpts0;
   const parentOptions = parentType
-    ? allOpts.filter((o) => o.type === parentType && o.active === 1)
+    ? allOpts.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId))
     : [];
   const fail = (msg: string) => {
     const fp = {
       id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions,
+      lockRegion: !admin && stateList.length === 1,
       regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
       parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
     };
@@ -553,22 +637,30 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   if (parentId === false) return fail(t("adm.errParentBad"));
   const clash = findOption(allOpts, current.type, label, regionId);
   if (clash && clash.id !== id) return fail(t("adm.errLabelDup"));
-  let effectiveRegion = regionId;
+  let anchorRegion = regionId;
   if (parentId != null) {
     const parent = allOpts.find((o) => o.id === parentId);
-    if (parent && parent.regionId !== 0) effectiveRegion = parent.regionId;
+    if (parent && parent.regionId !== 0) anchorRegion = parent.regionId;
   }
-  await db.update(lookupOptions).set({ label, regionId: effectiveRegion, parentId }).where(eq(lookupOptions.id, id));
+  // State managers cannot move an option out of their own states (or onto an
+  // all-states parent) — re-verify the target anchor before saving.
+  if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
+  await db.update(lookupOptions).set({ label, regionId: anchorRegion, parentId }).where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 
 adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = optionScopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?err=err-notfound", 302);
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  if (!canManageType(scope, current.type)) return forbidden(c);
+  const allOpts = await loadAllOptions(db);
+  const byId = new Map(allOpts.map((o) => [o.id, o] as const));
+  if (!canManageOption(scope, effectiveRegion(current, byId))) return forbidden(c);
   const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
 
   const column = OPTION_RAW_COLUMN[current.type as OptionType];
@@ -602,6 +694,7 @@ async function ageRangeClash(db: DB, min: number, max: number, excludeId?: numbe
 }
 
 adminRoutes.post("/age-groups", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const fromModal = c.req.header("X-Requested-With") === "modal";
@@ -625,6 +718,7 @@ adminRoutes.post("/age-groups", requirePermission("options.manage"), async (c) =
 });
 
 adminRoutes.get("/age-groups/:id/edit", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const lang = c.get("lang");
   const id = Number(c.req.param("id"));
@@ -649,6 +743,7 @@ adminRoutes.get("/age-groups/:id/edit", requirePermission("options.manage"), asy
 });
 
 adminRoutes.post("/age-groups/:id", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const fromModal = c.req.header("X-Requested-With") === "modal";
@@ -678,6 +773,7 @@ adminRoutes.post("/age-groups/:id", requirePermission("options.manage"), async (
 });
 
 adminRoutes.post("/age-groups/:id/delete", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/options?type=age_group&err=err-notfound", 302);
@@ -736,6 +832,7 @@ async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: 
 }
 
 adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const fromModal = c.req.header("X-Requested-With") === "modal";
@@ -755,6 +852,7 @@ adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
 });
 
 adminRoutes.get("/regions/:id/edit", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const lang = c.get("lang");
   const back = regionBack();
@@ -780,6 +878,7 @@ adminRoutes.get("/regions/:id/edit", requirePermission("options.manage"), async 
 });
 
 adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const back = regionBack();
@@ -803,6 +902,7 @@ adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) 
 });
 
 adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), async (c) => {
+  if (!optionScopeOf(c).scopeAll) return forbidden(c);
   const db = getDb(c.env);
   const back = regionBack();
   const id = Number(c.req.param("id"));
