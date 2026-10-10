@@ -1,6 +1,7 @@
 import type { Permission } from "../rbac";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
+import { html } from "hono/html";
 
 export type Flash = { kind: "ok" | "err" | "warn"; text: string } | null;
 
@@ -37,7 +38,9 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
         <link rel="icon" type="image/png" href="/logo.png" />
         <link rel="stylesheet" href="/styles.css" />
         <script>
-          {`try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}`}
+          {/* Raw JS (no double quotes / &-entities) so Hono's HTML escaper cannot
+              rewrite it — inside <script>, `&quot;` is a literal SyntaxError. */}
+          {html`try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}`}
         </script>
         <script src="/app.js" defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
