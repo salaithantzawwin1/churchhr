@@ -2,10 +2,10 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import { getDict, type Lang } from "../i18n";
 
-export function LoginPage({ error, username, lang }: { error?: string | null; username?: string; lang?: Lang }) {
+export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
   const t = getDict(lang ?? "mm");
   return (
-    <Layout title={t("login.title")} lang={lang}>
+    <Layout title={t("login.title")} lang={lang} flash={flash ?? null}>
       <div class="login-wrap">
         <div class="card">
           <div class="login-logo">
@@ -15,7 +15,9 @@ export function LoginPage({ error, username, lang }: { error?: string | null; us
               <div class="t2">{t("login.systemNote")}</div>
             </div>
           </div>
-          {error && <div class="flash err">{error}</div>}
+          {(error || flash) && (
+            <div class={`flash ${flash ? flash.kind : "err"}`}>{flash ? flash.text : error}</div>
+          )}
           <form method="post" action="/login">
             <label class="field">
               <span class="lbl">{t("login.username")}</span>

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { memberHistory } from "../db/schema";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
@@ -7,6 +8,16 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { findOption, loadAllOptions, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
+
+/** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
+function multi(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return typeof v === "string" ? [v] : [];
+}
+function ints(vals: string[]): number[] {
+  return vals.map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0);
+}
 import {
   asInt, ageFromDate, b64decode, b64encode, intParam, normKey,
   parseDateFlexible, s,
@@ -81,7 +92,7 @@ function scopeCond(scope: Scope) {
   if (scope.stateIds.length === 0) return sql`1=0`;
   // Qualified: /members joins regions + lookup tables, so a bare region_id
   // would be ambiguous (members and regions both have that column).
-  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`))})`;
+  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
 function parseFilters(q: Record<string, string | undefined>): Filters {
@@ -670,7 +681,11 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
             data[col] = Number(val);
           }
         }
-        await insertMember(db, data, userId);
+        const importId = await insertMember(db, data, userId);
+        await db.insert(memberHistory).values({
+          memberId: importId, actorId: userId, action: "create",
+          snapshotJson: JSON.stringify({ source: "csv-import", ...data }),
+        });
         inserted++;
       }
       report.done = true;
@@ -813,6 +828,10 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
     );
   if (!data) return render(400);
   const id = await insertMember(db, data, c.get("user").id);
+  await db.insert(memberHistory).values({
+    memberId: id, actorId: c.get("user").id, action: "create",
+    snapshotJson: JSON.stringify(data),
+  });
   return c.redirect(`/members/${id}?ok=member-created`, 302);
 });
 
@@ -826,9 +845,16 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   if (!Number.isInteger(id) || id < 1) return notFound();
   const row = await loadMemberDetail(db, id);
   if (!row || !inScope(row, scope)) return notFound();
+  const historyRows = await db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
+    SELECT h.id, h.action, h.created_at, u.username AS actor_name
+    FROM member_history h JOIN users u ON u.id = h.actor_id
+    WHERE h.member_id = ${id}
+    ORDER BY h.created_at DESC, h.id DESC
+    LIMIT 100`);
   return c.html(
     <MemberDetailPage
-      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row} lang={c.get("lang")}
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
+      history={historyRows as any} lang={c.get("lang")}
     />,
   );
 });
@@ -850,6 +876,57 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
   };
   if (c.req.query("modal") === "1") return c.html(<MemberFormFragment {...formProps} modal />);
   return c.html(<MemberFormPage {...formProps} />);
+});
+
+membersRoutes.post("/bulk", requirePermission("members.update"), async (c) => {
+  try {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody({ all: true });
+  const action = s(body.bulk_action);
+  const groupId = intParam(s(body.group_id) || undefined);
+  const ids = ([] as number[]).concat(...(multi(body.ids).map((v) => ints([v]))));
+  if (!ids.length) return c.redirect("/members?err=" + encodeURIComponent("bulk.noSelection"), 302);
+  if (!action && !groupId) return c.redirect("/members?err=" + encodeURIComponent("bulk.noAction"), 302);
+  const canDeleteRows = c.get("perms").has("members.delete");
+
+  // Restrict to rows visible inside the caller's state scope.
+  const owned = await db.all<{ id: number }>(sql`SELECT id FROM members m WHERE ${scopeCond(scope)} AND m.id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`);
+  const allowed = owned.map((r) => r.id);
+  if (!allowed.length) return c.redirect("/members?err=" + encodeURIComponent("bulk.noSelection"), 302);
+
+  const actorId = c.get("user").id;
+  const now = Math.floor(Date.now() / 1000);
+  let flash = "bulk.done";
+  if (action === "delete" && canDeleteRows) {
+    await db.delete(members).where(inArray(members.id, allowed));
+    for (const mid of allowed) {
+      await db.insert(memberHistory).values({
+        memberId: mid, actorId, action: "bulk_delete", snapshotJson: JSON.stringify({ id: mid, bulk: true }),
+      });
+    }
+    flash = "bulk.deleted";
+  } else {
+    const set: Record<string, unknown> = { updatedBy: actorId, updatedAt: now };
+    if (action === "status_active") set.status = "active";
+    if (action === "status_inactive") set.status = "inactive";
+    if (groupId) set.groupId = groupId;
+    if (Object.keys(set).length > 2) {
+      await db.update(members).set(set as any).where(inArray(members.id, allowed));
+      for (const mid of allowed) {
+        await db.insert(memberHistory).values({
+          memberId: mid, actorId, action: groupId && !action ? "bulk_group" : "bulk_status",
+          snapshotJson: JSON.stringify({ id: mid, status: set.status ?? null, groupId: groupId ?? null, bulk: true }),
+        });
+      }
+      flash = "bulk.updated";
+    }
+  }
+  return c.redirect(`/members?ok=${encodeURIComponent(flash)}`, 302);
+  } catch (e: any) {
+    const msg = String(e?.message ?? e ?? "unknown");
+    return c.redirect("/members?err=" + encodeURIComponent("bulk.failed: " + msg.slice(0, 120)), 302);
+  }
 });
 
 membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
@@ -880,9 +957,15 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
     .update(members)
     .set({ ...toDrizzleValues(data), updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) } as typeof members.$inferInsert)
     .where(eq(members.id, id));
+  await db.insert(memberHistory).values({
+    memberId: id, actorId: c.get("user").id, action: "update",
+    snapshotJson: JSON.stringify(data),
+  });
   if (fromModal) return c.redirect("/members?ok=member-updated", 303);
   return c.redirect(`/members/${id}?ok=member-updated`, 302);
 });
+
+// ---------- bulk actions on selected members ----------
 
 membersRoutes.post("/:id/delete", requirePermission("members.delete"), async (c) => {
   const db = getDb(c.env);
@@ -892,5 +975,9 @@ membersRoutes.post("/:id/delete", requirePermission("members.delete"), async (c)
   const existing = await loadMemberDetail(db, id);
   if (!existing || !inScope(existing, scope)) return c.redirect("/members?err=err-notfound", 302);
   await db.delete(members).where(eq(members.id, id));
+  await db.insert(memberHistory).values({
+    memberId: id, actorId: c.get("user").id, action: "delete",
+    snapshotJson: JSON.stringify({ id, name_english: existing.name_english, name_myanmar: existing.name_myanmar }),
+  });
   return c.redirect("/members?ok=member-deleted", 302);
 });

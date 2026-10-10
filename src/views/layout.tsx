@@ -5,6 +5,11 @@ import { html } from "hono/html";
 
 export type Flash = { kind: "ok" | "err" | "warn"; text: string } | null;
 
+/** Idle auto-logout: after this many seconds of no clicks/keys/scroll the
+ * browser posts /logout?auto=1 (public/app.js). Server-side, the session TTL
+ * still caps total life. Do not make it tiny — 20 min default. */
+const IDLE_TIMEOUT_SECONDS = Number(typeof process !== "undefined" && process.env?.IDLE_TIMEOUT_SECONDS) || 20 * 60;
+
 type LayoutProps = {
   title: string;
   lang?: Lang;
@@ -47,7 +52,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
       </head>
-      <body>
+      <body data-idle-seconds={String(IDLE_TIMEOUT_SECONDS)}>
         <header class="topbar">
           <a class="brand" href="/">
             <img src="/logo.png" alt="" />

@@ -201,3 +201,35 @@ export const members = sqliteTable(
     townshipIdx: index("members_township_idx").on(t.township),
   }),
 );
+
+/** Member change history — one row per mutating action on a member.
+ * Kept without an FK on member_id so history survives member deletion. */
+export const memberHistory = sqliteTable(
+  "member_history",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    memberId: integer("member_id").notNull(),
+    actorId: integer("actor_id")
+      .notNull()
+      .references(() => users.id),
+    action: text("action").notNull(),
+    snapshotJson: text("snapshot_json").notNull(),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    memberIdx: index("member_history_member_idx").on(t.memberId, t.createdAt),
+    actorIdx: index("member_history_actor_idx").on(t.actorId),
+  }),
+);
+
+/** Per-IP login attempt log for the sliding-window rate limiter. */
+export const loginAttempts = sqliteTable(
+  "login_attempts",
+  {
+    ip: text("ip").notNull(),
+    at: integer("at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    ipIdx: index("login_attempts_ip_idx").on(t.ip, t.at),
+  }),
+);

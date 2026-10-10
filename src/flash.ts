@@ -27,6 +27,10 @@ const FLASH_KEYS: Record<string, string> = {
   "err-perm": "flash.errPerm",
   "err-systemrole": "flash.errSystemrole",
   "err-used": "flash.errUsed",
+  "bulk.updated": "flash.bulkUpdated",
+  "bulk.deleted": "flash.bulkDeleted",
+  "bulk.noSelection": "flash.bulkNoSelection",
+  "bulk.noAction": "flash.bulkNoAction",
 };
 
 export function flashFromQuery(q: Record<string, string | undefined>, lang?: Lang): Flash {

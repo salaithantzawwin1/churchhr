@@ -10,6 +10,7 @@ import { requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
+import { checkPasswordPolicy } from "../password";
 import { findOption, loadAllOptions, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
@@ -251,6 +252,10 @@ adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const p = parseUserBody(body, t);
   if (p.password.length < 8) p.errors.push(t("adm.errPw8"));
+  else {
+    const pwFail = checkPasswordPolicy(p.password);
+    if (pwFail) p.errors.push(t(pwFail));
+  }
   const dup = await db.select({ id: users.id }).from(users).where(eq(users.username, p.username)).limit(1);
   if (dup.length > 0) p.errors.push(t("adm.errDupUser"));
   if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
@@ -286,7 +291,13 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   const dup = await db.select({ id: users.id }).from(users)
     .where(eq(users.username, p.username)).limit(1);
   if (dup[0] && dup[0].id !== id) p.errors.push(t("adm.errDupUser"));
-  if (p.newPassword && p.newPassword.length < 8) p.errors.push(t("adm.errPw8New"));
+  if (p.newPassword) {
+    if (p.newPassword.length < 8) p.errors.push(t("adm.errPw8New"));
+    else {
+      const pwFailNew = checkPasswordPolicy(p.newPassword);
+      if (pwFailNew) p.errors.push(t(pwFailNew));
+    }
+  }
   if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
     return userFail(c, p, roleList, allRegions);
   }

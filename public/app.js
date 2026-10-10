@@ -51,6 +51,48 @@
   }
   initStrengthMeters(document);
 
+  // Members list bulk actions: checkboxes fill the hidden ids field and show
+  // the floating bulk bar; the header checkbox toggles the page.
+  (function initBulkBar() {
+    var form = document.getElementById("bulk-form");
+    if (!form) return;
+    var idsField = document.getElementById("bulk-ids");
+    var bar = document.getElementById("bulk-bar");
+    var countEl = document.getElementById("bulk-count");
+    var checkAll = document.getElementById("bulk-check-all");
+    var boxes = Array.prototype.slice.call(document.querySelectorAll("input.bulk-check"));
+    function sync() {
+      var sel = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+      if (idsField) idsField.value = sel.join(",");
+      if (bar) bar.style.display = sel.length ? "flex" : "none";
+      if (countEl) countEl.textContent = sel.length + " selected";
+      if (checkAll && boxes.length) checkAll.checked = sel.length === boxes.length;
+    }
+    boxes.forEach(function (b) { b.addEventListener("change", sync); });
+    if (checkAll) checkAll.addEventListener("change", function () {
+      boxes.forEach(function (b) { b.checked = checkAll.checked; });
+      sync();
+    });
+    sync();
+  })();
+
+  // Idle auto-logout — after data-idle-seconds without any user activity
+  // (click/key/scroll) anywhere, redirect to /logout?auto=1. The server also
+  // caps the session, so a stale client cannot outlive the real timeout.
+  (function initIdleLogout() {
+    var secs = parseInt(document.body.getAttribute("data-idle-seconds") || "0", 10);
+    if (!secs || secs < 30) return;
+    var timer = null;
+    function reset() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () { location.assign("/logout?auto=1"); }, secs * 1000);
+    }
+    ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach(function (evt) {
+      document.addEventListener(evt, reset, { passive: true });
+    });
+    reset();
+  })();
+
   // Manual dark/light toggle — persists the explicit choice; without one the
   // CSS media query follows the OS preference.
   var themeBtn = document.querySelector(".theme-toggle");

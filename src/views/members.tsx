@@ -93,6 +93,7 @@ export function MembersListPage(props: ListProps) {
   const S = isEn ? STATUSES_EN : STATUSES;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
   const canCreate = perms.has("members.create");
+  const canUpdate = perms.has("members.update");
   const canDelete = perms.has("members.delete");
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
@@ -188,10 +189,28 @@ export function MembersListPage(props: ListProps) {
         </details>
       </div>
 
+      {(canDelete || canUpdate) && (
+        <form method="post" action="/members/bulk" id="bulk-form">
+          <input type="hidden" name="ids" value="" id="bulk-ids" />
+          <div class="card" id="bulk-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;margin-bottom:12px">
+            <strong class="small" id="bulk-count">0</strong>
+            <select name="bulk_action" required>
+              <option value="">{t("members.all")}</option>
+              <option value="status_active">{t("bulk.statusActive")}</option>
+              <option value="status_inactive">{t("bulk.statusInactive")}</option>
+              <option value="delete">{t("members.delete")}</option>
+            </select>
+            <select name="group_id">
+              <option value="">{t("bulk.assignGroupOpt")}</option>
+              {groups.map((o) => <option value={String(o.id)}>{o.label}</option>)}
+            </select>
+            <button class="btn sm" type="submit" data-confirm={t("bulk.confirm")}>{t("bulk.apply")}</button>
+          </div>
       <div class="tbl-wrap">
         <table class="list-tbl">
           <thead>
             <tr>
+              <th style="width:28px"><input type="checkbox" id="bulk-check-all" /></th>
               {cols.map((c) => {
                 // Server-side sort: header links toggle asc/desc and keep the
                 // filters; the active column shows a direction arrow.
@@ -219,6 +238,7 @@ export function MembersListPage(props: ListProps) {
             )}
             {rows.map((m) => (
               <tr>
+                <td style="width:28px"><input type="checkbox" class="bulk-check" value={String(m.id)} /></td>
                 <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
                 <td data-col="name">
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
@@ -251,6 +271,8 @@ export function MembersListPage(props: ListProps) {
           </tbody>
         </table>
       </div>
+        </form>
+      )}
 
       {pages > 1 && (
         <div class="actions" style="justify-content:center">
@@ -497,9 +519,24 @@ export type MemberDetail = {
   home_cell_id: number | null;
 };
 
-export function MemberDetailPage(props: Common & { m: MemberDetail }) {
-  const { user, perms, flash, m, lang } = props;
+export type MemberHistoryRow = {
+  id: number;
+  action: string;
+  actor_name: string;
+  created_at: number;
+};
+
+export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[] }) {
+  const { user, perms, flash, m, lang, history = [] } = props;
   const t = getDict(lang ?? "mm");
+  const ACTION_LABELS: Record<string, { mm: string; en: string; cls: string }> = {
+    create: { mm: "ထည့်သွင်း", en: "Created", cls: "active" },
+    update: { mm: "ပြင်ဆင်", en: "Updated", cls: "" },
+    delete: { mm: "ဖျက်သိမ်း", en: "Deleted", cls: "inactive" },
+    bulk_status: { mm: "Bulk status", en: "Bulk status", cls: "" },
+    bulk_delete: { mm: "Bulk delete", en: "Bulk delete", cls: "inactive" },
+    bulk_group: { mm: "Bulk assign", en: "Bulk assign", cls: "" },
+  };
   const isEn = (lang ?? "mm") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
@@ -563,6 +600,31 @@ export function MemberDetailPage(props: Common & { m: MemberDetail }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h2>{isEn ? "Change history" : "ပြောင်းလဲမှု မှတ်တမ်း"}</h2>
+        {history.length === 0 ? (
+          <p class="muted small">{isEn ? "No changes recorded yet." : "မှတ်တမ်း မရှိသေးပါ။"}</p>
+        ) : (
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>{isEn ? "When" : "အချိန်"}</th><th>{isEn ? "Action" : "လုပ်ဆောင်ချက်"}</th><th>{isEn ? "By" : "ပြုလုပ်သူ"}</th></tr></thead>
+              <tbody>
+                {history.map((h) => {
+                  const a = ACTION_LABELS[h.action] ?? { mm: h.action, en: h.action, cls: "" };
+                  return (
+                    <tr>
+                      <td class="muted small">{new Date(h.created_at * 1000).toLocaleString("en-GB")}</td>
+                      <td><span class={`badge ${a.cls}`}>{(isEn ? a.en : a.mm) || h.action}</span></td>
+                      <td>{h.actor_name}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </Layout>
   );
