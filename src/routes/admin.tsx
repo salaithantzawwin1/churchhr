@@ -17,7 +17,7 @@ import { s } from "../util";
 import { Layout } from "../views/layout";
 import {
   AddAgeGroupForm, AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
-  EditAgeGroupForm, EditOptionForm, EditRegionForm,
+  EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, UserFormFragment,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 
@@ -174,7 +174,19 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) 
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       editUser={{ ...target, ...assignments }}
       roles={await loadRoles(db)} regions={await loadRegionsLite(db, c.get("lang"))} editErrors={[]}
-      lang={c.get("lang")}
+      lang={c.get("lang")} modal={c.req.query("modal") === "1"}
+    />,
+  );
+});
+
+/** Bare create-user form for the js-add-modal fetch. */
+adminRoutes.get("/users/new", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  return c.html(
+    <UserFormFragment
+      lang={c.get("lang")} errors={[]}
+      values={{ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }}
+      roles={(await loadRoles(db)) as any} regions={await loadRegionsLite(db, c.get("lang"))}
     />,
   );
 });
@@ -190,7 +202,7 @@ function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) 
   const mustChange = s(body.must_change) === "1" ? 1 : 0;
   const errors: string[] = [];
   if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
-  return { username, password, newPassword, roleIds, statesRaw, allStates, active, mustChange, errors };
+  return { id: undefined as number | undefined, username, password, newPassword, roleIds, statesRaw, allStates, active, mustChange, errors };
 }
 
 async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[], allStates: boolean, errors: string[], _t: (k: string) => string) {
@@ -205,18 +217,45 @@ async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[
   return errors.length === 0;
 }
 
+/** Renders a bare user form for the modal (X-Requested-With: modal) or falls
+ * back to the list-page error redirect. Shared by create and edit handlers.
+ * `p.errors` may already hold either i18n keys or already-translated text —
+ * map only keys. This is async because the roles/regions lookups may have
+ * been clobbered by the earlier validate call in a separate DB pool. */
+async function userFail(
+  c: any,
+  p: { username: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
+  roleList: { id: number; name: string }[],
+  regionList: { id: number; name: string }[],
+) {
+  const t = getDict(c.get("lang"));
+  const errors = p.errors.map((e) => (e.startsWith("adm.") ? t(e) : e));
+  if (c.req.header("X-Requested-With") !== "modal") {
+    return c.redirect(errRedirect("/admin/users", errors.map(renderKey(t)).join(" ")), 302);
+  }
+  return c.html(
+    <UserFormFragment
+      lang={c.get("lang")} errors={errors}
+      values={{ id: p.id, username: p.username, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, active: p.active, mustChange: p.mustChange }}
+      roles={roleList} regions={regionList}
+    />,
+    400,
+  );
+}
+
 adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
+  const roleList: { id: number; name: string }[] = (await loadRoles(db)) as any;
+  const allRegions = await loadRegionsLite(db, c.get("lang"));
   const body = await c.req.parseBody({ all: true });
   const p = parseUserBody(body, t);
   if (p.password.length < 8) p.errors.push(t("adm.errPw8"));
   const dup = await db.select({ id: users.id }).from(users).where(eq(users.username, p.username)).limit(1);
   if (dup.length > 0) p.errors.push(t("adm.errDupUser"));
-  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t))) {
-    return c.redirect(errRedirect("/admin/users", p.errors.map(renderKey(t)).join(" ")), 302);
+  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
+    return userFail(c, p, roleList, allRegions);
   }
-  if (p.errors.length > 0) return c.redirect(errRedirect("/admin/users", p.errors.join(" ")), 302);
 
   const passwordHash = await hashPassword(p.password, parseIterations(c.env.PBKDF2_ITERATIONS));
   const created = await db.insert(users)
@@ -237,8 +276,11 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   if (!Number.isInteger(id) || id < 1 || id === me) {
     return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
   }
+  const roleList: { id: number; name: string }[] = (await loadRoles(db)) as any;
+  const allRegions = await loadRegionsLite(db, c.get("lang"));
   const body = await c.req.parseBody({ all: true });
   const p = parseUserBody(body, t);
+  p.id = id;
   const target = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, id)).limit(1);
   if (!target[0]) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
   const dup = await db.select({ id: users.id }).from(users)
@@ -246,7 +288,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   if (dup[0] && dup[0].id !== id) p.errors.push(t("adm.errDupUser"));
   if (p.newPassword && p.newPassword.length < 8) p.errors.push(t("adm.errPw8New"));
   if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
-    return c.redirect(errRedirect("/admin/users", p.errors.map(renderKey(t)).join(" ")), 302);
+    return userFail(c, p, roleList, allRegions);
   }
 
   const updates: Record<string, string | number> = {
@@ -285,6 +327,14 @@ adminRoutes.get("/roles", requirePermission("roles.manage"), async (c) => {
   );
 });
 
+/** Bare new-role form for the js-add-modal fetch. */
+adminRoutes.get("/roles/new", requirePermission("roles.manage"), (c) => {
+  const lang = c.get("lang");
+  return c.html(
+    <RoleFormFragment lang={lang} errors={!!c.req.query("errors") ? [] : []} values={{}} />,
+  );
+});
+
 adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
   const db = getDb(c.env);
   const body = await c.req.parseBody({ all: true });
@@ -292,7 +342,14 @@ adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
   const description = s(body.description);
   const perms = validPerms(multi(body.permissions));
   const t = getDict(c.get("lang"));
-  const fail = (msg: string) => c.redirect(errRedirect("/admin/roles", msg), 302);
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  const fail = (msg: string) =>
+    fromModal
+      ? c.html(
+          <RoleFormFragment lang={c.get("lang")} errors={[msg]} values={{ name, description, permissions: perms }} />,
+          400,
+        )
+      : c.redirect(errRedirect("/admin/roles", msg), 302);
   if (name.length < 2) return fail(t("adm.errRoleName"));
   const dup = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, name)).limit(1);
   if (dup[0]) return fail(t("adm.errRoleDup"));
@@ -311,6 +368,18 @@ async function loadRoleOrRedirect(db: DB, rawId: string) {
   return rows[0] ?? null;
 }
 
+/** Bare edit-role form for the js-edit-modal fetch. */
+adminRoutes.get("/roles/:id/edit", requirePermission("roles.manage"), async (c) => {
+  const lang = c.get("lang");
+  const role = await loadRoleOrRedirect(getDb(c.env), c.req.param("id"));
+  if (!role) return c.redirect("/admin/roles?err=err-notfound", 302);
+  const all = await loadRoles(getDb(c.env));
+  const info = all.find((r) => r.id === role.id);
+  return c.html(
+    <RoleFormFragment lang={lang} edit existing={info as AdminRoleRow} errors={[]} />,
+  );
+});
+
 adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
@@ -318,6 +387,15 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
   const body = await c.req.parseBody({ all: true });
   const perms = validPerms(multi(body.permissions));
+  const fromModal = c.req.header("X-Requested-With") === "modal";
+  if (fromModal && !perms.length) {
+    const all = await loadRoles(db);
+    const info = all.find((r) => r.id === role.id) as AdminRoleRow;
+    return c.html(
+      <RoleFormFragment lang={c.get("lang")} edit existing={info} errors={[t("adm.errRoleBad")]} />,
+      400,
+    );
+  }
   await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
   for (const p of perms) await db.insert(rolePermissions).values({ roleId: role.id, permission: p });
   return c.redirect("/admin/roles?ok=role-updated", 302);

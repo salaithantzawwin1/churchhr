@@ -48,7 +48,7 @@ function userForm(v: {
 }, props: { roles: { id: number; name: string }[]; regions: { id: number; name: string }[] }, t: (k: string) => string) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
   return (
-    <form method="post" action={action}>
+    <form method="post" action={action} data-flash-ok={v.id ? "user-updated" : "user-created"}>
       <div class="form-grid">
         <label class="field">
           <span class="lbl">Username {v.id === undefined && "*"}</span>
@@ -101,6 +101,27 @@ function userForm(v: {
   );
 }
 
+/** Bare user form (no Layout) — served for the add/edit modal?modal=1 fetch and
+ * reused by error responses inside the same modal. */
+export function UserFormFragment(props: {
+  lang?: Lang; errors: string[]; modal?: boolean;
+  values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; active: number; mustChange: number };
+  roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
+}) {
+  const t = getDict(props.lang ?? "mm");
+  return (
+    <>
+      {props.errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{props.errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      {userForm(props.values, { roles: props.roles, regions: props.regions }, t)}
+    </>
+  );
+}
+
 export function AdminUsersPage(props: UsersProps) {
   const { user, perms, flash, users, roles, regions, editUser, createErrors, editErrors, lang } = props;
   const t = getDict(lang ?? "mm");
@@ -108,7 +129,11 @@ export function AdminUsersPage(props: UsersProps) {
     <Layout title={t("adm.usersTitle")} lang={lang} user={user} perms={perms} active="/admin/users" flash={flash ?? null}>
       <div class="page-head">
         <h1>{t("adm.usersTitle")}</h1>
-        <a class="btn secondary" href="/">← Dashboard</a>
+        <div class="page-actions">
+          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn js-add-modal" href="/admin/users/new"
+             data-modal-title={t("adm.createHeading")} data-modal-size="md">+ {t("adm.createHeading")}</a>
+        </div>
       </div>
 
       <div class="tbl-wrap">
@@ -119,7 +144,7 @@ export function AdminUsersPage(props: UsersProps) {
           <tbody>
             {users.map((u) => (
               <tr>
-                <td>{u.id}</td>
+                <td class="muted">{u.id}</td>
                 <td>
                   {u.username}
                   {u.id === user.id && <span class="badge" style="margin-left:6px">{t("adm.you")}</span>}
@@ -132,9 +157,10 @@ export function AdminUsersPage(props: UsersProps) {
                     : <span class="badge inactive">{t("adm.off")}</span>}
                   {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
                 </td>
-                <td>
+                <td style="white-space:nowrap">
                   {u.id !== user.id
-                    ? <a class="btn sm secondary" href={`/admin/users/${u.id}/edit`}>{t("members.edit")}</a>
+                    ? <a class="btn sm secondary js-edit-modal" href={`/admin/users/${u.id}/edit`}
+                         data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md">{t("members.edit")}</a>
                     : <span class="muted small">{t("adm.selfEdit")}</span>}
                 </td>
               </tr>
@@ -143,15 +169,23 @@ export function AdminUsersPage(props: UsersProps) {
         </table>
       </div>
 
-      {!editUser && (
+      {editUser && (
         <div class="card" style="margin-top:18px">
-          <h2>{t("adm.createHeading")}</h2>
-          {createErrors.length > 0 && (
-            <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
+          <h2>{t("adm.editHeading")}: {editUser.username}</h2>
+          {editErrors.length > 0 && (
+            <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }, { roles, regions }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions }, t)}
         </div>
       )}
+
+      <div class="card" style="margin-top:18px">
+        <h2>{t("adm.createHeading")}</h2>
+        {createErrors.length > 0 && (
+          <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
+        )}
+        {userForm({ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }, { roles, regions }, t)}
+      </div>
     </Layout>
   );
 }
@@ -161,9 +195,17 @@ export function AdminUserEditPage(props: Common & {
   roles: { id: number; name: string; description: string | null }[];
   regions: { id: number; name: string }[];
   editErrors: string[];
+  modal?: boolean;
 }) {
-  const { user, perms, flash, editUser: u, roles, regions, editErrors, lang } = props;
+  const { user, perms, flash, editUser: u, roles, regions, editErrors, lang, modal } = props;
   const t = getDict(lang ?? "mm");
+  if (modal) {
+    return (
+      <UserFormFragment lang={lang} errors={editErrors}
+        values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }}
+        roles={roles} regions={regions} />
+    );
+  }
   return (
     <Layout title={`${t("members.edit")}: ${u.username}`} lang={lang} user={user} perms={perms} active="/admin/users" flash={flash ?? null}>
       <div class="page-head">
@@ -174,7 +216,9 @@ export function AdminUserEditPage(props: Common & {
         {editErrors.length > 0 && (
           <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
         )}
-        {userForm({ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }, { roles, regions }, t)}
+        <UserFormFragment lang={lang} errors={editErrors}
+          values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }}
+          roles={roles} regions={regions} />
       </div>
     </Layout>
   );
@@ -210,6 +254,57 @@ function permCheckboxes(role: { id: number; permissions: string[] } | null, labe
   );
 }
 
+/** Bare role form — create or edit one role's name/description/permissions.
+ * Served in the add/edit modal (no Layout) and as the no-JS fallback. */
+export function RoleFormFragment(props: {
+  id?: number; lang?: Lang; errors: string[];
+  values?: { name?: string; description?: string; permissions?: string[] };
+  edit?: boolean; existing?: AdminRoleRow;
+}) {
+  const t = getDict(props.lang ?? "mm");
+  const PL = (props.lang ?? "mm") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  const isNew = !props.edit;
+  const v = props.values ?? {};
+  const role = isNew ? null : (props.existing ?? null);
+  const perms = role ? role.permissions : (v.permissions ?? []);
+  const action = isNew ? "/admin/roles" : `/admin/roles/${role!.id}`;
+  return (
+    <form method="post" action={action} data-flash-ok={isNew ? "role-created" : "role-updated"}>
+      {props.errors.length > 0 && (
+        <div class="flash err">
+          <strong>{t("form.invalid")}</strong>
+          <ul class="err-list">{props.errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      {role && <input type="hidden" name="name" value={role.name} />}
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.roleName")} {isNew && "*"}</span>
+          <input type="text" name={isNew ? "name" : "description"} value={isNew ? v.name ?? "" : role?.description ?? ""}
+            required={isNew} {...isNew ? { maxLength: 60 } : {}} />
+          {isNew && <span class="field-hint">{t("adm.roleNameHint")}</span>}
+        </label>
+      </div>
+      <div style="margin-top:10px">
+        <strong class="small">Permissions:</strong>
+        <div class="form-grid" style="margin-top:8px">
+          {PERMISSIONS.map((p) => (
+            <label class="field" style="font-size:14px">
+              <input type="checkbox" name="permissions" value={p}
+                checked={perms.includes(p)} /> {PL[p]}
+              <span class="hint"> ({p})</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" type="submit">{isNew ? t("adm.createRole") : t("adm.savePerms")}</button>
+        <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+      </div>
+    </form>
+  );
+}
+
 export function AdminRolesPage(props: RolesProps) {
   const { user, perms, flash, roles, createErrors, saveErrors, lang } = props;
   const t = getDict(lang ?? "mm");
@@ -218,61 +313,61 @@ export function AdminRolesPage(props: RolesProps) {
     <Layout title="Roles" lang={lang} user={user} perms={perms} active="/admin/roles" flash={flash ?? null}>
       <div class="page-head">
         <h1>{t("adm.rolesHeading")}</h1>
-        <a class="btn secondary" href="/">← Dashboard</a>
-      </div>
-      {saveErrors.length > 0 && (
-        <div class="flash err"><ul class="err-list">{saveErrors.map((e) => <li>{e}</li>)}</ul></div>
-      )}
-
-      {roles.map((r) => (
-        <div class="card">
-          <div class="page-head" style="margin-bottom:4px">
-            <h2 style="margin:0">
-              {r.name}
-              {r.is_system === 1 && <span class="badge" style="margin-left:8px">system</span>}
-            </h2>
-            {r.is_system !== 1 && (
-              <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}
-               >
-                <button class="btn sm danger" type="submit">{t("members.delete")}</button>
-              </form>
-            )}
-          </div>
-          {r.description && <p class="muted small">{r.description}</p>}
-          <form method="post" action={`/admin/roles/${r.id}`}>
-            <input type="hidden" name="name" value={r.name} />
-            <input type="hidden" name="description" value={r.description ?? ""} />
-            {permCheckboxes(r, PL)}
-            <div class="actions">
-              <button class="btn" type="submit">{t("adm.savePerms")}</button>
-            </div>
-          </form>
+        <div class="page-actions">
+          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn js-add-modal" href="/admin/roles/new?add=1" data-modal-title={t("adm.newRole")} data-modal-size="sm">
+            + {t("adm.newRole")}
+          </a>
         </div>
-      ))}
-
-      <div class="card">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>{t("adm.roleName")}</th><th>{t("adm.desc")}</th><th>{t("adm.permissions")}</th><th>{t("members.status")}</th><th></th></tr>
+          </thead>
+          <tbody>
+            {roles.map((r) => (
+              <tr>
+                <td class="muted">{r.id}</td>
+                <td>
+                  {r.name}
+                  {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
+                </td>
+                <td class="small muted">{r.description || "—"}</td>
+                <td class="small">
+                  {r.permissions.length === 0
+                    ? <span class="muted">—</span>
+                    : r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
+                </td>
+                <td>
+                  {r.is_system === 1
+                    ? <span class="badge active">system</span>
+                    : <span class="badge inactive">—</span>}
+                </td>
+                <td style="white-space:nowrap">
+                  <a class="btn sm secondary js-edit-modal" href={`/admin/roles/${r.id}/edit`}
+                     data-modal-title={`${t("adm.rolesHeading")}: ${r.name}`} data-modal-size="md">{t("members.edit")}</a>{" "}
+                  {r.is_system !== 1 && (
+                    <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")} style="display:inline">
+                      <button class="btn sm danger" type="submit">{t("members.delete")}</button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-top:18px">
         <h2>{t("adm.newRole")}</h2>
         {createErrors.length > 0 && (
           <div class="flash err"><ul class="err-list">{createErrors.map((e) => <li>{e}</li>)}</ul></div>
         )}
-
-        <form method="post" action="/admin/roles">
-          <div class="form-grid">
-            <label class="field">
-              <span class="lbl">Role name *</span>
-              <input type="text" name="name" required />
-            </label>
-            <label class="field">
-              <span class="lbl">{t("adm.desc")}</span>
-              <input type="text" name="description" />
-            </label>
-          </div>
-          {permCheckboxes(null, PL)}
-          <div class="actions">
-            <button class="btn" type="submit">{t("adm.createRole")}</button>
-          </div>
-        </form>
+        <RoleFormFragment lang={lang} errors={[]} />
       </div>
+      {saveErrors.length > 0 && (
+        <div class="flash err" style="margin-top:18px"><ul class="err-list">{saveErrors.map((e) => <li>{e}</li>)}</ul></div>
+      )}
     </Layout>
   );
 }
