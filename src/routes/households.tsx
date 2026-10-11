@@ -282,10 +282,17 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   const [family] = (await db.all(sql`SELECT f.*, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
   if (!family) return c.redirect("/admin/households?err=err-notfound", 302);
   const lang = c.get("lang");
+  const allOptions = await loadAllOptions(db);
   return c.html(
     <HouseholdAddMemberPage
       user={c.get("user")} perms={c.get("perms")}
       family={family} values={defaultAddValues(family)} errors={[]} relationship={s(c.req.query("rel")) || "spouse"}
+      options={{
+        family_group: allOptions.filter((o) => o.type === "family_group"),
+        home_cell: allOptions.filter((o) => o.type === "home_cell"),
+        group: allOptions.filter((o) => o.type === "group"),
+        fellowship_category: allOptions.filter((o) => o.type === "fellowship_category"),
+      }}
       lang={lang}
     />,
   );
@@ -334,9 +341,17 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
     errors.push(getDict(lang)("val.state"));
   }
   if (errors.length > 0) {
+    const allOptions = await loadAllOptions(db);
     return c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
-        values={values} errors={errors} relationship={rel} lang={lang} />, 400,
+        values={values} errors={errors} relationship={rel}
+        options={{
+          family_group: allOptions.filter((o) => o.type === "family_group"),
+          home_cell: allOptions.filter((o) => o.type === "home_cell"),
+          group: allOptions.filter((o) => o.type === "group"),
+          fellowship_category: allOptions.filter((o) => o.type === "fellowship_category"),
+        }}
+        lang={lang} />, 400,
     );
   }
 

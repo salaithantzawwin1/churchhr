@@ -1,5 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
+import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -184,6 +185,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
 
 export function HouseholdAddMemberPage(props: Common & {
   family: any; values: Record<string, string>; errors: string[]; relationship: string;
+  options?: Record<string, OptionRow[]>;
 }) {
   const { user, perms, family, values: v, errors, lang } = props;
   const t = getDict(lang ?? "mm");
@@ -232,8 +234,55 @@ export function HouseholdAddMemberPage(props: Common & {
         <div class="card">
           <h2>{t("form.contact")}</h2>
           <div class="form-grid">
-            <label class="field"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone2" value={v.phone ?? ""} style="display:none" /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>{t("form.church")}</h2>
+          <p class="muted small" style="margin-top:0">
+            {isEn
+              ? "For the household head: pick the Family Group / Group / Home Cell — every other member added to this household copies these automatically."
+              : "အိမ်ထောင်ဦးစီးအတွက် Family Group / Group / Home Cell ရွေးပါ — ဒီမိသားစုထဲ နောက်ထည့်မယ့် အဖွဲ့ဝင်အားလုံးက အလိုအလျောက် ကူးယူပါမည်။"}
+          </p>
+          <div class="form-grid">
+            <label class="field"><span class="lbl">{t("form.familyGroup")}</span>
+              <select name="family_group_id">
+                <option value="">{t("form.choose")}</option>
+                {(props.options?.family_group ?? []).map((o) => (
+                  <option value={String(o.id)} selected={v.family_group_id === String(o.id)}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label class="field"><span class="lbl">{t("form.homeCell")}</span>
+              <select name="home_cell_id">
+                <option value="">{t("form.choose")}</option>
+                {(props.options?.home_cell ?? []).map((o) => (
+                  <option value={String(o.id)} selected={v.home_cell_id === String(o.id)}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label class="field"><span class="lbl">{t("form.group")}</span>
+              <select name="group_id">
+                <option value="">{t("form.choose")}</option>
+                {(props.options?.group ?? []).map((o) => (
+                  <option value={String(o.id)} selected={v.group_id === String(o.id)}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label class="field"><span class="lbl">{t("form.fellowship")}</span>
+              <select name="fellowship_category_id">
+                <option value="">{t("form.choose")}</option>
+                {(props.options?.fellowship_category ?? []).map((o) => (
+                  <option value={String(o.id)} selected={v.fellowship_category_id === String(o.id)}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label class="field"><span class="lbl">{t("form.statusLabel")}</span>
+              <select name="status">
+                <option value="active" selected={(v.status || "active") === "active"}>{isEn ? "Active" : "ပုံမှန်"}</option>
+                <option value="inactive" selected={v.status === "inactive"}>{isEn ? "Inactive" : "ရပ်တန့်"}</option>
+              </select>
+            </label>
           </div>
         </div>
         <div class="actions">
