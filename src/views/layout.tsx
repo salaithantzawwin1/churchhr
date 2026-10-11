@@ -1,4 +1,6 @@
 import type { Permission } from "../rbac";
+
+import { ASSET_V } from "../assets";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { html } from "hono/html";
@@ -41,13 +43,13 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
           {title} — Church Member Registry
         </title>
         <link rel="icon" type="image/png" href="/logo.png" />
-        <link rel="stylesheet" href="/styles.css" />
+        <link rel="stylesheet" href={`/styles.css?v=${ASSET_V}`} />
         <script>
           {/* Raw JS (no double quotes / &-entities) so Hono's HTML escaper cannot
               rewrite it — inside <script>, `&quot;` is a literal SyntaxError. */}
           {html`try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}`}
         </script>
-        <script src="/app.js" defer></script>
+        <script src={`/app.js?v=${ASSET_V}`} defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />

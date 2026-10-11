@@ -79,18 +79,41 @@
   // Idle auto-logout — after data-idle-seconds without any user activity
   // (click/key/scroll) anywhere, redirect to /logout?auto=1. The server also
   // caps the session, so a stale client cannot outlive the real timeout.
+  // Deliberately NOT listening to mousemove: sub-pixel jitter from a resting
+  // mouse or an idle driver keeps resetting the timer forever, so the tab
+  // never logs out. Only deliberate input (click/key/touch/scroll/wheel)
+  // counts as activity. While the tab is hidden the countdown is paused and
+  // resumed/checked on return, since browsers throttle background timers.
   (function initIdleLogout() {
     var secs = parseInt(document.body.getAttribute("data-idle-seconds") || "0", 10);
     if (!secs || secs < 30) return;
+    var last = Date.now();
     var timer = null;
-    function reset() {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(function () { location.assign("/logout?auto=1"); }, secs * 1000);
+    function logout() {
+      timer = null;
+      location.assign("/logout?auto=1");
     }
-    ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach(function (evt) {
-      document.addEventListener(evt, reset, { passive: true });
-    });
-    reset();
+    function arm() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(logout, secs * 1000);
+    }
+    function activity() {
+      last = Date.now();
+      if (!document.hidden) arm();
+    }
+    if (typeof document.addEventListener === "function") {
+      ["click", "keydown", "scroll", "wheel", "touchstart"].forEach(function (evt) {
+        document.addEventListener(evt, activity, { passive: true });
+      });
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) {
+          // Just came back: any activity before the idle window closed resets it.
+          if (Date.now() - last < secs * 1000) arm();
+          else location.assign("/logout?auto=1");
+        }
+      });
+    }
+    arm();
   })();
 
   // Manual dark/light toggle — persists the explicit choice; without one the
