@@ -155,6 +155,26 @@ export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
   township: "Township",
 };
 
+/** Households: one row per family; the head member anchors it. head_member_id
+ * has no FK so the registry record survives head deletion. */
+export const families = sqliteTable("families", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  headMemberId: integer("head_member_id"),
+  address: text("address"),
+  township: text("township"),
+  phone: text("phone"),
+  regionId: integer("region_id")
+    .notNull()
+    .references(() => regions.id),
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+}, (t) => ({
+  regionIdx: index("families_region_idx").on(t.regionId),
+  headIdx: index("families_head_idx").on(t.headMemberId),
+}));
+
 export const members = sqliteTable(
   "members",
   {
@@ -183,6 +203,8 @@ export const members = sqliteTable(
     fellowshipCategoryId: integer("fellowship_category_id").references(() => lookupOptions.id),
     groupId: integer("group_id").references(() => lookupOptions.id),
     homeCellId: integer("home_cell_id").references(() => lookupOptions.id),
+    householdId: integer("family_id"),
+    relationship: text("relationship").notNull().default(""),
     regionId: integer("region_id")
       .notNull()
       .references(() => regions.id),
@@ -196,6 +218,7 @@ export const members = sqliteTable(
   (t) => ({
     regionIdx: index("members_region_idx").on(t.regionId),
     statusIdx: index("members_status_idx").on(t.status),
+    familyIdx: index("members_family_idx").on(t.householdId),
     groupIdx: index("members_group_idx").on(t.groupId),
     homeCellIdx: index("members_home_cell_idx").on(t.homeCellId),
     townshipIdx: index("members_township_idx").on(t.township),

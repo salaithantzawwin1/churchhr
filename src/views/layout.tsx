@@ -32,6 +32,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
     { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
+    { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
   ];
   const items = NAV.filter((n) => !perms || perms.has(n.perm));
   return (

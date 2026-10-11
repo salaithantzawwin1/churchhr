@@ -5,6 +5,7 @@ import { requireAuth, requirePermission } from "./middleware";
 import { profileRoutes, publicAuthRoutes } from "./routes/auth";
 import { membersRoutes } from "./routes/members";
 import { adminRoutes } from "./routes/admin";
+import { householdsRoutes } from "./routes/households";
 import { getDb } from "./db/client";
 import { loadDashboard, type DashboardFilter } from "./dashboard";
 import { flashFromQuery } from "./flash";
@@ -78,6 +79,7 @@ app.get("/", requirePermission("dashboard.view"), async (c) => {
 });
 
 app.route("/members", membersRoutes);
+app.route("/admin/households", householdsRoutes);
 app.route("/admin", adminRoutes);
 
 app.notFound((c) => c.html(<NotFoundPage lang={c.get("lang")} />));
