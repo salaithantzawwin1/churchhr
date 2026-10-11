@@ -137,12 +137,12 @@ householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const allRegions = await loadRegions(db);
-  return c.html(
-    <HouseholdFormPage
-      user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope)} errors={[]} family={null}
-      regions={scopedRegions(allRegions, scope, c.get("lang"))} lang={c.get("lang")}
-    />,
-  );
+  const opts = {
+    user: c.get("user"), perms: c.get("perms"), values: defaultValues(scope), errors: [] as string[],
+    family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+  };
+  if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
+  return c.html(<HouseholdFormPage {...opts} />);
 });
 
 // ---------- POST /admin/households (create family + head member auto-assign) ----------
@@ -152,15 +152,16 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
   const allRegions = await loadRegions(db);
+  const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
-  const render = (status: 400 | 200) =>
-    c.html(
-      <HouseholdFormPage
-        user={c.get("user")} perms={c.get("perms")} values={values} errors={errors} family={null}
-        regions={scopedRegions(allRegions, scope, c.get("lang"))} lang={c.get("lang")}
-      />,
-      status,
-    );
+  const render = (status: 400 | 200) => {
+    const opts = {
+      user: c.get("user"), perms: c.get("perms"), values, errors,
+      family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+    };
+    if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
+    return c.html(<HouseholdFormPage {...opts} />, status);
+  };
   if (!data) return render(400);
 
   const inserted = await db
@@ -172,7 +173,9 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
 
-  return c.redirect(`/admin/households/${familyId}/add-member?new=1`, 302);
+  const next = `/admin/households/${familyId}/add-member?new=1`;
+  if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
+  return c.redirect(next, 302);
 });
 
 // ---------- GET /admin/households/:id ----------
@@ -216,12 +219,12 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
     name: row.name, address: row.address ?? "", township: row.township ?? "",
     phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "", head_name: "",
   };
-  return c.html(
-    <HouseholdFormPage
-      user={c.get("user")} perms={c.get("perms")} values={values} errors={[]} family={{ id }}
-      regions={scopedRegions(allRegions, scope, c.get("lang"))} lang={c.get("lang")}
-    />,
-  );
+  const opts = {
+    user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
+    family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+  };
+  if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
+  return c.html(<HouseholdFormPage {...opts} />);
 });
 
 // ---------- POST /admin/households/:id ----------
@@ -237,15 +240,16 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   }
   const body = await c.req.parseBody();
   const allRegions = await loadRegions(db);
+  const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
-  const render = (status: 400 | 200) =>
-    c.html(
-      <HouseholdFormPage
-        user={c.get("user")} perms={c.get("perms")} values={values} errors={errors} family={{ id }}
-        regions={scopedRegions(allRegions, scope, c.get("lang"))} lang={c.get("lang")}
-      />,
-      status,
-    );
+  const render = (status: 400 | 200) => {
+    const opts = {
+      user: c.get("user"), perms: c.get("perms"), values, errors,
+      family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+    };
+    if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
+    return c.html(<HouseholdFormPage {...opts} />, status);
+  };
   if (!data) return render(400);
   await db
     .update(families)
@@ -254,7 +258,9 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
       regionId: data.region_id, notes: data.notes,
     })
     .where(eq(families.id, id));
-  return c.redirect(`/admin/households/${id}?ok=hh.updated`, 302);
+  const next = `/admin/households/${id}?ok=hh.updated`;
+  if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
+  return c.redirect(next, 302);
 });
 
 // ---------- POST /admin/households/:id/delete ----------

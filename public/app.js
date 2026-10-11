@@ -359,6 +359,10 @@
     })
       .then(function (r) {
         if (r.ok) {
+          // Server may tell us where to land (e.g. household detail after
+          // create); honor it, else refresh with the flash key as before.
+          var redirect = r.headers.get("X-Redirect-To");
+          if (redirect) { location.assign(redirect); return; }
           location.assign(flashUrl(form.getAttribute("data-flash-ok") || "member-updated"));
           return;
         }

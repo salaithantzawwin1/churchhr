@@ -25,9 +25,9 @@ export function HouseholdFormPage(props: Common & {
 
 export function HouseholdFormFragment(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
-  regions: { id: number; name: string }[];
+  regions: { id: number; name: string }[]; modal?: boolean;
 }) {
-  const { values: v, errors, family, regions } = props;
+  const { values: v, errors, family, regions, modal } = props;
   const t = getDict(props.lang ?? "mm");
   const action = family ? `/admin/households/${family.id}` : "/admin/households";
   return (
@@ -36,7 +36,8 @@ export function HouseholdFormFragment(props: Common & {
         <div class="flash err"><strong>{t("form.invalid")}</strong>
           <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul></div>
       )}
-      <form method="post" action={action}>
+      <form method="post" action={action} data-flash-ok={modal ? "hh.updated" : undefined}>
+        {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("hh.cardHeading")}</h2>
           <div class="form-grid">
