@@ -2,6 +2,7 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
+import { regionCascadeSelects } from "./hh-cascade";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -26,6 +27,7 @@ export function HouseholdFormPage(props: Common & {
 export function HouseholdFormFragment(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; modal?: boolean;
+  options?: Record<string, OptionRow[]>;
 }) {
   const { values: v, errors, family, regions, modal } = props;
   const t = getDict(props.lang ?? "mm");
@@ -43,12 +45,20 @@ export function HouseholdFormFragment(props: Common & {
           <div class="form-grid">
             <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
               <input type="text" name="name" required value={v.name ?? ""} /></label>
-            <label class="field"><span class="lbl">{t("hh.state")}</span>
-              <select name="region_id" required>
-                <option value="">{t("form.choose")}</option>
-                {regions.map((r) => <option value={String(r.id)} selected={v.region_id === String(r.id)}>{r.name}</option>)}
-              </select></label>
-            <label class="field"><span class="lbl">{t("hh.townshipLabel")}</span><input type="text" name="township" value={v.township ?? ""} /></label>
+            {regionCascadeSelects({
+              lang: props.lang ?? "mm",
+              regions,
+              regionId: v.region_id ?? "",
+              township: v.township ?? "",
+              townshipOpts: props.options?.township ?? [],
+              homeCellId: v.home_cell_id ?? "",
+              homeCellOpts: props.options?.home_cell ?? [],
+              groupId: v.group_id ?? "",
+              groupOpts: props.options?.group ?? [],
+              familyGroupId: v.family_group_id ?? "",
+              familyGroupOpts: props.options?.family_group ?? [],
+            })}
+
             <label class="field"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
@@ -187,6 +197,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
 export function HouseholdAddMemberPage(props: Common & {
   family: any; values: Record<string, string>; errors: string[]; relationship: string;
   options?: Record<string, OptionRow[]>;
+  regions?: { id: number; name: string }[];
 }) {
   const { user, perms, family, values: v, errors, lang } = props;
   const t = getDict(lang ?? "mm");
@@ -246,30 +257,19 @@ export function HouseholdAddMemberPage(props: Common & {
               : "အိမ်ထောင်ဦးစီးအတွက် Family Group / Group / Home Cell ရွေးပါ — ဒီမိသားစုထဲ နောက်ထည့်မယ့် အဖွဲ့ဝင်အားလုံးက အလိုအလျောက် ကူးယူပါမည်။"}
           </p>
           <div class="form-grid">
-            <label class="field"><span class="lbl">{t("form.familyGroup")}</span>
-              <select name="family_group_id">
-                <option value="">{t("form.choose")}</option>
-                {(props.options?.family_group ?? []).map((o) => (
-                  <option value={String(o.id)} selected={v.family_group_id === String(o.id)}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-            <label class="field"><span class="lbl">{t("form.homeCell")}</span>
-              <select name="home_cell_id">
-                <option value="">{t("form.choose")}</option>
-                {(props.options?.home_cell ?? []).map((o) => (
-                  <option value={String(o.id)} selected={v.home_cell_id === String(o.id)}>{o.label}</option>
-                ))}
-              </select>
-            </label>
-            <label class="field"><span class="lbl">{t("form.group")}</span>
-              <select name="group_id">
-                <option value="">{t("form.choose")}</option>
-                {(props.options?.group ?? []).map((o) => (
-                  <option value={String(o.id)} selected={v.group_id === String(o.id)}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+            {regionCascadeSelects({
+              lang: props.lang ?? "mm",
+              regions: props.regions ?? [],
+              regionId: v.region_id ?? "",
+              township: v.township ?? "",
+              townshipOpts: props.options?.township ?? [],
+              homeCellId: v.home_cell_id ?? "",
+              homeCellOpts: props.options?.home_cell ?? [],
+              groupId: v.group_id ?? "",
+              groupOpts: props.options?.group ?? [],
+              familyGroupId: v.family_group_id ?? "",
+              familyGroupOpts: props.options?.family_group ?? [],
+            })}
             <label class="field"><span class="lbl">{t("form.fellowship")}</span>
               <select name="fellowship_category_id">
                 <option value="">{t("form.choose")}</option>

@@ -137,9 +137,11 @@ householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const allRegions = await loadRegions(db);
+  const allOptions = await loadAllOptions(db);
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values: defaultValues(scope), errors: [] as string[],
     family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+    options: hhFormOptions(allOptions),
   };
   if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
   return c.html(<HouseholdFormPage {...opts} />);
@@ -154,10 +156,12 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
   const allRegions = await loadRegions(db);
   const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const allOptions = await loadAllOptions(db);
   const render = (status: 400 | 200) => {
     const opts = {
       user: c.get("user"), perms: c.get("perms"), values, errors,
       family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+      options: hhFormOptions(allOptions),
     };
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
@@ -219,9 +223,11 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
     name: row.name, address: row.address ?? "", township: row.township ?? "",
     phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "", head_name: "",
   };
+  const allOptions = await loadAllOptions(db);
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
     family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+    options: hhFormOptions(allOptions),
   };
   if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
   return c.html(<HouseholdFormPage {...opts} />);
@@ -242,10 +248,12 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   const allRegions = await loadRegions(db);
   const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const allOptions = await loadAllOptions(db);
   const render = (status: 400 | 200) => {
     const opts = {
       user: c.get("user"), perms: c.get("perms"), values, errors,
       family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
+      options: hhFormOptions(allOptions),
     };
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
@@ -289,20 +297,28 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   if (!family) return c.redirect("/admin/households?err=err-notfound", 302);
   const lang = c.get("lang");
   const allOptions = await loadAllOptions(db);
+  const allRegions = await loadRegions(db);
   return c.html(
     <HouseholdAddMemberPage
       user={c.get("user")} perms={c.get("perms")}
       family={family} values={defaultAddValues(family)} errors={[]} relationship={s(c.req.query("rel")) || "spouse"}
-      options={{
-        family_group: allOptions.filter((o) => o.type === "family_group"),
-        home_cell: allOptions.filter((o) => o.type === "home_cell"),
-        group: allOptions.filter((o) => o.type === "group"),
-        fellowship_category: allOptions.filter((o) => o.type === "fellowship_category"),
-      }}
+      options={hhFormOptions(allOptions)}
+      regions={scopedRegions(allRegions, scopeOf(c), lang)}
       lang={lang}
     />,
   );
 });
+
+/** Option lists shared by household forms (region cascade fields). */
+function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
+  return {
+    township: all.filter((o) => o.type === "township"),
+    home_cell: all.filter((o) => o.type === "home_cell"),
+    group: all.filter((o) => o.type === "group"),
+    family_group: all.filter((o) => o.type === "family_group"),
+    fellowship_category: all.filter((o) => o.type === "fellowship_category"),
+  };
+}
 
 /** Pre-fill address/township/region from the household; relationship selectable. */
 function defaultAddValues(family: any): Record<string, string> {
@@ -348,15 +364,12 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   }
   if (errors.length > 0) {
     const allOptions = await loadAllOptions(db);
+    const allRegions = await loadRegions(db);
     return c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
         values={values} errors={errors} relationship={rel}
-        options={{
-          family_group: allOptions.filter((o) => o.type === "family_group"),
-          home_cell: allOptions.filter((o) => o.type === "home_cell"),
-          group: allOptions.filter((o) => o.type === "group"),
-          fellowship_category: allOptions.filter((o) => o.type === "fellowship_category"),
-        }}
+        options={hhFormOptions(allOptions)}
+        regions={scopedRegions(allRegions, scope, lang)}
         lang={lang} />, 400,
     );
   }
