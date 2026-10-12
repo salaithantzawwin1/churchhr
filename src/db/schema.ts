@@ -13,6 +13,8 @@ export const regions = sqliteTable("regions", {
   name: text("name").notNull(),
   nameEn: text("name_en").notNull(),
   slug: text("slug").notNull().unique(),
+  /** Short code (REG-001…) used in export/filter labels. */
+  code: text("code"),
 });
 
 export const users = sqliteTable("users", {
@@ -109,6 +111,8 @@ export const lookupOptions = sqliteTable(
     regionId: integer("region_id").notNull().default(0),
     /** Optional parent option: Home Cell -> Township, Family Group -> Home Cell. */
     parentId: integer("parent_id"),
+    /** Short code (TWP-001, CEL-014, …) shown in dropdowns/export; unique per type+region. */
+    code: text("code"),
   },
   (t) => ({
     typeIdx: index("lookup_options_type_idx").on(t.type),

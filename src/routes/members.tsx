@@ -6,7 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { findOption, loadAllOptions, optionsOfType, type OptionRow } from "../lookup";
+import { findOption, loadAllOptions, nextCodeCandidate, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
@@ -80,7 +80,7 @@ function renderMsg(raw: string, lang: "mm" | "en"): string {
 }
 
 type Scope = { scopeAll: boolean; stateIds: number[] };
-type Region = { id: number; name: string; nameEn: string; slug: string };
+type Region = { id: number; name: string; nameEn: string; slug: string; code: string | null };
 
 function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
   return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
@@ -124,15 +124,15 @@ function listCond(scope: Scope, f: Filters) {
 
 async function loadRegions(db: DB): Promise<Region[]> {
   return (await db
-    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn, slug: regions.slug })
+    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn, slug: regions.slug, code: regions.code })
     .from(regions)
     .orderBy(regions.id)) as Region[];
 }
 
-function scopedRegions(all: Region[], scope: Scope, lang: "mm" | "en"): { id: number; name: string }[] {
+function scopedRegions(all: Region[], scope: Scope, lang: "mm" | "en"): { id: number; name: string; code: string | null }[] {
   return all
     .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
-    .map((r) => ({ id: r.id, name: lang === "en" && r.nameEn ? r.nameEn : r.name }));
+    .map((r) => ({ id: r.id, name: lang === "en" && r.nameEn ? r.nameEn : r.name, code: r.code ?? null }));
 }
 
 // ---------- GET /members (list + search + filter + sort + pagination) ----------
@@ -619,10 +619,11 @@ async function ensureOption(
   const hit = findOption(cache, type, label, regionId);
   if (hit) return hit.id;
   try {
+    const code = nextCodeCandidate(cache.filter((o) => o.type === type).map((o) => o.code ?? ""), type);
     const rows = await db
       .insert(lookupOptions)
-      .values({ type, label, regionId })
-      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId });
+      .values({ type, label, regionId, code })
+      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId, code: lookupOptions.code });
     cache.push(rows[0]!);
     return rows[0]!.id;
   } catch {

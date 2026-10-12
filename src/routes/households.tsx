@@ -36,15 +36,19 @@ export type Relationship = (typeof RELATIONSHIPS)[number];
 /** nrc-like helpers borrowed pattern from members.tsx; kept local to route. */
 async function loadRegions(db: DB) {
   return (await db
-    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn, slug: regions.slug })
+    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn, slug: regions.slug, code: regions.code })
     .from(regions)
-    .orderBy(regions.id)) as { id: number; name: string; nameEn: string; slug: string }[];
+    .orderBy(regions.id)) as { id: number; name: string; nameEn: string; slug: string; code: string | null }[];
 }
 
-function scopedRegions(all: { id: number; name: string; nameEn: string }[], scope: Scope, lang: "mm" | "en") {
+function scopedRegions(all: { id: number; name: string; nameEn: string; code: string | null }[], scope: Scope, lang: "mm" | "en") {
   return all
     .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
-    .map((r) => ({ id: r.id, name: lang === "en" && r.nameEn ? r.nameEn : r.name }));
+    .map((r) => ({
+      id: r.id,
+      name: lang === "en" && r.nameEn ? r.nameEn : r.name,
+      code: r.code ?? null,
+    }));
 }
 
 const FORM_KEYS = ["name", "head_name", "address", "township", "phone", "region_id", "notes"] as const;

@@ -11,7 +11,7 @@ import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { checkPasswordPolicy } from "../password";
-import { findOption, loadAllOptions, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
+import { findOption, loadAllOptions, nextCodeCandidate, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
@@ -493,6 +493,7 @@ async function optionsPage(c: any, type: string, opts: {
   const labelById = new Map(all.map((o) => [o.id, o.label] as const));
   const options: OptionUsage[] = list.map((o) => ({
     id: o.id, label: o.label, active: o.active,
+    code: o.code ?? null,
     used: usage.get(type === "township" ? o.label : o.id) ?? 0,
     state: stateName(o.regionId ?? null),
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
@@ -591,6 +592,15 @@ async function ageGroupsPage(c: any, opts: { modal?: boolean; showAddForm?: bool
   );
 }
 
+/** Next free code for a type: PREFIX-001, skipping codes already taken
+ * (unique per type+region, but numbering is global per type for readability). */
+async function nextOptionCode(db: DB, type: string): Promise<string | null> {
+  const rows = await db.all<{ code: string }>(
+    sql`SELECT code FROM lookup_options WHERE type = ${type} AND code IS NOT NULL`,
+  );
+  return nextCodeCandidate(rows.map((r) => r.code), type);
+}
+
 adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
@@ -634,7 +644,8 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   // State managers may only anchor options inside their own states. When a
   // parent is chosen its state wins — verify that state, not the picked one.
   if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
-  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId });
+  const code = await nextOptionCode(db, type);
+  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId, code });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 

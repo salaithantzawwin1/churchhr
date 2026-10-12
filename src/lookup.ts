@@ -15,6 +15,8 @@ export type OptionRow = {
   regionId: number;
   /** Optional parent option id (Home Cell -> Township, Family Group -> Home Cell). */
   parentId: number | null;
+  /** Short code (TWP-001…), null until assigned. */
+  code: string | null;
 };
 
 export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
@@ -23,6 +25,7 @@ export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
       id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label,
       active: lookupOptions.active, sortOrder: lookupOptions.sortOrder,
       regionId: lookupOptions.regionId, parentId: lookupOptions.parentId,
+      code: lookupOptions.code,
     })
     .from(lookupOptions)
     .orderBy(asc(lookupOptions.type), asc(lookupOptions.sortOrder), asc(lookupOptions.label))) as OptionRow[];
@@ -82,6 +85,30 @@ export const OPTION_COLUMN: Record<OptionType, keyof typeof members._.columns> =
 
 export function isOptionType(v: string): v is OptionType {
   return (OPTION_TYPES as readonly string[]).includes(v);
+}
+
+/** Short-code prefix per region-scoped option type (TWP-001, CEL-001, …).
+ * Types without an entry stay code-less. */
+export const CODE_PREFIX: Partial<Record<string, string>> = {
+  township: "TWP",
+  home_cell: "CEL",
+  group: "GRP",
+  family_group: "FMG",
+};
+
+/** Deterministic next code candidate from a list of existing codes for the type:
+ * count-based (PREFIX-001, -002, …). Uniqueness per type+region is enforced by
+ * the DB index; callers should retry with the next number on conflict. */
+export function nextCodeCandidate(existingCodes: string[], type: string): string | null {
+  const prefix = CODE_PREFIX[type];
+  if (!prefix) return null;
+  let n = existingCodes.length + 1;
+  let code = `${prefix}-${String(n).padStart(3, "0")}`;
+  while (existingCodes.includes(code)) {
+    n += 1;
+    code = `${prefix}-${String(n).padStart(3, "0")}`;
+  }
+  return code;
 }
 
 /** Raw DB column names for each option type (for GROUP BY / COUNT queries). */

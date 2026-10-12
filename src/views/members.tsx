@@ -312,7 +312,7 @@ function opts(
         return (
           <option value={String(o.id)} selected={selected === String(o.id)}
             data-region={o.regionId === 0 ? "" : String(o.regionId)}
-            data-parent={parent}>{o.label}</option>
+            data-parent={parent}>{o.code ? `${o.code} · ${o.label}` : o.label}</option>
         );
       })}
     </>
@@ -327,7 +327,7 @@ function townshipOpts(options: OptionRow[], selected: string, blank: string) {
       {options.map((o) => (
         <option value={o.label} selected={selected === o.label}
           data-region={o.regionId === 0 ? "" : String(o.regionId)}
-          data-parent="">{o.label}</option>
+          data-parent="">{o.code ? `${o.code} · ${o.label}` : o.label}</option>
       ))}
     </>
   );
@@ -443,7 +443,9 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               <select name="region_id" required data-region-select="1">
                 <option value="">{t("form.choose")}</option>
                 {regions.map((r) => (
-                  <option value={String(r.id)} selected={v.region_id === String(r.id)}>{r.name}</option>
+                  <option value={String(r.id)} selected={v.region_id === String(r.id)}>
+                    {"code" in r && (r as any).code ? `${(r as any).code} · ${r.name}` : r.name}
+                  </option>
                 ))}
               </select>
               <span class="hint">{t("form.stateHint")}</span>

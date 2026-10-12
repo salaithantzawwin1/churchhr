@@ -365,6 +365,8 @@ export type OptionUsage = {
   label: string;
   active: number;
   used: number;
+  /** Short code (TWP-001…); null for legacy/non-scoped rows. */
+  code?: string | null;
   /** State/Region name for region-scoped options; null/undefined = all states. */
   state?: string | null;
   /** Parent option label (Home Cell -> Township, Family Group -> Home Cell). */
@@ -743,11 +745,12 @@ export function AdminOptionsPage(props: OptionsProps) {
         <>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>ID</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}{type === "home_cell" && <th>{t("form.township")}</th>}{type === "family_group" && <th>{t("form.homeCell")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>{t("adm.codeCol")}</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}{type === "home_cell" && <th>{t("form.township")}</th>}{type === "family_group" && <th>{t("form.homeCell")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
           <tbody>
-            {options.length === 0 ? emptyStateRow(5 + (scoped ? 1 : 0) + (type === "home_cell" || type === "family_group" ? 1 : 0), t) : options.map((o) => (
+            {options.length === 0 ? emptyStateRow(5 + (scoped ? 1 : 0) + (type === "home_cell" || type === "family_group" ? 1 : 0) + 1, t) : options.map((o) => (
               <tr>
                 <td class="muted">{o.id}</td>
+                <td><code>{o.code || "—"}</code></td>
                 <td>{o.label}</td>
                 {scoped && <td>{o.state || <span class="muted small">{t("adm.allStates")}</span>}</td>}
                 {(type === "home_cell" || type === "family_group") && <td>{o.parent || <span class="muted">—</span>}</td>}

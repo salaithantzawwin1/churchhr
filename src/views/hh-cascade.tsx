@@ -6,7 +6,7 @@ import type { OptionRow } from "../lookup";
 
 export function regionCascadeSelects(opts: {
   lang: "mm" | "en";
-  regions: { id: number; name: string }[];
+  regions: { id: number; name: string; code?: string | null }[];
   regionId: string;
   township: string;
   townshipOpts: OptionRow[];
@@ -38,12 +38,14 @@ export function regionCascadeSelects(opts: {
               data-region={o.regionId === 0 ? "" : String(o.regionId)}
               data-parent={useParentOfTownship ? parent : undefined}
             >
-              {o.label}
+              {withCode(o)}
             </option>
           );
         })}
     </>
   );
+
+  const withCode = (o: OptionRow) => (o.code ? `${o.code} · ${o.label}` : o.label);
 
   return (
     <>
@@ -52,7 +54,9 @@ export function regionCascadeSelects(opts: {
         <select name="region_id" required data-region-select="1">
           <option value="">{blank}</option>
           {opts.regions.map((r) => (
-            <option value={String(r.id)} selected={opts.regionId === String(r.id)}>{r.name}</option>
+            <option value={String(r.id)} selected={opts.regionId === String(r.id)}>
+              {r.code ? `${r.code} · ${r.name}` : r.name}
+            </option>
           ))}
         </select>
       </label>
@@ -70,7 +74,7 @@ export function regionCascadeSelects(opts: {
                 data-region={o.regionId === 0 ? "" : String(o.regionId)}
                 data-parent=""
               >
-                {o.label}
+                {withCode(o)}
               </option>
             ))}
           {opts.township && !opts.townshipOpts.some((o) => o.label === opts.township) && (
