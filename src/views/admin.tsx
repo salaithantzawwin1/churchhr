@@ -378,7 +378,7 @@ type OptionsProps = Common & {
   typeLabel: string;
   types: { key: string; label: string; active: boolean; count?: number | null }[];
   options?: OptionUsage[];
-  regionRows?: { id: number; name: string; name_en: string; used: number }[];
+  regionRows?: { id: number; name: string; name_en: string; code: string | null; used: number }[];
   ageGroupRows?: { id: number; name: string; min_age: number; max_age: number }[];
   /** States for the State/Region picker on region-scoped option types. */
   regions?: { id: number; name: string }[];
@@ -471,8 +471,9 @@ export function AddOptionForm(props: {
   );
 }
 
-/** Add form for State/Region rows — bare fragment for the modal (and the no-JS ?add=1 fallback). */
-export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string } }) {
+/** Add form for State/Region rows — bare fragment for the modal (and the no-JS ?add=1 fallback).
+ * Code is auto-assigned (REG-001…) on create; no field in the add form. */
+export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string; code?: string } }) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
@@ -616,7 +617,7 @@ export function EditOptionForm(props: {
 }
 
 /** Edit form for one State/Region row — bare fragment for the modal (and full-page no-JS fallback). */
-export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string } }) {
+export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string; code?: string } }) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
@@ -636,6 +637,12 @@ export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string
         <label class="field">
           <span class="lbl">{t("adm.regionNameEn")}</span>
           <input type="text" name="name_en" value={v.name_en ?? ""} maxLength={120} />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.codeCol")}</span>
+          <input type="text" name="code" value={v.code ?? ""} maxLength={16}
+            pattern="[A-Za-z0-9._-]{0,16}" title="A-Z, 0-9, dash/underscore (အလွတ် = code မရှိ)" />
+          <span class="field-hint">{t("adm.codeHint")}</span>
         </label>
       </div>
       <div class="actions">
@@ -727,12 +734,13 @@ export function AdminOptionsPage(props: OptionsProps) {
           <div class="tbl-wrap">
             <table>
               <thead>
-                <tr><th>ID</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th class="num">{t("adm.usage")}</th><th></th></tr>
+                <tr><th>ID</th><th>{t("adm.codeCol")}</th><th>{t("adm.regionNameMm")}</th><th>{t("adm.regionNameEn")}</th><th class="num">{t("adm.usage")}</th><th></th></tr>
               </thead>
               <tbody>
-                {regionRows.length === 0 ? emptyStateRow(5, t) : regionRows.map((r) => (
+                {regionRows.length === 0 ? emptyStateRow(6, t) : regionRows.map((r) => (
                   <tr>
                     <td class="muted">{r.id}</td>
+                    <td><code>{r.code || "—"}</code></td>
                     <td>{r.name}</td>
                     <td>{r.name_en || "—"}</td>
                     <td class={`num${r.used === 0 ? " muted" : ""}`}>{r.used} {t("members.count")}</td>

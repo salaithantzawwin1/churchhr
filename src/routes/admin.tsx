@@ -903,15 +903,15 @@ adminRoutes.post("/age-groups/:id/delete", requirePermission("options.manage"), 
 
 // ---------- State/Region management (Options > State/Region tab) ----------
 
-type RegionRow = { id: number; name: string; name_en: string; used: number };
+type RegionRow = { id: number; name: string; name_en: string; code: string | null; used: number };
 
 async function loadRegionRows(db: DB): Promise<RegionRow[]> {
-  const rows = await db.all<{ id: number; name: string; name_en: string | null; used: number }>(sql`
-    SELECT r.id, r.name, r.name_en,
+  const rows = await db.all<{ id: number; name: string; name_en: string | null; code: string | null; used: number }>(sql`
+    SELECT r.id, r.name, r.name_en, r.code,
       (SELECT COUNT(*) FROM members m WHERE m.region_id = r.id)
       + (SELECT COUNT(*) FROM user_state_assignments sa WHERE sa.region_id = r.id) AS used
     FROM regions r ORDER BY r.id`);
-  return rows.map((r) => ({ id: r.id, name: r.name, name_en: r.name_en ?? "", used: Number(r.used) }));
+  return rows.map((r) => ({ id: r.id, name: r.name, name_en: r.name_en ?? "", code: r.code ?? null, used: Number(r.used) }));
 }
 
 function regionBack(): string {
@@ -965,9 +965,21 @@ adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
   if (dup[0]) return fail(t("adm.errRegionDup"));
   const slug = await uniqueRegionSlug(db, slugify(nameEn || name));
-  await db.insert(regions).values({ name, nameEn: nameEn || name, slug });
+  const code = await nextRegionCode(db);
+  await db.insert(regions).values({ name, nameEn: nameEn || name, slug, code });
   return c.redirect(`${regionBack()}&ok=region-added`, 302);
 });
+
+/** Next free region code: REG-001… (global numbering, matching 0010 backfill). */
+async function nextRegionCode(db: DB): Promise<string> {
+  const rows = await db.all<{ code: string }>(sql`SELECT code FROM regions WHERE code IS NOT NULL`);
+  let n = rows.length + 1;
+  const codes = new Set(rows.map((r) => r.code));
+  for (;; n++) {
+    const code = `REG-${String(n).padStart(3, "0")}`;
+    if (!codes.has(code)) return code;
+  }
+}
 
 adminRoutes.get("/regions/:id/edit", requirePermission("options.manage"), async (c) => {
   if (!optionScopeOf(c).scopeAll) return forbidden(c);
@@ -979,7 +991,7 @@ adminRoutes.get("/regions/:id/edit", requirePermission("options.manage"), async 
   const rows = await db.select().from(regions).where(eq(regions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect(`${back}&err=err-notfound`, 302);
-  const values = { name: current.name, name_en: current.nameEn ?? "" };
+  const values = { name: current.name, name_en: current.nameEn ?? "", code: current.code ?? "" };
   if (c.req.query("modal") === "1") return c.html(<EditRegionForm id={id} values={values} lang={lang} modal />);
   const t = getDict(lang);
   return c.html(
@@ -1008,14 +1020,23 @@ adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) 
   const name = s(body.name);
   const nameEn = s(body.name_en);
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const fail = (msg: string) =>
+  const rawCode = s(body.code).toUpperCase().replace(/\s+/g, "");
+  const failWith = (v: { name: string; name_en: string; code: string }, msg: string) =>
     fromModal
-      ? c.html(<EditRegionForm id={id} lang={c.get("lang")} values={{ name, name_en: nameEn }} errors={[msg]} modal />, 400)
+      ? c.html(<EditRegionForm id={id} lang={c.get("lang")} values={v} errors={[msg]} modal />, 400)
       : c.redirect(errRedirect(back, msg), 302);
+  if (rawCode && !/^[A-Z0-9._-]{2,16}$/.test(rawCode)) return failWith({ name, name_en: nameEn, code: s(body.code) }, t("adm.errCodeBad"));
+  const fail = (msg: string) => failWith({ name, name_en: nameEn, code: rawCode }, msg);
   if (name.length < 1 || name.length > 120) return fail(t("adm.errRegionName"));
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
   if (dup[0] && dup[0].id !== id) return fail(t("adm.errRegionDup"));
-  await db.update(regions).set({ name, nameEn: nameEn || name }).where(eq(regions.id, id));
+  if (rawCode) {
+    const clashCode = await db.all<{ id: number }>(
+      sql`SELECT id FROM regions WHERE code = ${rawCode} AND id <> ${id} LIMIT 1`,
+    );
+    if (clashCode[0]) return fail(t("adm.errCodeDup"));
+  }
+  await db.update(regions).set({ name, nameEn: nameEn || name, code: rawCode || null }).where(eq(regions.id, id));
   return c.redirect(`${back}&ok=region-updated`, 302);
 });
 
