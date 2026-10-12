@@ -3,9 +3,12 @@
 -- survives label edits ("အင်းစိန်မြို့နယ်" vs "Insein Township").
 --
 -- NULL is allowed: legacy rows and non-scoped types (ethnicity, education,
--- fellowship_category) stay without code until edited. Codes are unique per
--- (type, region_id) so a township in two states can share "001"; all-states
--- options share one numbering space per type.
+-- fellowship_category, blood_type) stay without code until edited. Codes are
+-- unique per (type, region_id) so a township in two states can share "001";
+-- all-states options share one numbering space per type.
+-- Format per type prefix: township TWP, home_cell CEL, group GRP,
+-- family_group FMG; regions REG. Numbering is grouped by prefix only
+-- (not per state) so an option's code can be quoted without knowing its state.
 ALTER TABLE lookup_options ADD COLUMN code TEXT;
 ALTER TABLE regions ADD COLUMN code TEXT;
 
@@ -15,9 +18,6 @@ CREATE UNIQUE INDEX regions_code_uq ON regions(code) WHERE code IS NOT NULL;
 
 -- Backfill: seed every region-scoped type + region with a code so numbering
 -- starts consistent (TWP-001…) rather than jumping in later.
--- Format per type prefix: township TWP, home_cell CEL, group GRP,
--- family_group FMG; regions REG. Numbering is grouped by prefix only
--- (not per state) so an option's code can be quoted without knowing its state.
 UPDATE lookup_options SET
   code = 'TWP-' || printf('%03d',
     (SELECT COUNT(*) FROM lookup_options p WHERE p.type = 'township' AND p.id <= lookup_options.id))

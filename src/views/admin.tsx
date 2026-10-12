@@ -580,6 +580,7 @@ export function EditOptionForm(props: {
   id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string;
   type?: string; regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
+  code?: string;
 }) {
   const t = getDict(props.lang ?? "mm");
   const errors = props.errors ?? [];
@@ -591,11 +592,19 @@ export function EditOptionForm(props: {
           <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
         </div>
       )}
-      <label class="field">
-        <span class="lbl">{t("adm.optionLabel")}</span>
-        <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
-        <span class="field-hint">{t("adm.labelHint")}</span>
-      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span class="lbl">{t("adm.optionLabel")}</span>
+          <input type="text" name="label" value={props.label ?? ""} required maxLength={120} />
+          <span class="field-hint">{t("adm.labelHint")}</span>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.codeCol")}</span>
+          <input type="text" name="code" value={props.code ?? ""} maxLength={16}
+            pattern="[A-Za-z0-9._-]{0,16}" title="3-16 အက္ခရာ/ဂဏန်း/underscore/dash (အလွတ် = code မရှိ)" />
+          <span class="field-hint">{t("adm.codeHint")}</span>
+        </label>
+      </div>
       {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion)}
       {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
       <div class="actions">

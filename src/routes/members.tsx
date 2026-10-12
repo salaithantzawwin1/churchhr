@@ -247,7 +247,10 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
 
   if (v.gender && !(v.gender in GENDERS)) errors.push(msg("val.gender"));
   if (v.marital_status && !(v.marital_status in MARITAL_STATUSES)) errors.push(msg("val.marital"));
-  if (v.blood_type && !BLOOD_TYPES.includes(v.blood_type)) errors.push(msg("val.blood"));
+  if (v.blood_type && !BLOOD_TYPES.includes(v.blood_type) &&
+      !findOption(options, "blood_type", v.blood_type, 0)) {
+    errors.push(msg("val.blood"));
+  }
 
   let dob: string | null = "";
   if (v.date_of_birth) {
@@ -501,7 +504,11 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
     let blood = rec("blood_type");
     if (blood) {
       blood = blood.toUpperCase().replace(/\s+/g, "").replace("POSITIVE", "+").replace("NEGATIVE", "-").replace("RH", "");
-      if (!BLOOD_TYPES.includes(blood)) rowErrors.push(`${msg("imp.badBlood")}: ${blood}`);
+      if (!BLOOD_TYPES.includes(blood) &&
+          // managed blood_type options match by label (case-insensitive)
+          !allOptions.some((o) => o.type === "blood_type" && o.label.toUpperCase() === blood)) {
+        rowErrors.push(`${msg("imp.badBlood")}: ${blood}`);
+      }
     }
 
     const statusRaw = rec("status");
@@ -786,7 +793,7 @@ function rowToValues(row: MemberDetail): FormValues {
 // ---------- create ----------
 
 // Option types rendered on the member form (Family + Church cards).
-const FORM_OPTION_TYPES = ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell", "township"];
+const FORM_OPTION_TYPES = ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell", "township", "blood_type"];
 
 function formOptions(all: OptionRow[], keep?: (o: OptionRow) => boolean) {
   return Object.fromEntries(

@@ -130,6 +130,7 @@ export const OPTION_TYPES = [
   "fellowship_category",
   "group",
   "township",
+  "blood_type",
 ] as const;
 export type OptionType = (typeof OPTION_TYPES)[number];
 
@@ -147,6 +148,7 @@ export const OPTION_TYPE_LABELS: Record<OptionType, string> = {
   fellowship_category: "Fellowship Categories",
   group: "Group",
   township: "မြို့နယ် (Township)",
+  blood_type: "သွေးအမျိုးအစား (Blood Type)",
 };
 
 export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
@@ -157,6 +159,7 @@ export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
   fellowship_category: "Fellowship Categories",
   group: "Group",
   township: "Township",
+  blood_type: "Blood Type",
 };
 
 /** Households: one row per family; the head member anchors it. head_member_id

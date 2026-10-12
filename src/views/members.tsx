@@ -405,7 +405,18 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               <span class="lbl">{t("form.blood")}</span>
               <select name="blood_type">
                 <option value="">{t("form.choose")}</option>
-                {BLOOD_TYPES.map((b) => <option value={b} selected={v.blood_type === b}>{b}</option>)}
+                {(() => {
+                  // Managed options first (code · label); fall back to the
+                  // std eight when none are active, merging so both show.
+                  const opts = options.blood_type ?? [];
+                  const rows = opts.length > 0
+                    ? opts.map((o) => ({ value: o.label, text: o.code ? `${o.code} · ${o.label}` : o.label }))
+                    : BLOOD_TYPES.map((b) => ({ value: b, text: b }));
+                  if (v.blood_type && !rows.some((r) => r.value === v.blood_type)) {
+                    rows.push({ value: v.blood_type, text: v.blood_type });
+                  }
+                  return rows.map((r) => <option value={r.value} selected={v.blood_type === r.value}>{r.text}</option>);
+                })()}
               </select>
             </label>
           </div>

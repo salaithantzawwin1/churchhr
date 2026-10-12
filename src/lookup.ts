@@ -78,9 +78,10 @@ export const OPTION_COLUMN: Record<OptionType, keyof typeof members._.columns> =
   family_group: "familyGroupId",
   fellowship_category: "fellowshipCategoryId",
   group: "groupId",
-  // members.township stores the option *label* (text), not an id — usage counts
-  // and delete guards for 'township' compare labels (see admin routes).
+  // members.township / members.blood_type store the option *label* (text), not
+  // an id — usage counts and delete guards compare labels (see admin routes).
   township: "township",
+  blood_type: "bloodType",
 };
 
 export function isOptionType(v: string): v is OptionType {
@@ -120,4 +121,5 @@ export const OPTION_RAW_COLUMN: Record<OptionType, string> = {
   fellowship_category: "fellowship_category_id",
   group: "group_id",
   township: "township",
+  blood_type: "blood_type",
 };

@@ -670,6 +670,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
     id, label: current.label, lang,
     type: current.type, regions: stateList,
     lockRegion: !admin && stateList.length === 1,
+    code: current.code ?? "",
     regionId: current.regionId === 0 ? "" : String(current.regionId),
     parentId: current.parentId == null ? "" : String(current.parentId),
     parentOptions: parentType
@@ -728,6 +729,7 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
     const fp = {
       id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions,
       lockRegion: !admin && stateList.length === 1,
+      code: s(body.code),
       regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
       parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
     };
@@ -748,7 +750,20 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   // State managers cannot move an option out of their own states (or onto an
   // all-states parent) — re-verify the target anchor before saving.
   if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
-  await db.update(lookupOptions).set({ label, regionId: anchorRegion, parentId }).where(eq(lookupOptions.id, id));
+  // Editable short code: normalize to UPPER, empty = clear. Uniqueness per
+  // (type, region) is enforced by the partial unique index (0010)
+  // surfaced here as a friendly duplicate error.
+  const rawCode = s(body.code).toUpperCase().replace(/\s+/g, "");
+  if (rawCode && !/^[A-Z0-9._-]{2,16}$/.test(rawCode)) return fail(t("adm.errCodeBad"));
+  if (rawCode) {
+    const clashCode = await db.all<{ id: number }>(
+      sql`SELECT id FROM lookup_options WHERE type = ${current.type} AND region_id = ${anchorRegion} AND code = ${rawCode} AND id <> ${id} LIMIT 1`,
+    );
+    if (clashCode[0]) return fail(t("adm.errCodeDup"));
+  }
+  await db.update(lookupOptions)
+    .set({ label, regionId: anchorRegion, parentId, code: rawCode || null })
+    .where(eq(lookupOptions.id, id));
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 
