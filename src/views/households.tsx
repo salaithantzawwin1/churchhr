@@ -73,7 +73,7 @@ export function HouseholdFormFragment(props: Common & {
   );
 }
 
-export function HouseholdsListPage(props: Common & { rows: any[]; q: string }) {
+export function HouseholdsListPage(props: Common & { rows: any[]; q: string; township?: string; townshipOptions?: { id: number; label: string }[] }) {
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "mm");
   const isEn = (lang ?? "mm") === "en";
@@ -90,6 +90,12 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string }) {
 
       <form method="get" action="/admin/households" class="filters card">
         <input type="text" name="q" value={q} placeholder={t("hh.searchPlaceholder")} style="max-width:280px" />
+        <select name="township" style="max-width:220px">
+          <option value="">{isEn ? "All townships" : "မြို့နယ် အားလုံး"}</option>
+          {(props.townshipOptions ?? []).map((o) => (
+            <option value={o.label} selected={props.township === o.label}>{o.label}</option>
+          ))}
+        </select>
         <button class="btn secondary" type="submit">{t("members.search")}</button>
       </form>
 
@@ -98,11 +104,12 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string }) {
           <thead><tr>
             <th>ID</th><th>{t("hh.name")}</th><th>{isEn ? "Head" : "အိမ်ထောင်ဦးစီး"}</th>
             <th class="num">{isEn ? "Members" : "အဆူရေ"}</th>
-            <th>{t("detail.state")}</th><th>{t("hh.townshipLabel")}</th><th></th>
+            <th>{t("detail.state")}</th><th>{t("hh.townshipLabel")}</th>
+            <th>{isEn ? "Home Cell" : "Home Cell"}</th><th></th>
           </tr></thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={7} style="text-align:center" class="muted">{t("hh.empty")}</td></tr>
+              <tr><td colSpan={8} style="text-align:center" class="muted">{t("hh.empty")}</td></tr>
             ) : rows.map((f) => (
               <tr key={f.id}>
                 <td>{f.id}</td>
@@ -111,6 +118,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string }) {
                 <td class="num">{f.member_count ?? 0}</td>
                 <td>{isEn && f.state_name_en ? f.state_name_en : f.state_name}</td>
                 <td>{f.township ?? ""}</td>
+                <td>{f.home_cell_label || <span class="muted">—</span>}</td>
                 <td>{perms.has("members.update") && <a class="btn sm js-edit-modal" href={`/admin/households/${f.id}/edit`}>{t("members.edit")}</a>}</td>
               </tr>
             ))}
@@ -154,6 +162,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
           <tr><th>{isEn ? "Head" : "အိမ်ထောင်ဦးစီး"}</th><td>{headName || <span class="muted">—</span>}</td></tr>
           <tr><th>{t("detail.state")}</th><td>{isEn && family.state_name_en ? family.state_name_en : family.state_name}</td></tr>
           <tr><th>{t("hh.townshipLabel")}</th><td>{family.township}</td></tr>
+          <tr><th>{isEn ? "Home Cell" : "Home Cell"}</th><td>{family.home_cell_label || <span class="muted">—</span>}</td></tr>
           <tr><th>{t("detail.address")}</th><td>{family.address}</td></tr>
           <tr><th>{t("detail.phone")}</th><td>{family.phone}</td></tr>
           <tr><th>{t("detail.notes")}</th><td>{family.notes}</td></tr>

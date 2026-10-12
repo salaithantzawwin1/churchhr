@@ -107,26 +107,36 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   const scope = scopeOf(c);
   const q = (c.req.query("q") ?? "").trim().slice(0, 100);
   const like = `%${q}%`;
-  const search = q ? sql` AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``;
-  void search;
+  // Township filter — f.township stores the option LABEL (free text).
+  const township = (c.req.query("township") ?? "").trim().slice(0, 120);
+  const townshipCond = township ? sql`AND f.township = ${township}` : sql``;
   const rows = (await db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
            r.name AS state_name, r.name_en AS state_name_en,
            head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
+           head.phone AS head_phone,
+           hc.label AS home_cell_label,
            hm.cnt AS member_count
     FROM families f
     JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
+    LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
-    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``}
+    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond}
     ORDER BY f.id DESC
     LIMIT 200`)) as any[];
   const lang = c.get("lang");
+  // Township dropdown options for the filter, scoped like the list itself.
+  const allOptions = await loadAllOptions(db);
+  const townshipsInScope = scope.scopeAll
+    ? allOptions.filter((o) => o.type === "township" && o.active === 1)
+    : allOptions.filter((o) => o.type === "township" && o.active === 1 &&
+        (o.regionId === 0 || scope.stateIds.includes(o.regionId)));
   return c.html(
     <HouseholdsListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
-      rows={rows} q={q} lang={lang}
+      rows={rows} q={q} township={township} townshipOptions={townshipsInScope} lang={lang}
     />,
   );
 });
@@ -191,9 +201,11 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
   const [row] = await db.all(sql`
     SELECT f.*, r.name AS state_name, r.name_en AS state_name_en,
-      head.name_myanmar AS head_name_mm, head.name_english AS head_name_en
+      head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
+      hc.label AS home_cell_label
     FROM families f JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
+    LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
     WHERE f.id = ${id}`) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
