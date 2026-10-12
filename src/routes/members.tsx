@@ -806,6 +806,18 @@ membersRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const scope = scopeOf(c);
   const allRegions = await loadRegions(db);
   const options = await loadAllOptions(db);
+  const modal = c.req.query("modal") === "1";
+  const render = (status: 400 | 200) =>
+    c.html(
+      <MemberFormFragment
+        user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope, allRegions)}
+        errors={[]} member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
+        options={formOptions(options)}
+        lang={c.get("lang")} modal={modal}
+      />,
+      status,
+    );
+  if (modal) return render(200);
   return c.html(
     <MemberFormPage
       user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope, allRegions)}
@@ -820,18 +832,27 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
+  const fromModal = s(body.from_modal) === "1" || c.req.header("X-Requested-With") === "modal";
   const options = await loadAllOptions(db);
   const { values, errors, data } = readAndValidate(body, scope, options);
   const allRegions = await loadRegions(db);
   const render = (status: 400 | 200) =>
     c.html(
-      <MemberFormPage
-        user={c.get("user")} perms={c.get("perms")} values={values}
-        errors={errors.map((e) => renderMsg(e, c.get("lang")))}
-        member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-        options={formOptions(options)}
-        lang={c.get("lang")}
-      />,
+      fromModal
+        ? <MemberFormFragment
+            user={c.get("user")} perms={c.get("perms")} values={values}
+            errors={errors.map((e) => renderMsg(e, c.get("lang")))}
+            member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
+            options={formOptions(options)}
+            lang={c.get("lang")} modal
+          />
+        : <MemberFormPage
+            user={c.get("user")} perms={c.get("perms")} values={values}
+            errors={errors.map((e) => renderMsg(e, c.get("lang")))}
+            member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
+            options={formOptions(options)}
+            lang={c.get("lang")}
+          />,
       status,
     );
   if (!data) return render(400);
@@ -840,6 +861,7 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
     memberId: id, actorId: c.get("user").id, action: "create",
     snapshotJson: JSON.stringify(data),
   });
+  if (fromModal) return c.redirect(`/members/${id}?ok=member-created`, 303);
   return c.redirect(`/members/${id}?ok=member-created`, 302);
 });
 
