@@ -51,6 +51,22 @@
   }
   initStrengthMeters(document);
 
+  // Password visibility toggle (login form): flips the input type and keeps
+  // the button's label/pressed state in sync for screen readers.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest("[data-pw-toggle]") : null;
+    if (!btn) return;
+    var wrap = btn.closest(".pw-wrap");
+    var input = wrap && wrap.querySelector("input");
+    if (!input) return;
+    var show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.setAttribute("aria-pressed", show ? "true" : "false");
+    var label = btn.getAttribute(show ? "data-label-hide" : "data-label-show");
+    if (label) btn.setAttribute("aria-label", label);
+    input.focus();
+  });
+
   // Members list bulk actions: checkboxes fill the hidden ids field and show
   // the floating bulk bar; the header checkbox toggles the page.
   (function initBulkBar() {

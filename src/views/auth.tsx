@@ -37,7 +37,22 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
               </label>
               <label class="field" style="margin-top:12px">
                 <span class="lbl">{t("login.password")}</span>
-                <input type="password" name="password" autocomplete="current-password" required />
+                <span class="pw-wrap">
+                  <input type="password" name="password" id="login-password" autocomplete="current-password" required />
+                  <button
+                    type="button"
+                    class="pw-toggle"
+                    data-pw-toggle
+                    aria-controls="login-password"
+                    aria-pressed="false"
+                    aria-label={t("login.showPassword")}
+                    data-label-show={t("login.showPassword")}
+                    data-label-hide={t("login.hidePassword")}
+                  >
+                    <svg class="ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
+                    <svg class="ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 10.7a3 3 0 0 0 4.2 4.2" /><path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17.5 17.5 0 0 1-3.4 4.3" /><path d="M6.1 6.1A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4-.8" /></svg>
+                  </button>
+                </span>
               </label>
               <div class="actions">
                 <button class="btn full" type="submit">{t("login.submit")}</button>

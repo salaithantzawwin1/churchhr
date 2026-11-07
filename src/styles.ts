@@ -217,7 +217,7 @@ textarea { min-height: 84px; resize: vertical; }
   content: ""; position: absolute; right: -70px; bottom: -90px; width: 260px; height: 260px;
   border-radius: 50%; background: rgba(255,255,255,.07); pointer-events: none;
 }
-.auth-mark { width: 46px; height: 46px; border-radius: 11px; background: #fff; padding: 3px; flex: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.auth-mark { width: 60px; height: 60px; border-radius: 13px; background: #fff; padding: 4px; flex: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 .auth-aside h1 { margin: 0; font-size: 26px; line-height: 1.25; letter-spacing: -.01em; }
 .auth-lead { margin: 8px 0 0; color: rgba(255,255,255,.78); font-size: 13.5px; line-height: 1.55; }
 .auth-points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; font-size: 13.5px; color: rgba(255,255,255,.92); position: relative; z-index: 1; }
@@ -228,6 +228,21 @@ textarea { min-height: 84px; resize: vertical; }
 .auth-sub { margin: 0 0 18px; line-height: 1.5; }
 .auth-main form { margin-top: 2px; }
 .auth-main .actions { margin-top: 18px; }
+/* Password visibility toggle: the button sits inside the field, so the input
+   keeps its normal width and focus ring; only the right padding grows. */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 44px; }
+.pw-toggle {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pw-toggle:hover { background: var(--chip-bg); color: var(--ink); }
+.pw-toggle svg { width: 17px; height: 17px; display: block; }
+.pw-toggle .ico-eye-off { display: none; }
+.pw-toggle[aria-pressed="true"] .ico-eye { display: none; }
+.pw-toggle[aria-pressed="true"] .ico-eye-off { display: block; }
 .auth-secure { display: flex; align-items: center; gap: 6px; margin: 18px 0 0; font-size: 12px; color: var(--muted); }
 .auth-secure svg { width: 13px; height: 13px; flex: none; }
 .auth-card + * { margin-top: 18px; }
@@ -242,7 +257,7 @@ textarea { min-height: 84px; resize: vertical; }
 @media (max-width: 420px) {
   .auth-main { padding: 18px; }
   .auth-aside { padding: 18px; }
-  .auth-mark { width: 36px; height: 36px; border-radius: 9px; }
+  .auth-mark { width: 44px; height: 44px; border-radius: 10px; }
   .auth-card { border-radius: 14px; }
 }
 /* ---------- dashboard / KPI stat cards ---------- */
