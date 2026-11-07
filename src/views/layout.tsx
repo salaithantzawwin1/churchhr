@@ -23,7 +23,7 @@ type LayoutProps = {
 };
 
 export function Layout({ title, lang, user, perms, active, flash, children }: LayoutProps) {
-  const L = lang ?? "mm";
+  const L = lang ?? "en";
   const t = getDict(L);
   const NAV: { href: string; label: string; perm: Permission }[] = [
     { href: "/", label: t("nav.dashboard"), perm: "dashboard.view" },

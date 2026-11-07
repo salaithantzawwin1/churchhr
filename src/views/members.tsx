@@ -87,8 +87,8 @@ const LIST_COLS = (t: (k: string) => string) => [
 
 export function MembersListPage(props: ListProps) {
   const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, groups, fellowships, lang } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
   const S = isEn ? STATUSES_EN : STATUSES;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
@@ -101,7 +101,7 @@ export function MembersListPage(props: ListProps) {
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("members.title")} <span class="muted small">({total}{(lang ?? "mm") === "mm" ? ` ${t("members.count")}` : " members"})</span></h1>
+        <h1>{t("members.title")} <span class="muted small">({total}{(lang ?? "en") === "mm" ? ` ${t("members.count")}` : " members"})</span></h1>
         <div class="actions" style="margin:0">
           {canImport && <a class="btn secondary" href="/members/import">CSV Import</a>}
           {canExport && <a class="btn secondary" href={`/members/export${filterQs(f)}`}>CSV Export</a>}
@@ -346,7 +346,7 @@ function select(name: string, map: Record<string, string>, selected: string, bla
 
 export function MemberFormPage(props: FormProps) {
   const { user, perms, member, lang } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   const edit = member !== null;
   return (
     <Layout title={edit ? t("form.editTitle") : t("form.newTitle")} lang={lang} user={user} perms={perms} active="/members">
@@ -362,8 +362,8 @@ export function MemberFormPage(props: FormProps) {
 /** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const { values: v, errors, member, regions, options, lang, modal } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
   const S = isEn ? STATUSES_EN : STATUSES;
@@ -541,7 +541,7 @@ export type MemberHistoryRow = {
 
 export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[] }) {
   const { user, perms, flash, m, lang, history = [] } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   const ACTION_LABELS: Record<string, { mm: string; en: string; cls: string }> = {
     create: { mm: "ထည့်သွင်း", en: "Created", cls: "active" },
     update: { mm: "ပြင်ဆင်", en: "Updated", cls: "" },
@@ -550,7 +550,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
     bulk_delete: { mm: "Bulk delete", en: "Bulk delete", cls: "inactive" },
     bulk_group: { mm: "Bulk assign", en: "Bulk assign", cls: "" },
   };
-  const isEn = (lang ?? "mm") === "en";
+  const isEn = (lang ?? "en") === "en";
   const G = isEn ? GENDERS_EN : GENDERS;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
   const S = isEn ? STATUSES_EN : STATUSES;
@@ -657,7 +657,7 @@ export type ImportReport = {
 
 export function ImportPage(props: Common & { report: ImportReport | null; error: string | null }) {
   const { user, perms, flash, report, error, lang } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title="CSV Import" lang={lang} user={user} perms={perms} active="/members/import" flash={flash ?? null}>
       <div class="page-head">

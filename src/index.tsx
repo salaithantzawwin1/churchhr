@@ -51,7 +51,7 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// Resolve UI language: ?lang=mm|en wins and persists to a cookie; else cookie; else mm.
+// Resolve UI language: ?lang=mm|en wins and persists to a cookie; else cookie; else en.
 app.use("*", async (c, next) => {
   const fromQuery = langFromQuery(c.req.query());
   const lang = fromQuery ?? normalizeLang(getCookie(c, LANG_COOKIE));
@@ -118,7 +118,7 @@ app.route("/admin", adminRoutes);
 app.notFound((c) => c.html(<NotFoundPage lang={c.get("lang")} />));
 app.onError((err, c) => {
   console.error("unhandled error:", err);
-  const t = getDict(c.get("lang") ?? "mm");
+  const t = getDict(c.get("lang") ?? "en");
   return c.html(<GenericErrorPage message={t("err.genericBody")} lang={c.get("lang")} />, 500);
 });
 

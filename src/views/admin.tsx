@@ -111,7 +111,7 @@ export function UserFormFragment(props: {
   values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; active: number; mustChange: number };
   roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
 }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   return (
     <>
       {props.errors.length > 0 && (
@@ -127,7 +127,7 @@ export function UserFormFragment(props: {
 
 export function AdminUsersPage(props: UsersProps) {
   const { user, perms, flash, users, roles, regions, editUser, createErrors, editErrors, lang } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title={t("adm.usersTitle")} lang={lang} user={user} perms={perms} active="/admin/users" flash={flash ?? null}>
       <div class="page-head">
@@ -194,7 +194,7 @@ export function AdminUserEditPage(props: Common & {
   modal?: boolean;
 }) {
   const { user, perms, flash, editUser: u, roles, regions, editErrors, lang, modal } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   if (modal) {
     return (
       <UserFormFragment lang={lang} errors={editErrors}
@@ -257,8 +257,8 @@ export function RoleFormFragment(props: {
   values?: { name?: string; description?: string; permissions?: string[] };
   edit?: boolean; existing?: AdminRoleRow;
 }) {
-  const t = getDict(props.lang ?? "mm");
-  const PL = (props.lang ?? "mm") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  const t = getDict(props.lang ?? "en");
+  const PL = (props.lang ?? "en") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
   const isNew = !props.edit;
   const v = props.values ?? {};
   const role = isNew ? null : (props.existing ?? null);
@@ -303,8 +303,8 @@ export function RoleFormFragment(props: {
 
 export function AdminRolesPage(props: RolesProps) {
   const { user, perms, flash, roles, createErrors, saveErrors, lang } = props;
-  const t = getDict(lang ?? "mm");
-  const PL = (lang ?? "mm") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  const t = getDict(lang ?? "en");
+  const PL = (lang ?? "en") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
   return (
     <Layout title="Roles" lang={lang} user={user} perms={perms} active="/admin/roles" flash={flash ?? null}>
       <div class="page-head">
@@ -445,7 +445,7 @@ export function AddOptionForm(props: {
   regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
 }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   return (
     <form method="post" action="/admin/options" data-flash-ok="option-added">
@@ -474,7 +474,7 @@ export function AddOptionForm(props: {
 /** Add form for State/Region rows — bare fragment for the modal (and the no-JS ?add=1 fallback).
  * Code is auto-assigned (REG-001…) on create; no field in the add form. */
 export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string; code?: string } }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
   return (
@@ -505,7 +505,7 @@ export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: b
 
 /** Add form for an age group — bare fragment for the modal (and the no-JS ?add=1 fallback). */
 export function AddAgeGroupForm(props: { lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; min_age?: string; max_age?: string } }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
   return (
@@ -543,7 +543,7 @@ export function EditAgeGroupForm(props: {
   id: number; lang?: Lang; errors?: string[]; modal?: boolean;
   values?: { name?: string; min_age?: string; max_age?: string };
 }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
   return (
@@ -583,7 +583,7 @@ export function EditOptionForm(props: {
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
   code?: string;
 }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   return (
     <form method="post" action={`/admin/options/${props.id}`} data-flash-ok="option-updated">
@@ -618,7 +618,7 @@ export function EditOptionForm(props: {
 
 /** Edit form for one State/Region row — bare fragment for the modal (and full-page no-JS fallback). */
 export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string[]; modal?: boolean; values?: { name?: string; name_en?: string; code?: string } }) {
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
   const v = props.values ?? {};
   return (
@@ -666,8 +666,8 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 
 export function AdminOptionsPage(props: OptionsProps) {
   const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion } = props;
-  const t = getDict(lang ?? "mm");
-  const TL = (lang ?? "mm") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
+  const t = getDict(lang ?? "en");
+  const TL = (lang ?? "en") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   const isRegion = type === "region";
   const scoped = isRegionScopedType(type);
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;

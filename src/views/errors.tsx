@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import { getDict, type Lang } from "../i18n";
 
 export function ForbiddenPage({ path, lang }: { path?: string; lang?: Lang }) {
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title="403" lang={lang}>
       <div class="card">
@@ -19,7 +19,7 @@ export function ForbiddenPage({ path, lang }: { path?: string; lang?: Lang }) {
 }
 
 export function NotFoundPage({ lang }: { lang?: Lang }) {
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title="404" lang={lang}>
       <div class="card">
@@ -34,7 +34,7 @@ export function NotFoundPage({ lang }: { lang?: Lang }) {
 }
 
 export function GenericErrorPage({ message, lang }: { message: string; lang?: Lang }) {
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title="Error" lang={lang}>
       <div class="card">

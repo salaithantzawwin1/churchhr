@@ -154,7 +154,7 @@ adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
   );
 });
 
-async function loadRegionsLite(db: DB, lang: "mm" | "en" = "mm"): Promise<{ id: number; name: string }[]> {
+async function loadRegionsLite(db: DB, lang: "mm" | "en" = "en"): Promise<{ id: number; name: string }[]> {
   const rows = await db.all<{ id: number; name: string; name_en: string }>(sql`SELECT id, name, name_en FROM regions ORDER BY id`);
   return rows.map((r) => ({ id: r.id, name: lang === "en" && r.name_en ? r.name_en : r.name }));
 }

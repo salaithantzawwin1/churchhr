@@ -71,8 +71,8 @@ export function DashboardPage(props: {
   lang?: Lang;
 }) {
   const { user, perms, flash, data, lang } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   const stateName = (r: { name: string; name_en?: string | null }) =>
     isEn && r.name_en ? r.name_en : r.name;
   /** Widest state count drives the horizontal bars in the by-state table. */

@@ -13,7 +13,7 @@ export function HouseholdFormPage(props: Common & {
   regions: { id: number; name: string }[];
 }) {
   const { user, perms, lang } = props;
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   const edit = props.family !== null;
   return (
     <Layout title={edit ? t("hh.editTitle") : t("hh.newTitle")} lang={lang} user={user} perms={perms} active="/admin/households">
@@ -30,7 +30,7 @@ export function HouseholdFormFragment(props: Common & {
   options?: Record<string, OptionRow[]>;
 }) {
   const { values: v, errors, family, regions, modal } = props;
-  const t = getDict(props.lang ?? "mm");
+  const t = getDict(props.lang ?? "en");
   const action = family ? `/admin/households/${family.id}` : "/admin/households";
   return (
     <>
@@ -46,7 +46,7 @@ export function HouseholdFormFragment(props: Common & {
             <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
               <input type="text" name="name" required value={v.name ?? ""} /></label>
             {regionCascadeSelects({
-              lang: props.lang ?? "mm",
+              lang: props.lang ?? "en",
               regions,
               regionId: v.region_id ?? "",
               township: v.township ?? "",
@@ -75,8 +75,8 @@ export function HouseholdFormFragment(props: Common & {
 
 export function HouseholdsListPage(props: Common & { rows: any[]; q: string; township?: string; townshipOptions?: { id: number; label: string }[] }) {
   const { user, perms, flash, rows, lang, q } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
@@ -131,8 +131,8 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
 
 export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[] }) {
   const { user, perms, flash, family, members: mems, lang } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   const headName = family.head_name_mm || family.head_name_en || "";
   const REL: Record<string, { mm: string; en: string }> = {
     head: { mm: "အိမ်ထောင်ဦးစီး", en: "Head" },
@@ -209,8 +209,8 @@ export function HouseholdAddMemberPage(props: Common & {
   regions?: { id: number; name: string }[];
 }) {
   const { user, perms, family, values: v, errors, lang } = props;
-  const t = getDict(lang ?? "mm");
-  const isEn = (lang ?? "mm") === "en";
+  const t = getDict(lang ?? "en");
+  const isEn = (lang ?? "en") === "en";
   const REL = HouseholdDetailPageRel(isEn);
   return (
     <Layout title={t("hh.addMember.title")} lang={lang} user={user} perms={perms} active="/admin/households">
@@ -267,7 +267,7 @@ export function HouseholdAddMemberPage(props: Common & {
           </p>
           <div class="form-grid">
             {regionCascadeSelects({
-              lang: props.lang ?? "mm",
+              lang: props.lang ?? "en",
               regions: props.regions ?? [],
               regionId: v.region_id ?? "",
               township: v.township ?? "",

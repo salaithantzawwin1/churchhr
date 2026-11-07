@@ -1,12 +1,12 @@
 /** MM/EN bilingual UI layer. Language is stored in the "lang" cookie (mm | en);
- * every page render resolves the dictionary once and threads it through views. */
+ * English is the default when no preference is set. */
 
 export type Lang = "mm" | "en";
 
 export const LANG_COOKIE = "lang";
 
 export function normalizeLang(value: string | undefined | null): Lang {
-  return value === "en" ? "en" : "mm";
+  return value === "mm" ? "mm" : "en";
 }
 
 export function langFromQuery(q: Record<string, string | undefined>): Lang | null {
@@ -17,7 +17,7 @@ export function langFromQuery(q: Record<string, string | undefined>): Lang | nul
 
 type Dict = Record<string, string>;
 
-/** Myanmar (default, original strings). */
+/** Myanmar (original strings). */
 const MM: Dict = {
   // brand / footer
   "app.name": "Church Member Registry",

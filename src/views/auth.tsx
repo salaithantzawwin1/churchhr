@@ -3,7 +3,7 @@ import type { Flash } from "./layout";
 import { getDict, type Lang } from "../i18n";
 
 export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title={t("login.title")} lang={lang} flash={flash ?? null}>
       <div class="login-wrap">
@@ -48,7 +48,7 @@ export function ProfilePage({
   flash?: Flash;
   lang?: Lang;
 }) {
-  const t = getDict(lang ?? "mm");
+  const t = getDict(lang ?? "en");
   return (
     <Layout title={t("profile.title")} lang={lang} flash={flash ?? null}>
       <div class="card" style="max-width:520px">
