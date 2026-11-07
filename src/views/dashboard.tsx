@@ -47,6 +47,8 @@ export function DashboardPage(props: {
   const byState = data.byState.filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
   /** Widest state count drives the ranked bars. */
   const maxState = Math.max(1, ...byState.map((r) => r.n));
+  /** Share of the registry's regions that currently hold members. */
+  const coveragePct = data.byState.length > 0 ? Math.round((byState.length / data.byState.length) * 100) : 0;
   const genderTotal = data.male + data.female;
   const malePct = pct(data.male, genderTotal);
   const femalePct = genderTotal > 0 ? Math.round((100 - malePct) * 10) / 10 : 0;
@@ -194,7 +196,14 @@ export function DashboardPage(props: {
             </ol>
           )}
           {byState.length > 0 && byState.length <= 6 && byState.length < data.byState.length && (
-            <p class="dc-scroll-hint">ⓘ {t("dash.hiddenRegions")}</p>
+            <div class="dc-coverage">
+              <div class="cov-top">
+                <span>{t("dash.coverage")}</span>
+                <b>{byState.length} / {data.byState.length}</b>
+              </div>
+              <div class="cov-bar" role="presentation"><span style={`width:${coveragePct}%`} /></div>
+              <p>{t("dash.coverageNote")}</p>
+            </div>
           )}
           {byState.length > 6 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
           <div class="dc-foot">

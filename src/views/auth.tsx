@@ -6,32 +6,49 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("login.title")} lang={lang} flash={null}>
-      <div class="login-wrap">
-        <div class="card">
-          <div class="login-logo">
-            <img src="/logo.png" alt="" />
+      <div class="auth-wrap">
+        <section class="auth-card">
+          <aside class="auth-aside">
+            <img class="auth-mark" src="/logo.png" alt="" />
             <div>
-              <div class="t1">Church Member Registry</div>
-              <div class="t2">{t("login.systemNote")}</div>
+              <h1>{t("login.welcome")}</h1>
+              <p class="auth-lead">{t("login.systemNote")}</p>
             </div>
+            <ul class="auth-points">
+              {(["login.point1", "login.point2", "login.point3"] as const).map((k) => (
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                  <span>{t(k)}</span>
+                </li>
+              ))}
+            </ul>
+          </aside>
+
+          <div class="auth-main">
+            <h2>{t("login.heading")}</h2>
+            <p class="muted small auth-sub">{t("login.subtitle")}</p>
+            {(error || flash) && (
+              <div class={`flash ${flash ? flash.kind : "err"}`}>{flash ? flash.text : error}</div>
+            )}
+            <form method="post" action="/login">
+              <label class="field">
+                <span class="lbl">{t("login.username")}</span>
+                <input type="text" name="username" value={username ?? ""} autocomplete="username" autofocus required />
+              </label>
+              <label class="field" style="margin-top:12px">
+                <span class="lbl">{t("login.password")}</span>
+                <input type="password" name="password" autocomplete="current-password" required />
+              </label>
+              <div class="actions">
+                <button class="btn full" type="submit">{t("login.submit")}</button>
+              </div>
+            </form>
+            <p class="auth-secure">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 1 1 8 0v3" /></svg>
+              {t("login.secureNote")}
+            </p>
           </div>
-          {(error || flash) && (
-            <div class={`flash ${flash ? flash.kind : "err"}`}>{flash ? flash.text : error}</div>
-          )}
-          <form method="post" action="/login">
-            <label class="field">
-              <span class="lbl">{t("login.username")}</span>
-              <input type="text" name="username" value={username ?? ""} autocomplete="username" autofocus required />
-            </label>
-            <label class="field" style="margin-top:12px">
-              <span class="lbl">{t("login.password")}</span>
-              <input type="password" name="password" autocomplete="current-password" required />
-            </label>
-            <div class="actions">
-              <button class="btn full" type="submit">{t("login.submit")}</button>
-            </div>
-          </form>
-        </div>
+        </section>
       </div>
     </Layout>
   );
