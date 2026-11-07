@@ -64,7 +64,7 @@ export function DashboardPage(props: {
       <div class="page-head">
         <div>
           <h1>{t("dash.title")}</h1>
-          <p class="page-sub">{t("dash.overview")} · {scopeLabel}</p>
+          <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
         </div>
         <div class="actions" style="margin:0">
           {canCreate && <a class="btn" href="/members/new">{t("members.addNew")}</a>}
