@@ -1,8 +1,8 @@
 name: Deploy to Cloudflare Workers
 
+# Production deploys run through Cloudflare Workers Builds (Git integration).
+# Keep this workflow for manual emergency deploys only.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
