@@ -581,7 +581,7 @@ td.empty-state .small { margin-top: 4px; }
 .donut .d-center { position: relative; z-index: 1; text-align: center; line-height: 1.2; }
 .donut .d-center b { display: block; font-size: 23px; font-variant-numeric: tabular-nums; }
 .donut .d-center span { font-size: 11px; color: var(--muted); }
-.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; min-width: 130px; flex: 1; }
+.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; flex: 0 1 190px; min-width: 150px; }
 .legend .lg { display: grid; grid-template-columns: 9px 1fr auto auto; gap: 8px; align-items: center; }
 .legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 .legend .dot.m { background: var(--male); }
