@@ -80,10 +80,12 @@ export function DashboardPage(props: {
   return (
     <Layout title="Dashboard" lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
       <div class="page-head">
-        <h1>Dashboard</h1>
+        <h1>{t("dash.title")}</h1>
         {perms.has("members.view") && <a class="btn" href="/members">{t("dash.membersLink")}</a>}
       </div>
 
+      <details class="filter-box" open>
+      <summary>{t("members.filters")}<span class="chev" aria-hidden="true">▾</span></summary>
       <form class="card filters" method="get" action="/">
         <label class="field">
           <span class="lbl">{t("members.state")}</span>
@@ -130,6 +132,7 @@ export function DashboardPage(props: {
           <a class="btn secondary" href="/">{t("members.clear")}</a>
         </div>
       </form>
+      </details>
 
       <div class="stat-grid">
         <Stat icon="users" tone="brand" label={t("dash.total")} n={data.total} />

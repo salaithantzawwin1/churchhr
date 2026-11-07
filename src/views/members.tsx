@@ -101,14 +101,16 @@ export function MembersListPage(props: ListProps) {
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("members.title")} <span class="muted small">({total}{(lang ?? "en") === "mm" ? ` ${t("members.count")}` : " members"})</span></h1>
+        <h1>{t("members.title")}<span class="count-pill">{total}</span></h1>
         <div class="actions" style="margin:0">
           {canImport && <a class="btn secondary" href="/members/import">CSV Import</a>}
           {canExport && <a class="btn secondary" href={`/members/export${filterQs(f)}`}>CSV Export</a>}
-          {canCreate && <a class="btn" href="/members/new">{t("members.addNew")}</a>}
+          {canCreate && <a class="btn primary-action" href="/members/new">{t("members.addNew")}</a>}
         </div>
       </div>
 
+      <details class="filter-box" open>
+      <summary>{t("members.filters")}<span class="chev" aria-hidden="true">▾</span></summary>
       <form class="card filters" method="get" action="/members">
         <label class="field">
           <span class="lbl">{t("members.search")}</span>
@@ -175,6 +177,7 @@ export function MembersListPage(props: ListProps) {
           <a class="btn secondary" href="/members">{t("members.clear")}</a>
         </div>
       </form>
+      </details>
 
       <div class="col-chooser">
         <details>
@@ -192,34 +195,40 @@ export function MembersListPage(props: ListProps) {
       {(canDelete || canUpdate) && (
         <form method="post" action="/members/bulk" id="bulk-form">
           <input type="hidden" name="ids" value="" id="bulk-ids" />
-          <div class="card" id="bulk-bar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;margin-bottom:12px">
-            <strong class="small" id="bulk-count">0</strong>
-            <select name="bulk_action" required>
-              <option value="">{t("members.all")}</option>
+          <div class="card" id="bulk-bar" data-selected-label={t("bulk.selected")} style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
+            <strong class="small bulk-count" id="bulk-count">0</strong>
+            <select name="bulk_action" required aria-label={t("bulk.action")}>
+              <option value="">{t("bulk.action")}</option>
               <option value="status_active">{t("bulk.statusActive")}</option>
               <option value="status_inactive">{t("bulk.statusInactive")}</option>
               <option value="delete">{t("members.delete")}</option>
             </select>
-            <select name="group_id">
+            <select name="group_id" aria-label={t("bulk.assignGroupOpt")}>
               <option value="">{t("bulk.assignGroupOpt")}</option>
               {groups.map((o) => <option value={String(o.id)}>{o.label}</option>)}
             </select>
             <button class="btn sm" type="submit" data-confirm={t("bulk.confirm")}>{t("bulk.apply")}</button>
+            <button class="btn sm secondary" type="button" data-bulk-clear="1">{t("members.clear")}</button>
           </div>
+      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
         <table class="list-tbl">
           <thead>
             <tr>
-              <th style="width:28px"><input type="checkbox" id="bulk-check-all" /></th>
+              <th style="width:28px"><input type="checkbox" id="bulk-check-all" aria-label={t("members.selectAll")} /></th>
               {cols.map((c) => {
                 // Server-side sort: header links toggle asc/desc and keep the
                 // filters; the active column shows a direction arrow.
                 const active = sort === c.key;
                 const nextDir: "asc" | "desc" = active && dir === "asc" ? "desc" : "asc";
                 return (
-                  <th data-col={c.key} class={active ? "sorted" : ""}>
+                  <th
+                    data-col={c.key}
+                    class={active ? "sorted" : ""}
+                    aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+                  >
                     <a class="th-sort" href={`/members${sortQs(f, c.key, nextDir)}`}>
-                      {c.label}{active && <span class="sort-ind">{dir === "asc" ? " ▲" : " ▼"}</span>}
+                      {c.label}{active && <span class="sort-ind" aria-hidden="true">{dir === "asc" ? " ▲" : " ▼"}</span>}
                     </a>
                   </th>
                 );
@@ -230,7 +239,7 @@ export function MembersListPage(props: ListProps) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={14} class="empty-state">
+                <td colSpan={cols.length + 2} class="empty-state">
                   <strong>{t("members.empty")}</strong>
                   {canCreate && <div class="small">{t("members.emptyHint")}</div>}
                 </td>
@@ -238,7 +247,7 @@ export function MembersListPage(props: ListProps) {
             )}
             {rows.map((m) => (
               <tr>
-                <td style="width:28px"><input type="checkbox" class="bulk-check" value={String(m.id)} /></td>
+                <td style="width:28px"><input type="checkbox" class="bulk-check" value={String(m.id)} aria-label={m.name_myanmar || m.name_english || `#${m.id}`} /></td>
                 <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
                 <td data-col="name">
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
@@ -387,11 +396,11 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           <h2>{t("form.basic")}</h2>
           <div class="form-grid">
             <label class="field">
-              <span class="lbl">{t("form.nameMm")} <span class="hint">Name Myanmar</span></span>
+              <span class="lbl">{t("form.nameMm")}</span>
               <input type="text" name="name_myanmar" value={v.name_myanmar ?? ""} />
             </label>
             <label class="field">
-              <span class="lbl">{t("form.nameEn")} <span class="hint">Name English</span></span>
+              <span class="lbl">{t("form.nameEn")}</span>
               <input type="text" name="name_english" value={v.name_english ?? ""} />
             </label>
             <label class="field"><span class="lbl">{t("form.gender")}</span>{select("gender", G, v.gender ?? "", t("form.choose"))}</label>
@@ -427,7 +436,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           <div class="form-grid">
             <label class="field"><span class="lbl">{t("form.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.nrc")}</span><input type="text" name="nrc_number" value={v.nrc_number ?? ""} /></label>
-            <label class="field"><span class="lbl">{t("form.language")}</span><input type="text" name="languages" value={v.languages ?? ""} placeholder="မြန်မာ၊ ကရင်..." /></label>
+            <label class="field"><span class="lbl">{t("form.language")}</span><input type="text" name="languages" value={v.languages ?? ""} placeholder={t("form.languagePlaceholder")} /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
           </div>
         </div>
@@ -437,12 +446,11 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           <div class="form-grid">
             <label class="field"><span class="lbl">{t("form.father")}</span><input type="text" name="father_name" value={v.father_name ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.mother")}</span><input type="text" name="mother_name" value={v.mother_name ?? ""} /></label>
-            <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.ethnicity")}</span><select name="ethnicity_id">{opts(options.ethnicity ?? [], v.ethnicity_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.education")}</span><select name="education_id">{opts(options.education ?? [], v.education_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.job")}</span><input type="text" name="job" value={v.job ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.skills")}</span><input type="text" name="work_skills" value={v.work_skills ?? ""} /></label>
-            <label class="field"><span class="lbl">{t("form.income")}</span><input type="text" name="income" value={v.income ?? ""} placeholder="ဥပမာ 300000" /></label>
+            <label class="field"><span class="lbl">{t("form.income")}</span><input type="text" name="income" value={v.income ?? ""} placeholder={t("form.incomePlaceholder")} /></label>
           </div>
         </div>
 
@@ -554,41 +562,66 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
   const G = isEn ? GENDERS_EN : GENDERS;
   const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
   const S = isEn ? STATUSES_EN : STATUSES;
-  const rows: [string, string][] = [
-    ["ID", m.member_code ?? `#${m.id}`],
-    [t("detail.name"), m.name_myanmar ?? ""],
-    [t("detail.nameEn"), m.name_english ?? ""],
-    [t("detail.gender"), m.gender ? G[m.gender] ?? m.gender : ""],
-    [t("detail.marital"), m.marital_status ? M[m.marital_status] ?? m.marital_status : ""],
-    [t("detail.dob"), m.date_of_birth ?? ""],
-    [t("detail.age"), m.date_of_birth ? String(ageFromDate(m.date_of_birth) ?? "—") : ""],
-    [t("detail.blood"), m.blood_type],
-    [t("detail.phone"), m.phone ?? ""],
-    [t("detail.nrc"), m.nrc_number ?? ""],
-    [t("detail.ethnicity"), m.ethnicity ?? ""],
-    [t("detail.languages"), m.languages ?? ""],
-    [t("detail.education"), m.education ?? ""],
-    [t("detail.job"), m.job ?? ""],
-    [t("detail.skills"), m.work_skills ?? ""],
-    [t("detail.income"), m.income !== null ? String(m.income) : ""],
-    [t("detail.address"), m.address ?? ""],
-    [t("detail.father"), m.father_name ?? ""],
-    [t("detail.mother"), m.mother_name ?? ""],
-    [t("detail.salvation"), m.salvation_date ?? ""],
-    [t("detail.familyGroup"), m.family_group ?? ""],
-    ["Fellowship", m.fellowship ?? ""],
-    ["Group", m.group_label ?? ""],
-    ["Home Cell", m.home_cell ?? ""],
-    [t("detail.state"), isEn && m.state_name_en ? m.state_name_en : m.state_name],
-    [t("detail.township"), m.township ?? ""],
-    [t("detail.status"), S[m.status] ?? m.status],
-    [t("detail.notes"), m.notes ?? ""],
-    [t("detail.updatedAt"), new Date(m.updated_at * 1000).toLocaleString("en-GB")],
+  /** Stored dates are ISO already; render timestamps the same unambiguous way. */
+  const stamp = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const sections: { title: string; rows: [string, string][] }[] = [
+    {
+      title: t("form.basic"),
+      rows: [
+        ["ID", m.member_code ?? `#${m.id}`],
+        [t("detail.name"), m.name_myanmar ?? ""],
+        [t("detail.nameEn"), m.name_english ?? ""],
+        [t("detail.gender"), m.gender ? G[m.gender] ?? m.gender : ""],
+        [t("detail.marital"), m.marital_status ? M[m.marital_status] ?? m.marital_status : ""],
+        [t("detail.dob"), m.date_of_birth ?? ""],
+        [t("detail.age"), m.date_of_birth ? String(ageFromDate(m.date_of_birth) ?? "—") : ""],
+        [t("detail.blood"), m.blood_type],
+      ],
+    },
+    {
+      title: t("form.contact"),
+      rows: [
+        [t("detail.phone"), m.phone ?? ""],
+        [t("detail.nrc"), m.nrc_number ?? ""],
+        [t("detail.languages"), m.languages ?? ""],
+        [t("detail.address"), m.address ?? ""],
+      ],
+    },
+    {
+      title: t("form.family"),
+      rows: [
+        [t("detail.father"), m.father_name ?? ""],
+        [t("detail.mother"), m.mother_name ?? ""],
+        [t("detail.ethnicity"), m.ethnicity ?? ""],
+        [t("detail.education"), m.education ?? ""],
+        [t("detail.job"), m.job ?? ""],
+        [t("detail.skills"), m.work_skills ?? ""],
+        [t("detail.income"), m.income !== null ? String(m.income) : ""],
+      ],
+    },
+    {
+      title: t("form.church"),
+      rows: [
+        [t("detail.state"), isEn && m.state_name_en ? m.state_name_en : m.state_name],
+        [t("detail.township"), m.township ?? ""],
+        [t("detail.salvation"), m.salvation_date ?? ""],
+        [t("detail.familyGroup"), m.family_group ?? ""],
+        [t("form.fellowship"), m.fellowship ?? ""],
+        [t("form.group"), m.group_label ?? ""],
+        [t("form.homeCell"), m.home_cell ?? ""],
+        [t("detail.status"), S[m.status] ?? m.status],
+        [t("detail.notes"), m.notes ?? ""],
+      ],
+    },
   ];
   return (
     <Layout title={m.name_myanmar || m.name_english || "Member"} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{m.name_myanmar || m.name_english || `#${m.id}`} <span class="muted small">{m.member_code}</span></h1>
+        <h1>
+          {m.name_myanmar || m.name_english || `#${m.id}`}
+          {m.name_english && m.name_myanmar && <span class="muted small" style="margin-left:8px;font-weight:400">{m.name_english}</span>}
+          <span class="count-pill">{m.member_code}</span>
+        </h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href="/members">{t("members.toList")}</a>
           {perms.has("members.update") && (
@@ -597,23 +630,25 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
           {perms.has("members.delete") && (
             <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
              >
-              <button class="btn danger" type="submit">{t("members.delete")}</button>
+              <button class="btn outline-danger" type="submit">{t("members.delete")}</button>
             </form>
           )}
         </div>
       </div>
-      <div class="tbl-wrap">
-        <table>
-          <tbody>
-            {rows.map(([label, value]) => (
-              <tr>
-                <th style="width:220px">{label}</th>
-                <td>{value || <span class="muted">—</span>}</td>
-              </tr>
+      {sections.map((s) => (
+        <div class="card detail-card">
+          <h2>{s.title}</h2>
+          <div class="detail-grid">
+            {s.rows.map(([label, value]) => (
+              <div class="detail-item">
+                <span class="k">{label}</span>
+                <span class={`v${value ? "" : " empty"}`}>{value || "—"}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
+      ))}
+      <p class="muted small">{t("detail.updatedAt")}: {stamp(m.updated_at)}</p>
 
       <div class="card" style="margin-top:18px">
         <h2>{isEn ? "Change history" : "ပြောင်းလဲမှု မှတ်တမ်း"}</h2>
@@ -628,7 +663,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
                   const a = ACTION_LABELS[h.action] ?? { mm: h.action, en: h.action, cls: "" };
                   return (
                     <tr>
-                      <td class="muted small">{new Date(h.created_at * 1000).toLocaleString("en-GB")}</td>
+                      <td class="muted small">{new Date(h.created_at * 1000).toISOString().slice(0, 16).replace("T", " ")}</td>
                       <td><span class={`badge ${a.cls}`}>{(isEn ? a.en : a.mm) || h.action}</span></td>
                       <td>{h.actor_name}</td>
                     </tr>

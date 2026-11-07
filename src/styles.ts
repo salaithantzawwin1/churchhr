@@ -354,4 +354,155 @@ th.bar-col { width: 42%; }
 .pw-strength .pw-label {
   font-size: 12px; color: var(--muted, #667085); line-height: 1.2; min-width: 0;
 }
+
+/* ============================================================
+   UI refresh — hierarchy, mobile ergonomics and dark-mode polish.
+   These rules refine the base styles above; keep tokens at :root.
+   ============================================================ */
+/* Let native widgets (scrollbars, date pickers, checkboxes) follow the theme. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+}
+* { scrollbar-color: var(--line-strong) transparent; scrollbar-width: thin; }
+
+/* Keyboard users can jump the header/nav. Hidden until focused. */
+.skip-link {
+  position: absolute; left: 12px; top: -60px; z-index: 100;
+  background: var(--card); color: var(--ink); padding: 9px 14px;
+  border-radius: 8px; border: 1px solid var(--line-strong); font-weight: 600;
+  text-decoration: none; transition: top .15s ease;
+}
+.skip-link:focus { top: 12px; }
+
+/* ---------- topbar ---------- */
+.topbar { padding: 9px 18px; gap: 8px 14px; }
+.topbar nav { gap: 2px; }
+.topbar nav a { padding: 6px 11px; border-radius: 8px; font-size: 14.5px; opacity: .88; }
+.topbar nav a:hover { opacity: 1; background: rgba(255,255,255,.12); }
+.topbar nav a.active { background: rgba(255,255,255,.2); opacity: 1; font-weight: 600; }
+.topbar .who { gap: 10px; }
+.topbar .who-link {
+  color: var(--brand-ink); text-decoration: none; font-weight: 600;
+  padding: 4px 7px; border-radius: 7px; max-width: 140px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar .who-link:hover { background: rgba(255,255,255,.14); }
+.topbar .who form .btn {
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.42);
+  color: var(--brand-ink); min-height: 34px; padding: 5px 12px;
+}
+.topbar .who form .btn:hover { background: rgba(255,255,255,.24); filter: none; }
+.topbar .langswitch a { min-height: 30px; display: inline-flex; align-items: center; }
+
+/* Between tablet and desktop the nav needs its own row; keeping it inline
+   would wrap a few items under the brand and leave an awkward gap. */
+@media (max-width: 1180px) {
+  .topbar nav {
+    order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .topbar nav::-webkit-scrollbar { display: none; }
+  .topbar .who { margin-left: auto; }
+}
+
+/* ---------- page/card polish ---------- */
+.card {
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16,24,40,.04);
+}
+.page-head { margin-bottom: 16px; }
+.page-head h1 { font-size: 22px; letter-spacing: -.01em; }
+.page-head .count-pill {
+  display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 9px;
+  border-radius: 999px; background: var(--chip-bg); color: var(--muted);
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0;
+}
+.btn:not(.secondary):not(.danger):not(.outline-danger) { box-shadow: 0 1px 2px rgba(16,24,40,.12); }
+.btn.outline-danger {
+  background: transparent; color: #b42318; border: 1px solid #e6b4b0;
+}
+.btn.outline-danger:hover { background: var(--err-bg); filter: none; }
+:root[data-theme="dark"] .btn.outline-danger { color: var(--err-ink); border-color: #6b3134; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn.outline-danger { color: var(--err-ink); border-color: #6b3134; }
+}
+
+/* ---------- collapsible filter panel (mobile) ---------- */
+.filter-box { margin-bottom: 14px; }
+.filter-box > summary { display: none; }
+.filter-box > form.filters { margin-bottom: 0; }
+
+/* ---------- table: scroll affordance + sticky identity ---------- */
+.scroll-hint { display: none; }
+@media (max-width: 1180px) {
+  .topbar { padding: 8px 12px; }
+  .topbar nav { padding-right: 18px; }
+  .list-tbl th:first-child, .list-tbl td:first-child {
+    position: sticky; left: 0; z-index: 3; background: var(--card);
+  }
+  .list-tbl th[data-col="name"], .list-tbl td[data-col="name"] {
+    position: sticky; left: 28px; z-index: 2; background: var(--card);
+    box-shadow: 8px 0 10px -8px rgba(16,24,40,.28);
+  }
+  .list-tbl thead th:first-child, .list-tbl thead th[data-col="name"] { background: var(--th-bg); z-index: 5; }
+  .list-tbl tbody tr:hover td:first-child, .list-tbl tbody tr:hover td[data-col="name"] { background: var(--row-hover); }
+  .scroll-hint {
+    display: flex; align-items: center; gap: 6px; margin: 2px 0 8px;
+    color: var(--muted); font-size: 12.5px;
+  }
+}
+
+/* ---------- floating bulk action bar ---------- */
+#bulk-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 45; width: min(760px, calc(100% - 24px));
+  padding: 12px 16px; margin: 0; border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(2,8,23,.3);
+}
+#bulk-bar .bulk-count { font-weight: 700; white-space: nowrap; }
+#bulk-bar select { flex: 1 1 170px; min-width: 0; }
+#bulk-bar .btn { flex: none; }
+@media (max-width: 640px) {
+  #bulk-bar { bottom: 10px; width: calc(100% - 16px); padding: 10px 12px; gap: 8px; }
+  #bulk-bar select { flex: 1 1 100%; }
+  #bulk-bar .btn { flex: 1 1 100%; }
+  .topbar nav { mask-image: linear-gradient(to right, #000 88%, transparent); -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); }
+  .filter-box > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    list-style: none; cursor: pointer; padding: 11px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    font-weight: 600; font-size: 14px; color: var(--ink);
+  }
+  .filter-box > summary::-webkit-details-marker { display: none; }
+  .filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
+  .filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
+  .filter-box[open] > summary .chev { transform: rotate(180deg); }
+  .filter-box > form.filters { border-top-left-radius: 0; border-top-right-radius: 0; }
+  .filter-box > form.filters .actions { margin-top: 4px; }
+  .who-link { max-width: 70px; }
+  .page-head .actions .primary-action { order: -1; }
+}
+
+/* ---------- member detail sections ---------- */
+.detail-card { margin-bottom: 18px; }
+.detail-card h2 { margin: 0 0 4px; }
+.detail-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0 24px;
+}
+.detail-item { padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.detail-item:last-child { border-bottom: 0; }
+.detail-item .k {
+  display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px;
+}
+.detail-item .v { font-size: 14.5px; overflow-wrap: anywhere; }
+.detail-item .v.empty { color: var(--muted); }
+
+/* ---------- empty state ---------- */
+td.empty-state { padding: 38px 16px; }
+td.empty-state strong { font-size: 15px; color: var(--ink); }
+td.empty-state .small { margin-top: 4px; }
 `; // end of stylesheet

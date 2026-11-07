@@ -5,7 +5,7 @@ import { getDict, type Lang } from "../i18n";
 export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
   const t = getDict(lang ?? "en");
   return (
-    <Layout title={t("login.title")} lang={lang} flash={flash ?? null}>
+    <Layout title={t("login.title")} lang={lang} flash={null}>
       <div class="login-wrap">
         <div class="card">
           <div class="login-logo">
@@ -54,7 +54,7 @@ export function ProfilePage({
       <div class="card" style="max-width:520px">
         <h1>{t("profile.heading")}</h1>
         <p class="muted small">
-          Username: <strong>{username}</strong>
+          {t("profile.username")}: <strong>{username}</strong>
         </p>
         {mustChange && (
           <div class="flash warn">
@@ -81,7 +81,7 @@ export function ProfilePage({
           <div class="actions">
             <button class="btn" type="submit">{t("profile.save")}</button>
             {!mustChange && (
-              <a class="btn secondary" href="/">Dashboard</a>
+              <a class="btn secondary" href="/">{t("nav.dashboard")}</a>
             )}
           </div>
         </form>

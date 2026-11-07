@@ -783,7 +783,7 @@ export function AdminOptionsPage(props: OptionsProps) {
                   <form method="post" action={`/admin/options/${o.id}`} style="display:inline">
                     <input type="hidden" name="toggle" value="1" />
                     <input type="hidden" name="label" value={o.label} />
-                    <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.offShort") : t("adm.onShort")}</button>
+                    <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
                   </form>{" "}
                   <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
                    >

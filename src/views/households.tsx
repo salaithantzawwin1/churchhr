@@ -80,7 +80,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("hh.pageHeading")}</h1>
+        <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
         <div class="actions">
           {perms.has("members.create") && (
             <a class="btn js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>+ {t("hh.newHeading")}</a>
@@ -89,27 +89,45 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
       </div>
 
       <form method="get" action="/admin/households" class="filters card">
-        <input type="text" name="q" value={q} placeholder={t("hh.searchPlaceholder")} style="max-width:280px" />
-        <select name="township" style="max-width:220px">
-          <option value="">{isEn ? "All townships" : "မြို့နယ် အားလုံး"}</option>
-          {(props.townshipOptions ?? []).map((o) => (
-            <option value={o.label} selected={props.township === o.label}>{o.label}</option>
-          ))}
-        </select>
-        <button class="btn secondary" type="submit">{t("members.search")}</button>
+        <label class="field">
+          <span class="lbl">{t("hh.searchLabel")}</span>
+          <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")} />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("hh.townshipLabel")}</span>
+          <select name="township">
+            <option value="">{isEn ? "All townships" : "မြို့နယ် အားလုံး"}</option>
+            {(props.townshipOptions ?? []).map((o) => (
+              <option value={o.label} selected={props.township === o.label}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <div class="actions" style="margin:0">
+          <button class="btn" type="submit">{t("members.searchBtn")}</button>
+          {(q || props.township) && <a class="btn secondary" href="/admin/households">{t("members.clear")}</a>}
+        </div>
       </form>
 
       <div class="tbl-wrap">
         <table class="list-tbl">
           <thead><tr>
             <th>ID</th><th>{t("hh.name")}</th><th>{isEn ? "Head" : "အိမ်ထောင်ဦးစီး"}</th>
-            <th class="num">{isEn ? "Members" : "အဆူရေ"}</th>
+            <th class="num">{isEn ? "Members" : "အဖွဲ့ဝင်"}</th>
             <th>{t("detail.state")}</th><th>{t("hh.townshipLabel")}</th>
-            <th>{isEn ? "Home Cell" : "Home Cell"}</th><th></th>
+            <th>{t("form.homeCell")}</th><th></th>
           </tr></thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} style="text-align:center" class="muted">{t("hh.empty")}</td></tr>
+              <tr>
+                <td colSpan={8} class="empty-state">
+                  <strong>{t("hh.empty")}</strong>
+                  {perms.has("members.create") && (
+                    <div class="small">
+                      <a class="js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>{t("hh.emptyHint")}</a>
+                    </div>
+                  )}
+                </td>
+              </tr>
             ) : rows.map((f) => (
               <tr key={f.id}>
                 <td>{f.id}</td>

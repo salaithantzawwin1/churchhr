@@ -56,20 +56,22 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
       </head>
       <body data-idle-seconds={String(IDLE_TIMEOUT_SECONDS)}>
+        <a class="skip-link" href="#main">{t("nav.skip")}</a>
         <header class="topbar">
           <a class="brand" href="/">
             <img src="/logo.png" alt="" />
             {t("app.name")}
           </a>
           {user && (
-            <nav>
-              {items.map((n, i) => (
-                <>
-                  {i > 0 && <span class="sep">|</span>}
-                  <a href={n.href} class={active === n.href ? "active" : ""}>
-                    {n.label}
-                  </a>
-                </>
+            <nav aria-label={t("nav.main")}>
+              {items.map((n) => (
+                <a
+                  href={n.href}
+                  class={active === n.href ? "active" : ""}
+                  aria-current={active === n.href ? "page" : undefined}
+                >
+                  {n.label}
+                </a>
               ))}
             </nav>
           )}
@@ -91,7 +93,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
             </span>
             {user && (
               <>
-                <a href="/profile" style="color:#fff">{user.username}</a>
+                <a class="who-link" href="/profile" title={t("nav.profile")}>{user.username}</a>
                 <form method="post" action="/logout">
                   <button class="btn sm secondary" type="submit">{t("nav.logout")}</button>
                 </form>
@@ -99,7 +101,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
             )}
           </div>
         </header>
-        <main class="container">
+        <main class="container" id="main">
           {flash && <div class={`flash ${flash.kind}`}>{flash.text}</div>}
           {children}
         </main>

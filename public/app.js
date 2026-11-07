@@ -65,10 +65,18 @@
       var sel = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
       if (idsField) idsField.value = sel.join(",");
       if (bar) bar.style.display = sel.length ? "flex" : "none";
-      if (countEl) countEl.textContent = sel.length + " selected";
+      if (countEl) {
+        var tpl = (bar && bar.getAttribute("data-selected-label")) || "{{n}} selected";
+        countEl.textContent = tpl.replace("{{n}}", sel.length);
+      }
       if (checkAll && boxes.length) checkAll.checked = sel.length === boxes.length;
     }
     boxes.forEach(function (b) { b.addEventListener("change", sync); });
+    var clearBtn = form.querySelector("[data-bulk-clear]");
+    if (clearBtn) clearBtn.addEventListener("click", function () {
+      boxes.forEach(function (b) { b.checked = false; });
+      sync();
+    });
     if (checkAll) checkAll.addEventListener("change", function () {
       boxes.forEach(function (b) { b.checked = checkAll.checked; });
       sync();
@@ -252,6 +260,20 @@
     apply();
   })();
 
+  // Collapsible filter panels: open on desktop, collapsed on phones. Once the
+  // user toggles one, resize only forces it open for wide viewports.
+  (function initFilterBoxes() {
+    var boxes = document.querySelectorAll("details.filter-box");
+    if (!boxes.length) return;
+    var mq = window.matchMedia("(max-width: 640px)");
+    Array.prototype.forEach.call(boxes, function (d) {
+      if (mq.matches) d.open = false;
+      mq.addEventListener("change", function () {
+        if (!mq.matches) d.open = true;
+      });
+    });
+  })();
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
@@ -280,7 +302,16 @@
     if (el && el.closest && el.closest("[data-close]")) closeModal();
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !modal.hidden) closeModal();
+    if (modal.hidden) return;
+    if (e.key === "Escape") { closeModal(); return; }
+    if (e.key !== "Tab") return;
+    // Keep keyboard focus inside the dialog while it is open.
+    var items = card.querySelectorAll('a[href], button:not([disabled]), input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
   function flashUrl(key) {
@@ -303,6 +334,8 @@
       '<button type="button" class="btn danger" data-confirm-yes="1">' + (modal.getAttribute("data-yes") || "OK") + "</button>" +
       '<button type="button" class="btn secondary" data-close="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
       "</div>";
+    var yes = bodyEl.querySelector("[data-confirm-yes]");
+    if (yes) yes.focus();
   });
 
   function setModalHtml(doc) {
