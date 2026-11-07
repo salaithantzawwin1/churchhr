@@ -6,6 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { users, loginAttempts } from "../db/schema";
 import { hashPassword, parseIterations, verifyPassword } from "../auth";
 import { checkPasswordPolicy } from "../password";
+import { isHttpsRequest } from "../util";
 import {
   getSessionUser,
   SESSION_TTL_SECONDS,
@@ -106,7 +107,7 @@ publicAuthRoutes.post("/login", async (c) => {
     httpOnly: true,
     sameSite: "Lax",
     maxAge: SESSION_TTL_SECONDS,
-    secure: new URL(c.req.url).protocol === "https:",
+    secure: isHttpsRequest(c),
   });
   await purgeExpiredSessions(db);
   return c.redirect(user.mustChangePassword === 1 ? "/profile?msg=change" : "/", 302);

@@ -1,3 +1,12 @@
+import type { Context } from "hono";
+import type { AppEnv } from "./env";
+
+/** True when the request reached us over TLS (Cloudflare forwards the original scheme). */
+export function isHttpsRequest(c: Context<AppEnv>): boolean {
+  const forwarded = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  return new URL(c.req.url).protocol === "https:" || forwarded === "https";
+}
+
 /** Form field value -> trimmed string (non-strings become ""). */
 export function s(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";

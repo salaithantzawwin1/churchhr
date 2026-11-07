@@ -10,13 +10,46 @@ import { getDb } from "./db/client";
 import { loadDashboard, type DashboardFilter } from "./dashboard";
 import { flashFromQuery } from "./flash";
 import { GENDERS } from "./enums";
-import { intParam } from "./util";
+import { intParam, isHttpsRequest } from "./util";
 import { getDict, langFromQuery, normalizeLang, LANG_COOKIE } from "./i18n";
 import { DashboardPage } from "./views/dashboard";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
 
 const app = new Hono<AppEnv>();
+
+const CANONICAL_HOST = "www.mmgoodnewshr.online";
+const APEX_HOST = "mmgoodnewshr.online";
+
+// Security headers for every response, including redirects.
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  c.header("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  const url = new URL(c.req.url);
+  if ((url.hostname === CANONICAL_HOST || url.hostname === APEX_HOST) && isHttpsRequest(c)) {
+    c.header("Strict-Transport-Security", "max-age=15552000");
+  }
+});
+
+// One canonical origin: HTTPS on www. Local dev and workers.dev are left alone.
+app.use("*", async (c, next) => {
+  // Cloudflare always adds CF-Ray; Wrangler dev does not, so dev keeps its local URL.
+  if (!c.req.header("cf-ray")) {
+    await next();
+    return;
+  }
+  const url = new URL(c.req.url);
+  const host = url.hostname.toLowerCase();
+  const isProdHost = host === CANONICAL_HOST || host === APEX_HOST;
+  if (isProdHost && (host !== CANONICAL_HOST || !isHttpsRequest(c))) {
+    return c.redirect(`https://${CANONICAL_HOST}${url.pathname}${url.search}`, 301);
+  }
+  await next();
+});
 
 // Resolve UI language: ?lang=mm|en wins and persists to a cookie; else cookie; else mm.
 app.use("*", async (c, next) => {
