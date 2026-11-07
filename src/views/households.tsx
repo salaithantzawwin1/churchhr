@@ -77,6 +77,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "en");
   const isEn = (lang ?? "en") === "en";
+  const filtered = Boolean(q.trim() || props.township);
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
@@ -120,11 +121,20 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} class="empty-state">
-                  <strong>{t("hh.empty")}</strong>
-                  {perms.has("members.create") && (
-                    <div class="small">
-                      <a class="js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>{t("hh.emptyHint")}</a>
-                    </div>
+                  {filtered ? (
+                    <>
+                      <strong>{t("hh.emptyFiltered")}</strong>
+                      <div class="small"><a href="/admin/households">{t("members.clearFilters")}</a></div>
+                    </>
+                  ) : (
+                    <>
+                      <strong>{t("hh.empty")}</strong>
+                      {perms.has("members.create") && (
+                        <div class="small">
+                          <a class="js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>{t("hh.emptyHint")}</a>
+                        </div>
+                      )}
+                    </>
                   )}
                 </td>
               </tr>

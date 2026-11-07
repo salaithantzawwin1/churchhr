@@ -57,6 +57,11 @@ function filterQs(f: Filters, page?: number): string {
   });
 }
 
+/** True when any list filter is narrowing the result set. */
+function hasFilters(f: Filters): boolean {
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.group || f.fellowship);
+}
+
 /** Filter/pagination query plus the current sort, for header sort links. */
 function sortQs(f: Filters, sort: string, dir: string): string {
   const base = filterQs(f);
@@ -98,6 +103,7 @@ export function MembersListPage(props: ListProps) {
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
+  const filtered = hasFilters(f);
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
@@ -240,8 +246,17 @@ export function MembersListPage(props: ListProps) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={cols.length + 2} class="empty-state">
-                  <strong>{t("members.empty")}</strong>
-                  {canCreate && <div class="small">{t("members.emptyHint")}</div>}
+                  {filtered ? (
+                    <>
+                      <strong>{t("members.emptyFiltered")}</strong>
+                      <div class="small"><a href="/members">{t("members.clearFilters")}</a></div>
+                    </>
+                  ) : (
+                    <>
+                      <strong>{t("members.empty")}</strong>
+                      {canCreate && <div class="small">{t("members.emptyHint")}</div>}
+                    </>
+                  )}
                 </td>
               </tr>
             )}
