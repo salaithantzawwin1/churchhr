@@ -558,11 +558,10 @@ td.empty-state .small { margin-top: 4px; }
   .kpi.hero:hover { box-shadow: 0 12px 26px rgba(16, 40, 74, .3); }
 }
 
-/* Two independent card columns: each side stacks on its own, so a short card
-   never leaves a hole beside a taller one. */
-.dash-cols { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
-.dash-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.dash-card { margin: 0; padding: 16px 18px; border-radius: 14px; display: flex; flex-direction: column; }
+/* Paired cards share a row height: the region list and the gender panel line up
+   as two equal-height panels. */
+.dash-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; align-items: stretch; margin-bottom: 14px; }
+.dash-card { margin: 0; padding: 16px 18px; border-radius: 14px; display: flex; flex-direction: column; min-width: 0; }
 .dash-card .dc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .dash-card .dc-head h2 { margin: 0; font-size: 15px; }
 .dash-card .dc-head a { font-size: 12.5px; text-decoration: none; white-space: nowrap; }
@@ -571,7 +570,7 @@ td.empty-state .small { margin-top: 4px; }
    so the card keeps a predictable height next to the gender card. */
 .rank-list {
   list-style: none; margin: 0; padding: 0 6px 0 0; display: flex; flex-direction: column; gap: 11px;
-  max-height: 320px; overflow-y: auto; scrollbar-width: thin;
+  flex: 1 1 auto; min-height: 0; max-height: 200px; overflow-y: auto; scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
 .rank-list:focus-visible { outline: 2px solid var(--link); outline-offset: 4px; border-radius: 6px; }
@@ -596,7 +595,7 @@ td.empty-state .small { margin-top: 4px; }
 .rk-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--link), var(--brand)); }
 
 /* gender donut + legend */
-.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; flex: 1 1 auto; }
 .donut {
   width: 132px; height: 132px; border-radius: 50%; flex: none;
   display: grid; place-items: center; position: relative;
@@ -605,7 +604,7 @@ td.empty-state .small { margin-top: 4px; }
 .donut .d-center { position: relative; z-index: 1; text-align: center; line-height: 1.2; }
 .donut .d-center b { display: block; font-size: 23px; font-variant-numeric: tabular-nums; }
 .donut .d-center span { font-size: 11px; color: var(--muted); }
-.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; flex: 0 1 190px; min-width: 150px; }
+.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; flex: 0 1 180px; min-width: 150px; }
 .legend .lg { display: grid; grid-template-columns: 9px 1fr auto auto; gap: 8px; align-items: center; }
 .legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 .legend .dot.m { background: var(--male); }
@@ -641,8 +640,7 @@ td.empty-state .small { margin-top: 4px; }
 .recent-list .rn a, .recent-list .rn > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 900px) {
-  .dash-cols { flex-direction: column; }
-  .dash-col { width: 100%; }
+  .dash-cols { grid-template-columns: 1fr; }
   .donut-wrap { justify-content: center; }
 }
 @media (max-width: 640px) {

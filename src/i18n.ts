@@ -111,6 +111,7 @@ const MM: Dict = {
   "dash.regionsWithMembers": "မန်ဘာရှိသော တိုင်း/ပြည်နယ်",
   "dash.regionOne": "မန်ဘာရှိသော တိုင်း/ပြည်နယ်",
   "dash.scrollForMore": "ပိုကြည့်ရန် စာရင်းကို scroll လုပ်ပါ",
+  "dash.hiddenRegions": "မန်ဘာမရှိသော တိုင်း/ပြည်နယ်များကို ဖျောက်ထားသည်။",
   // members list
   "members.title": "Member စာရင်း",
   "members.count": "ယောက်",
@@ -515,6 +516,7 @@ const EN: Dict = {
   "dash.regionsWithMembers": "regions with members",
   "dash.regionOne": "region with members",
   "dash.scrollForMore": "Scroll the list for more",
+  "dash.hiddenRegions": "Regions without members are hidden.",
   "members.title": "Members",
   "members.count": "",
   "members.addNew": "+ New member",

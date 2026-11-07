@@ -162,7 +162,6 @@ export function DashboardPage(props: {
       </div>
 
       <div class="dash-cols">
-        <div class="dash-col">
         <section class="card dash-card">
           <div class="dc-head">
             <h2>{t("dash.state")}</h2>
@@ -193,6 +192,9 @@ export function DashboardPage(props: {
                 </li>
               ))}
             </ol>
+          )}
+          {byState.length > 0 && byState.length <= 6 && byState.length < data.byState.length && (
+            <p class="dc-scroll-hint">ⓘ {t("dash.hiddenRegions")}</p>
           )}
           {byState.length > 6 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
           <div class="dc-foot">
@@ -240,9 +242,9 @@ export function DashboardPage(props: {
             </div>
           </div>
         </section>
-        </div>
+      </div>
 
-        <div class="dash-col">
+      <div class="dash-cols">
         <section class="card dash-card">
           <div class="dc-head">
             <h2>{t("dash.ageGroups")}</h2>
@@ -304,7 +306,6 @@ export function DashboardPage(props: {
             </ul>
           )}
         </section>
-        </div>
       </div>
     </Layout>
   );
