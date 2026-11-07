@@ -37,6 +37,8 @@ const MM: Dict = {
   "nav.themeLight": "အလင်းအသွင်အပြင်သို့ ပြောင်းမည်",
   "nav.skip": "အဓိက အကြောင်းအရာသို့ ကျော်ရန်",
   "nav.main": "ပင်မ လမ်းညွှန်",
+  "nav.admin": "စီမံခန့်ခွဲမှု",
+  "nav.adminShort": "စီမံ",
   "nav.profile": "ကျွန်ုပ်၏ Account",
   // login
   "login.title": "Login",
@@ -453,6 +455,8 @@ const EN: Dict = {
   "nav.language": "Language",
   "nav.skip": "Skip to main content",
   "nav.main": "Main navigation",
+  "nav.admin": "Administration",
+  "nav.adminShort": "Admin",
   "nav.profile": "My account",
   "nav.theme": "Switch appearance",
   "nav.themeDark": "Switch to dark appearance",

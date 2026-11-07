@@ -89,6 +89,38 @@ a { color: var(--link); }
 }
 .topbar nav a:hover, .topbar nav a.active { background: rgba(255,255,255,.16); opacity: 1; }
 .topbar nav .sep { opacity: .35; padding: 5px 2px; }
+/* Administration: a dropdown on wide screens, inline links once the nav moves
+   to its own scrolling row (a dropdown there would be clipped by overflow). */
+.nav-admin { position: relative; display: block; }
+.nav-admin > summary {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
+  color: var(--brand-ink); padding: 6px 11px; border-radius: 8px;
+  font-size: 14.5px; opacity: .88; white-space: nowrap;
+}
+.nav-admin > summary::-webkit-details-marker { display: none; }
+.nav-admin > summary:hover { opacity: 1; background: rgba(255,255,255,.12); }
+.nav-admin[open] > summary { background: rgba(255,255,255,.16); opacity: 1; }
+.nav-admin.active > summary { background: rgba(255,255,255,.2); opacity: 1; font-weight: 600; }
+.nav-admin .chev { font-size: 10px; line-height: 1; transition: transform .15s ease; }
+.nav-admin[open] .chev { transform: rotate(180deg); }
+.nav-admin .nav-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30;
+  min-width: 200px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(2, 8, 23, .25);
+}
+.topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: 7px; font-size: 14px; text-decoration: none; }
+.topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
+.topbar nav .nav-menu a.active { background: var(--chip-brand-bg); color: var(--link); font-weight: 600; }
+.nav-admin-inline { display: none; align-items: center; gap: 2px; flex: none; }
+.nav-admin-inline .nav-group-label {
+  color: var(--brand-ink); opacity: .62; font-size: 11.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; padding: 0 4px 0 7px; white-space: nowrap;
+}
+@media (max-width: 1180px) {
+  .nav-admin { display: none; }
+  .nav-admin-inline { display: flex; }
+}
 .topbar .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .topbar .who form { margin: 0; }
 .container { max-width: 1100px; margin: 22px auto; padding: 0 16px; }
@@ -229,7 +261,7 @@ textarea { min-height: 84px; resize: vertical; }
 }
 .auth-points li { display: flex; align-items: flex-start; gap: 9px; }
 .auth-points svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: #a9c9f0; }
-.auth-main { padding: 34px 32px 30px; display: flex; flex-direction: column; }
+.auth-main { padding: 34px 32px 30px; display: flex; flex-direction: column; justify-content: center; }
 .auth-main h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.01em; }
 .auth-sub { margin: 0 0 18px; line-height: 1.5; }
 .auth-main form { margin-top: 2px; }

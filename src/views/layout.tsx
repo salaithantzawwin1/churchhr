@@ -25,16 +25,21 @@ type LayoutProps = {
 export function Layout({ title, lang, user, perms, active, flash, children }: LayoutProps) {
   const L = lang ?? "en";
   const t = getDict(L);
-  const NAV: { href: string; label: string; perm: Permission }[] = [
+  const PRIMARY_NAV: { href: string; label: string; perm: Permission }[] = [
     { href: "/", label: t("nav.dashboard"), perm: "dashboard.view" },
     { href: "/members", label: t("nav.members"), perm: "members.view" },
+    { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
+  ];
+  const ADMIN_NAV: { href: string; label: string; perm: Permission }[] = [
     { href: "/members/import", label: t("nav.import"), perm: "members.import" },
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
     { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
-    { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
   ];
-  const items = NAV.filter((n) => !perms || perms.has(n.perm));
+  const allowed = (n: { perm: Permission }) => !perms || perms.has(n.perm);
+  const primaryItems = PRIMARY_NAV.filter(allowed);
+  const adminItems = ADMIN_NAV.filter(allowed);
+  const adminActive = adminItems.some((n) => n.href === active);
   return (
     <html lang={L === "mm" ? "my" : "en"}>
       <head>
@@ -64,7 +69,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
           </a>
           {user && (
             <nav aria-label={t("nav.main")}>
-              {items.map((n) => (
+              {primaryItems.map((n) => (
                 <a
                   href={n.href}
                   class={active === n.href ? "active" : ""}
@@ -73,6 +78,42 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
                   {n.label}
                 </a>
               ))}
+              {adminItems.length > 0 && (
+                <>
+                  {/* Desktop: a tidy Administration dropdown. */}
+                  <details class={`nav-admin${adminActive ? " active" : ""}`}>
+                    <summary aria-current={adminActive ? "page" : undefined}>
+                      {t("nav.admin")} <span class="chev" aria-hidden="true">▾</span>
+                    </summary>
+                    <div class="nav-menu">
+                      {adminItems.map((n) => (
+                        <a
+                          href={n.href}
+                          class={active === n.href ? "active" : ""}
+                          aria-current={active === n.href ? "page" : undefined}
+                        >
+                          {n.label}
+                        </a>
+                      ))}
+                    </div>
+                  </details>
+                  {/* Narrow screens: the dropdown would be clipped by the scrolling
+                      nav, so the same links sit inline after a group label. */}
+                  <span class="nav-admin-inline">
+                    <span class="sep" aria-hidden="true">|</span>
+                    <span class="nav-group-label">{t("nav.adminShort")}</span>
+                    {adminItems.map((n) => (
+                      <a
+                        href={n.href}
+                        class={active === n.href ? "active" : ""}
+                        aria-current={active === n.href ? "page" : undefined}
+                      >
+                        {n.label}
+                      </a>
+                    ))}
+                  </span>
+                </>
+              )}
             </nav>
           )}
           <div class="who">

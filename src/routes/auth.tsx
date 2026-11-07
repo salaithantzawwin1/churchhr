@@ -21,6 +21,8 @@ import type { Flash } from "../views/layout";
 
 const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_SECONDS = 600;
+const LAST_USER_COOKIE = "last_user";
+const LAST_USER_MAX_AGE = 60 * 60 * 24 * 365;
 
 // Per-IP sliding window: at most 10 attempts inside 10 minutes, else 15-min wait.
 const IP_WINDOW_SECONDS = 600;
@@ -59,7 +61,13 @@ publicAuthRoutes.get("/login", async (c) => {
   const flash = c.req.query("msg") === "auto-logout"
     ? { kind: "warn" as const, text: t("login.autoLogout") }
     : undefined;
-  return c.html(<LoginPage lang={lang} flash={flash} />);
+  // Remember only a username that actually signed in (set on success below).
+  const rawLastUser = getCookie(c, LAST_USER_COOKIE);
+  let lastUser: string | undefined;
+  if (rawLastUser) {
+    try { lastUser = decodeURIComponent(rawLastUser); } catch { lastUser = rawLastUser; }
+  }
+  return c.html(<LoginPage lang={lang} flash={flash} username={lastUser} />);
 });
 
 publicAuthRoutes.post("/login", async (c) => {
@@ -107,6 +115,13 @@ publicAuthRoutes.post("/login", async (c) => {
     httpOnly: true,
     sameSite: "Lax",
     maxAge: SESSION_TTL_SECONDS,
+    secure: isHttpsRequest(c),
+  });
+  setCookie(c, LAST_USER_COOKIE, encodeURIComponent(user.username), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "Lax",
+    maxAge: LAST_USER_MAX_AGE,
     secure: isHttpsRequest(c),
   });
   await purgeExpiredSessions(db);

@@ -53,6 +53,27 @@
 
   // Password visibility toggle (login form): flips the input type and keeps
   // the button's label/pressed state in sync for screen readers.
+  // Administration dropdown: close it on outside click or Escape, so it does
+  // not stay open while the page is used elsewhere.
+  (function initAdminMenus() {
+    var menus = Array.prototype.slice.call(document.querySelectorAll("details.nav-admin"));
+    if (!menus.length) return;
+    document.addEventListener("click", function (e) {
+      menus.forEach(function (d) {
+        if (d.open && !d.contains(e.target)) d.open = false;
+      });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      menus.forEach(function (d) {
+        if (!d.open) return;
+        d.open = false;
+        var summary = d.querySelector("summary");
+        if (summary) summary.focus();
+      });
+    });
+  })();
+
   // Caps Lock warning under password fields. The browser only exposes the
   // Caps Lock state on keyboard events, so sync it while typing and hide it
   // again when the field loses focus.
