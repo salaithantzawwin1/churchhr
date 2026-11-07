@@ -2,6 +2,25 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import { getDict, type Lang } from "../i18n";
 
+/** Show/hide control for a password input; behaviour lives in public/app.js. */
+function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string; hideLabel: string }) {
+  return (
+    <button
+      type="button"
+      class="pw-toggle"
+      data-pw-toggle
+      aria-controls={id}
+      aria-pressed="false"
+      aria-label={showLabel}
+      data-label-show={showLabel}
+      data-label-hide={hideLabel}
+    >
+      <svg class="ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
+      <svg class="ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 10.7a3 3 0 0 0 4.2 4.2" /><path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17.5 17.5 0 0 1-3.4 4.3" /><path d="M6.1 6.1A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4-.8" /></svg>
+    </button>
+  );
+}
+
 export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
   const t = getDict(lang ?? "en");
   return (
@@ -39,19 +58,7 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
                 <label class="lbl" for="login-password">{t("login.password")}</label>
                 <span class="pw-wrap">
                   <input type="password" name="password" id="login-password" autocomplete="current-password" required />
-                  <button
-                    type="button"
-                    class="pw-toggle"
-                    data-pw-toggle
-                    aria-controls="login-password"
-                    aria-pressed="false"
-                    aria-label={t("login.showPassword")}
-                    data-label-show={t("login.showPassword")}
-                    data-label-hide={t("login.hidePassword")}
-                  >
-                    <svg class="ico-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
-                    <svg class="ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 10.7a3 3 0 0 0 4.2 4.2" /><path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17.5 17.5 0 0 1-3.4 4.3" /><path d="M6.1 6.1A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4-.8" /></svg>
-                  </button>
+                  <PwToggle id="login-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
                 </span>
               </div>
               <div class="actions">
@@ -95,20 +102,29 @@ export function ProfilePage({
         )}
         <h2>{t("profile.changePassword")}</h2>
         <form method="post" action="/profile">
-          <label class="field">
-            <span class="lbl">{t("profile.currentPassword")}</span>
-            <input type="password" name="current_password" autocomplete="current-password" required />
-          </label>
-          <label class="field" style="margin-top:12px">
-            <span class="lbl">{t("profile.newPassword")}</span>
-            <input type="password" name="new_password" autocomplete="new-password" minlength={8} required
-              data-strength="1"
-              data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
-          </label>
-          <label class="field" style="margin-top:12px">
-            <span class="lbl">{t("profile.confirmPassword")}</span>
-            <input type="password" name="confirm_password" autocomplete="new-password" minlength={8} required />
-          </label>
+          <div class="field">
+            <label class="lbl" for="current_password">{t("profile.currentPassword")}</label>
+            <span class="pw-wrap">
+              <input type="password" name="current_password" id="current_password" autocomplete="current-password" required />
+              <PwToggle id="current_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+            </span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label class="lbl" for="new_password">{t("profile.newPassword")}</label>
+            <span class="pw-wrap">
+              <input type="password" name="new_password" id="new_password" autocomplete="new-password" minlength={8} required
+                data-strength="1"
+                data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
+              <PwToggle id="new_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+            </span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label class="lbl" for="confirm_password">{t("profile.confirmPassword")}</label>
+            <span class="pw-wrap">
+              <input type="password" name="confirm_password" id="confirm_password" autocomplete="new-password" minlength={8} required />
+              <PwToggle id="confirm_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+            </span>
+          </div>
           <p class="muted small">{t("profile.minChars")}</p>
           <div class="actions">
             <button class="btn" type="submit">{t("profile.save")}</button>
