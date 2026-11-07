@@ -35,8 +35,8 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
                 <span class="lbl">{t("login.username")}</span>
                 <input type="text" name="username" value={username ?? ""} autocomplete="username" autofocus required />
               </label>
-              <label class="field" style="margin-top:12px">
-                <span class="lbl">{t("login.password")}</span>
+              <div class="field" style="margin-top:12px">
+                <label class="lbl" for="login-password">{t("login.password")}</label>
                 <span class="pw-wrap">
                   <input type="password" name="password" id="login-password" autocomplete="current-password" required />
                   <button
@@ -53,7 +53,7 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
                     <svg class="ico-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 10.7a3 3 0 0 0 4.2 4.2" /><path d="M9.9 5.2A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17.5 17.5 0 0 1-3.4 4.3" /><path d="M6.1 6.1A17.6 17.6 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4-.8" /></svg>
                   </button>
                 </span>
-              </label>
+              </div>
               <div class="actions">
                 <button class="btn full" type="submit">{t("login.submit")}</button>
               </div>

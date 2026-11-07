@@ -160,6 +160,8 @@ tbody tr:hover { background: var(--row-hover); }
 label.field { display: block; font-size: 13.5px; color: var(--muted); }
 label.field span.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 label.field .hint { font-weight: 400; color: var(--muted); }
+.field { display: block; font-size: 13.5px; color: var(--muted); }
+.field > label.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 input[type=text], input[type=search], input[type=password], input[type=date],
 input[type=number], input[type=file], select, textarea {
   width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
