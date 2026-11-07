@@ -245,6 +245,11 @@ textarea { min-height: 84px; resize: vertical; }
 .pw-toggle .ico-eye-off { display: none; }
 .pw-toggle[aria-pressed="true"] .ico-eye { display: none; }
 .pw-toggle[aria-pressed="true"] .ico-eye-off { display: block; }
+.caps-hint {
+  display: block; margin-top: 6px; padding: 5px 9px; border-radius: 7px;
+  background: var(--warn-bg); color: var(--warn-ink); font-size: 12px; font-weight: 600;
+}
+.caps-hint[hidden] { display: none; }
 .auth-secure { display: flex; align-items: center; gap: 6px; margin: 18px 0 0; font-size: 12px; color: var(--muted); }
 .auth-secure svg { width: 13px; height: 13px; flex: none; }
 .auth-card + * { margin-top: 18px; }

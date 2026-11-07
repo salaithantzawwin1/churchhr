@@ -2,6 +2,11 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import { getDict, type Lang } from "../i18n";
 
+/** Warning shown under a password field while Caps Lock is on (public/app.js). */
+function CapsHint({ label }: { label: string }) {
+  return <span class="caps-hint" hidden>{label}</span>;
+}
+
 /** Show/hide control for a password input; behaviour lives in public/app.js. */
 function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string; hideLabel: string }) {
   return (
@@ -60,6 +65,7 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
                   <input type="password" name="password" id="login-password" autocomplete="current-password" required />
                   <PwToggle id="login-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
                 </span>
+                <CapsHint label={t("pw.capsLock")} />
               </div>
               <div class="actions">
                 <button class="btn full" type="submit">{t("login.submit")}</button>
@@ -108,6 +114,7 @@ export function ProfilePage({
               <input type="password" name="current_password" id="current_password" autocomplete="current-password" required />
               <PwToggle id="current_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
             </span>
+            <CapsHint label={t("pw.capsLock")} />
           </div>
           <div class="field" style="margin-top:12px">
             <label class="lbl" for="new_password">{t("profile.newPassword")}</label>
@@ -117,6 +124,7 @@ export function ProfilePage({
                 data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
               <PwToggle id="new_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
             </span>
+            <CapsHint label={t("pw.capsLock")} />
           </div>
           <div class="field" style="margin-top:12px">
             <label class="lbl" for="confirm_password">{t("profile.confirmPassword")}</label>
@@ -124,6 +132,7 @@ export function ProfilePage({
               <input type="password" name="confirm_password" id="confirm_password" autocomplete="new-password" minlength={8} required />
               <PwToggle id="confirm_password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
             </span>
+            <CapsHint label={t("pw.capsLock")} />
           </div>
           <p class="muted small">{t("profile.minChars")}</p>
           <div class="actions">

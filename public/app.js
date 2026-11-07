@@ -53,6 +53,30 @@
 
   // Password visibility toggle (login form): flips the input type and keeps
   // the button's label/pressed state in sync for screen readers.
+  // Caps Lock warning under password fields. The browser only exposes the
+  // Caps Lock state on keyboard events, so sync it while typing and hide it
+  // again when the field loses focus.
+  (function initCapsLockHints() {
+    function sync(e) {
+      var input = e.target;
+      if (!input || input.tagName !== "INPUT" || !input.closest(".pw-wrap")) return;
+      var on = false;
+      try { on = !!(e.getModifierState && e.getModifierState("CapsLock")); } catch (err) { on = false; }
+      var field = input.closest(".field") || input.parentNode;
+      var hint = field && field.querySelector(".caps-hint");
+      if (hint) hint.hidden = !on;
+    }
+    document.addEventListener("keydown", sync, true);
+    document.addEventListener("keyup", sync, true);
+    document.addEventListener("focusout", function (e) {
+      var input = e.target;
+      if (!input || input.tagName !== "INPUT" || !input.closest(".pw-wrap")) return;
+      var field = input.closest(".field") || input.parentNode;
+      var hint = field && field.querySelector(".caps-hint");
+      if (hint) hint.hidden = true;
+    }, true);
+  })();
+
   document.addEventListener("click", function (e) {
     var btn = e.target && e.target.closest ? e.target.closest("[data-pw-toggle]") : null;
     if (!btn) return;
