@@ -69,7 +69,7 @@ export function DashboardPage(props: {
         <div class="actions" style="margin:0">
           {canCreate && <a class="btn" href="/members/new">{t("members.addNew")}</a>}
           {canImport && <a class="btn secondary" href="/members/import">CSV Import</a>}
-          {canView && <a class="btn secondary" href="/members">{t("dash.membersLink")}</a>}
+          {canView && <a class="btn secondary dash-members" href="/members">{t("dash.membersLink")}</a>}
         </div>
       </div>
 
@@ -162,6 +162,7 @@ export function DashboardPage(props: {
       </div>
 
       <div class="dash-cols">
+        <div class="dash-col">
         <section class="card dash-card">
           <div class="dc-head">
             <h2>{t("dash.state")}</h2>
@@ -170,7 +171,7 @@ export function DashboardPage(props: {
           {byState.length === 0 ? (
             <p class="muted small">{t("dash.none")}</p>
           ) : (
-            <ol class="rank-list">
+            <ol class="rank-list" tabindex={0} aria-label={t("dash.state")}>
               {byState.map((r, i) => (
                 <li class="rank-row">
                   <span class="rk">{i + 1}</span>
@@ -181,7 +182,9 @@ export function DashboardPage(props: {
                           ? <a href={`/members${qs({ state: r.id })}`}>{stateName(r)}</a>
                           : stateName(r)}
                       </b>
-                      <span>{r.n}</span>
+                      <span class="rv">
+                        {r.n}<span class="rp"> · {pct(r.n, data.total)}%</span>
+                      </span>
                     </div>
                     <div class="rk-bar" role="presentation">
                       <span style={`width:${Math.round((r.n / maxState) * 1000) / 10}%`} />
@@ -191,6 +194,11 @@ export function DashboardPage(props: {
               ))}
             </ol>
           )}
+          {byState.length > 6 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
+          <div class="dc-foot">
+            <span><b>{data.total}</b> {t("dash.count")}</span>
+            <span>{byState.length} {t(byState.length === 1 ? "dash.regionOne" : "dash.regionsWithMembers")}</span>
+          </div>
         </section>
 
         <section class="card dash-card">
@@ -232,9 +240,9 @@ export function DashboardPage(props: {
             </div>
           </div>
         </section>
-      </div>
+        </div>
 
-      <div class="dash-cols">
+        <div class="dash-col">
         <section class="card dash-card">
           <div class="dc-head">
             <h2>{t("dash.ageGroups")}</h2>
@@ -296,6 +304,7 @@ export function DashboardPage(props: {
             </ul>
           )}
         </section>
+        </div>
       </div>
     </Layout>
   );
