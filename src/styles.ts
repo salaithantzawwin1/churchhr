@@ -243,24 +243,35 @@ textarea { min-height: 84px; resize: vertical; }
   box-shadow: 0 18px 44px rgba(16, 40, 74, .12);
 }
 .auth-aside {
-  position: relative; overflow: hidden; color: #fff; padding: 34px 32px;
-  display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center;
+  position: relative; overflow: hidden; color: #fff; padding: 32px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center;
   background: linear-gradient(150deg, var(--brand) 0%, #14355f 72%, #0f2a4c 100%);
 }
 .auth-aside::after {
   content: ""; position: absolute; right: -70px; bottom: -90px; width: 260px; height: 260px;
   border-radius: 50%; background: rgba(255,255,255,.07); pointer-events: none;
 }
-.auth-mark { width: 80px; height: 80px; border-radius: 18px; background: #fff; padding: 5px; flex: none; box-shadow: 0 6px 18px rgba(0,0,0,.22); }
-.auth-aside h1 { margin: 0; font-size: 26px; line-height: 1.25; letter-spacing: -.01em; }
-.auth-lead { margin: 8px auto 0; max-width: 300px; color: rgba(255,255,255,.78); font-size: 13.5px; line-height: 1.55; }
+.auth-mark {
+  width: 112px; height: 112px; border-radius: 24px; background: #fff; padding: 7px; flex: none;
+  box-shadow: 0 12px 28px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.16);
+}
+.auth-aside h1 { margin: 0; font-size: 27px; line-height: 1.3; letter-spacing: -.01em; }
+.auth-lead { margin: 8px auto 0; max-width: 300px; color: rgba(255,255,255,.8); font-size: 13.5px; line-height: 1.6; }
 .auth-points {
-  list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 250px;
+  list-style: none; margin: 0 auto; padding: 18px 0 0; width: 100%; max-width: 258px;
   display: flex; flex-direction: column; gap: 11px; text-align: left;
   font-size: 13.5px; color: rgba(255,255,255,.92); position: relative; z-index: 1;
+  border-top: 1px solid rgba(255,255,255,.16);
 }
-.auth-points li { display: flex; align-items: flex-start; gap: 9px; }
-.auth-points svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: #a9c9f0; }
+.auth-points li { display: flex; align-items: flex-start; gap: 10px; }
+.auth-points svg {
+  width: 14px; height: 14px; flex: none; margin-top: 1px; padding: 3px; box-sizing: content-box;
+  color: #d5e7fb; background: rgba(255,255,255,.12); border-radius: 50%;
+}
+/* Myanmar glyphs need extra leading in the narrow brand column. */
+html[lang="my"] .auth-aside h1 { line-height: 1.7; }
+html[lang="my"] .auth-lead,
+html[lang="my"] .auth-points li { line-height: 1.9; }
 .auth-main { padding: 34px 32px 30px; display: flex; flex-direction: column; justify-content: center; }
 .auth-main h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.01em; }
 .auth-sub { margin: 0 0 18px; line-height: 1.5; }
@@ -292,16 +303,16 @@ textarea { min-height: 84px; resize: vertical; }
 @media (max-width: 820px) {
   .auth-wrap { margin-top: 16px; }
   .auth-card { grid-template-columns: 1fr; }
-  .auth-aside { padding: 22px; gap: 14px; }
+  .auth-aside { padding: 22px; gap: 12px; }
   .auth-aside h1 { font-size: 21px; }
-  .auth-mark { width: 60px; height: 60px; border-radius: 14px; }
+  .auth-mark { width: 84px; height: 84px; border-radius: 19px; padding: 5px; }
   .auth-points { display: none; }
   .auth-main { padding: 22px; }
 }
 @media (max-width: 420px) {
   .auth-main { padding: 18px; }
   .auth-aside { padding: 18px; }
-  .auth-mark { width: 52px; height: 52px; border-radius: 12px; }
+  .auth-mark { width: 68px; height: 68px; border-radius: 16px; }
   .auth-card { border-radius: 14px; }
 }
 /* ---------- dashboard / KPI stat cards ---------- */
