@@ -153,6 +153,18 @@ export const OPTION_TYPE_LABELS: Record<OptionType, string> = {
   blood_type: "သွေးအမျိုးအစား (Blood Type)",
 };
 
+export const OPTION_TYPE_LABELS_KR: Record<OptionType, string> = {
+  ethnicity: "민족",
+  education: "학력",
+  home_cell: "홈셀",
+  family_group: "가족 그룹",
+  fellowship_category: "친교 분류",
+  sector: "참여 부문",
+  group: "그룹",
+  township: "타운십",
+  blood_type: "혈액형",
+};
+
 export const OPTION_TYPE_LABELS_EN: Record<OptionType, string> = {
   ethnicity: "Ethnicity",
   education: "Education",

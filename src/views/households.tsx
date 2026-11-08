@@ -4,6 +4,27 @@ import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 import { regionCascadeSelects } from "./hh-cascade";
 import { qs } from "../util";
+import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
+
+/** Household relationships: stored key -> label per UI language. */
+const RELATIONSHIPS: Record<string, { mm: string; en: string; ko: string }> = {
+  head: { mm: "အိမ်ထောင်ဦးစီး", en: "Head", ko: "가장" },
+  spouse: { mm: "ဇနီး/ခင်ပွန်း", en: "Spouse", ko: "배우자" },
+  son: { mm: "သား", en: "Son", ko: "아들" },
+  daughter: { mm: "သမီး", en: "Daughter", ko: "딸" },
+  father: { mm: "အဖ", en: "Father", ko: "아버지" },
+  mother: { mm: "အမိ", en: "Mother", ko: "어머니" },
+  brother: { mm: "ညီအကို", en: "Brother", ko: "형제" },
+  sister: { mm: "အစ်မ/ညီမ", en: "Sister", ko: "자매" },
+  grandchild: { mm: "မြေး", en: "Grandchild", ko: "손자녀" },
+  other: { mm: "အခြား", en: "Other", ko: "기타" },
+};
+
+function relationshipOptions(lang?: Lang): Record<string, string> {
+  const L = lang ?? "en";
+  const key: "mm" | "en" | "ko" = L === "kr" ? "ko" : L;
+  return Object.fromEntries(Object.entries(RELATIONSHIPS).map(([k, v]) => [k, v[key]]));
+}
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -77,7 +98,8 @@ export function HouseholdFormFragment(props: Common & {
 export function HouseholdsListPage(props: Common & { rows: any[]; q: string; township?: string; townshipOptions?: { id: number; label: string }[] }) {
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "en");
-  const isEn = (lang ?? "en") === "en";
+  // Korean reads the English data labels (region/township names).
+  const isEn = (lang ?? "en") !== "mm";
   const filtered = Boolean(q.trim() || props.township);
   const activeParams = { q: q.trim(), township: props.township ?? null };
   const withoutFilter = (key: keyof typeof activeParams) => `/admin/households${qs({ ...activeParams, [key]: null })}`;
@@ -104,7 +126,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
           <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")}
             aria-label={t("hh.searchLabel")} enterkeyhint="search" />
           <select name="township" aria-label={t("hh.townshipLabel")}>
-            <option value="">{isEn ? "All townships" : "မြို့နယ် အားလုံး"}</option>
+            <option value="">{t("dash.allTownships")}</option>
             {(props.townshipOptions ?? []).map((o) => (
               <option value={o.label} selected={props.township === o.label}>{o.label}</option>
             ))}
@@ -127,8 +149,8 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
       <div class="tbl-wrap">
         <table class="list-tbl">
           <thead><tr>
-            <th>ID</th><th>{t("hh.name")}</th><th>{isEn ? "Head" : "အိမ်ထောင်ဦးစီး"}</th>
-            <th class="num">{isEn ? "Members" : "အဖွဲ့ဝင်"}</th>
+            <th>ID</th><th>{t("hh.name")}</th><th>{t("hh.head")}</th>
+            <th class="num">{t("hh.memberCount")}</th>
             <th>{t("detail.state")}</th><th>{t("hh.townshipLabel")}</th>
             <th>{t("form.homeCell")}</th><th></th>
           </tr></thead>
@@ -175,20 +197,9 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
 export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[] }) {
   const { user, perms, flash, family, members: mems, lang } = props;
   const t = getDict(lang ?? "en");
-  const isEn = (lang ?? "en") === "en";
+  const L = lang ?? "en";
+  const isEn = L !== "mm";
   const headName = family.head_name_mm || family.head_name_en || "";
-  const REL: Record<string, { mm: string; en: string }> = {
-    head: { mm: "အိမ်ထောင်ဦးစီး", en: "Head" },
-    spouse: { mm: "ဇनီ/မောင်", en: "Spouse" },
-    son: { mm: "သား", en: "Son" },
-    daughter: { mm: "သမီး", en: "Daughter" },
-    father: { mm: "အဖ", en: "Father" },
-    mother: { mm: "အမိ", en: "Mother" },
-    brother: { mm: "ညီအကို/မောင်", en: "Brother" },
-    sister: { mm: "အစ်မ/အစ်မိ", en: "Sister" },
-    grandchild: { mm: "မြေး", en: "Grandchild" },
-    other: { mm: "အခြား", en: "Other" },
-  };
   return (
     <Layout title={family.name} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
@@ -202,10 +213,10 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
       <div class="tbl-wrap">
         <table><tbody>
           <tr><th style="width:220px">{t("hh.name")}</th><td>{family.name}</td></tr>
-          <tr><th>{isEn ? "Head" : "အိမ်ထောင်ဦးစီး"}</th><td>{headName || <span class="muted">—</span>}</td></tr>
+          <tr><th>{t("hh.head")}</th><td>{headName || <span class="muted">—</span>}</td></tr>
           <tr><th>{t("detail.state")}</th><td>{isEn && family.state_name_en ? family.state_name_en : family.state_name}</td></tr>
           <tr><th>{t("hh.townshipLabel")}</th><td>{family.township}</td></tr>
-          <tr><th>{isEn ? "Home Cell" : "Home Cell"}</th><td>{family.home_cell_label || <span class="muted">—</span>}</td></tr>
+          <tr><th>{t("form.homeCell")}</th><td>{family.home_cell_label || <span class="muted">—</span>}</td></tr>
           <tr><th>{t("detail.address")}</th><td>{family.address}</td></tr>
           <tr><th>{t("detail.phone")}</th><td>{family.phone}</td></tr>
           <tr><th>{t("detail.notes")}</th><td>{family.notes}</td></tr>
@@ -213,24 +224,24 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
       </div>
 
       <div class="card" style="margin-top:18px">
-        <h2>{isEn ? "Household members" : "မိသားစုဝင်များ"} {mems.length > 0 && <span class="muted small">({mems.length})</span>}</h2>
+        <h2>{t("hh.members")} {mems.length > 0 && <span class="muted small">({mems.length})</span>}</h2>
         {perms.has("members.create") && (
           <p style="margin-bottom:8px">
-            <a class="btn sm" href={`/admin/households/${family.id}/add-member`}>+ {isEn ? "Add family member" : "မိသားစုဝင် ထည့်ရန်"}</a>
+            <a class="btn sm" href={`/admin/households/${family.id}/add-member`}>+ {t("hh.addMember.title")}</a>
           </p>
         )}
         {mems.length === 0 ? (
-          <p class="muted small">{isEn ? "No members in this household yet." : "မိသားစုဝင် မရှိသေးပါ။"}</p>
+          <p class="muted small">{t("hh.noMembers")}</p>
         ) : (
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>ID</th><th>{t("detail.name")}</th><th>{isEn ? "Relationship" : "ဆွဲဆွဲအပြစ်"}</th><th>{isEn ? "Status" : "အခြေအနေ"}</th><th></th></tr></thead>
+              <thead><tr><th>ID</th><th>{t("detail.name")}</th><th>{t("hh.relationship")}</th><th>{t("detail.status")}</th><th></th></tr></thead>
               <tbody>
                 {mems.map((m) => (
                   <tr>
                     <td>{m.id}</td>
                     <td><a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english}</a></td>
-                    <td>{REL[m.relationship]?.[isEn ? "en" : "mm"] ?? m.relationship}</td>
+                    <td>{RELATIONSHIPS[m.relationship]?.[L === "kr" ? "ko" : L] ?? m.relationship}</td>
                     <td><span class={`badge ${m.status}`}>{m.status}</span></td>
                     {perms.has("members.update") && (
                       <td><a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a></td>
@@ -253,8 +264,11 @@ export function HouseholdAddMemberPage(props: Common & {
 }) {
   const { user, perms, family, values: v, errors, lang } = props;
   const t = getDict(lang ?? "en");
-  const isEn = (lang ?? "en") === "en";
-  const REL = HouseholdDetailPageRel(isEn);
+  const L = lang ?? "en";
+  const REL = relationshipOptions(lang);
+  const G = L === "mm" ? GENDERS : L === "kr" ? GENDERS_KR : GENDERS_EN;
+  const M = L === "mm" ? MARITAL_STATUSES : L === "kr" ? MARITAL_STATUSES_KR : MARITAL_STATUSES_EN;
+  const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   return (
     <Layout title={t("hh.addMember.title")} lang={lang} user={user} perms={perms} active="/admin/households">
       <div class="page-head">
@@ -270,7 +284,7 @@ export function HouseholdAddMemberPage(props: Common & {
           <h2>{t("form.basic")}</h2>
           <div class="form-grid">
             <label class="field">
-              <span class="lbl">{isEn ? "Relationship to household" : "အိမ်ထောင်နှင့် ဆွဲဆွဲအပြစ်"}</span>
+              <span class="lbl">{t("hh.relationshipTo")}</span>
               <select name="relationship" value={props.relationship}>
                 {Object.entries(REL).map(([k, label]) => <option value={k} selected={props.relationship === k}>{label}</option>)}
               </select>
@@ -281,17 +295,17 @@ export function HouseholdAddMemberPage(props: Common & {
             <label class="field"><span class="lbl">{t("form.gender")}</span>
               <select name="gender">
                 <option value="">{t("form.choose")}</option>
-                <option value="male" selected={v.gender === "male"}>{isEn ? "Male" : "အမျိုးသား"}</option>
-                <option value="female" selected={v.gender === "female"}>{isEn ? "Female" : "အမျိုးသမီး"}</option>
+                <option value="male" selected={v.gender === "male"}>{G.male}</option>
+                <option value="female" selected={v.gender === "female"}>{G.female}</option>
               </select></label>
             <label class="field"><span class="lbl">{t("form.dob")}</span><input type="date" name="date_of_birth" value={v.date_of_birth ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.nrc")}</span><input type="text" name="nrc_number" value={v.nrc_number ?? ""} /></label>
-            <label class="field"><span class="lbl">{isEn ? "Marital status" : "အိမ်ထောင်ရေး"}</span>
+            <label class="field"><span class="lbl">{t("form.marital")}</span>
               <select name="marital_status">
                 <option value="">{t("form.choose")}</option>
-                <option value="single" selected={v.marital_status === "single"}>{isEn ? "Single" : "အိမ်ထောင်မရှိ"}</option>
-                <option value="married" selected={v.marital_status === "married"}>{isEn ? "Married" : "အိမ်ထောင်ရှိ"}</option>
+                <option value="single" selected={v.marital_status === "single"}>{M.single}</option>
+                <option value="married" selected={v.marital_status === "married"}>{M.married}</option>
               </select></label>
           </div>
         </div>
@@ -304,9 +318,7 @@ export function HouseholdAddMemberPage(props: Common & {
         <div class="card">
           <h2>{t("form.church")}</h2>
           <p class="muted small" style="margin-top:0">
-            {isEn
-              ? "For the household head: pick the Family Group / Group / Home Cell — every other member added to this household copies these automatically."
-              : "အိမ်ထောင်ဦးစီးအတွက် Family Group / Group / Home Cell ရွေးပါ — ဒီမိသားစုထဲ နောက်ထည့်မယ့် အဖွဲ့ဝင်အားလုံးက အလိုအလျောက် ကူးယူပါမည်။"}
+            {t("hh.headAssignHint")}
           </p>
           <div class="form-grid">
             {regionCascadeSelects({
@@ -332,23 +344,17 @@ export function HouseholdAddMemberPage(props: Common & {
             </label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>
               <select name="status">
-                <option value="active" selected={(v.status || "active") === "active"}>{isEn ? "Active" : "ပုံမှန်"}</option>
-                <option value="inactive" selected={v.status === "inactive"}>{isEn ? "Inactive" : "ရပ်တန့်"}</option>
+                <option value="active" selected={(v.status || "active") === "active"}>{S.active}</option>
+                <option value="inactive" selected={v.status === "inactive"}>{S.inactive}</option>
               </select>
             </label>
           </div>
         </div>
         <div class="actions">
-          <button class="btn" type="submit">{isEn ? "Add to household" : "မိသားစုထဲသို့ ထည့်ရန်"}</button>
+          <button class="btn" type="submit">{t("hh.addToHousehold")}</button>
           <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("form.cancel")}</a>
         </div>
       </form>
     </Layout>
   );
-}
-
-function HouseholdDetailPageRel(isEn: boolean): Record<string, string> {
-  return isEn
-    ? { head: "Head", spouse: "Spouse", son: "Son", daughter: "Daughter", father: "Father", mother: "Mother", brother: "Brother", sister: "Sister", grandchild: "Grandchild", other: "Other" }
-    : { head: "အိမ်ထောင်ဦးစီး", spouse: "ဇနီး/ခင်ပွန်း", son: "သား", daughter: "သမီး", father: "အဖ", mother: "အမိ", brother: "ညီအကို", sister: "အစ်မ/ညီမ", grandchild: "မြေး", other: "အခြား" };
 }

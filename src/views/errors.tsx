@@ -36,7 +36,7 @@ export function NotFoundPage({ lang }: { lang?: Lang }) {
 export function GenericErrorPage({ message, lang }: { message: string; lang?: Lang }) {
   const t = getDict(lang ?? "en");
   return (
-    <Layout title="Error" lang={lang}>
+    <Layout title={t("err.generic")} lang={lang}>
       <div class="card">
         <h1>{t("err.generic")}</h1>
         <p class="muted">{message}</p>

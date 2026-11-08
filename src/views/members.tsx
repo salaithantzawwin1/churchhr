@@ -3,7 +3,7 @@ import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { ageFromDate, qs } from "../util";
-import { BLOOD_TYPES, GENDERS, GENDERS_EN, MARITAL_STATUSES, MARITAL_STATUSES_EN, STATUSES, STATUSES_EN } from "../enums";
+import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
 
 export type MemberListItem = {
@@ -95,10 +95,12 @@ const LIST_COLS = (t: (k: string) => string) => [
 export function MembersListPage(props: ListProps) {
   const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, groups, fellowships, lang } = props;
   const t = getDict(lang ?? "en");
-  const isEn = (lang ?? "en") === "en";
-  const G = isEn ? GENDERS_EN : GENDERS;
-  const S = isEn ? STATUSES_EN : STATUSES;
-  const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
+  const L = lang ?? "en";
+  // Korean uses the English data labels (region names etc.); only MM differs.
+  const isEn = L !== "mm";
+  const G = L === "mm" ? GENDERS : L === "kr" ? GENDERS_KR : GENDERS_EN;
+  const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
+  const M = L === "mm" ? MARITAL_STATUSES : L === "kr" ? MARITAL_STATUSES_KR : MARITAL_STATUSES_EN;
   const canCreate = perms.has("members.create");
   const canUpdate = perms.has("members.update");
   const canDelete = perms.has("members.delete");
@@ -138,8 +140,8 @@ export function MembersListPage(props: ListProps) {
       <div class="page-head">
         <h1>{t("members.title")}<span class="count-pill">{total}</span></h1>
         <div class="actions" style="margin:0">
-          {canImport && <a class="btn secondary" href="/members/import">CSV Import</a>}
-          {canExport && <a class="btn secondary" href={`/members/export${filterQs(f)}`}>CSV Export</a>}
+          {canImport && <a class="btn secondary" href="/members/import">{t("members.importCsv")}</a>}
+          {canExport && <a class="btn secondary" href={`/members/export${filterQs(f)}`}>{t("members.exportCsv")}</a>}
           {canCreate && <a class="btn primary-action" href="/members/new">{t("members.addNew")}</a>}
         </div>
       </div>
@@ -410,10 +412,11 @@ export function MemberFormPage(props: FormProps) {
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const { values: v, errors, member, regions, options, lang, modal } = props;
   const t = getDict(lang ?? "en");
-  const isEn = (lang ?? "en") === "en";
-  const G = isEn ? GENDERS_EN : GENDERS;
-  const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
-  const S = isEn ? STATUSES_EN : STATUSES;
+  const L = lang ?? "en";
+  const isEn = L !== "mm";
+  const G = L === "mm" ? GENDERS : L === "kr" ? GENDERS_KR : GENDERS_EN;
+  const M = L === "mm" ? MARITAL_STATUSES : L === "kr" ? MARITAL_STATUSES_KR : MARITAL_STATUSES_EN;
+  const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   const action = member ? `/members/${member.id}` : "/members";
   const edit = member !== null;
   const dob = v.date_of_birth || "";
@@ -591,18 +594,19 @@ export type MemberHistoryRow = {
 export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[] }) {
   const { user, perms, flash, m, lang, history = [] } = props;
   const t = getDict(lang ?? "en");
-  const ACTION_LABELS: Record<string, { mm: string; en: string; cls: string }> = {
-    create: { mm: "ထည့်သွင်း", en: "Created", cls: "active" },
-    update: { mm: "ပြင်ဆင်", en: "Updated", cls: "" },
-    delete: { mm: "ဖျက်သိမ်း", en: "Deleted", cls: "inactive" },
-    bulk_status: { mm: "Bulk status", en: "Bulk status", cls: "" },
-    bulk_delete: { mm: "Bulk delete", en: "Bulk delete", cls: "inactive" },
-    bulk_group: { mm: "Bulk assign", en: "Bulk assign", cls: "" },
+  const ACTION_LABELS: Record<string, { mm: string; en: string; ko: string; cls: string }> = {
+    create: { mm: "ထည့်သွင်း", en: "Created", ko: "생성", cls: "active" },
+    update: { mm: "ပြင်ဆင်", en: "Updated", ko: "수정", cls: "" },
+    delete: { mm: "ဖျက်သိမ်း", en: "Deleted", ko: "삭제", cls: "inactive" },
+    bulk_status: { mm: "Bulk status", en: "Bulk status", ko: "일괄 상태 변경", cls: "" },
+    bulk_delete: { mm: "Bulk delete", en: "Bulk delete", ko: "일괄 삭제", cls: "inactive" },
+    bulk_group: { mm: "Bulk assign", en: "Bulk assign", ko: "일괄 지정", cls: "" },
   };
-  const isEn = (lang ?? "en") === "en";
-  const G = isEn ? GENDERS_EN : GENDERS;
-  const M = isEn ? MARITAL_STATUSES_EN : MARITAL_STATUSES;
-  const S = isEn ? STATUSES_EN : STATUSES;
+  const L = lang ?? "en";
+  const isEn = L !== "mm";
+  const G = L === "mm" ? GENDERS : L === "kr" ? GENDERS_KR : GENDERS_EN;
+  const M = L === "mm" ? MARITAL_STATUSES : L === "kr" ? MARITAL_STATUSES_KR : MARITAL_STATUSES_EN;
+  const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   /** Stored dates are ISO already; render timestamps the same unambiguous way. */
   const stamp = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " ");
   const sections: { title: string; rows: [string, string][] }[] = [
@@ -693,20 +697,20 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
       <p class="muted small">{t("detail.updatedAt")}: {stamp(m.updated_at)}</p>
 
       <div class="card" style="margin-top:18px">
-        <h2>{isEn ? "Change history" : "ပြောင်းလဲမှု မှတ်တမ်း"}</h2>
+        <h2>{t("detail.history")}</h2>
         {history.length === 0 ? (
-          <p class="muted small">{isEn ? "No changes recorded yet." : "မှတ်တမ်း မရှိသေးပါ။"}</p>
+          <p class="muted small">{t("detail.historyEmpty")}</p>
         ) : (
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>{isEn ? "When" : "အချိန်"}</th><th>{isEn ? "Action" : "လုပ်ဆောင်ချက်"}</th><th>{isEn ? "By" : "ပြုလုပ်သူ"}</th></tr></thead>
+              <thead><tr><th>{t("detail.historyWhen")}</th><th>{t("detail.historyAction")}</th><th>{t("detail.historyBy")}</th></tr></thead>
               <tbody>
                 {history.map((h) => {
-                  const a = ACTION_LABELS[h.action] ?? { mm: h.action, en: h.action, cls: "" };
+                  const a = ACTION_LABELS[h.action] ?? { mm: h.action, en: h.action, ko: h.action, cls: "" };
                   return (
                     <tr>
                       <td class="muted small">{new Date(h.created_at * 1000).toISOString().slice(0, 16).replace("T", " ")}</td>
-                      <td><span class={`badge ${a.cls}`}>{(isEn ? a.en : a.mm) || h.action}</span></td>
+                      <td><span class={`badge ${a.cls}`}>{(L === "mm" ? a.mm : L === "kr" ? a.ko : a.en) || h.action}</span></td>
                       <td>{h.actor_name}</td>
                     </tr>
                   );
@@ -736,9 +740,9 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
   const { user, perms, flash, report, error, lang } = props;
   const t = getDict(lang ?? "en");
   return (
-    <Layout title="CSV Import" lang={lang} user={user} perms={perms} active="/members/import" flash={flash ?? null}>
+    <Layout title={t("nav.import")} lang={lang} user={user} perms={perms} active="/members/import" flash={flash ?? null}>
       <div class="page-head">
-        <h1>CSV Import (Bulk Upload)</h1>
+        <h1>{t("import.heading")}</h1>
         <a class="btn secondary" href="/members">{t("members.toList")}</a>
       </div>
       {error && <div class="flash err">{error}</div>}
@@ -762,7 +766,7 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
               <input type="file" name="file" accept=".csv,text/csv" required />
             </label>
             <div class="actions">
-              <button class="btn" type="submit">Upload &amp; Preview</button>
+              <button class="btn" type="submit">{t("import.uploadPreview")}</button>
             </div>
           </form>
         </div>
@@ -781,9 +785,9 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
 
           {report.errors.length > 0 && (
             <div style="margin-top:14px">
-              <strong class="small">Row errors:</strong>
+              <strong class="small">{t("import.rowErrors")}</strong>
               <ul class="err-list small">
-                {report.errors.map((e) => <li>Row {e.line}: {e.msg}</li>)}
+                {report.errors.map((e) => <li>{t("import.row")} {e.line}: {e.msg}</li>)}
               </ul>
             </div>
           )}

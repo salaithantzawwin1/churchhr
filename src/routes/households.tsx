@@ -7,7 +7,7 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { loadAllOptions, type OptionRow } from "../lookup";
 import { asInt, intParam, normKey, s } from "../util";
-import { getDict } from "../i18n";
+import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
   type FormValues as HFormValues,
@@ -41,12 +41,12 @@ async function loadRegions(db: DB) {
     .orderBy(regions.id)) as { id: number; name: string; nameEn: string; slug: string; code: string | null }[];
 }
 
-function scopedRegions(all: { id: number; name: string; nameEn: string; code: string | null }[], scope: Scope, lang: "mm" | "en") {
+function scopedRegions(all: { id: number; name: string; nameEn: string; code: string | null }[], scope: Scope, lang: Lang) {
   return all
     .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
     .map((r) => ({
       id: r.id,
-      name: lang === "en" && r.nameEn ? r.nameEn : r.name,
+      name: lang !== "mm" && r.nameEn ? r.nameEn : r.name,
       code: r.code ?? null,
     }));
 }

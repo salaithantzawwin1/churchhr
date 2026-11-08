@@ -45,12 +45,12 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
   const adminItems = ADMIN_NAV.filter(allowed);
   const adminActive = adminItems.some((n) => n.href === active);
   return (
-    <html lang={L === "mm" ? "my" : "en"}>
+    <html lang={L === "mm" ? "my" : L === "kr" ? "ko" : "en"}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>
-          {title} — Church Member Registry
+          {title} — {t("app.name")}
         </title>
         <link rel="icon" type="image/png" href="/logo.png" />
         <link rel="stylesheet" href={`/styles.css?v=${ASSET_V}`} />
@@ -62,14 +62,14 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
         <script src={`/app.js?v=${ASSET_V}`} defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" />
       </head>
       <body class={bodyClass} data-idle-seconds={String(IDLE_TIMEOUT_SECONDS)}>
         <a class="skip-link" href="#main">{t("nav.skip")}</a>
         <header class="topbar">
-          <a class="brand" href="/">
+          <a class="brand" href="/" aria-label={t("app.name")}>
             <img src="/logo.png" alt="" />
-            {t("app.name")}
+            <span class="brand-name">{t("app.name")}</span>
           </a>
           {user && (
             <nav aria-label={t("nav.main")}>
@@ -133,8 +133,9 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
               <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
             </button>
             <span class="langswitch" title={t("nav.language")}>
-              <a href="?lang=mm" class={L === "mm" ? "on" : ""}>MM</a>
-              <a href="?lang=en" class={L === "en" ? "on" : ""}>ENG</a>
+              <a href="?lang=mm" class={L === "mm" ? "on" : ""} lang="my">MM</a>
+              <a href="?lang=en" class={L === "en" ? "on" : ""} lang="en">EN</a>
+              <a href="?lang=kr" class={L === "kr" ? "on" : ""} lang="ko">KR</a>
             </span>
             {user && (
               <>

@@ -1,11 +1,12 @@
 import type { OptionRow } from "../lookup";
+import type { Lang } from "../i18n";
 
 /** Shared cascade selects for household forms, mirroring members.tsx:
  * State (data-region-select) narrows Township (data-region-filter) →
  * Home Cell (data-parent-filter=township) → Family Group. */
 
 export function regionCascadeSelects(opts: {
-  lang: "mm" | "en";
+  lang: Lang;
   regions: { id: number; name: string; code?: string | null }[];
   regionId: string;
   township: string;
@@ -17,8 +18,9 @@ export function regionCascadeSelects(opts: {
   familyGroupId: string;
   familyGroupOpts: OptionRow[];
 }) {
-  const t = (en: string, mm: string) => (opts.lang === "en" ? en : mm);
-  const blank = t("Select…", "ရွေးချယ်ပါ");
+  const t = (en: string, mm: string, kr: string) =>
+    opts.lang === "mm" ? mm : opts.lang === "kr" ? kr : en;
+  const blank = t("Select…", "ရွေးချယ်ပါ", "선택…");
   const townshipLabelById = new Map(opts.townshipOpts.map((o) => [o.id, o.label] as const));
 
   const filteredOpts = (list: OptionRow[], selected: string, useParentOfTownship = false) => (
@@ -50,7 +52,7 @@ export function regionCascadeSelects(opts: {
   return (
     <>
       <label class="field">
-        <span class="lbl">{t("State / Region", "တိုင်း/ပြည်နယ်")}</span>
+        <span class="lbl">{t("State / Region", "တိုင်း/ပြည်နယ်", "주 / 지역")}</span>
         <select name="region_id" required data-region-select="1">
           <option value="">{blank}</option>
           {opts.regions.map((r) => (
@@ -61,7 +63,7 @@ export function regionCascadeSelects(opts: {
         </select>
       </label>
       <label class="field">
-        <span class="lbl">{t("Township", "မြို့နယ်")}</span>
+        <span class="lbl">{t("Township", "မြို့နယ်", "타운십")}</span>
         <select name="township" data-region-filter="1">
           {/* township stores the label string; filters by data-region */}
           <option value="">{blank}</option>
@@ -83,19 +85,19 @@ export function regionCascadeSelects(opts: {
         </select>
       </label>
       <label class="field">
-        <span class="lbl">{t("Home Cell", "Home Cell")}</span>
+        <span class="lbl">{t("Home Cell", "Home Cell", "홈셀")}</span>
         <select name="home_cell_id" data-region-filter="1" data-parent-filter="township">
           {filteredOpts(opts.homeCellOpts, opts.homeCellId, true)}
         </select>
       </label>
       <label class="field">
-        <span class="lbl">{t("Group", "Group")}</span>
+        <span class="lbl">{t("Group", "Group", "그룹")}</span>
         <select name="group_id" data-region-filter="1">
           {filteredOpts(opts.groupOpts, opts.groupId)}
         </select>
       </label>
       <label class="field">
-        <span class="lbl">{t("Family Group", "မိသားစုအဖွဲ့")}</span>
+        <span class="lbl">{t("Family Group", "မိသားစုအဖွဲ့", "가족 그룹")}</span>
         <select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">
           {filteredOpts(opts.familyGroupOpts, opts.familyGroupId, true)}
         </select>

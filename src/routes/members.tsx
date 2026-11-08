@@ -23,7 +23,7 @@ import {
   parseDateFlexible, s,
 } from "../util";
 import { BLOOD_TYPES, GENDERS, MARITAL_STATUSES, STATUSES, normEnum } from "../enums";
-import { getDict } from "../i18n";
+import { getDict, type Lang } from "../i18n";
 import {
   ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MembersListPage,
   type Filters, type FormValues, type ImportReport, type MemberDetail,
@@ -72,7 +72,7 @@ function msg(key: string): string {
 }
 
 /** Renders a message produced by validators/import: @key -> dictionary, else literal. */
-function renderMsg(raw: string, lang: "mm" | "en"): string {
+function renderMsg(raw: string, lang: Lang): string {
   if (!raw.startsWith("@")) return raw;
   const t = getDict(lang);
   const key = validMsgKeys[raw.slice(1)];
@@ -129,10 +129,10 @@ async function loadRegions(db: DB): Promise<Region[]> {
     .orderBy(regions.id)) as Region[];
 }
 
-function scopedRegions(all: Region[], scope: Scope, lang: "mm" | "en"): { id: number; name: string; code: string | null }[] {
+function scopedRegions(all: Region[], scope: Scope, lang: Lang): { id: number; name: string; code: string | null }[] {
   return all
     .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
-    .map((r) => ({ id: r.id, name: lang === "en" && r.nameEn ? r.nameEn : r.name, code: r.code ?? null }));
+    .map((r) => ({ id: r.id, name: lang !== "mm" && r.nameEn ? r.nameEn : r.name, code: r.code ?? null }));
 }
 
 // ---------- GET /members (list + search + filter + sort + pagination) ----------
@@ -628,7 +628,7 @@ const TYPE_TO_COLUMN: Record<string, string> = {
 /** Find or create an import option. Rows without a state fall back to the
  * all-states (regionId 0) option; rows with a state resolve/create region-scoped. */
 async function ensureOption(
-  db: DB, cache: OptionRow[], type: string, label: string, lang: "mm" | "en", regionId = 0,
+  db: DB, cache: OptionRow[], type: string, label: string, lang: Lang, regionId = 0,
 ): Promise<number> {
   const hit = findOption(cache, type, label, regionId);
   if (hit) return hit.id;

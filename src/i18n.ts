@@ -1,17 +1,19 @@
-/** MM/EN bilingual UI layer. Language is stored in the "lang" cookie (mm | en);
+/** MM/EN/KR UI layer. Language is stored in the "lang" cookie (mm | en | kr);
  * English is the default when no preference is set. */
 
-export type Lang = "mm" | "en";
+import { KO } from "./i18n.ko";
+
+export type Lang = "mm" | "en" | "kr";
 
 export const LANG_COOKIE = "lang";
 
 export function normalizeLang(value: string | undefined | null): Lang {
-  return value === "mm" ? "mm" : "en";
+  return value === "mm" || value === "kr" ? value : "en";
 }
 
 export function langFromQuery(q: Record<string, string | undefined>): Lang | null {
   const v = q.lang;
-  if (v === "en" || v === "mm") return v;
+  if (v === "en" || v === "mm" || v === "kr") return v;
   return null;
 }
 
@@ -175,6 +177,12 @@ const MM: Dict = {
   "members.page": "စာမျက်နှာ",
   "members.back": "← နောက်",
   "members.toList": "← စာရင်း",
+  "members.importCsv": "CSV Import",
+  "members.exportCsv": "CSV Export",
+  "import.heading": "CSV Import (အစုလိုက်)",
+  "import.uploadPreview": "CSV တင်ပြီး Preview ကြည့်ရန်",
+  "import.rowErrors": "Row အမှားများ:",
+  "import.row": "Row",
   // member form
   "form.newTitle": "Member အသစ်ထည့်ရန်",
   "form.editTitle": "Member ပြင်ရန်",
@@ -246,6 +254,11 @@ const MM: Dict = {
   "detail.status": "အခြေအနေ",
   "detail.notes": "မှတ်စု",
   "detail.updatedAt": "နောက်ဆုံးပြင်ချိန်",
+  "detail.history": "ပြောင်းလဲမှု မှတ်တမ်း",
+  "detail.historyEmpty": "မှတ်တမ်း မရှိသေးပါ။",
+  "detail.historyWhen": "အချိန်",
+  "detail.historyAction": "လုပ်ဆောင်ချက်",
+  "detail.historyBy": "ပြုလုပ်သူ",
 
   // households (/admin/households)
   "hh.pageTitle": "မိသားစု စာရင်း စီမံခန့်ခွဲမှု",
@@ -255,6 +268,14 @@ const MM: Dict = {
   "hh.editTitle": "မိသားစု ပြင်ရန်",
   "hh.editHeading": "မိသားစု ပြင်ရန်",
   "hh.cardHeading": "မိသားစု အချက်အလက်",
+  "hh.head": "အိမ်ထောင်ဦးစီး",
+  "hh.members": "မိသားစုဝင်များ",
+  "hh.memberCount": "အဖွဲ့ဝင်",
+  "hh.noMembers": "မိသားစုဝင် မရှိသေးပါ။",
+  "hh.relationship": "တော်စပ်ပုံ",
+  "hh.relationshipTo": "အိမ်ထောင်နှင့် တော်စပ်ပုံ",
+  "hh.headAssignHint": "အိမ်ထောင်ဦးစီးအတွက် Family Group / Group / Home Cell ရွေးပါ — ဒီမိသားစုထဲ နောက်ထည့်မယ့် အဖွဲ့ဝင်အားလုံးက အလိုအလျောက် ကူးယူပါမည်။",
+  "hh.addToHousehold": "မိသားစုထဲသို့ ထည့်ရန်",
   "hh.name": "မိသားစုအမည်",
   "hh.nameHint": "ဥပမာ Mg Mg မိသားစု",
   "hh.state": "တိုင်း/ပြည်နယ်",
@@ -605,6 +626,12 @@ const EN: Dict = {
   "members.page": "Page",
   "members.back": "← Back",
   "members.toList": "← List",
+  "members.importCsv": "CSV Import",
+  "members.exportCsv": "CSV Export",
+  "import.heading": "CSV Import (Bulk Upload)",
+  "import.uploadPreview": "Upload & Preview",
+  "import.rowErrors": "Row errors:",
+  "import.row": "Row",
   "form.newTitle": "New Member",
   "form.editTitle": "Edit Member",
   "form.newHeading": "Add a new member",
@@ -674,6 +701,11 @@ const EN: Dict = {
   "detail.status": "Status",
   "detail.notes": "Notes",
   "detail.updatedAt": "Last updated",
+  "detail.history": "Change history",
+  "detail.historyEmpty": "No changes recorded yet.",
+  "detail.historyWhen": "When",
+  "detail.historyAction": "Action",
+  "detail.historyBy": "By",
 
   // households (EN)
   "hh.pageTitle": "Household management",
@@ -683,6 +715,14 @@ const EN: Dict = {
   "hh.editTitle": "Edit household",
   "hh.editHeading": "Edit household",
   "hh.cardHeading": "Household details",
+  "hh.head": "Head",
+  "hh.members": "Household members",
+  "hh.memberCount": "Members",
+  "hh.noMembers": "No members in this household yet.",
+  "hh.relationship": "Relationship",
+  "hh.relationshipTo": "Relationship to household",
+  "hh.headAssignHint": "For the household head: pick the Family Group / Group / Home Cell — every other member added to this household copies these automatically.",
+  "hh.addToHousehold": "Add to household",
   "hh.name": "Household name",
   "hh.nameHint": "e.g. Mg Mg household",
   "hh.state": "State / Region",
@@ -874,13 +914,14 @@ const EN: Dict = {
   "err.genericBody": "An error occurred on the server.",
 };
 
-const DICTS: Record<Lang, Dict> = { mm: MM, en: EN };
+const DICTS: Record<Lang, Dict> = { mm: MM, en: EN, kr: KO };
 
 export type T = (key: string) => string;
 
-/** Resolve a dictionary bound to the language; missing EN keys fall back to MM. */
+/** Resolve a dictionary bound to the language. Missing Korean keys fall back
+ * to English; missing MM/EN keys fall back to Myanmar (existing behaviour). */
 export function getDict(lang: Lang): T {
   const dict = DICTS[lang];
-  const fallback = DICTS.mm;
+  const fallback = lang === "kr" ? DICTS.en : DICTS.mm;
   return (key: string) => dict[key] ?? fallback[key] ?? key;
 }

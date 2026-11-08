@@ -3,7 +3,7 @@ import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { DashboardData } from "../dashboard";
 import { getDict, type Lang } from "../i18n";
-import { GENDERS, GENDERS_EN } from "../enums";
+import { GENDERS, GENDERS_EN, GENDERS_KR } from "../enums";
 import { qs } from "../util";
 
 /** Inline stroke icons (lucide-style, 24×24 viewBox) for the dashboard cards. */
@@ -62,7 +62,8 @@ export function DashboardPage(props: {
   const inactive = data.byStatus.inactive ?? 0;
   const canView = perms.has("members.view");
   const scopeLabel = data.scopeAll ? t("dash.allStates") : `${data.stateCount} ${t("dash.stateScope")}`;
-  const genderLabels: Record<string, string> = isEn ? GENDERS_EN : GENDERS;
+  const genderLabels: Record<string, string> =
+    (lang ?? "en") === "mm" ? GENDERS : (lang ?? "en") === "kr" ? GENDERS_KR : GENDERS_EN;
   /** Current query params, used to build "remove this filter" links. */
   const activeParams = {
     state: data.filters.state,
@@ -88,7 +89,7 @@ export function DashboardPage(props: {
   }
 
   return (
-    <Layout title="Dashboard" lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
+    <Layout title={t("dash.title")} lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
       <div class="page-head dash-head">
         <div class="dash-head-title">
           <h1>{t("dash.title")}</h1>

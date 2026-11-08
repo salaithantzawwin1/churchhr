@@ -8,6 +8,11 @@ export const GENDERS_EN: Record<string, string> = {
   female: "Female",
 };
 
+export const GENDERS_KR: Record<string, string> = {
+  male: "남성 (Male)",
+  female: "여성 (Female)",
+};
+
 export const MARITAL_STATUSES: Record<string, string> = {
   single: "အလွတ် (Single)",
   married: "အိမ်ထောင်သည် (Married)",
@@ -22,6 +27,13 @@ export const MARITAL_STATUSES_EN: Record<string, string> = {
   divorced: "Divorced",
 };
 
+export const MARITAL_STATUSES_KR: Record<string, string> = {
+  single: "미혼 (Single)",
+  married: "기혼 (Married)",
+  widowed: "사별 (Widowed)",
+  divorced: "이혼 (Divorced)",
+};
+
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export const STATUSES: Record<string, string> = {
@@ -34,6 +46,12 @@ export const STATUSES_EN: Record<string, string> = {
   active: "Active",
   moved: "Moved",
   inactive: "Inactive",
+};
+
+export const STATUSES_KR: Record<string, string> = {
+  active: "활성 (Active)",
+  moved: "이사 (Moved)",
+  inactive: "비활성 (Inactive)",
 };
 
 /** Short single-language label for badges/lists: strips the "(English)" tail in MM. */

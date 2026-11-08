@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
-  ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPES, regions,
+  ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, OPTION_TYPES, regions,
   rolePermissions, roles, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
 import { requirePermission } from "../middleware";
@@ -13,7 +13,7 @@ import { hashPassword, parseIterations } from "../auth";
 import { checkPasswordPolicy } from "../password";
 import { findOption, loadAllOptions, nextCodeCandidate, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
-import { getDict } from "../i18n";
+import { getDict, type Lang } from "../i18n";
 import { s } from "../util";
 import { Layout } from "../views/layout";
 import {
@@ -103,8 +103,14 @@ async function loadRoles(db: DB): Promise<RoleInfo[]> {
   }));
 }
 
-async function loadAdminUsers(db: DB, lang: "mm" | "en"): Promise<AdminUserRow[]> {
-  const stateCol = lang === "en" ? "r3.name_en" : "r3.name";
+/** Option-type label in the active UI language. */
+function typeLabel(lang: Lang, type: OptionType): string {
+  const labels = lang === "mm" ? OPTION_TYPE_LABELS : lang === "kr" ? OPTION_TYPE_LABELS_KR : OPTION_TYPE_LABELS_EN;
+  return labels[type];
+}
+
+async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
+  const stateCol = lang !== "mm" ? "COALESCE(r3.name_en, r3.name)" : "r3.name";
   const rows = await db.all<AdminUserRow & { state_ids: string | null }>(
     sql.raw(`
     SELECT u.id, u.username, u.active, u.must_change_password, u.created_at,
@@ -154,9 +160,9 @@ adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
   );
 });
 
-async function loadRegionsLite(db: DB, lang: "mm" | "en" = "en"): Promise<{ id: number; name: string }[]> {
+async function loadRegionsLite(db: DB, lang: Lang = "en"): Promise<{ id: number; name: string }[]> {
   const rows = await db.all<{ id: number; name: string; name_en: string }>(sql`SELECT id, name, name_en FROM regions ORDER BY id`);
-  return rows.map((r) => ({ id: r.id, name: lang === "en" && r.name_en ? r.name_en : r.name }));
+  return rows.map((r) => ({ id: r.id, name: lang !== "mm" && r.name_en ? r.name_en : r.name }));
 }
 
 adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) => {
@@ -455,7 +461,7 @@ async function optionsPage(c: any, type: string, opts: {
   showAddForm?: boolean;
 } = {}, scope: OptionScope = { scopeAll: true, stateIds: [] }) {
   const db = getDb(c.env);
-  const lang: "mm" | "en" = c.get("lang");
+  const lang: Lang = c.get("lang");
   const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
   const admin = isOptionsAdmin(scope);
@@ -503,15 +509,15 @@ async function optionsPage(c: any, type: string, opts: {
   }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
   const types = admin
-    ? optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: await ageGroupCount(db) }, t("adm.ageTab"))
+    ? optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: await ageGroupCount(db) }, t("adm.ageTab"), lang)
     : OPTION_TYPES.filter((k) => isRegionScopedType(k)).map((k) => {
         const entry = all.filter((o) => o.type === k && canManageOption(scope, effectiveRegion(o, byId)));
-        return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1), count: entry.length };
+        return { key: k, label: typeLabel(lang, k), active: entry.some((o) => o.active === 1), count: entry.length };
       });
   return c.html(
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
+      type={type} typeLabel={typeLabel(lang, type as OptionType)} types={types}
       options={options} regions={stateList}
       lockRegion={!admin && stateList.length === 1}
       allowAllStates={admin}
@@ -532,13 +538,14 @@ function optionTabs(
   all: OptionRow[],
   counts: { region: number | null; ageGroup: number | null },
   ageTabLabel: string,
+  lang: Lang,
 ): Tab[] {
   return [
     { key: "region", label: "", active: true, count: counts.region },
     { key: "age_group", label: ageTabLabel, active: true, count: counts.ageGroup },
     ...OPTION_TYPES.map((k) => {
       const entry = all.filter((o) => o.type === k);
-      return { key: k, label: OPTION_TYPE_LABELS[k], active: entry.some((o) => o.active === 1), count: entry.length };
+      return { key: k, label: typeLabel(lang, k), active: entry.some((o) => o.active === 1), count: entry.length };
     }),
   ];
 }
@@ -579,7 +586,7 @@ async function loadAgeGroups(db: DB): Promise<AgeGroupRow[]> {
 
 async function ageGroupsPage(c: any, opts: { modal?: boolean; showAddForm?: boolean } = {}) {
   const db = getDb(c.env);
-  const lang: "mm" | "en" = c.get("lang");
+  const lang: Lang = c.get("lang");
   if (opts.modal) return c.html(<AddAgeGroupForm lang={lang} modal />);
   const t = getDict(lang);
   const rows = await loadAgeGroups(db);
@@ -589,7 +596,7 @@ async function ageGroupsPage(c: any, opts: { modal?: boolean; showAddForm?: bool
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       type="age_group" typeLabel={t("adm.ageTab")}
-      types={optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: rows.length }, t("adm.ageTab"))}
+      types={optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: rows.length }, t("adm.ageTab"), lang)}
       ageGroupRows={rows}
       addErrors={[]} editError={null} showAddForm={opts.showAddForm}
       lang={lang}
@@ -940,7 +947,7 @@ async function uniqueRegionSlug(db: DB, base: string): Promise<string> {
 
 async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: boolean } = {}) {
   const db = getDb(c.env);
-  const lang: "mm" | "en" = c.get("lang");
+  const lang: Lang = c.get("lang");
   const t = getDict(lang);
   if (opts.modal) return c.html(<AddRegionForm lang={lang} modal />);
   const all = await loadAllOptions(db);
@@ -949,7 +956,7 @@ async function regionOptionsPage(c: any, opts: { modal?: boolean; showAddForm?: 
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       type="region" typeLabel={getDict(lang)("adm.regionTab")}
-      types={optionTabs(all, { region: regionRows.length, ageGroup: await ageGroupCount(db) }, t("adm.ageTab"))}
+      types={optionTabs(all, { region: regionRows.length, ageGroup: await ageGroupCount(db) }, t("adm.ageTab"), lang)}
       regionRows={regionRows}
       addErrors={[]} editError={null} showAddForm={opts.showAddForm}
       lang={lang}

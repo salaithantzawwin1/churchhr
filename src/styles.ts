@@ -46,7 +46,7 @@ export const CSS = `
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
-  font-family: "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Segoe UI", system-ui, sans-serif;
+  font-family: "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
   font-size: 15px; line-height: 1.6;
 }
 a { color: var(--link); }
@@ -406,8 +406,9 @@ th.bar-col { width: 42%; }
 /* ---------- responsive: small laptop / tablet (≤900px) ---------- */
 @media (max-width: 900px) {
   .topbar { padding: 8px 12px; gap: 8px 10px; }
-  .topbar .brand { font-size: 14.5px; }
-  .topbar .brand img { width: 28px; height: 28px; }
+  .topbar .brand { font-size: 14.5px; min-width: 0; }
+  .topbar .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .brand img { width: 28px; height: 28px; flex: none; }
   .topbar nav { order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; }
   .topbar nav::-webkit-scrollbar { display: none; }
@@ -897,5 +898,30 @@ td.empty-state .small { margin-top: 4px; }
   .kpi .k-num { font-size: 26px; }
   .donut { width: 116px; height: 116px; }
   .donut .d-center b { font-size: 20px; }
+}
+/* ---------- phones/tablets: whole admin nav visible, no sideways scrolling ---------- */
+@media (max-width: 900px) {
+  /* The nav gets its own full-width row (≤1180px already does this); let it
+     wrap instead of scrolling so every link, including Administration, shows. */
+  .topbar nav {
+    flex-wrap: wrap; overflow: visible; padding-right: 0; gap: 2px;
+    -webkit-mask-image: none; mask-image: none;
+  }
+  .topbar nav a { padding: 5px 8px; }
+  /* Use the dropdown here too now that the row no longer clips it, and drop
+     the inline admin links that needed a horizontal swipe. */
+  .nav-admin { display: block; }
+  .nav-admin > summary { padding: 6px 9px; }
+  .nav-admin-inline { display: none; }
+}
+@media (max-width: 640px) {
+  .nav-admin .nav-menu { min-width: 180px; }
+  /* Logo only: the language switch now has three options, so the brand text
+     would push the controls past the viewport on a phone. */
+  .topbar .brand-name { display: none; }
+  .topbar .brand img { width: 30px; height: 30px; }
+  .topbar .who { gap: 6px; margin-left: auto; }
+  .topbar .langswitch { font-size: 12px; }
+  .topbar .langswitch a { padding: 2px 6px; min-height: 28px; }
 }
 `; // end of stylesheet

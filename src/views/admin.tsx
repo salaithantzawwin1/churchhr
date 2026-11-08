@@ -1,9 +1,9 @@
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { PERMISSIONS, PERMISSION_LABELS, PERMISSION_LABELS_EN } from "../rbac";
+import { PERMISSIONS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR } from "../rbac";
 import { getDict, type Lang } from "../i18n";
-import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, isRegionScopedType, type OptionType } from "../db/schema";
+import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
 import { qs } from "../util";
 
@@ -65,7 +65,7 @@ function userForm(v: {
         </label>
       </div>
       <div style="margin-top:12px">
-        <strong class="small">Roles:</strong>
+        <strong class="small">{t("nav.roles")}:</strong>
         <div class="form-grid" style="margin-top:6px">
           {props.roles.map((r) => (
             <label class="field" style="font-size:14px">
@@ -133,7 +133,7 @@ export function AdminUsersPage(props: UsersProps) {
       <div class="page-head">
         <h1>{t("adm.usersTitle")}</h1>
         <div class="page-actions">
-          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
           <a class="btn js-add-modal" href="/admin/users/new"
              data-modal-title={t("adm.createHeading")} data-modal-size="md">+ {t("adm.createHeading")}</a>
         </div>
@@ -143,7 +143,7 @@ export function AdminUsersPage(props: UsersProps) {
       <div class="tbl-wrap">
         <table class="admin-tbl">
           <thead>
-            <tr><th>ID</th><th>Username</th><th>Roles</th><th>State Scope</th><th>{t("members.status")}</th><th></th></tr>
+            <tr><th>ID</th><th>{t("profile.username")}</th><th>{t("nav.roles")}</th><th>{t("adm.stateScope")}</th><th>{t("members.status")}</th><th></th></tr>
           </thead>
           <tbody>
             {users.map((u) => (
@@ -159,7 +159,7 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="small">{stateSummary(u, regions, t("adm.allStates"))}</td>
                 <td>
                   {u.active === 1
-                    ? <span class="badge active">active</span>
+                    ? <span class="badge active">{t("adm.active")}</span>
                     : <span class="badge inactive">{t("adm.off")}</span>}
                   {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
                 </td>
@@ -261,7 +261,8 @@ export function RoleFormFragment(props: {
   edit?: boolean; existing?: AdminRoleRow;
 }) {
   const t = getDict(props.lang ?? "en");
-  const PL = (props.lang ?? "en") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  const PL = (props.lang ?? "en") === "mm" ? PERMISSION_LABELS
+    : (props.lang ?? "en") === "kr" ? PERMISSION_LABELS_KR : PERMISSION_LABELS_EN;
   const isNew = !props.edit;
   const v = props.values ?? {};
   const role = isNew ? null : (props.existing ?? null);
@@ -285,7 +286,7 @@ export function RoleFormFragment(props: {
         </label>
       </div>
       <div style="margin-top:10px">
-        <strong class="small">Permissions:</strong>
+        <strong class="small">{t("adm.permissions")}:</strong>
         <div class="form-grid" style="margin-top:8px">
           {PERMISSIONS.map((p) => (
             <label class="field" style="font-size:14px">
@@ -307,13 +308,14 @@ export function RoleFormFragment(props: {
 export function AdminRolesPage(props: RolesProps) {
   const { user, perms, flash, roles, createErrors, saveErrors, lang } = props;
   const t = getDict(lang ?? "en");
-  const PL = (lang ?? "en") === "en" ? PERMISSION_LABELS_EN : PERMISSION_LABELS;
+  const PL = (lang ?? "en") === "mm" ? PERMISSION_LABELS
+    : (lang ?? "en") === "kr" ? PERMISSION_LABELS_KR : PERMISSION_LABELS_EN;
   return (
-    <Layout title="Roles" lang={lang} user={user} perms={perms} active="/admin/roles" flash={flash ?? null}>
+    <Layout title={t("adm.rolesHeading")} lang={lang} user={user} perms={perms} active="/admin/roles" flash={flash ?? null}>
       <div class="page-head">
         <h1>{t("adm.rolesHeading")}</h1>
         <div class="page-actions">
-          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
           <a class="btn js-add-modal" href="/admin/roles/new?add=1" data-modal-title={t("adm.newRole")} data-modal-size="sm">
             + {t("adm.newRole")}
           </a>
@@ -680,7 +682,8 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 export function AdminOptionsPage(props: OptionsProps) {
   const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion, allowAllStates } = props;
   const t = getDict(lang ?? "en");
-  const TL = (lang ?? "en") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
+  const TL = (lang ?? "en") === "mm" ? OPTION_TYPE_LABELS
+    : (lang ?? "en") === "kr" ? OPTION_TYPE_LABELS_KR : OPTION_TYPE_LABELS_EN;
   const isRegion = type === "region";
   const scoped = isRegionScopedType(type);
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
@@ -694,7 +697,7 @@ export function AdminOptionsPage(props: OptionsProps) {
       <div class="page-head">
         <h1>{t("adm.optionsHeading")}</h1>
         <div class="page-actions">
-          <a class="btn secondary" href="/">← Dashboard</a>
+          <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
           <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
             + {t("adm.addOption")}
           </a>
@@ -802,7 +805,7 @@ export function AdminOptionsPage(props: OptionsProps) {
                 <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used} {t("members.count")}</td>
                 <td>
                   {o.active === 1
-                    ? <span class="badge active">active</span>
+                    ? <span class="badge active">{t("adm.active")}</span>
                     : <span class="badge inactive">{t("adm.off")}</span>}
                 </td>
                 <td style="white-space:nowrap">
