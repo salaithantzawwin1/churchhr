@@ -1,6 +1,6 @@
 export const GENDERS: Record<string, string> = {
-  male: "ကျား (Male)",
-  female: "မ (Female)",
+  male: "ကျား",
+  female: "မ",
 };
 
 export const GENDERS_EN: Record<string, string> = {
@@ -9,8 +9,8 @@ export const GENDERS_EN: Record<string, string> = {
 };
 
 export const GENDERS_KR: Record<string, string> = {
-  male: "남성 (Male)",
-  female: "여성 (Female)",
+  male: "남성",
+  female: "여성",
 };
 
 export const MARITAL_STATUSES: Record<string, string> = {
@@ -37,7 +37,7 @@ export const MARITAL_STATUSES_KR: Record<string, string> = {
 export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export const STATUSES: Record<string, string> = {
-  active: "အသက်ရှင် (Active)",
+  active: "Active",
   moved: "ပြောင်းသွား (Moved)",
   inactive: "ရပ်ထား (Inactive)",
 };
@@ -49,7 +49,7 @@ export const STATUSES_EN: Record<string, string> = {
 };
 
 export const STATUSES_KR: Record<string, string> = {
-  active: "활성 (Active)",
+  active: "활성",
   moved: "이사 (Moved)",
   inactive: "비활성 (Inactive)",
 };
@@ -73,6 +73,7 @@ export function normEnum(raw: string, map: Record<string, string>): string | nul
     if (["m", "ကျား"].includes(t)) return "male";
     if (["f", "မ"].includes(t)) return "female";
   }
+  if (map === STATUSES && t === "အသက်ရှင်") return "active";
   if (map === MARITAL_STATUSES) {
     if (["single", " unmarried", "unmarried"].includes(t)) return "single";
     if (["married"].includes(t)) return "married";

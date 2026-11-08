@@ -305,6 +305,20 @@ export function RoleFormFragment(props: {
   );
 }
 
+/** Seeded system roles: show their description in the current UI language
+ * instead of the Myanmar text stored in the database. */
+const SYSTEM_ROLE_DESC: Record<number, string> = {
+  1: "adm.roleSuperAdminDesc",
+  2: "adm.roleStateManagerDesc",
+  3: "adm.roleDataEntryDesc",
+  4: "adm.roleViewerDesc",
+};
+
+function roleDescription(r: AdminRoleRow, t: (key: string) => string): string {
+  const key = r.is_system === 1 ? SYSTEM_ROLE_DESC[r.id] : undefined;
+  return (key ? t(key) : r.description) || "—";
+}
+
 export function AdminRolesPage(props: RolesProps) {
   const { user, perms, flash, roles, createErrors, saveErrors, lang } = props;
   const t = getDict(lang ?? "en");
@@ -335,7 +349,7 @@ export function AdminRolesPage(props: RolesProps) {
                   {r.name}
                   {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
                 </td>
-                <td class="small muted">{r.description || "—"}</td>
+                <td class="small muted">{roleDescription(r, t)}</td>
                 <td class="small">
                   {r.permissions.length === 0
                     ? <span class="muted">—</span>
