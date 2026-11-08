@@ -56,8 +56,6 @@ export function DashboardPage(props: {
   const active = data.byStatus.active ?? 0;
   const moved = data.byStatus.moved ?? 0;
   const inactive = data.byStatus.inactive ?? 0;
-  const canCreate = perms.has("members.create");
-  const canImport = perms.has("members.import");
   const canView = perms.has("members.view");
   const scopeLabel = data.scopeAll ? t("dash.allStates") : `${data.stateCount} ${t("dash.stateScope")}`;
 
@@ -67,11 +65,6 @@ export function DashboardPage(props: {
         <div>
           <h1>{t("dash.title")}</h1>
           <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
-        </div>
-        <div class="actions" style="margin:0">
-          {canCreate && <a class="btn" href="/members/new">{t("members.addNew")}</a>}
-          {canImport && <a class="btn secondary" href="/members/import">CSV Import</a>}
-          {canView && <a class="btn secondary dash-members" href="/members">{t("dash.membersLink")}</a>}
         </div>
       </div>
 
