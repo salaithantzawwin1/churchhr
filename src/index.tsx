@@ -13,6 +13,7 @@ import { GENDERS } from "./enums";
 import { intParam, isHttpsRequest } from "./util";
 import { getDict, langFromQuery, normalizeLang, LANG_COOKIE } from "./i18n";
 import { DashboardPage } from "./views/dashboard";
+import { RegionsPage } from "./views/regions";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
 
@@ -105,6 +106,20 @@ app.get("/", requirePermission("dashboard.view"), async (c) => {
   }, filters);
   return c.html(
     <DashboardPage
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      data={data} lang={c.get("lang")}
+    />,
+  );
+});
+
+app.get("/regions", requirePermission("dashboard.view"), async (c) => {
+  const db = getDb(c.env);
+  const data = await loadDashboard(db, {
+    scopeAll: c.get("scopeAll"),
+    stateIds: c.get("stateIds"),
+  });
+  return c.html(
+    <RegionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       data={data} lang={c.get("lang")}
     />,

@@ -49,6 +49,8 @@ export function DashboardPage(props: {
     .sort((a, b) => b.n - a.n || stateName(a).localeCompare(stateName(b)));
   /** Widest state count drives the ranked bars. */
   const maxState = Math.max(1, ...byState.map((r) => r.n));
+  /** The card shows the five busiest regions; /regions has the full breakdown. */
+  const topStates = byState.slice(0, 5);
   /** Share of the registry's regions that currently hold members. */
   const coveragePct = data.byState.length > 0 ? Math.round((byState.length / data.byState.length) * 100) : 0;
   const genderTotal = data.male + data.female;
@@ -183,13 +185,13 @@ export function DashboardPage(props: {
         <section class="card dash-card">
           <div class="dc-head">
             <h2>{t("dash.state")}</h2>
-            {canView && <a href="/members">{t("dash.viewAll")} →</a>}
+            {canView && <a href="/regions">{t("dash.viewAll")} →</a>}
           </div>
           {byState.length === 0 ? (
             <p class="muted small">{t("dash.none")}</p>
           ) : (
-            <ol class={"rank-list" + (byState.length > 5 ? " is-scroll" : "")} tabindex={0} aria-label={t("dash.state")}>
-              {byState.map((r, i) => (
+            <ol class="rank-list" tabindex={0} aria-label={t("dash.state")}>
+              {topStates.map((r, i) => (
                 <li class="rank-row">
                   <span class="rk">{i + 1}</span>
                   <div class="rn">
@@ -211,7 +213,6 @@ export function DashboardPage(props: {
               ))}
             </ol>
           )}
-          {byState.length > 5 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
           <div class="dc-foot">
             <span><b>{data.total}</b> {t("dash.count")}</span>
             {byState.length > 0 && byState.length < data.byState.length ? (

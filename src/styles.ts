@@ -720,29 +720,17 @@ td.empty-state .small { margin-top: 4px; }
 .dash-card .dc-head h2 { margin: 0; font-size: 15px; }
 .dash-card .dc-head a { font-size: 12.5px; text-decoration: none; white-space: nowrap; }
 
-/* ranked state/region list: internally scrollable once there are many rows,
-   so the card keeps a predictable height next to the gender card. */
+/* ranked state/region list: the five busiest regions; /regions has the rest. */
 .rank-list {
   list-style: none; margin: 0; padding: 0 6px 0 0; display: flex; flex-direction: column; gap: 11px;
-  flex: 0 1 auto; min-height: 0; max-height: 224px; overflow-y: auto; scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-.rank-list.is-scroll {
-  /* Fade the clipped next row so a scrolled list never ends on a hard half-row. */
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 .rank-list:focus-visible { outline: 2px solid var(--link); outline-offset: 4px; border-radius: 6px; }
-.rank-list::-webkit-scrollbar { width: 8px; }
-.rank-list::-webkit-scrollbar-track { background: transparent; }
-.rank-list::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
 .dc-foot {
   display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap;
   gap: 4px 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line);
   font-size: 12.5px; color: var(--muted);
 }
 .dc-foot b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.dc-scroll-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
 /* Regional coverage: a slim footer read-out, not a nested mini-card. */
 .dc-cov { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .dc-cov-track {
@@ -751,6 +739,39 @@ td.empty-state .small { margin-top: 4px; }
 }
 .dc-cov-track > span { display: block; height: 100%; border-radius: 999px; background: var(--link); }
 .dc-cov b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* full state/region breakdown page */
+.region-panel { padding: 16px 18px; border-radius: 14px; }
+.region-panel-head {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 10px 18px; margin-bottom: 14px;
+}
+.region-total { font-size: 13px; color: var(--muted); }
+.region-total b { margin-right: 4px; font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.region-cov { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.region-cov b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.region-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.region-tile {
+  display: flex; flex-direction: column; gap: 7px; min-width: 0;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--ink); text-decoration: none;
+}
+.region-tile:hover { border-color: var(--line-strong); background: var(--chip-bg); }
+.rt-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 500; }
+.rt-n { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rt-bar { height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.rt-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--link), var(--brand)); }
+.rt-pct { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.region-tile.is-empty { color: var(--muted); }
+.region-tile.is-empty .rt-bar { opacity: .5; }
+@media (max-width: 640px) {
+  .region-grid { grid-template-columns: 1fr 1fr; }
+  .region-tile { padding: 9px 10px; }
+}
+@media (max-width: 400px) {
+  .region-grid { grid-template-columns: 1fr; }
+}
 .rank-row { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; }
 .rank-row .rk { color: var(--muted); font-size: 11.5px; line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; }
 .rank-row .rn { min-width: 0; display: flex; flex-direction: column; gap: 5px; }

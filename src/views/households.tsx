@@ -3,6 +3,7 @@ import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 import { regionCascadeSelects } from "./hh-cascade";
+import { qs } from "../util";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -78,6 +79,11 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
   const t = getDict(lang ?? "en");
   const isEn = (lang ?? "en") === "en";
   const filtered = Boolean(q.trim() || props.township);
+  const activeParams = { q: q.trim(), township: props.township ?? null };
+  const withoutFilter = (key: keyof typeof activeParams) => `/admin/households${qs({ ...activeParams, [key]: null })}`;
+  const chips: { label: string; href: string }[] = [];
+  if (q.trim()) chips.push({ label: `“${q.trim()}”`, href: withoutFilter("q") });
+  if (props.township) chips.push({ label: props.township, href: withoutFilter("township") });
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
@@ -89,25 +95,34 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
         </div>
       </div>
 
-      <form method="get" action="/admin/households" class="filters card">
-        <label class="field">
-          <span class="lbl">{t("hh.searchLabel")}</span>
-          <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("hh.townshipLabel")}</span>
-          <select name="township">
+      <details class="filter-box filter-toolbar-box" open>
+        <summary>
+          <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+          <span class="chev" aria-hidden="true">▾</span>
+        </summary>
+        <form class="filter-toolbar" method="get" action="/admin/households" data-auto-submit="1">
+          <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")}
+            aria-label={t("hh.searchLabel")} enterkeyhint="search" />
+          <select name="township" aria-label={t("hh.townshipLabel")}>
             <option value="">{isEn ? "All townships" : "မြို့နယ် အားလုံး"}</option>
             {(props.townshipOptions ?? []).map((o) => (
               <option value={o.label} selected={props.township === o.label}>{o.label}</option>
             ))}
           </select>
-        </label>
-        <div class="actions" style="margin:0">
-          <button class="btn" type="submit">{t("members.searchBtn")}</button>
-          {(q || props.township) && <a class="btn secondary" href="/admin/households">{t("members.clear")}</a>}
+          {filtered && <a class="filter-clear" href="/admin/households">{t("members.clear")}</a>}
+        </form>
+      </details>
+
+      {chips.length > 0 && (
+        <div class="filter-chips" aria-label={t("dash.activeFilters")}>
+          {chips.map((c) => (
+            <a class="filter-chip" href={c.href} aria-label={`${t("dash.removeFilter")}: ${c.label}`}>
+              {c.label}<span class="chip-x" aria-hidden="true">×</span>
+            </a>
+          ))}
+          <a class="filter-clear-all" href="/admin/households">{t("dash.clearAll")}</a>
         </div>
-      </form>
+      )}
 
       <div class="tbl-wrap">
         <table class="list-tbl">
