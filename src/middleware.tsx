@@ -1,11 +1,12 @@
 import { createMiddleware } from "hono/factory";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import { eq, inArray } from "drizzle-orm";
 import type { AppEnv } from "./env";
 import { getDb } from "./db/client";
-import { rolePermissions, userRoles, userStateAssignments } from "./db/schema";
+import { rolePermissions, userRoles, userStateAssignments, users } from "./db/schema";
 import { ALL_STATES_WILDCARD, type Permission } from "./rbac";
 import { getSessionUser } from "./session";
+import { LANG_COOKIE, langFromQuery, normalizeLang } from "./i18n";
 import { ForbiddenPage } from "./views/errors";
 
 export type Access = {
@@ -48,6 +49,31 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   const token = getCookie(c, "session");
   const user = token ? await getSessionUser(db, token) : null;
   if (!user) return c.redirect("/login", 302);
+
+  // Account language: an explicit ?lang= switch wins and is saved to the
+  // account, otherwise the saved language applies on every device. Without a
+  // saved preference the cookie/default from the global language middleware
+  // stays in effect.
+  const fromQuery = langFromQuery(c.req.query());
+  if (fromQuery) {
+    c.set("lang", fromQuery);
+    if (user.language !== fromQuery) {
+      try {
+        await db.update(users).set({ language: fromQuery }).where(eq(users.id, user.id));
+      } catch (err) {
+        // Pre-migration safety: the cookie still remembers it in this browser.
+        console.warn("could not save account language:", err);
+      }
+    }
+  } else if (user.language) {
+    const accountLang = normalizeLang(user.language);
+    if (accountLang !== c.get("lang")) {
+      c.set("lang", accountLang);
+      if (getCookie(c, LANG_COOKIE) !== accountLang) {
+        setCookie(c, LANG_COOKIE, accountLang, { path: "/", maxAge: 31536000, sameSite: "Lax" });
+      }
+    }
+  }
 
   const path = new URL(c.req.url).pathname;
   const allowedWhileForced = path === "/profile" || path === "/logout";

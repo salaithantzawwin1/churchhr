@@ -8,7 +8,20 @@ export type SessionUser = {
   id: number;
   username: string;
   mustChangePassword: boolean;
+  /** UI language saved on the account (null until the user picks one). */
+  language: string | null;
 };
+
+type SessionRow = {
+  id: number;
+  username: string;
+  mustChangePassword: number;
+  active: number;
+  language?: string | null;
+};
+
+/** Warn once per isolate if the language migration has not been applied yet. */
+let warnedMissingLanguage = false;
 
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -46,20 +59,43 @@ export async function destroySession(db: DB, token: string): Promise<void> {
 /** Resolves a cookie token to a live (non-expired, active-user) session, or null. */
 export async function getSessionUser(db: DB, token: string): Promise<SessionUser | null> {
   const tokenHash = await sha256Hex(token);
-  const rows = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      mustChangePassword: users.mustChangePassword,
-      active: users.active,
-    })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, nowSeconds())))
-    .limit(1);
+  const live = and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, nowSeconds()));
+  const base = {
+    id: users.id,
+    username: users.username,
+    mustChangePassword: users.mustChangePassword,
+    active: users.active,
+  };
+  let rows: SessionRow[];
+  try {
+    rows = await db
+      .select({ ...base, language: users.language })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(live)
+      .limit(1);
+  } catch (err) {
+    // Deploy-before-migration safety: keep sessions working on a database that
+    // does not have users.language yet, just without account-level language.
+    if (!warnedMissingLanguage) {
+      console.warn("account language unavailable (run D1 migrations):", err);
+      warnedMissingLanguage = true;
+    }
+    rows = await db
+      .select(base)
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(live)
+      .limit(1);
+  }
   const row = rows[0];
   if (!row || row.active !== 1) return null;
-  return { id: row.id, username: row.username, mustChangePassword: row.mustChangePassword === 1 };
+  return {
+    id: row.id,
+    username: row.username,
+    mustChangePassword: row.mustChangePassword === 1,
+    language: row.language ?? null,
+  };
 }
 
 export async function purgeExpiredSessions(db: DB): Promise<void> {
