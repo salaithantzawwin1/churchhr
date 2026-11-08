@@ -335,6 +335,22 @@
     });
   })();
 
+  // Auto-apply filter toolbars: choosing any select submits the GET form so the
+  // results update without a separate Filter button. The timeout lets the
+  // state/region cascade reset dependent selections before submitting.
+  (function initAutoSubmit() {
+    Array.prototype.forEach.call(document.querySelectorAll("form[data-auto-submit]"), function (form) {
+      form.addEventListener("change", function (e) {
+        var el = e.target;
+        if (!el || el.tagName !== "SELECT") return;
+        window.setTimeout(function () {
+          if (form.requestSubmit) form.requestSubmit();
+          else form.submit();
+        }, 0);
+      });
+    });
+  })();
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");

@@ -58,65 +58,86 @@ export function DashboardPage(props: {
   const inactive = data.byStatus.inactive ?? 0;
   const canView = perms.has("members.view");
   const scopeLabel = data.scopeAll ? t("dash.allStates") : `${data.stateCount} ${t("dash.stateScope")}`;
+  const genderLabels: Record<string, string> = isEn ? GENDERS_EN : GENDERS;
+  /** Current query params, used to build "remove this filter" links. */
+  const activeParams = {
+    state: data.filters.state,
+    gender: data.filters.gender,
+    home_cell: data.filters.homeCell,
+    township: data.filters.township,
+  };
+  const withoutFilter = (key: keyof typeof activeParams) => `/${qs({ ...activeParams, [key]: null })}`;
+  const chips: { key: string; label: string; href: string }[] = [];
+  if (data.filters.state) {
+    const region = data.filterRegions.find((r) => r.id === data.filters.state);
+    if (region) chips.push({ key: "state", label: stateName(region), href: withoutFilter("state") });
+  }
+  if (data.filters.gender && genderLabels[data.filters.gender]) {
+    chips.push({ key: "gender", label: genderLabels[data.filters.gender]!, href: withoutFilter("gender") });
+  }
+  if (data.filters.homeCell) {
+    const cell = data.homeCells.find((o) => o.id === data.filters.homeCell);
+    if (cell) chips.push({ key: "home_cell", label: cell.label, href: withoutFilter("home_cell") });
+  }
+  if (data.filters.township) {
+    chips.push({ key: "township", label: data.filters.township, href: withoutFilter("township") });
+  }
 
   return (
     <Layout title="Dashboard" lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
-      <div class="page-head">
-        <div>
+      <div class="page-head dash-head">
+        <div class="dash-head-title">
           <h1>{t("dash.title")}</h1>
           <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
         </div>
+
+        <details class="filter-box dash-filter-box" open>
+          <summary>
+            <span>{t("members.filters")}{chips.length > 0 && <span class="dash-count">{chips.length}</span>}</span>
+            <span class="chev" aria-hidden="true">▾</span>
+          </summary>
+          <form class="dash-filters" method="get" action="/" data-auto-submit="1">
+            <select name="state" data-region-select="1" aria-label={t("members.state")}>
+              <option value="">{t("dash.allStatesOpt")}</option>
+              {data.filterRegions.map((r) => (
+                <option value={String(r.id)} selected={data.filters.state === r.id}>{stateName(r)}</option>
+              ))}
+            </select>
+            <select name="gender" aria-label={t("members.gender")}>
+              <option value="">{t("dash.allGenders")}</option>
+              {Object.entries(genderLabels).map(([k, v]) => (
+                <option value={k} selected={data.filters.gender === k}>{v}</option>
+              ))}
+            </select>
+            <select name="home_cell" data-region-filter="1" aria-label={t("members.thHomeCell")}>
+              <option value="">{t("dash.allCells")}</option>
+              {data.homeCells.map((o) => (
+                <option value={String(o.id)} selected={data.filters.homeCell === o.id}
+                  data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
+              ))}
+            </select>
+            <select name="township" data-region-filter="1" aria-label={t("members.township")}>
+              <option value="">{t("dash.allTownships")}</option>
+              {data.townships.map((o) => (
+                <option value={o.label} selected={data.filters.township === o.label}
+                  data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
+              ))}
+            </select>
+            {chips.length > 0 && <a class="dash-clear" href="/">{t("dash.clearAll")}</a>}
+          </form>
+        </details>
       </div>
 
-      <details class="filter-box" open>
-      <summary>{t("members.filters")}<span class="chev" aria-hidden="true">▾</span></summary>
-      <form class="card filters" method="get" action="/">
-        <label class="field">
-          <span class="lbl">{t("members.state")}</span>
-          <select name="state" data-region-select="1">
-            <option value="">{t("members.all")}</option>
-            {data.filterRegions.map((r) => (
-              <option value={String(r.id)} selected={data.filters.state === r.id}>
-                {isEn && r.name_en ? r.name_en : r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.gender")}</span>
-          <select name="gender">
-            <option value="">{t("members.all")}</option>
-            {Object.entries(isEn ? GENDERS_EN : GENDERS).map(([k, v]) => (
-              <option value={k} selected={data.filters.gender === k}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.thHomeCell")}</span>
-          <select name="home_cell" data-region-filter="1">
-            <option value="">{t("members.all")}</option>
-            {data.homeCells.map((o) => (
-              <option value={String(o.id)} selected={data.filters.homeCell === o.id}
-                data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.township")}</span>
-          <select name="township" data-region-filter="1">
-            <option value="">{t("members.all")}</option>
-            {data.townships.map((o) => (
-              <option value={o.label} selected={data.filters.township === o.label}
-                data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-        <div class="actions" style="margin:0">
-          <button class="btn" type="submit">{t("dash.filterBtn")}</button>
-          <a class="btn secondary" href="/">{t("members.clear")}</a>
+      {chips.length > 0 && (
+        <div class="dash-active" aria-label={t("dash.activeFilters")}>
+          {chips.map((c) => (
+            <a class="filter-chip" href={c.href} aria-label={`${t("dash.removeFilter")}: ${c.label}`}>
+              {c.label}<span class="chip-x" aria-hidden="true">×</span>
+            </a>
+          ))}
+          <a class="dash-clear-all" href="/">{t("dash.clearAll")}</a>
         </div>
-      </form>
-      </details>
+      )}
 
       <div class="dash-kpis">
         <div class="kpi hero">

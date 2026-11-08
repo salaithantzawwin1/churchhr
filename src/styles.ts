@@ -610,6 +610,54 @@ td.empty-state .small { margin-top: 4px; }
 
 /* ---------- dashboard: card layout ---------- */
 .page-sub { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+
+/* Dashboard: compact filter toolbar beside the page title. Selects auto-submit
+   and the active choices are echoed as removable chips under the heading. */
+.dash-head { align-items: flex-start; gap: 12px 24px; margin-bottom: 10px; }
+.dash-head-title { flex: 1 1 240px; min-width: 0; }
+.dash-head .dash-filter-box { margin: 0; flex: 0 1 auto; max-width: 100%; }
+.dash-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
+.dash-filters select {
+  width: 150px; max-width: 100%; height: 36px; padding: 0 30px 0 10px;
+  font-size: 13.5px; border-radius: 9px;
+}
+.dash-clear {
+  padding: 6px 4px; font-size: 13px; color: var(--muted);
+  text-decoration: none; white-space: nowrap;
+}
+.dash-clear:hover { color: var(--ink); text-decoration: underline; }
+.dash-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--chip-bg);
+  color: var(--ink); font-size: 12.5px; font-weight: 600; text-decoration: none;
+}
+.filter-chip:hover { border-color: var(--muted); }
+.filter-chip .chip-x { color: var(--muted); font-size: 15px; line-height: 1; }
+.filter-chip:hover .chip-x { color: var(--err-ink); }
+.dash-clear-all { margin-left: 2px; font-size: 12.5px; color: var(--muted); }
+.dash-clear-all:hover { color: var(--ink); }
+.dash-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px;
+  border-radius: 999px; background: var(--link); color: #fff;
+  font-size: 11px; font-weight: 700;
+}
+@media (max-width: 640px) {
+  /* On phones the toolbar collapses behind the "Filters" summary. */
+  .dash-head { align-items: stretch; }
+  .dash-head .dash-filter-box { flex: 1 1 100%; }
+  .dash-filters {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px;
+    background: var(--card); border: 1px solid var(--line); border-top: 0;
+    border-radius: 0 0 12px 12px;
+  }
+  .dash-filters select { width: 100%; height: 40px; }
+  .dash-clear { grid-column: 1 / -1; text-align: left; }
+}
+@media (max-width: 400px) {
+  .dash-filters { grid-template-columns: 1fr; }
+}
 .dash-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .kpi {
   position: relative; overflow: hidden; background: var(--card);
