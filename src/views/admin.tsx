@@ -17,6 +17,8 @@ export type AdminUserRow = {
   active: number;
   must_change_password: number;
   created_at: number;
+  /** Saved account UI language (mm | en | kr), or null when never chosen. */
+  language: string | null;
   role_names: string;
   state_ids: number[];
 };
@@ -143,7 +145,7 @@ export function AdminUsersPage(props: UsersProps) {
       <div class="tbl-wrap">
         <table class="admin-tbl">
           <thead>
-            <tr><th>ID</th><th>{t("profile.username")}</th><th>{t("nav.roles")}</th><th>{t("adm.stateScope")}</th><th>{t("members.status")}</th><th></th></tr>
+            <tr><th>ID</th><th>{t("profile.username")}</th><th>{t("nav.roles")}</th><th>{t("nav.language")}</th><th>{t("adm.stateScope")}</th><th>{t("members.status")}</th><th></th></tr>
           </thead>
           <tbody>
             {users.map((u) => (
@@ -156,6 +158,11 @@ export function AdminUsersPage(props: UsersProps) {
                   )}
                 </td>
                 <td>{u.role_names || "—"}</td>
+                <td>
+                  {u.language
+                    ? <span class="badge">{u.language.toUpperCase()}</span>
+                    : <span class="muted">—</span>}
+                </td>
                 <td class="small">{stateSummary(u, regions, t("adm.allStates"))}</td>
                 <td>
                   {u.active === 1
@@ -305,8 +312,20 @@ export function RoleFormFragment(props: {
   );
 }
 
-/** Seeded system roles: show their description in the current UI language
- * instead of the Myanmar text stored in the database. */
+/** Seeded system roles: show their name and description in the current UI
+ * language instead of the stored text (descriptions are seeded in Myanmar). */
+const SYSTEM_ROLE_NAME: Record<number, string> = {
+  1: "adm.roleSuperAdminName",
+  2: "adm.roleStateManagerName",
+  3: "adm.roleDataEntryName",
+  4: "adm.roleViewerName",
+};
+
+function roleName(r: AdminRoleRow, t: (key: string) => string): string {
+  const key = r.is_system === 1 ? SYSTEM_ROLE_NAME[r.id] : undefined;
+  return key ? t(key) : r.name;
+}
+
 const SYSTEM_ROLE_DESC: Record<number, string> = {
   1: "adm.roleSuperAdminDesc",
   2: "adm.roleStateManagerDesc",
@@ -346,7 +365,7 @@ export function AdminRolesPage(props: RolesProps) {
               <tr>
                 <td class="muted">{r.id}</td>
                 <td>
-                  {r.name}
+                  {roleName(r, t)}
                   {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
                 </td>
                 <td class="small muted">{roleDescription(r, t)}</td>
@@ -362,7 +381,7 @@ export function AdminRolesPage(props: RolesProps) {
                 </td>
                 <td class="row-actions">
                   <a class="btn sm secondary js-edit-modal" href={`/admin/roles/${r.id}/edit`}
-                     data-modal-title={`${t("adm.rolesHeading")}: ${r.name}`} data-modal-size="md">{t("members.edit")}</a>{" "}
+                     data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md">{t("members.edit")}</a>{" "}
                   {r.is_system !== 1 && (
                     <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")} style="display:inline">
                       <button class="btn sm danger" type="submit">{t("members.delete")}</button>

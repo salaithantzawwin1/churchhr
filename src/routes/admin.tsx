@@ -109,11 +109,13 @@ function typeLabel(lang: Lang, type: OptionType): string {
   return labels[type];
 }
 
+let warnedMissingUserLanguage = false;
+
 async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
   const stateCol = lang !== "mm" ? "COALESCE(r3.name_en, r3.name)" : "r3.name";
-  const rows = await db.all<AdminUserRow & { state_ids: string | null }>(
+  const query = (languageCol: string) => db.all<AdminUserRow & { state_ids: string | null }>(
     sql.raw(`
-    SELECT u.id, u.username, u.active, u.must_change_password, u.created_at,
+    SELECT u.id, u.username, u.active, u.must_change_password, ${languageCol}u.created_at,
       COALESCE((
         SELECT group_concat(r2.name, ', ')
         FROM user_roles ur JOIN roles r2 ON r2.id = ur.role_id
@@ -127,8 +129,20 @@ async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
       (SELECT group_concat(sa.region_id) FROM user_state_assignments sa WHERE sa.user_id = u.id) AS state_ids
     FROM users u ORDER BY u.id`),
   );
+  let rows: (AdminUserRow & { state_ids: string | null })[];
+  try {
+    rows = await query("u.language, ");
+  } catch (err) {
+    // Deploy-before-migration safety: the users page still loads without 0013.
+    if (!warnedMissingUserLanguage) {
+      console.warn("account language unavailable on users page (run D1 migrations):", err);
+      warnedMissingUserLanguage = true;
+    }
+    rows = await query("");
+  }
   return rows.map((r: any) => ({
     ...r,
+    language: r.language ?? null,
     state_names: r.state_names_raw || "",
     state_ids: r.state_ids ? String(r.state_ids).split(",").map((x) => Number(x)) : [],
   }));
