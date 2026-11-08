@@ -236,7 +236,14 @@ textarea { min-height: 84px; resize: vertical; }
 .badge.moved { background: var(--warn-bg); color: var(--warn-ink); }
 .badge.inactive { background: var(--err-bg); color: var(--err-ink); }
 /* ---------- login: branded split card ---------- */
-.auth-wrap { max-width: 940px; margin: 5vh auto 0; }
+/* Centre the card in the space between the top bar and the footer. */
+body.auth-page { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body.auth-page .container {
+  flex: 1 0 auto; width: 100%; max-width: 1100px; margin: 0 auto;
+  padding: 28px 16px; display: flex; align-items: center; justify-content: center;
+}
+body.auth-page .footer { padding-top: 0; }
+.auth-wrap { width: 100%; max-width: 940px; margin: 0 auto; }
 .auth-card {
   display: grid; grid-template-columns: 1.05fr 1fr; background: var(--card);
   border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
@@ -301,7 +308,7 @@ html[lang="my"] .auth-points li { line-height: 1.9; }
 .auth-secure svg { width: 13px; height: 13px; flex: none; }
 .auth-card + * { margin-top: 18px; }
 @media (max-width: 820px) {
-  .auth-wrap { margin-top: 16px; }
+  body.auth-page .container { padding: 16px 12px; }
   .auth-card { grid-template-columns: 1fr; }
   .auth-aside { padding: 22px; gap: 12px; }
   .auth-aside h1 { font-size: 21px; }
@@ -399,8 +406,11 @@ th.bar-col { width: 42%; }
      1100px container and wide dead margins either side of the table. Cells
      tighten a little so all columns fit inside a 1366px viewport. */
   .container { max-width: 1600px; }
-  .list-tbl th, .list-tbl td { padding: 8px 7px; font-size: 13.5px; }
+  .list-tbl th, .list-tbl td { padding: 8px 5px; font-size: 13px; }
   .list-tbl td:nth-child(2) { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+  /* Long double-word headers wrap instead of widening the whole table. */
+  .list-tbl th[data-col="sector"] { max-width: 100px; }
+  .list-tbl th[data-col="sector"] .th-sort { white-space: normal; }
 }
 /* ---------- responsive: phones (≤640px) ---------- */
 @media (max-width: 640px) {

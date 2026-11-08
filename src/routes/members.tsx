@@ -152,6 +152,7 @@ const SORT_EXPR: Record<string, string> = {
   group: "gr.label",
   familyGroup: "fg.label",
   fellowship: "fc.label",
+  sector: "sec.label",
   status: "m.status",
 };
 
@@ -182,13 +183,14 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
            m.date_of_birth, m.marital_status, m.township,
            r.name AS state_name, r.name_en AS state_name_en,
            hc.label AS home_cell, gr.label AS group_label,
-           fg.label AS family_group, fc.label AS fellowship
+           fg.label AS family_group, fc.label AS fellowship, sec.label AS sector
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
+    LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     WHERE ${cond}
     ORDER BY ${sql.raw(orderByFrom(c.req.query()))}
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
@@ -217,6 +219,7 @@ const OPTION_FIELD: Record<string, string> = {
   education_id: "education",
   family_group_id: "family_group",
   fellowship_category_id: "fellowship_category",
+  sector_id: "sector",
   group_id: "group",
   home_cell_id: "home_cell",
 };
@@ -225,7 +228,7 @@ const FORM_KEYS = [
   "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
   "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
   "family_group_id", "ethnicity_id", "education_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id",
+  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id", "sector_id",
   "salvation_date", "status", "notes",
 ] as const;
 
@@ -323,7 +326,7 @@ const EXPORT_HEADER = [
   "ID", "Name English", "Name Myanmar", "Gender", "Married Status", "Date of Birth", "Age",
   "Blood Type", "Phone Number", "NRC Number", "Ethnicity", "Language", "Education", "Job",
   "Work Skills", "Income", "Address", "Father's Name", "Mother's Name", "Salvation Date",
-  "Family Group", "Fellowship Categories", "Group", "Home Cell", "Township", "State", "Status",
+  "Family Group", "Fellowship Categories", "Participating Sector", "Group", "Home Cell", "Township", "State", "Status",
 ];
 
 membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
@@ -334,13 +337,14 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
   const rows = await db.all(sql`
     SELECT m.*, r.name AS state_name,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
-      fc.label AS fellowship, gr.label AS group_label, hc.label AS home_cell
+      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
+    LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     WHERE ${cond}
@@ -352,7 +356,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     r.date_of_birth ?? "", ageFromDate(r.date_of_birth) ?? "", r.blood_type,
     r.phone, r.nrc_number, r.ethnicity, r.languages, r.education, r.job, r.work_skills,
     r.income, r.address, r.father_name, r.mother_name, r.salvation_date,
-    r.family_group, r.fellowship, r.group_label, r.home_cell, r.township, r.state_name,
+    r.family_group, r.fellowship, r.sector, r.group_label, r.home_cell, r.township, r.state_name,
     r.status ? STATUSES[r.status]?.split(" (")[0] ?? r.status : "",
   ]);
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, ...body]);
@@ -373,7 +377,7 @@ membersRoutes.get("/import/template", requirePermission("members.import"), (c) =
   const sample = [
     "", "Aung Aung", "မောင်အောင်", "male", "married", "1990-05-12", "", "O+", "0912345678",
     "12/abc(N)123456", "ဗမာ", "မြန်မာ", "Bachelor", "ဆရာဝန်", "", "300000", "ရန်ကုန်",
-    "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Group 1", "Cell 1",
+    "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Young Adults", "Group 1", "Cell 1",
     "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active",
   ];
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, sample]);
@@ -406,6 +410,7 @@ const IMPORT_ALIASES: Record<string, string> = {
   "salvation date": "salvation",
   "family group": "family_group",
   "fellowship categories": "fellowship", "fellowship category": "fellowship", "fellowship": "fellowship",
+  "participating sector": "sector", "sector": "sector",
   "group": "group",
   "home cell": "home_cell",
   "state": "state", "region": "state",
@@ -419,6 +424,7 @@ const IMPORT_OPTION_FIELDS: Record<string, string> = {
   education: "education",
   family_group: "family_group",
   fellowship: "fellowship_category",
+  sector: "sector",
   group: "group",
   home_cell: "home_cell",
 };
@@ -614,6 +620,7 @@ const TYPE_TO_COLUMN: Record<string, string> = {
   education: "education_id",
   family_group: "family_group_id",
   fellowship_category: "fellowship_category_id",
+  sector: "sector_id",
   group: "group_id",
   home_cell: "home_cell_id",
 };
@@ -715,13 +722,14 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
   const rows = await db.all(sql`
     SELECT m.*, r.name AS state_name, r.name_en AS state_name_en,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
-      fc.label AS fellowship, gr.label AS group_label, hc.label AS home_cell
+      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
+    LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     WHERE m.id = ${id}`);
@@ -738,7 +746,7 @@ const SNAKE_TO_CAMEL: Record<string, string> = {
   father_name: "fatherName", mother_name: "motherName", work_skills: "workSkills",
   salvation_date: "salvationDate", region_id: "regionId", ethnicity_id: "ethnicityId",
   education_id: "educationId", family_group_id: "familyGroupId",
-  fellowship_category_id: "fellowshipCategoryId", group_id: "groupId", home_cell_id: "homeCellId",
+  fellowship_category_id: "fellowshipCategoryId", sector_id: "sectorId", group_id: "groupId", home_cell_id: "homeCellId",
 };
 
 /** Drizzle keys by TS property names (camelCase); our form data uses DB column names. */
@@ -785,6 +793,7 @@ function rowToValues(row: MemberDetail): FormValues {
     education_id: num(row.education_id),
     family_group_id: num(row.family_group_id),
     fellowship_category_id: num(row.fellowship_category_id),
+    sector_id: num(row.sector_id),
     group_id: num(row.group_id),
     home_cell_id: num(row.home_cell_id),
   };
@@ -793,7 +802,7 @@ function rowToValues(row: MemberDetail): FormValues {
 // ---------- create ----------
 
 // Option types rendered on the member form (Family + Church cards).
-const FORM_OPTION_TYPES = ["ethnicity", "education", "family_group", "fellowship_category", "group", "home_cell", "township", "blood_type"];
+const FORM_OPTION_TYPES = ["ethnicity", "education", "family_group", "fellowship_category", "sector", "group", "home_cell", "township", "blood_type"];
 
 function formOptions(all: OptionRow[], keep?: (o: OptionRow) => boolean) {
   return Object.fromEntries(

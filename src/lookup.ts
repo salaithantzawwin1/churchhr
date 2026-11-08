@@ -77,6 +77,7 @@ export const OPTION_COLUMN: Record<OptionType, keyof typeof members._.columns> =
   home_cell: "homeCellId",
   family_group: "familyGroupId",
   fellowship_category: "fellowshipCategoryId",
+  sector: "sectorId",
   group: "groupId",
   // members.township / members.blood_type store the option *label* (text), not
   // an id — usage counts and delete guards compare labels (see admin routes).
@@ -119,6 +120,7 @@ export const OPTION_RAW_COLUMN: Record<OptionType, string> = {
   home_cell: "home_cell_id",
   family_group: "family_group_id",
   fellowship_category: "fellowship_category_id",
+  sector: "sector_id",
   group: "group_id",
   township: "township",
   blood_type: "blood_type",

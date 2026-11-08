@@ -23,6 +23,7 @@ export type MemberListItem = {
   township: string | null;
   family_group: string | null;
   fellowship: string | null;
+  sector: string | null;
 };
 
 export type Filters = {
@@ -72,7 +73,7 @@ function sortQs(f: Filters, sort: string, dir: string): string {
 /** Member list columns (data-col keys shared by <th>/<td> and the chooser JS). */
 const SORTABLE = new Set([
   "id", "name", "gender", "age", "phone", "state", "township", "marital",
-  "homeCell", "group", "familyGroup", "fellowship", "status",
+  "homeCell", "group", "familyGroup", "fellowship", "sector", "status",
 ]);
 const LIST_COLS = (t: (k: string) => string) => [
   { key: "id", label: t("members.thId") },
@@ -87,6 +88,7 @@ const LIST_COLS = (t: (k: string) => string) => [
   { key: "group", label: t("members.thGroup") },
   { key: "familyGroup", label: t("members.thFamilyGroup") },
   { key: "fellowship", label: t("form.fellowship") },
+  { key: "sector", label: t("form.sector") },
   { key: "status", label: t("members.status") },
 ];
 
@@ -298,6 +300,7 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="group">{m.group_label ?? ""}</td>
                 <td data-col="familyGroup">{m.family_group ?? ""}</td>
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
+                <td data-col="sector">{m.sector ?? ""}</td>
                 <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
                 <td style="white-space:nowrap">
                   {perms.has("members.update") && (
@@ -517,6 +520,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id" data-region-filter="1">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.sector")}</span><select name="sector_id">{opts(options.sector ?? [], v.sector_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>{select("status", S, v.status || "active", "")}</label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
@@ -565,12 +569,14 @@ export type MemberDetail = {
   education: string | null;
   family_group: string | null;
   fellowship: string | null;
+  sector: string | null;
   group_label: string | null;
   home_cell: string | null;
   ethnicity_id: number | null;
   education_id: number | null;
   family_group_id: number | null;
   fellowship_category_id: number | null;
+  sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
 };
@@ -642,6 +648,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("detail.salvation"), m.salvation_date ?? ""],
         [t("detail.familyGroup"), m.family_group ?? ""],
         [t("form.fellowship"), m.fellowship ?? ""],
+        [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],
         [t("form.homeCell"), m.home_cell ?? ""],
         [t("detail.status"), S[m.status] ?? m.status],

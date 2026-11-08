@@ -29,7 +29,7 @@ function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string;
 export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
   const t = getDict(lang ?? "en");
   return (
-    <Layout title={t("login.title")} lang={lang} flash={null}>
+    <Layout title={t("login.title")} lang={lang} flash={null} bodyClass="auth-page" footerNote={t("login.systemNote")}>
       <div class="auth-wrap">
         <section class="auth-card">
           <aside class="auth-aside">

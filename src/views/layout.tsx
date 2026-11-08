@@ -19,10 +19,14 @@ type LayoutProps = {
   perms?: Set<string>;
   active?: string;
   flash?: Flash;
+  /** Extra class on <body>, e.g. the vertically centred login page. */
+  bodyClass?: string;
+  /** Replaces the whole footer line (login shows just the organisation name). */
+  footerNote?: string;
   children?: any;
 };
 
-export function Layout({ title, lang, user, perms, active, flash, children }: LayoutProps) {
+export function Layout({ title, lang, user, perms, active, flash, bodyClass, footerNote, children }: LayoutProps) {
   const L = lang ?? "en";
   const t = getDict(L);
   const PRIMARY_NAV: { href: string; label: string; perm: Permission }[] = [
@@ -60,7 +64,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
       </head>
-      <body data-idle-seconds={String(IDLE_TIMEOUT_SECONDS)}>
+      <body class={bodyClass} data-idle-seconds={String(IDLE_TIMEOUT_SECONDS)}>
         <a class="skip-link" href="#main">{t("nav.skip")}</a>
         <header class="topbar">
           <a class="brand" href="/">
@@ -146,7 +150,7 @@ export function Layout({ title, lang, user, perms, active, flash, children }: La
           {flash && <div class={`flash ${flash.kind}`}>{flash.text}</div>}
           {children}
         </main>
-        <footer class="footer">{t("app.name")} — {t("app.tagline")}</footer>
+        <footer class="footer">{footerNote ?? `${t("app.name")} — ${t("app.tagline")}`}</footer>
         <div
           id="app-modal"
           class="modal"
