@@ -179,6 +179,9 @@ th .sort-ind { font-size: 11px; }
    wrapping mid-syllable. Long text columns opt out via .cell-wrap. */
 .list-tbl td { white-space: nowrap; }
 .list-tbl td.cell-wrap { white-space: normal; }
+/* Admin tables keep their Edit/Delete buttons on one line; on phones the
+   self-edit note is allowed to wrap inside the pinned action column. */
+.admin-tbl .row-actions { white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row-hover); }
 .muted { color: var(--muted); }
@@ -443,11 +446,24 @@ th.bar-col { width: 42%; }
   table.list-tbl { min-width: 760px; }
   .tbl-wrap { -webkit-overflow-scrolling: touch; }
   /* Keep cell content on one line inside the horizontal scroller — wrapping a
-     name one syllable per line is unreadable. (Wide-table nowrap now lives in
-     the base .list-tbl rules; only the name column needs a floor here.) */
-  .tbl-wrap td:not(.empty-state) { white-space: nowrap; }
-  .tbl-wrap td.cell-wrap { white-space: normal; }
-  .tbl-wrap td:nth-child(2) { min-width: 130px; }
+     name one syllable per line is unreadable. Scoped to the member list: on
+     admin tables (users, roles) nowrap made long descriptions and permission
+     badges push the action buttons far off-screen. */
+  .list-tbl td:not(.empty-state) { white-space: nowrap; }
+  .list-tbl td.cell-wrap { white-space: normal; }
+  .list-tbl td:nth-child(2) { min-width: 130px; }
+  /* Admin tables (users, roles) keep compact rows and pin their action
+     column to the right, so Edit/Delete is reachable without a long swipe. */
+  .admin-tbl th, .admin-tbl td { white-space: nowrap; }
+  .admin-tbl th:last-child, .admin-tbl td:last-child {
+    position: sticky; right: 0; z-index: 2; background: var(--card);
+    box-shadow: -8px 0 10px -8px rgba(16,24,40,.28);
+  }
+  .admin-tbl thead th:last-child { background: var(--th-bg); z-index: 3; }
+  .admin-tbl tbody tr:hover td:last-child { background: var(--row-hover); }
+  /* A centred empty-state cell sits in the middle of a wide table, which is
+     off-screen when the table scrolls; keep its message at the visible edge. */
+  .tbl-wrap td.empty-state { text-align: left; }
   .form-grid { grid-template-columns: 1fr; gap: 12px; }
   .btn { min-height: 40px; }
   .btn.sm { min-height: 34px; }

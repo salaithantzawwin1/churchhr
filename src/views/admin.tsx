@@ -139,8 +139,9 @@ export function AdminUsersPage(props: UsersProps) {
         </div>
       </div>
 
+      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
-        <table>
+        <table class="admin-tbl">
           <thead>
             <tr><th>ID</th><th>Username</th><th>Roles</th><th>State Scope</th><th>{t("members.status")}</th><th></th></tr>
           </thead>
@@ -150,7 +151,9 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="muted">{u.id}</td>
                 <td>
                   {u.username}
-                  {u.id === user.id && <span class="badge" style="margin-left:6px">{t("adm.you")}</span>}
+                  {u.id === user.id && (
+                    <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
+                  )}
                 </td>
                 <td>{u.role_names || "—"}</td>
                 <td class="small">{stateSummary(u, regions, t("adm.allStates"))}</td>
@@ -160,11 +163,11 @@ export function AdminUsersPage(props: UsersProps) {
                     : <span class="badge inactive">{t("adm.off")}</span>}
                   {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
                 </td>
-                <td style="white-space:nowrap">
+                <td class="row-actions">
                   {u.id !== user.id
                     ? <a class="btn sm secondary js-edit-modal" href={`/admin/users/${u.id}/edit`}
                          data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md">{t("members.edit")}</a>
-                    : <span class="muted small">{t("adm.selfEdit")}</span>}
+                    : <span class="muted" title={t("adm.selfEdit")}>—</span>}
                 </td>
               </tr>
             ))}
@@ -316,8 +319,9 @@ export function AdminRolesPage(props: RolesProps) {
           </a>
         </div>
       </div>
+      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
-        <table>
+        <table class="admin-tbl">
           <thead>
             <tr><th>ID</th><th>{t("adm.roleName")}</th><th>{t("adm.desc")}</th><th>{t("adm.permissions")}</th><th>{t("members.status")}</th><th></th></tr>
           </thead>
@@ -340,7 +344,7 @@ export function AdminRolesPage(props: RolesProps) {
                     ? <span class="badge active">system</span>
                     : <span class="badge inactive">—</span>}
                 </td>
-                <td style="white-space:nowrap">
+                <td class="row-actions">
                   <a class="btn sm secondary js-edit-modal" href={`/admin/roles/${r.id}/edit`}
                      data-modal-title={`${t("adm.rolesHeading")}: ${r.name}`} data-modal-size="md">{t("members.edit")}</a>{" "}
                   {r.is_system !== 1 && (
