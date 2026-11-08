@@ -924,4 +924,24 @@ td.empty-state .small { margin-top: 4px; }
   .topbar .langswitch { font-size: 12px; }
   .topbar .langswitch a { padding: 2px 6px; min-height: 28px; }
 }
+/* ---------- household member picker: search existing members ---------- */
+.hh-pick-search { display: flex; gap: 8px; align-items: flex-end; }
+.hh-pick-search label.field { flex: 1 1 auto; min-width: 0; margin: 0; }
+.hh-pick-search .btn { flex: none; }
+.hh-pick {
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  justify-content: space-between; padding: 12px 14px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+}
+.hh-pick-main { flex: 1 1 230px; min-width: 0; }
+.hh-pick-name { font-weight: 600; }
+.hh-pick-meta { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.hh-pick-actions { display: flex; gap: 8px; align-items: center; margin: 0; }
+.hh-pick-actions select { min-width: 132px; }
+@media (max-width: 640px) {
+  .hh-pick-search { flex-wrap: wrap; }
+  .hh-pick-search .btn { width: 100%; }
+  .hh-pick-actions { width: 100%; }
+  .hh-pick-actions select { flex: 1; min-width: 0; }
+}
 `; // end of stylesheet

@@ -257,6 +257,87 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
   );
 }
 
+export function HouseholdSearchMemberPage(props: Common & {
+  family: any; q: string; results: any[]; searched: boolean;
+}) {
+  const { user, perms, family, q, results, searched, lang } = props;
+  const t = getDict(lang ?? "en");
+  const L = lang ?? "en";
+  const isEn = L !== "mm";
+  const REL = relationshipOptions(lang);
+  const headExists = Boolean(family.head_member_id);
+  const relOptions = Object.entries(REL).filter(([k]) => k !== "head" || !headExists);
+  const defaultRel = headExists ? "spouse" : "head";
+  return (
+    <Layout title={t("hh.addMember.title")} lang={lang} user={user} perms={perms} active="/admin/households">
+      <div class="page-head">
+        <h1>{t("hh.addMember.heading")} — {family.name}</h1>
+        <div class="page-actions">
+          <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
+          <a class="btn" href={`/admin/households/${family.id}/add-member?new=1`}>+ {t("hh.pick.createNew")}</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="muted small" style="margin-top:0">{t("hh.pick.hint")}</p>
+        <form method="get" action={`/admin/households/${family.id}/add-member`} class="hh-pick-search">
+          <label class="field">
+            <span class="lbl">{t("hh.pick.searchLabel")}</span>
+            <input type="search" name="q" value={q} placeholder={t("hh.pick.placeholder")} />
+          </label>
+          <button class="btn" type="submit">{t("members.searchBtn")}</button>
+        </form>
+      </div>
+
+      {!searched ? (
+        <p class="muted small">{t("hh.pick.noQuery")}</p>
+      ) : results.length === 0 ? (
+        <div class="card"><p class="muted small" style="margin:0">{t("hh.pick.empty")}</p></div>
+      ) : (
+        <div>
+          {results.map((m) => {
+            const primary = L === "mm"
+              ? (m.name_myanmar || m.name_english)
+              : (m.name_english || m.name_myanmar);
+            const secondary = primary === m.name_myanmar ? m.name_english : m.name_myanmar;
+            return (
+              <div class="hh-pick">
+                <div class="hh-pick-main">
+                  <div>
+                    <a class="hh-pick-name" href={`/members/${m.id}`}>{primary}</a>
+                    {m.member_code && <span class="muted small" style="margin-left:6px">{m.member_code}</span>}
+                  </div>
+                  <div class="hh-pick-meta">
+                    {secondary && secondary !== primary && <span>{secondary} · </span>}
+                    {isEn && m.state_name_en ? m.state_name_en : m.state_name}
+                    {m.phone && <span> · {m.phone}</span>}
+                  </div>
+                  <div style="margin-top:4px">
+                    {m.family_id
+                      ? <span class="badge moved">{t("hh.pick.current")}: {m.family_name}</span>
+                      : <span class="muted small">{t("hh.pick.none")}</span>}
+                  </div>
+                </div>
+                <form method="post" action={`/admin/households/${family.id}/attach`} class="hh-pick-actions">
+                  <input type="hidden" name="member_id" value={String(m.id)} />
+                  <select name="relationship" aria-label={t("hh.relationship")}>
+                    {relOptions.map(([k, label]) => (
+                      <option value={k} selected={k === defaultRel}>{label}</option>
+                    ))}
+                  </select>
+                  <button class="btn sm" type="submit" aria-label={`${m.family_id ? t("hh.pick.move") : t("form.add")}: ${primary}`}>
+                    {m.family_id ? t("hh.pick.move") : t("form.add")}
+                  </button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Layout>
+  );
+}
+
 export function HouseholdAddMemberPage(props: Common & {
   family: any; values: Record<string, string>; errors: string[]; relationship: string;
   options?: Record<string, OptionRow[]>;
@@ -273,7 +354,10 @@ export function HouseholdAddMemberPage(props: Common & {
     <Layout title={t("hh.addMember.title")} lang={lang} user={user} perms={perms} active="/admin/households">
       <div class="page-head">
         <h1>{t("hh.addMember.heading")} — {family.name}</h1>
-        <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
+        <div class="page-actions">
+          <a class="btn secondary" href={`/admin/households/${family.id}/add-member`}>{t("hh.pick.searchExisting")}</a>
+          <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
+        </div>
       </div>
       {errors.length > 0 && (
         <div class="flash err"><strong>{t("form.invalid")}</strong>
@@ -286,7 +370,9 @@ export function HouseholdAddMemberPage(props: Common & {
             <label class="field">
               <span class="lbl">{t("hh.relationshipTo")}</span>
               <select name="relationship" value={props.relationship}>
-                {Object.entries(REL).map(([k, label]) => <option value={k} selected={props.relationship === k}>{label}</option>)}
+                {Object.entries(REL)
+                  .filter(([k]) => k !== "head" || !family.head_member_id)
+                  .map(([k, label]) => <option value={k} selected={props.relationship === k}>{label}</option>)}
               </select>
               <span class="hint">{t("hh.addMember.relHint")}</span>
             </label>

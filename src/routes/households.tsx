@@ -10,6 +10,7 @@ import { asInt, intParam, normKey, s } from "../util";
 import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
+  HouseholdSearchMemberPage,
   type FormValues as HFormValues,
 } from "../views/households";
 
@@ -307,19 +308,65 @@ householdsRoutes.post("/:id/delete", requirePermission("members.delete"), async 
 
 householdsRoutes.get("/:id/add-member", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
   const [family] = (await db.all(sql`SELECT f.*, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
-  if (!family) return c.redirect("/admin/households?err=err-notfound", 302);
+  if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
+    return c.redirect("/admin/households?err=err-notfound", 302);
+  }
   const lang = c.get("lang");
-  const allOptions = await loadAllOptions(db);
-  const allRegions = await loadRegions(db);
+
+  // ?new=1 keeps the create-a-new-member form (used right after creating a
+  // household); the default view searches the existing member list instead.
+  if (s(c.req.query("new")) === "1") {
+    const allOptions = await loadAllOptions(db);
+    const allRegions = await loadRegions(db);
+    const requested = s(c.req.query("rel"));
+    const relationship = requested && (RELATIONSHIPS as readonly string[]).includes(requested)
+      && (requested !== "head" || !family.head_member_id)
+      ? requested
+      : (family.head_member_id ? "spouse" : "head");
+    return c.html(
+      <HouseholdAddMemberPage
+        user={c.get("user")} perms={c.get("perms")}
+        family={family} values={defaultAddValues(family)} errors={[]} relationship={relationship}
+        options={hhFormOptions(allOptions)}
+        regions={scopedRegions(allRegions, scope, lang)}
+        lang={lang}
+      />,
+    );
+  }
+
+  const q = s(c.req.query("q")).trim().slice(0, 100);
+  let results: any[] = [];
+  if (q) {
+    const like = `%${q}%`;
+    const inScope = scope.scopeAll
+      ? sql`1=1`
+      : scope.stateIds.length
+        ? sql`m.region_id IN (${sql.join(scope.stateIds.map((sid) => sql`${sid}`), sql`, `)})`
+        : sql`1=0`;
+    results = (await db.all(sql`
+      SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.phone,
+             m.family_id, f.name AS family_name,
+             r.name AS state_name, r.name_en AS state_name_en
+      FROM members m
+      JOIN regions r ON r.id = m.region_id
+      LEFT JOIN families f ON f.id = m.family_id
+      WHERE ${inScope}
+        AND (m.family_id IS NULL OR m.family_id <> ${id})
+        AND (m.name_myanmar LIKE ${like} OR m.name_english LIKE ${like}
+             OR m.member_code LIKE ${like} OR m.phone LIKE ${like})
+      ORDER BY COALESCE(NULLIF(m.name_english, ''), m.name_myanmar, '')
+      LIMIT 20
+    `)) as any[];
+  }
+
   return c.html(
-    <HouseholdAddMemberPage
+    <HouseholdSearchMemberPage
       user={c.get("user")} perms={c.get("perms")}
-      family={family} values={defaultAddValues(family)} errors={[]} relationship={s(c.req.query("rel")) || "spouse"}
-      options={hhFormOptions(allOptions)}
-      regions={scopedRegions(allRegions, scopeOf(c), lang)}
+      family={family} q={q} results={results} searched={Boolean(q)}
       lang={lang}
     />,
   );
@@ -478,6 +525,15 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
   if (!m || !(scope.scopeAll || scope.stateIds.includes(m.regionId))) {
     return c.redirect(`/admin/households/${id}?err=err-notfound`, 302);
   }
+  if (m.householdId === id) return c.redirect(`/admin/households/${id}?err=hh.alreadyMember`, 302);
+
+  // Moving a household head leaves the old household without a head; clear the
+  // stale pointer so it does not reference a member who is no longer inside.
+  if (m.householdId) {
+    await db.update(families).set({ headMemberId: null })
+      .where(and(eq(families.id, m.householdId), eq(families.headMemberId, memberId)));
+  }
+
   const relSafe = (RELATIONSHIPS as readonly string[]).includes(rel) ? rel : "other";
   await db.update(members)
     .set({ householdId: id, relationship: relSafe, updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) })

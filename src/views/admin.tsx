@@ -9,6 +9,24 @@ import { qs } from "../util";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
+/** Seeded system role names, mapped to their dictionary keys so aggregated
+ * names in the users table follow the Korean UI as well. */
+const SYSTEM_ROLE_NAME_KEY: Record<string, string> = {
+  "Super Admin": "adm.roleSuperAdminName",
+  "State Manager": "adm.roleStateManagerName",
+  "Data Entry": "adm.roleDataEntryName",
+  "Viewer": "adm.roleViewerName",
+};
+
+function localizedRoleNames(names: string, lang?: Lang): string {
+  if ((lang ?? "en") !== "kr" || !names) return names;
+  const t = getDict("kr");
+  return names
+    .split(", ")
+    .map((name) => (SYSTEM_ROLE_NAME_KEY[name] ? t(SYSTEM_ROLE_NAME_KEY[name]) : name))
+    .join(", ");
+}
+
 // ---------- Users ----------
 
 export type AdminUserRow = {
@@ -157,7 +175,7 @@ export function AdminUsersPage(props: UsersProps) {
                     <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
                   )}
                 </td>
-                <td>{u.role_names || "—"}</td>
+                <td>{localizedRoleNames(u.role_names, lang) || "—"}</td>
                 <td>
                   {u.language
                     ? <span class="badge">{u.language.toUpperCase()}</span>
