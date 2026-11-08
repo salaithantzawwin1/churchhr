@@ -100,7 +100,7 @@ function defaultValues(scope: Scope): HFormValues {
 /** Members of a household, head first; used by detail card. */
 async function householdMembers(db: DB, familyId: number) {
   return (await db.all(sql`
-    SELECT m.id, m.name_myanmar, m.name_english, m.gender, m.status, m.relationship, m.date_of_birth
+    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.status, m.relationship, m.date_of_birth
     FROM members m WHERE m.family_id = ${familyId}
     ORDER BY CASE WHEN m.relationship = 'head' THEN 0 ELSE 1 END, m.id ASC`)) as any[];
 }
@@ -192,7 +192,7 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
 
-  const next = `/admin/households/${familyId}/add-member?new=1`;
+  const next = `/admin/households/${familyId}/add-member?ok=hh.created`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
 });
@@ -317,27 +317,6 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   }
   const lang = c.get("lang");
 
-  // ?new=1 keeps the create-a-new-member form (used right after creating a
-  // household); the default view searches the existing member list instead.
-  if (s(c.req.query("new")) === "1") {
-    const allOptions = await loadAllOptions(db);
-    const allRegions = await loadRegions(db);
-    const requested = s(c.req.query("rel"));
-    const relationship = requested && (RELATIONSHIPS as readonly string[]).includes(requested)
-      && (requested !== "head" || !family.head_member_id)
-      ? requested
-      : (family.head_member_id ? "spouse" : "head");
-    return c.html(
-      <HouseholdAddMemberPage
-        user={c.get("user")} perms={c.get("perms")}
-        family={family} values={defaultAddValues(family)} errors={[]} relationship={relationship}
-        options={hhFormOptions(allOptions)}
-        regions={scopedRegions(allRegions, scope, lang)}
-        lang={lang}
-      />,
-    );
-  }
-
   const q = s(c.req.query("q")).trim().slice(0, 100);
   let results: any[] = [];
   if (q) {
@@ -365,7 +344,7 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
 
   return c.html(
     <HouseholdSearchMemberPage
-      user={c.get("user")} perms={c.get("perms")}
+      user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       family={family} q={q} results={results} searched={Boolean(q)}
       lang={lang}
     />,
@@ -380,16 +359,6 @@ function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
     group: all.filter((o) => o.type === "group"),
     family_group: all.filter((o) => o.type === "family_group"),
     fellowship_category: all.filter((o) => o.type === "fellowship_category"),
-  };
-}
-
-/** Pre-fill address/township/region from the household; relationship selectable. */
-function defaultAddValues(family: any): Record<string, string> {
-  return {
-    address: family.address ?? "",
-    township: family.township ?? "",
-    region_id: String(family.region_id ?? ""),
-    status: "active",
   };
 }
 
@@ -563,4 +532,36 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
     snapshotJson: JSON.stringify({ family_id: id, relationship: relSafe, attached: true }),
   });
   return c.redirect(`/admin/households/${id}?ok=hh.attached`, 302);
+});
+
+// ---------- remove a member from a household (keeps the member record) ----------
+
+householdsRoutes.post("/:id/detach", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
+  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
+    return c.redirect("/admin/households?err=err-notfound", 302);
+  }
+  const body = await c.req.parseBody();
+  const memberId = intParam(s(body.member_id));
+  if (!memberId) return c.redirect(`/admin/households/${id}?err=hh.noMember`, 302);
+  const [m] = await db.select().from(members).where(eq(members.id, memberId)).limit(1);
+  if (!m || m.householdId !== id || !(scope.scopeAll || scope.stateIds.includes(m.regionId))) {
+    return c.redirect(`/admin/households/${id}?err=err-notfound`, 302);
+  }
+
+  if (family.head_member_id === memberId) {
+    await db.update(families).set({ headMemberId: null }).where(eq(families.id, id));
+  }
+  await db.update(members)
+    .set({ householdId: null, relationship: "", updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(members.id, memberId));
+  await db.insert(memberHistory).values({
+    memberId, actorId: c.get("user").id, action: "update",
+    snapshotJson: JSON.stringify({ family_id: null, detached_from: id }),
+  });
+  return c.redirect(`/admin/households/${id}?ok=hh.detached`, 302);
 });

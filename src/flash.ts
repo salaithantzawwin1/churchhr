@@ -17,6 +17,8 @@ const FLASH_KEYS: Record<string, string> = {
   "option-deactivated": "flash.optionDeactivated",
   "hh.memberAdded": "hh.memberAdded",
   "hh.attached": "hh.attached",
+  "hh.created": "hh.created",
+  "hh.detached": "hh.detached",
   "hh.noMember": "hh.noMember",
   "hh.alreadyMember": "hh.alreadyMember",
   "age-group-added": "flash.ageGroupAdded",

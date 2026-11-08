@@ -908,14 +908,20 @@ td.empty-state .small { margin-top: 4px; }
     -webkit-mask-image: none; mask-image: none;
   }
   .topbar nav a { padding: 5px 8px; }
-  /* Use the dropdown here too now that the row no longer clips it, and drop
-     the inline admin links that needed a horizontal swipe. */
-  .nav-admin { display: block; }
-  .nav-admin > summary { padding: 6px 9px; }
-  .nav-admin-inline { display: none; }
+  /* Phones/tablets: show the admin links inline (they wrap with the rest of
+     the nav) instead of hiding them behind a dropdown that needs an extra tap
+     and can cover the page content. */
+  .nav-admin { display: none; }
+  .nav-admin-inline { display: flex; flex-wrap: wrap; max-width: 100%; }
+  .nav-admin-inline .sep { display: none; }
 }
 @media (max-width: 640px) {
   .nav-admin .nav-menu { min-width: 180px; }
+  /* Keep the admin group compact: the section label is redundant once the
+     links wrap, and a shorter line box saves a whole nav row on Myanmar. */
+  .nav-admin-inline .nav-group-label { display: none; }
+  .nav-admin-inline { padding-left: 5px; border-left: 1px solid rgba(255,255,255,.22); }
+  .topbar nav a { line-height: 1.6; }
   /* Logo only: the language switch now has three options, so the brand text
      would push the controls past the viewport on a phone. */
   .topbar .brand-name { display: none; }
@@ -943,5 +949,89 @@ td.empty-state .small { margin-top: 4px; }
   .hh-pick-search .btn { width: 100%; }
   .hh-pick-actions { width: 100%; }
   .hh-pick-actions select { flex: 1; min-width: 0; }
+}
+
+/* ---------- households: responsive cards, detail panels, member roster ---------- */
+.back-link { display: inline-block; margin: 0 0 2px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.back-link:hover { color: var(--link); text-decoration: underline; }
+.hh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.hh-card {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 15px 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.hh-card:hover { border-color: var(--line-strong); box-shadow: var(--hover-shadow); }
+.hh-card-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hh-avatar {
+  width: 38px; height: 38px; border-radius: 11px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--chip-brand-bg); color: var(--link); font-weight: 700;
+}
+.hh-avatar svg { width: 20px; height: 20px; display: block; }
+.hh-avatar.sm { width: 32px; height: 32px; border-radius: 50%; font-size: 13px; }
+.hh-avatar.lg { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 10px; }
+.hh-card-title { flex: 1; min-width: 0; }
+.hh-card-title a {
+  display: block; color: var(--ink); font-size: 16px; font-weight: 600;
+  line-height: 1.45; text-decoration: none; overflow-wrap: anywhere;
+}
+.hh-card-title a:hover { color: var(--link); text-decoration: underline; }
+.hh-card-title .muted { display: block; line-height: 1.4; }
+.hh-count {
+  flex: none; display: inline-flex; align-items: baseline; gap: 3px;
+  padding: 2px 9px; border-radius: 999px; background: var(--chip-bg);
+  color: var(--ink); font-size: 11.5px; white-space: nowrap;
+}
+.hh-count b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.hh-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 14px; }
+.hh-fact { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hh-fact.wide { grid-column: 1 / -1; }
+.hh-fact-label { color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.hh-fact-value { font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.hh-fact-value a { color: var(--link); text-decoration: none; }
+.hh-fact-value a:hover { text-decoration: underline; }
+.hh-card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 2px; }
+.hh-card-actions .btn { flex: 1; text-align: center; }
+.hh-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 34px 20px; margin-bottom: 18px; text-align: center;
+}
+.hh-empty h2 { margin: 0 0 4px; }
+.hh-empty-sm { padding: 22px 16px; }
+.hh-empty-sm .hh-avatar { display: none; }
+.hh-detail-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
+.hh-detail-grid .card { height: 100%; margin-bottom: 0; }
+.hh-panel h2 { margin-bottom: 12px; }
+.hh-members-panel { margin-top: 16px; }
+.section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.section-head h2 { display: flex; align-items: center; gap: 7px; margin: 0; }
+.hh-member-list { display: flex; flex-direction: column; gap: 8px; }
+.hh-member {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card);
+}
+.hh-member-main { flex: 1 1 140px; min-width: 0; }
+.hh-member-main a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.hh-member-main a:hover { color: var(--link); text-decoration: underline; }
+.hh-member-main .small { line-height: 1.5; }
+.hh-rel {
+  flex: none; padding: 2px 9px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--ink); font-size: 12px; white-space: nowrap;
+}
+.hh-member-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.hh-member-actions form { margin: 0; }
+@media (max-width: 760px) {
+  .hh-grid { grid-template-columns: 1fr; }
+  .hh-detail-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .hh-card { padding: 14px; }
+  .hh-facts { gap: 8px 12px; }
+  .page-head .actions.hh-page-actions { width: auto; }
+  .hh-page-actions .btn { flex: 0 0 auto; min-height: 34px; padding: 5px 14px; }
+  .hh-member { flex-wrap: wrap; }
+  .hh-member-actions { width: 100%; margin-left: 0; }
+  .hh-member-actions .btn { flex: 1; }
 }
 `; // end of stylesheet

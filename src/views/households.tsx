@@ -28,6 +28,17 @@ function relationshipOptions(lang?: Lang): Record<string, string> {
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
+/** Small line icon used on household cards and empty states. */
+function HouseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+      <path d="M9.5 21v-6h5v6" />
+    </svg>
+  );
+}
+
 export type FormValues = Record<string, string | undefined>;
 
 export function HouseholdFormPage(props: Common & {
@@ -109,7 +120,10 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
+        <div>
+          <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
+          <p class="page-sub">{t("hh.listSub")}</p>
+        </div>
         <div class="actions">
           {perms.has("members.create") && (
             <a class="btn js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>+ {t("hh.newHeading")}</a>
@@ -146,50 +160,49 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
         </div>
       )}
 
-      <div class="tbl-wrap">
-        <table class="list-tbl">
-          <thead><tr>
-            <th>ID</th><th>{t("hh.name")}</th><th>{t("hh.head")}</th>
-            <th class="num">{t("hh.memberCount")}</th>
-            <th>{t("detail.state")}</th><th>{t("hh.townshipLabel")}</th>
-            <th>{t("form.homeCell")}</th><th></th>
-          </tr></thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={8} class="empty-state">
-                  {filtered ? (
-                    <>
-                      <strong>{t("hh.emptyFiltered")}</strong>
-                      <div class="small"><a href="/admin/households">{t("members.clearFilters")}</a></div>
-                    </>
-                  ) : (
-                    <>
-                      <strong>{t("hh.empty")}</strong>
-                      {perms.has("members.create") && (
-                        <div class="small">
-                          <a class="js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>{t("hh.emptyHint")}</a>
-                        </div>
-                      )}
-                    </>
+      {rows.length === 0 ? (
+        <div class="card hh-empty">
+          <span class="hh-avatar lg" aria-hidden="true"><HouseGlyph /></span>
+          <h2>{filtered ? t("hh.emptyFiltered") : t("hh.empty")}</h2>
+          {filtered ? (
+            <p class="muted small"><a href="/admin/households">{t("members.clearFilters")}</a></p>
+          ) : perms.has("members.create") ? (
+            <p class="muted small"><a class="js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>{t("hh.emptyHint")}</a></p>
+          ) : null}
+        </div>
+      ) : (
+        <div class="hh-grid">
+          {rows.map((f) => {
+            const headName = isEn
+              ? (f.head_name_en || f.head_name_mm)
+              : (f.head_name_mm || f.head_name_en);
+            return (
+              <article class="hh-card">
+                <div class="hh-card-head">
+                  <span class="hh-avatar" aria-hidden="true"><HouseGlyph /></span>
+                  <div class="hh-card-title">
+                    <a href={`/admin/households/${f.id}`}>{f.name}</a>
+                    <span class="muted small">#{f.id}</span>
+                  </div>
+                  <span class="hh-count"><b>{f.member_count ?? 0}</b> {(f.member_count ?? 0) === 1 ? t("hh.memberCountOne") : t("hh.memberCount")}</span>
+                </div>
+                <div class="hh-facts">
+                  <div class="hh-fact"><span class="hh-fact-label">{t("hh.head")}</span><span class="hh-fact-value">{headName || "—"}</span></div>
+                  <div class="hh-fact"><span class="hh-fact-label">{t("detail.state")}</span><span class="hh-fact-value">{isEn && f.state_name_en ? f.state_name_en : f.state_name}</span></div>
+                  <div class="hh-fact"><span class="hh-fact-label">{t("hh.townshipLabel")}</span><span class="hh-fact-value">{f.township || "—"}</span></div>
+                  <div class="hh-fact"><span class="hh-fact-label">{t("form.homeCell")}</span><span class="hh-fact-value">{f.home_cell_label || "—"}</span></div>
+                </div>
+                <div class="hh-card-actions">
+                  <a class="btn sm secondary" href={`/admin/households/${f.id}`}>{t("members.open")}</a>
+                  {perms.has("members.update") && (
+                    <a class="btn sm secondary js-edit-modal" href={`/admin/households/${f.id}/edit`} data-modal-title={t("hh.editTitle")}>{t("members.edit")}</a>
                   )}
-                </td>
-              </tr>
-            ) : rows.map((f) => (
-              <tr key={f.id}>
-                <td>{f.id}</td>
-                <td><a href={`/admin/households/${f.id}`}>{f.name}</a></td>
-                <td>{f.head_name_mm || f.head_name_en || <span class="muted">—</span>}</td>
-                <td class="num">{f.member_count ?? 0}</td>
-                <td>{isEn && f.state_name_en ? f.state_name_en : f.state_name}</td>
-                <td>{f.township ?? ""}</td>
-                <td>{f.home_cell_label || <span class="muted">—</span>}</td>
-                <td>{perms.has("members.update") && <a class="btn sm js-edit-modal" href={`/admin/households/${f.id}/edit`}>{t("members.edit")}</a>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </Layout>
   );
 }
@@ -199,60 +212,122 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
-  const headName = family.head_name_mm || family.head_name_en || "";
+  const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
+  const headName = isEn
+    ? (family.head_name_en || family.head_name_mm || "")
+    : (family.head_name_mm || family.head_name_en || "");
+  const stateName = isEn && family.state_name_en ? family.state_name_en : family.state_name;
+  const nameOf = (m: any) => isEn
+    ? (m.name_english || m.name_myanmar || "")
+    : (m.name_myanmar || m.name_english || "");
   return (
     <Layout title={family.name} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{family.name} <span class="muted small">#{family.id}</span></h1>
-        <div class="actions" style="margin:0">
-          <a class="btn secondary" href="/admin/households">{t("hh.toList")}</a>
-          {perms.has("members.update") && <a class="btn js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")} data-modal-size="md">{t("members.edit")}</a>}
+        <div>
+          <a class="back-link" href="/admin/households">{t("hh.toList")}</a>
+          <h1>{family.name}<span class="muted small"> #{family.id}</span></h1>
+          <p class="page-sub">
+            {stateName}
+            {family.township ? ` · ${family.township}` : ""}
+            {` · ${mems.length} ${mems.length === 1 ? t("hh.memberCountOne") : t("hh.memberCount")}`}
+          </p>
+        </div>
+        <div class="actions hh-page-actions">
+          {perms.has("members.update") && (
+            <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")} data-modal-size="md">{t("members.edit")}</a>
+          )}
         </div>
       </div>
 
-      <div class="tbl-wrap">
-        <table><tbody>
-          <tr><th style="width:220px">{t("hh.name")}</th><td>{family.name}</td></tr>
-          <tr><th>{t("hh.head")}</th><td>{headName || <span class="muted">—</span>}</td></tr>
-          <tr><th>{t("detail.state")}</th><td>{isEn && family.state_name_en ? family.state_name_en : family.state_name}</td></tr>
-          <tr><th>{t("hh.townshipLabel")}</th><td>{family.township}</td></tr>
-          <tr><th>{t("form.homeCell")}</th><td>{family.home_cell_label || <span class="muted">—</span>}</td></tr>
-          <tr><th>{t("detail.address")}</th><td>{family.address}</td></tr>
-          <tr><th>{t("detail.phone")}</th><td>{family.phone}</td></tr>
-          <tr><th>{t("detail.notes")}</th><td>{family.notes}</td></tr>
-        </tbody></table>
+      <div class="hh-detail-grid">
+        <section class="card hh-panel">
+          <h2>{t("hh.cardHeading")}</h2>
+          <div class="hh-facts">
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("hh.head")}</span>
+              <span class="hh-fact-value">
+                {headName
+                  ? (family.head_member_id ? <a href={`/members/${family.head_member_id}`}>{headName}</a> : headName)
+                  : "—"}
+              </span>
+            </div>
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("detail.state")}</span>
+              <span class="hh-fact-value">{stateName}</span>
+            </div>
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("hh.townshipLabel")}</span>
+              <span class="hh-fact-value">{family.township || "—"}</span>
+            </div>
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("form.homeCell")}</span>
+              <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card hh-panel">
+          <h2>{t("form.contact")}</h2>
+          <div class="hh-facts">
+            <div class="hh-fact wide">
+              <span class="hh-fact-label">{t("detail.phone")}</span>
+              <span class="hh-fact-value">{family.phone ? <a href={`tel:${family.phone}`}>{family.phone}</a> : "—"}</span>
+            </div>
+            <div class="hh-fact wide">
+              <span class="hh-fact-label">{t("detail.address")}</span>
+              <span class="hh-fact-value">{family.address || "—"}</span>
+            </div>
+            <div class="hh-fact wide">
+              <span class="hh-fact-label">{t("detail.notes")}</span>
+              <span class="hh-fact-value">{family.notes || "—"}</span>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div class="card" style="margin-top:18px">
-        <h2>{t("hh.members")} {mems.length > 0 && <span class="muted small">({mems.length})</span>}</h2>
-        {perms.has("members.create") && (
-          <p style="margin-bottom:8px">
-            <a class="btn sm" href={`/admin/households/${family.id}/add-member`}>+ {t("hh.addMember.title")}</a>
-          </p>
-        )}
+      <section class="card hh-panel hh-members-panel">
+        <div class="section-head">
+          <h2>{t("hh.members")}<span class="count-pill">{mems.length}</span></h2>
+          {perms.has("members.create") && (
+            <a class="btn sm" href={`/admin/households/${family.id}/add-member`}>+ {t("hh.addExisting")}</a>
+          )}
+        </div>
         {mems.length === 0 ? (
-          <p class="muted small">{t("hh.noMembers")}</p>
+          <p class="muted small" style="margin:0">{t("hh.noMembers")}</p>
         ) : (
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>ID</th><th>{t("detail.name")}</th><th>{t("hh.relationship")}</th><th>{t("detail.status")}</th><th></th></tr></thead>
-              <tbody>
-                {mems.map((m) => (
-                  <tr>
-                    <td>{m.id}</td>
-                    <td><a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english}</a></td>
-                    <td>{RELATIONSHIPS[m.relationship]?.[L === "kr" ? "ko" : L] ?? m.relationship}</td>
-                    <td><span class={`badge ${m.status}`}>{m.status}</span></td>
-                    {perms.has("members.update") && (
-                      <td><a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a></td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div class="hh-member-list">
+            {mems.map((m) => {
+              const nm = nameOf(m);
+              const initial = nm.trim().charAt(0) || "?";
+              return (
+                <div class="hh-member">
+                  <span class="hh-avatar sm" aria-hidden="true">{initial}</span>
+                  <div class="hh-member-main">
+                    <a href={`/members/${m.id}`}>{nm}</a>
+                    <div class="small muted">
+                      {m.member_code ? `${m.member_code} · ` : ""}
+                      {S[m.status] ?? m.status}
+                    </div>
+                  </div>
+                  <span class="hh-rel">{RELATIONSHIPS[m.relationship]?.[L === "kr" ? "ko" : L] ?? m.relationship}</span>
+                  {perms.has("members.update") && (
+                    <div class="hh-member-actions">
+                      <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
+                      <form method="post" action={`/admin/households/${family.id}/detach`}
+                        data-confirm={t("hh.removeConfirm")}
+                        data-confirm-title={t("hh.removeTitle")}
+                        data-confirm-yes={t("hh.removeMember")}>
+                        <input type="hidden" name="member_id" value={String(m.id)} />
+                        <button class="btn sm outline-danger" type="submit" aria-label={`${t("hh.removeMember")}: ${nm}`}>{t("hh.removeMember")}</button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
     </Layout>
   );
 }
@@ -260,7 +335,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
 export function HouseholdSearchMemberPage(props: Common & {
   family: any; q: string; results: any[]; searched: boolean;
 }) {
-  const { user, perms, family, q, results, searched, lang } = props;
+  const { user, perms, flash, family, q, results, searched, lang } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -269,12 +344,11 @@ export function HouseholdSearchMemberPage(props: Common & {
   const relOptions = Object.entries(REL).filter(([k]) => k !== "head" || !headExists);
   const defaultRel = headExists ? "spouse" : "head";
   return (
-    <Layout title={t("hh.addMember.title")} lang={lang} user={user} perms={perms} active="/admin/households">
+    <Layout title={t("hh.addExisting")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("hh.addMember.heading")} — {family.name}</h1>
-        <div class="page-actions">
-          <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
-          <a class="btn" href={`/admin/households/${family.id}/add-member?new=1`}>+ {t("hh.pick.createNew")}</a>
+        <div>
+          <a class="back-link" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
+          <h1>{t("hh.addExisting")}<span class="muted small"> · {family.name}</span></h1>
         </div>
       </div>
 
@@ -290,9 +364,15 @@ export function HouseholdSearchMemberPage(props: Common & {
       </div>
 
       {!searched ? (
-        <p class="muted small">{t("hh.pick.noQuery")}</p>
+        <div class="card hh-empty hh-empty-sm">
+          <p class="muted small" style="margin:0">{t("hh.pick.noQuery")}</p>
+          <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
+        </div>
       ) : results.length === 0 ? (
-        <div class="card"><p class="muted small" style="margin:0">{t("hh.pick.empty")}</p></div>
+        <div class="card hh-empty hh-empty-sm">
+          <p class="muted small" style="margin:0">{t("hh.pick.empty")}</p>
+          <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
+        </div>
       ) : (
         <div>
           {results.map((m) => {

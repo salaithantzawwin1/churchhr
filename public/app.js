@@ -404,11 +404,11 @@
     if (!f || !f.getAttribute || !f.getAttribute("data-confirm")) return;
     e.preventDefault();
     pendingForm = f;
-    openModal(modal.getAttribute("data-confirm-title") || "", true);
+    openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", true);
     bodyEl.innerHTML =
       '<p style="margin:0 0 4px">' + f.getAttribute("data-confirm") + "</p>" +
       '<div class="actions" style="margin-top:14px">' +
-      '<button type="button" class="btn danger" data-confirm-yes="1">' + (modal.getAttribute("data-yes") || "OK") + "</button>" +
+      '<button type="button" class="btn danger" data-confirm-yes="1">' + (f.getAttribute("data-confirm-yes") || modal.getAttribute("data-yes") || "OK") + "</button>" +
       '<button type="button" class="btn secondary" data-close="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
       "</div>";
     var yes = bodyEl.querySelector("[data-confirm-yes]");
