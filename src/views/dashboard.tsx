@@ -44,7 +44,9 @@ export function DashboardPage(props: {
   const stateName = (r: { name: string; name_en?: string | null }) =>
     isEn && r.name_en ? r.name_en : r.name;
   /** Only regions that actually have members, busiest first. */
-  const byState = data.byState.filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
+  const byState = data.byState
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n || stateName(a).localeCompare(stateName(b)));
   /** Widest state count drives the ranked bars. */
   const maxState = Math.max(1, ...byState.map((r) => r.n));
   /** Share of the registry's regions that currently hold members. */
@@ -186,13 +188,13 @@ export function DashboardPage(props: {
           {byState.length === 0 ? (
             <p class="muted small">{t("dash.none")}</p>
           ) : (
-            <ol class="rank-list" tabindex={0} aria-label={t("dash.state")}>
+            <ol class={"rank-list" + (byState.length > 5 ? " is-scroll" : "")} tabindex={0} aria-label={t("dash.state")}>
               {byState.map((r, i) => (
                 <li class="rank-row">
                   <span class="rk">{i + 1}</span>
                   <div class="rn">
                     <div class="vals">
-                      <b>
+                      <b title={stateName(r)}>
                         {canView
                           ? <a href={`/members${qs({ state: r.id })}`}>{stateName(r)}</a>
                           : stateName(r)}
@@ -209,20 +211,23 @@ export function DashboardPage(props: {
               ))}
             </ol>
           )}
-          {byState.length > 0 && byState.length <= 6 && byState.length < data.byState.length && (
-            <div class="dc-coverage">
-              <div class="cov-top">
-                <span>{t("dash.coverage")}</span>
-                <b>{byState.length} / {data.byState.length}</b>
-              </div>
-              <div class="cov-bar" role="presentation"><span style={`width:${coveragePct}%`} /></div>
-              <p>{t("dash.coverageNote")}</p>
-            </div>
-          )}
-          {byState.length > 6 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
+          {byState.length > 5 && <p class="dc-scroll-hint">↕ {t("dash.scrollForMore")}</p>}
           <div class="dc-foot">
             <span><b>{data.total}</b> {t("dash.count")}</span>
-            <span>{byState.length} {t(byState.length === 1 ? "dash.regionOne" : "dash.regionsWithMembers")}</span>
+            {byState.length > 0 && byState.length < data.byState.length ? (
+              <span
+                class="dc-cov"
+                title={t("dash.coverageNote")}
+                aria-label={`${t("dash.coverage")} ${byState.length} / ${data.byState.length}. ${t("dash.coverageNote")}`}
+              >
+                <span class="dc-cov-track" aria-hidden="true">
+                  <span style={`width:${coveragePct}%`} />
+                </span>
+                <span>{t("dash.coverage")} <b>{byState.length} / {data.byState.length}</b></span>
+              </span>
+            ) : (
+              <span>{byState.length} {t(byState.length === 1 ? "dash.regionOne" : "dash.regionsWithMembers")}</span>
+            )}
           </div>
         </section>
 

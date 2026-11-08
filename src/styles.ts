@@ -580,6 +580,7 @@ th.bar-col { width: 42%; }
   .filter-box > form.filters { border-top-left-radius: 0; border-top-right-radius: 0; }
   .filter-box > form.filters .actions { margin-top: 4px; }
   .who-link { max-width: 70px; }
+  .topbar .who form .btn { white-space: nowrap; padding: 0 10px; }
   .page-head .actions .primary-action { order: -1; }
   .dash-kpis { gap: 10px; }
   .kpi { padding: 13px 13px 12px; border-radius: 12px; }
@@ -723,29 +724,33 @@ td.empty-state .small { margin-top: 4px; }
    so the card keeps a predictable height next to the gender card. */
 .rank-list {
   list-style: none; margin: 0; padding: 0 6px 0 0; display: flex; flex-direction: column; gap: 11px;
-  flex: 0 1 auto; min-height: 0; max-height: 200px; overflow-y: auto; scrollbar-width: thin;
+  flex: 0 1 auto; min-height: 0; max-height: 224px; overflow-y: auto; scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
+}
+.rank-list.is-scroll {
+  /* Fade the clipped next row so a scrolled list never ends on a hard half-row. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 .rank-list:focus-visible { outline: 2px solid var(--link); outline-offset: 4px; border-radius: 6px; }
 .rank-list::-webkit-scrollbar { width: 8px; }
 .rank-list::-webkit-scrollbar-track { background: transparent; }
 .rank-list::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
 .dc-foot {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line);
+  display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap;
+  gap: 4px 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line);
   font-size: 12.5px; color: var(--muted);
 }
 .dc-foot b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .dc-scroll-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
-.dc-coverage {
-  margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line);
-  border-radius: 10px; background: var(--th-bg);
+/* Regional coverage: a slim footer read-out, not a nested mini-card. */
+.dc-cov { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.dc-cov-track {
+  width: 64px; height: 5px; flex: none; border-radius: 999px;
+  background: var(--track); overflow: hidden;
 }
-.dc-coverage .cov-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
-.dc-coverage .cov-top b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.dc-coverage .cov-bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin: 7px 0 6px; }
-.dc-coverage .cov-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--link), var(--brand)); }
-.dc-coverage p { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+.dc-cov-track > span { display: block; height: 100%; border-radius: 999px; background: var(--link); }
+.dc-cov b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .rank-row { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; }
 .rank-row .rk { color: var(--muted); font-size: 11.5px; line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; }
 .rank-row .rn { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
