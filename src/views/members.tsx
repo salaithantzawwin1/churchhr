@@ -104,6 +104,33 @@ export function MembersListPage(props: ListProps) {
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
   const filtered = hasFilters(f);
+  /** Current list query, used to build "remove this filter" links. */
+  const activeParams = {
+    q: f.q, state: f.state, gender: f.gender, status: f.status,
+    home_cell: f.homeCell, group: f.group, fellowship: f.fellowship,
+    sort: sort || null, dir: sort ? dir : null,
+  };
+  const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
+  const chips: { label: string; href: string }[] = [];
+  if (f.q.trim()) chips.push({ label: `“${f.q.trim()}”`, href: withoutFilter("q") });
+  if (f.state) {
+    const region = regions.find((r) => r.id === f.state);
+    if (region) chips.push({ label: region.name, href: withoutFilter("state") });
+  }
+  if (f.gender && G[f.gender]) chips.push({ label: G[f.gender]!, href: withoutFilter("gender") });
+  if (f.status && S[f.status]) chips.push({ label: S[f.status]!, href: withoutFilter("status") });
+  if (f.homeCell) {
+    const cell = homeCells.find((o) => o.id === f.homeCell);
+    if (cell) chips.push({ label: cell.label, href: withoutFilter("home_cell") });
+  }
+  if (f.group) {
+    const group = groups.find((o) => o.id === f.group);
+    if (group) chips.push({ label: group.label, href: withoutFilter("group") });
+  }
+  if (f.fellowship) {
+    const fellowship = fellowships.find((o) => o.id === f.fellowship);
+    if (fellowship) chips.push({ label: fellowship.label, href: withoutFilter("fellowship") });
+  }
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
@@ -115,75 +142,68 @@ export function MembersListPage(props: ListProps) {
         </div>
       </div>
 
-      <details class="filter-box" open>
-      <summary>{t("members.filters")}<span class="chev" aria-hidden="true">▾</span></summary>
-      <form class="card filters" method="get" action="/members">
-        <label class="field">
-          <span class="lbl">{t("members.search")}</span>
-          <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.state")}</span>
-          <select name="state" data-region-select="1">
-            <option value="">{t("members.all")}</option>
-            {regions.map((r) => (
-              <option value={String(r.id)} selected={f.state === r.id}>{r.name}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.gender")}</span>
-          <select name="gender">
-            <option value="">{t("members.all")}</option>
-            {Object.entries(G).map(([k, v]) => (
-              <option value={k} selected={f.gender === k}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.status")}</span>
-          <select name="status">
-            <option value="">{t("members.all")}</option>
-            {Object.entries(S).map(([k, v]) => (
-              <option value={k} selected={f.status === k}>{v}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.thHomeCell")}</span>
-          <select name="home_cell" data-region-filter="1">
-            <option value="">{t("members.all")}</option>
-            {homeCells.map((o) => (
-              <option value={String(o.id)} selected={f.homeCell === o.id}
-                data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("members.thGroup")}</span>
-          <select name="group" data-region-filter="1">
-            <option value="">{t("members.all")}</option>
-            {groups.map((o) => (
-              <option value={String(o.id)} selected={f.group === o.id}
-                data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.fellowship")}</span>
-          <select name="fellowship">
-            <option value="">{t("members.all")}</option>
-            {fellowships.map((o) => (
-              <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
-            ))}
-          </select>
-        </label>
-        <div class="actions" style="margin:0">
-          <button class="btn" type="submit">{t("members.searchBtn")}</button>
-          <a class="btn secondary" href="/members">{t("members.clear")}</a>
-        </div>
+      <details class="filter-box filter-toolbar-box" open>
+      <summary>
+        <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <form class="filter-toolbar" method="get" action="/members" data-auto-submit="1">
+        <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")}
+          aria-label={t("members.search")} enterkeyhint="search" />
+        <select name="state" data-region-select="1" aria-label={t("members.state")}>
+          <option value="">{t("dash.allStatesOpt")}</option>
+          {regions.map((r) => (
+            <option value={String(r.id)} selected={f.state === r.id}>{r.name}</option>
+          ))}
+        </select>
+        <select name="gender" aria-label={t("members.gender")}>
+          <option value="">{t("dash.allGenders")}</option>
+          {Object.entries(G).map(([k, v]) => (
+            <option value={k} selected={f.gender === k}>{v}</option>
+          ))}
+        </select>
+        <select name="status" aria-label={t("members.status")}>
+          <option value="">{t("members.allStatuses")}</option>
+          {Object.entries(S).map(([k, v]) => (
+            <option value={k} selected={f.status === k}>{v}</option>
+          ))}
+        </select>
+        <select name="home_cell" data-region-filter="1" aria-label={t("members.thHomeCell")}>
+          <option value="">{t("dash.allCells")}</option>
+          {homeCells.map((o) => (
+            <option value={String(o.id)} selected={f.homeCell === o.id}
+              data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
+          ))}
+        </select>
+        <select name="group" data-region-filter="1" aria-label={t("members.thGroup")}>
+          <option value="">{t("members.allGroups")}</option>
+          {groups.map((o) => (
+            <option value={String(o.id)} selected={f.group === o.id}
+              data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
+          ))}
+        </select>
+        <select name="fellowship" aria-label={t("form.fellowship")}>
+          <option value="">{t("members.allFellowships")}</option>
+          {fellowships.map((o) => (
+            <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
+          ))}
+        </select>
+        {sort && <input type="hidden" name="sort" value={sort} />}
+        {sort && <input type="hidden" name="dir" value={dir} />}
+        {filtered && <a class="filter-clear" href="/members">{t("members.clear")}</a>}
       </form>
       </details>
+
+      {chips.length > 0 && (
+        <div class="filter-chips" aria-label={t("dash.activeFilters")}>
+          {chips.map((c) => (
+            <a class="filter-chip" href={c.href} aria-label={`${t("dash.removeFilter")}: ${c.label}`}>
+              {c.label}<span class="chip-x" aria-hidden="true">×</span>
+            </a>
+          ))}
+          <a class="filter-clear-all" href="/members">{t("dash.clearAll")}</a>
+        </div>
+      )}
 
       <div class="col-chooser">
         <details>

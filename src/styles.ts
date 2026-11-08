@@ -95,7 +95,7 @@ a { color: var(--link); }
 .nav-admin > summary {
   display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
   color: var(--brand-ink); padding: 6px 11px; border-radius: 8px;
-  font-size: 14.5px; opacity: .88; white-space: nowrap;
+  font-size: 14.5px; line-height: 1.9; opacity: .88; white-space: nowrap;
 }
 .nav-admin > summary::-webkit-details-marker { display: none; }
 .nav-admin > summary:hover { opacity: 1; background: rgba(255,255,255,.12); }
@@ -109,7 +109,7 @@ a { color: var(--link); }
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 14px 34px rgba(2, 8, 23, .25);
 }
-.topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: 7px; font-size: 14px; text-decoration: none; }
+.topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: 7px; font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
 .topbar nav .nav-menu a.active { background: var(--chip-brand-bg); color: var(--link); font-weight: 600; }
 .nav-admin-inline { display: none; align-items: center; gap: 2px; flex: none; }
@@ -477,7 +477,7 @@ th.bar-col { width: 42%; }
 /* ---------- topbar ---------- */
 .topbar { padding: 9px 18px; gap: 8px 14px; }
 .topbar nav { gap: 2px; }
-.topbar nav a { padding: 6px 11px; border-radius: 8px; font-size: 14.5px; opacity: .88; }
+.topbar nav a { padding: 6px 11px; border-radius: 8px; font-size: 14.5px; line-height: 1.9; opacity: .88; }
 .topbar nav a:hover { opacity: 1; background: rgba(255,255,255,.12); }
 .topbar nav a.active { background: rgba(255,255,255,.2); opacity: 1; font-weight: 600; }
 .topbar .who { gap: 10px; }
@@ -611,33 +611,39 @@ td.empty-state .small { margin-top: 4px; }
 /* ---------- dashboard: card layout ---------- */
 .page-sub { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
 
-/* Dashboard: compact filter toolbar beside the page title. Selects auto-submit
-   and the active choices are echoed as removable chips under the heading. */
+/* Compact filter toolbar shared by the dashboard and the members list. Selects
+   auto-submit and the active choices are echoed as removable chips below. */
 .dash-head { align-items: flex-start; gap: 12px 24px; margin-bottom: 10px; }
 .dash-head-title { flex: 1 1 240px; min-width: 0; }
-.dash-head .dash-filter-box { margin: 0; flex: 0 1 auto; max-width: 100%; }
-.dash-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
-.dash-filters select {
+.filter-toolbar-box { margin: 0 0 12px; }
+.dash-head .filter-toolbar-box { margin: 0; flex: 0 1 auto; max-width: 100%; }
+.filter-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
+.filter-toolbar select {
   width: 150px; max-width: 100%; height: 36px; padding: 0 30px 0 10px;
   font-size: 13.5px; border-radius: 9px;
 }
-.dash-clear {
+.filter-toolbar input[type="search"] {
+  width: 240px; max-width: 100%; height: 36px; padding: 0 10px;
+  font-size: 13.5px; border-radius: 9px;
+}
+.filter-clear {
   padding: 6px 4px; font-size: 13px; color: var(--muted);
   text-decoration: none; white-space: nowrap;
 }
-.dash-clear:hover { color: var(--ink); text-decoration: underline; }
-.dash-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
+.filter-clear:hover { color: var(--ink); text-decoration: underline; }
+.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
 .filter-chip {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 4px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--chip-bg);
-  color: var(--ink); font-size: 12.5px; font-weight: 600; text-decoration: none;
+  color: var(--ink); font-size: 12.5px; font-weight: 600; line-height: 1.9;
+  text-decoration: none;
 }
 .filter-chip:hover { border-color: var(--muted); }
 .filter-chip .chip-x { color: var(--muted); font-size: 15px; line-height: 1; }
 .filter-chip:hover .chip-x { color: var(--err-ink); }
-.dash-clear-all { margin-left: 2px; font-size: 12.5px; color: var(--muted); }
-.dash-clear-all:hover { color: var(--ink); }
-.dash-count {
+.filter-clear-all { margin-left: 2px; font-size: 12.5px; color: var(--muted); }
+.filter-clear-all:hover { color: var(--ink); }
+.filter-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px;
   border-radius: 999px; background: var(--link); color: #fff;
@@ -646,17 +652,18 @@ td.empty-state .small { margin-top: 4px; }
 @media (max-width: 640px) {
   /* On phones the toolbar collapses behind the "Filters" summary. */
   .dash-head { align-items: stretch; }
-  .dash-head .dash-filter-box { flex: 1 1 100%; }
-  .dash-filters {
+  .dash-head .filter-toolbar-box { flex: 1 1 100%; }
+  .filter-toolbar {
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px;
     background: var(--card); border: 1px solid var(--line); border-top: 0;
     border-radius: 0 0 12px 12px;
   }
-  .dash-filters select { width: 100%; height: 40px; }
-  .dash-clear { grid-column: 1 / -1; text-align: left; }
+  .filter-toolbar select, .filter-toolbar input[type="search"] { width: 100%; height: 40px; }
+  .filter-toolbar input[type="search"] { grid-column: 1 / -1; }
+  .filter-clear { grid-column: 1 / -1; text-align: left; }
 }
 @media (max-width: 400px) {
-  .dash-filters { grid-template-columns: 1fr; }
+  .filter-toolbar { grid-template-columns: 1fr; }
 }
 .dash-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .kpi {
@@ -791,8 +798,14 @@ td.empty-state .small { margin-top: 4px; }
   display: grid; place-items: center; font-size: 13px; font-weight: 700;
   background: var(--chip-brand-bg); color: var(--link);
 }
-.recent-list .rn { min-width: 0; display: flex; flex-direction: column; line-height: 1.4; }
-.recent-list .rn a, .recent-list .rn > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-list .rn {
+  min-width: 0; display: flex; flex-direction: column; line-height: 1.6;
+}
+.recent-list .rn a, .recent-list .rn > span:first-child {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* Myanmar stacked marks need a taller line box than Latin text or they clip. */
+  line-height: 2.2;
+}
 
 @media (max-width: 900px) {
   .dash-cols { grid-template-columns: 1fr; }

@@ -91,12 +91,12 @@ export function DashboardPage(props: {
           <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
         </div>
 
-        <details class="filter-box dash-filter-box" open>
+        <details class="filter-box filter-toolbar-box" open>
           <summary>
-            <span>{t("members.filters")}{chips.length > 0 && <span class="dash-count">{chips.length}</span>}</span>
+            <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
             <span class="chev" aria-hidden="true">▾</span>
           </summary>
-          <form class="dash-filters" method="get" action="/" data-auto-submit="1">
+          <form class="filter-toolbar" method="get" action="/" data-auto-submit="1">
             <select name="state" data-region-select="1" aria-label={t("members.state")}>
               <option value="">{t("dash.allStatesOpt")}</option>
               {data.filterRegions.map((r) => (
@@ -123,19 +123,19 @@ export function DashboardPage(props: {
                   data-region={o.region_id === 0 ? "" : String(o.region_id)}>{o.label}</option>
               ))}
             </select>
-            {chips.length > 0 && <a class="dash-clear" href="/">{t("dash.clearAll")}</a>}
+            {chips.length > 0 && <a class="filter-clear" href="/">{t("members.clear")}</a>}
           </form>
         </details>
       </div>
 
       {chips.length > 0 && (
-        <div class="dash-active" aria-label={t("dash.activeFilters")}>
+        <div class="filter-chips" aria-label={t("dash.activeFilters")}>
           {chips.map((c) => (
             <a class="filter-chip" href={c.href} aria-label={`${t("dash.removeFilter")}: ${c.label}`}>
               {c.label}<span class="chip-x" aria-hidden="true">×</span>
             </a>
           ))}
-          <a class="dash-clear-all" href="/">{t("dash.clearAll")}</a>
+          <a class="filter-clear-all" href="/">{t("dash.clearAll")}</a>
         </div>
       )}
 
