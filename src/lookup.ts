@@ -89,6 +89,11 @@ export function isOptionType(v: string): v is OptionType {
   return (OPTION_TYPES as readonly string[]).includes(v);
 }
 
+/** Types whose members column stores the option *label* (text), not an id. */
+export function isLabelOptionType(type: string): boolean {
+  return type === "township" || type === "blood_type";
+}
+
 /** Short-code prefix per region-scoped option type (TWP-001, CEL-001, …).
  * Types without an entry stay code-less. */
 export const CODE_PREFIX: Partial<Record<string, string>> = {

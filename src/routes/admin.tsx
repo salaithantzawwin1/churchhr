@@ -11,7 +11,7 @@ import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { checkPasswordPolicy } from "../password";
-import { findOption, loadAllOptions, nextCodeCandidate, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, type OptionRow } from "../lookup";
+import { findOption, loadAllOptions, nextCodeCandidate, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict } from "../i18n";
 import { s } from "../util";
@@ -467,6 +467,7 @@ async function optionsPage(c: any, type: string, opts: {
     const parentType = PARENT_TYPE[type];
     return c.html(
       <AddOptionForm type={type} lang={lang} regions={stateList} modal lockRegion={!admin && stateList.length === 1}
+        allowAllStates={admin}
         parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId === 0 ? 0 : o.regionId)) : []} />,
     );
   }
@@ -478,10 +479,12 @@ async function optionsPage(c: any, type: string, opts: {
     // options belong to the global admin and are hidden from them).
     .filter((o) => admin || canManageOption(scope, effectiveRegion(o, byId)));
   const column = OPTION_RAW_COLUMN[type as OptionType];
-  // 'township' stores its label in members.township (no id), so usage is counted by label.
-  const usageRows: { oid: string | number; n: number }[] = type === "township"
+  // Township and blood type store the option label in the member row (no id),
+  // so their usage is counted by label.
+  const labelStored = isLabelOptionType(type);
+  const usageRows: { oid: string | number; n: number }[] = labelStored
     ? await db.all<{ oid: string; n: number }>(
-        sql`SELECT township AS oid, COUNT(*) AS n FROM members WHERE township IS NOT NULL AND township <> '' GROUP BY township`,
+        sql`SELECT ${sql.raw(column)} AS oid, COUNT(*) AS n FROM members WHERE ${sql.raw(column)} IS NOT NULL AND ${sql.raw(column)} <> '' GROUP BY ${sql.raw(column)}`,
       )
     : await db.all<{ oid: number; n: number }>(
         sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
@@ -494,7 +497,7 @@ async function optionsPage(c: any, type: string, opts: {
   const options: OptionUsage[] = list.map((o) => ({
     id: o.id, label: o.label, active: o.active,
     code: o.code ?? null,
-    used: usage.get(type === "township" ? o.label : o.id) ?? 0,
+    used: usage.get(labelStored ? o.label : o.id) ?? 0,
     state: stateName(o.regionId ?? null),
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
   }));
@@ -511,6 +514,7 @@ async function optionsPage(c: any, type: string, opts: {
       type={type} typeLabel={(lang === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS)[type as OptionType]} types={types}
       options={options} regions={stateList}
       lockRegion={!admin && stateList.length === 1}
+      allowAllStates={admin}
       parentOptions={PARENT_TYPE[type]
         ? all.filter((o) => o.type === PARENT_TYPE[type] && o.active === 1 && canManageOption(scope, o.regionId))
         : []}
@@ -547,10 +551,11 @@ async function ageGroupCount(db: DB): Promise<number> {
 adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   const scope = optionScopeOf(c);
   const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
-  // Default tab differs by scope: admins start on the first lookup type, state
-  // managers start on Township (their first manageable type) instead of
-  // bouncing off ethnicity with a confusing 403.
-  const rawType = c.req.query("type") ?? (isOptionsAdmin(scope) ? OPTION_TYPES[0]! : "township");
+  // Default tab differs by scope: admins start on State/Region (the first tab,
+  // always populated) rather than an empty lookup list, and state managers
+  // start on Township (their first manageable type) instead of bouncing off
+  // ethnicity with a confusing 403.
+  const rawType = c.req.query("type") ?? (isOptionsAdmin(scope) ? "region" : "township");
   const type = rawType;
   // State managers only get the four region-scoped types, in their own states.
   if (!isOptionsAdmin(scope)) {
@@ -618,7 +623,7 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
       ? c.html(
           <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
             regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)}
-            lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} modal />,
+            lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} allowAllStates={isOptionsAdmin(scope)} modal />,
           400,
         )
       : c.redirect(errRedirect(back, msg), 302);
@@ -670,6 +675,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
     id, label: current.label, lang,
     type: current.type, regions: stateList,
     lockRegion: !admin && stateList.length === 1,
+    allowAllStates: admin,
     code: current.code ?? "",
     regionId: current.regionId === 0 ? "" : String(current.regionId),
     parentId: current.parentId == null ? "" : String(current.parentId),
@@ -729,6 +735,7 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
     const fp = {
       id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions,
       lockRegion: !admin && stateList.length === 1,
+      allowAllStates: admin,
       code: s(body.code),
       regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
       parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
@@ -782,9 +789,10 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   const back = `/admin/options?type=${encodeURIComponent(current.type)}`;
 
   const column = OPTION_RAW_COLUMN[current.type as OptionType];
-  // 'township' lives on members as a text label, not an id — count by label.
-  const used = current.type === "township"
-    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members WHERE township = ${current.label}`)
+  // Township and blood type live on members as a text label, not an id —
+  // count by label so deleting a used option is still guarded.
+  const used = isLabelOptionType(current.type)
+    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members WHERE ${sql.raw(column)} = ${current.label}`)
     : column
       ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
       : [{ n: 0 }];

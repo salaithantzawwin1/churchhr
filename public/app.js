@@ -487,4 +487,18 @@
       })
       .catch(function () { form.submit(); });
   });
+
+  // Swipeable tab strip (Options page): bring the active tab into view so a
+  // deep-linked tab (?type=...) is not hidden off the right edge on phones.
+  (function revealActiveTab() {
+    var strip = document.querySelector(".page-toolbar .tabs");
+    if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+    var active = strip.querySelector('[aria-current="page"]');
+    if (!active) return;
+    var s = strip.getBoundingClientRect();
+    var a = active.getBoundingClientRect();
+    if (a.left < s.left || a.right > s.right) {
+      strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2;
+    }
+  })();
 })();

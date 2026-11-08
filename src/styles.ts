@@ -137,6 +137,19 @@ a { color: var(--link); }
    page head (top right), keeping this row to the tabs alone. */
 .page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
 .page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* The options page has many tab pills: on narrow screens keep them on one
+   swipeable row instead of stacking several rows above the table. */
+@media (max-width: 900px) {
+  .page-toolbar .tabs {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .page-toolbar .tabs::-webkit-scrollbar { display: none; }
+  .page-toolbar .tabs .btn { flex: 0 0 auto; }
+}
+@media (max-width: 640px) {
+  .page-toolbar .tabs .tab-off { display: none; }
+}
 .page-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .page-toolbar .count {
   display: inline-block; min-width: 20px; margin-left: 6px; padding: 0 6px;

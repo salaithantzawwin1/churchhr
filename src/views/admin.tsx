@@ -384,6 +384,8 @@ type OptionsProps = Common & {
   regions?: { id: number; name: string }[];
   /** Pin the State/Region picker to the single allowed state (state managers). */
   lockRegion?: boolean;
+  /** Global admins may create all-states options; state managers may not. */
+  allowAllStates?: boolean;
   /** Parent options for chained types (Home Cell -> Township, Family Group -> Home Cell). */
   parentOptions?: { id: number; label: string; regionId: number }[];
   addErrors: string[];
@@ -392,25 +394,30 @@ type OptionsProps = Common & {
 };
 
 /** State/Region picker for region-scoped option types (blank = every state).
- * lockRegion pins the select to a single state (state managers with one state). */
+ * lockRegion pins the select to a single state (state managers with one state).
+ * A locked select is disabled for display only, so the hidden input carries its
+ * value — disabled controls are not submitted with the form. allowAllStates is
+ * false for state managers, who may never create an all-states option. */
 function optionStateField(
   regions: { id: number; name: string }[] | undefined,
   type: string,
   selected: string,
   t: (k: string) => string,
   lockRegion = false,
+  allowAllStates = true,
 ) {
   if (!isRegionScopedType(type) || !regions || regions.length === 0) return null;
   return (
     <label class="field">
       <span class="lbl">{t("adm.optionState")}</span>
+      {lockRegion && <input type="hidden" name="region_id" value={selected || String(regions[0]!.id)} />}
       <select name="region_id" disabled={lockRegion ? true : undefined}>
-        {!lockRegion && <option value="">{t("adm.allStates")}</option>}
+        {!lockRegion && allowAllStates && <option value="">{t("adm.allStates")}</option>}
         {regions.map((r) => (
           <option value={String(r.id)} selected={lockRegion || selected === String(r.id)}>{r.name}</option>
         ))}
       </select>
-      <span class="field-hint">{t("adm.optionStateHint")}</span>
+      {allowAllStates && <span class="field-hint">{t("adm.optionStateHint")}</span>}
     </label>
   );
 }
@@ -443,6 +450,7 @@ function optionParentField(
 export function AddOptionForm(props: {
   type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string;
   regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
+  allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
 }) {
   const t = getDict(props.lang ?? "en");
@@ -461,7 +469,7 @@ export function AddOptionForm(props: {
         <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
-      {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion)}
+      {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
       {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
@@ -580,6 +588,7 @@ export function EditAgeGroupForm(props: {
 export function EditOptionForm(props: {
   id: number; lang?: Lang; errors?: string[]; modal?: boolean; label?: string;
   type?: string; regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
+  allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
   code?: string;
 }) {
@@ -606,7 +615,7 @@ export function EditOptionForm(props: {
           <span class="field-hint">{t("adm.codeHint")}</span>
         </label>
       </div>
-      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion)}
+      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
       {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
@@ -665,12 +674,17 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 }
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion, allowAllStates } = props;
   const t = getDict(lang ?? "en");
   const TL = (lang ?? "en") === "en" ? OPTION_TYPE_LABELS_EN : OPTION_TYPE_LABELS;
   const isRegion = type === "region";
   const scoped = isRegionScopedType(type);
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
+  // Actions sit in the last column, which is off-screen on phones until the
+  // table is swiped; the hint matches the member list's scroll affordance.
+  const scrollHint = (
+    <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
+  );
   return (
     <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>
       <div class="page-head">
@@ -686,9 +700,10 @@ export function AdminOptionsPage(props: OptionsProps) {
       <div class="page-toolbar">
         <div class="tabs">
           {types.map((t2) => (
-            <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}>
+            <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}
+               aria-current={t2.key === type ? "page" : undefined}>
               {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}
-              {t2.active ? "" : <span class="dim"> ({t("adm.offShort")})</span>}
+              {t2.active ? "" : <span class="dim tab-off"> ({t("adm.offShort")})</span>}
               {t2.count != null && <span class="count">{t2.count}</span>}
             </a>
           ))}
@@ -703,11 +718,17 @@ export function AdminOptionsPage(props: OptionsProps) {
           {addErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{addErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {isRegion ? <AddRegionForm lang={lang} /> : <AddOptionForm type={type} lang={lang} regions={regions} lockRegion={lockRegion} parentOptions={parentOptions} />}
+          {isRegion
+            ? <AddRegionForm lang={lang} />
+            : type === "age_group"
+              ? <AddAgeGroupForm lang={lang} />
+              : <AddOptionForm type={type} lang={lang} regions={regions} lockRegion={lockRegion} allowAllStates={allowAllStates} parentOptions={parentOptions} />}
         </div>
       )}
 
       {type === "age_group" ? (
+        <>
+        {scrollHint}
         <div class="tbl-wrap">
           <table>
             <thead><tr><th>ID</th><th>{t("adm.ageNameCol")}</th><th class="num">{t("adm.ageRange")}</th><th></th></tr></thead>
@@ -729,8 +750,10 @@ export function AdminOptionsPage(props: OptionsProps) {
             </tbody>
           </table>
         </div>
+        </>
       ) : type === "region" ? (
         <>
+          {scrollHint}
           <div class="tbl-wrap">
             <table>
               <thead>
@@ -760,6 +783,7 @@ export function AdminOptionsPage(props: OptionsProps) {
         </>
       ) : (
         <>
+      {scrollHint}
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>ID</th><th>{t("adm.codeCol")}</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}{type === "home_cell" && <th>{t("form.township")}</th>}{type === "family_group" && <th>{t("form.homeCell")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
