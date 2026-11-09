@@ -4,6 +4,8 @@ import { getDict, normalizeLang, type Lang } from "./i18n";
 /** Flash code (query param) -> i18n dictionary key. */
 const FLASH_KEYS: Record<string, string> = {
   "member-created": "flash.memberCreated",
+  "report-created": "flash.reportCreated",
+  "report-reviewed": "flash.reportReviewed",
   "member-updated": "flash.memberUpdated",
   "member-deleted": "flash.memberDeleted",
   "user-created": "flash.userCreated",

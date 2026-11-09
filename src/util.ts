@@ -72,6 +72,18 @@ export function b64decode(b64: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+/** Today in Myanmar time (UTC+6:30). Workers run in UTC, where the date is
+ * still yesterday between local midnight and 06:30. */
+export function todayInYangon(): string {
+  return new Date(Date.now() + 6.5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD plus/minus whole days (calendar dates only, UTC arithmetic). */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d! + days)).toISOString().slice(0, 10);
+}
+
 /** "CODE · label" for a lookup option, collapsed to a single value when the
  * label already is the code (imported groups are often named by their code). */
 export function optionText(code: string | null | undefined, label: string | null | undefined): string {

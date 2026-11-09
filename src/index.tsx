@@ -6,6 +6,7 @@ import { profileRoutes, publicAuthRoutes } from "./routes/auth";
 import { membersRoutes } from "./routes/members";
 import { adminRoutes } from "./routes/admin";
 import { householdsRoutes } from "./routes/households";
+import { reportsRoutes } from "./routes/reports";
 import { getDb } from "./db/client";
 import { loadDashboard, type DashboardFilter } from "./dashboard";
 import { flashFromQuery } from "./flash";
@@ -141,6 +142,7 @@ app.get("/regions", requirePermission("dashboard.view"), async (c) => {
 });
 
 app.route("/members", membersRoutes);
+app.route("/reports", reportsRoutes);
 app.route("/admin/households", householdsRoutes);
 app.route("/admin", adminRoutes);
 

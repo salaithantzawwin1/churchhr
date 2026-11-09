@@ -273,6 +273,37 @@ export const memberHistory = sqliteTable(
   }),
 );
 
+/** Daily activity reports: one row per author per day (unique index), with an
+ * optional review pass by a leader who can see the author's state. */
+export const activityReports = sqliteTable("activity_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reportDate: text("report_date").notNull(),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  regionId: integer("region_id").notNull().references(() => regions.id),
+  township: text("township"),
+  homeCellId: integer("home_cell_id").references(() => lookupOptions.id),
+  groupId: integer("group_id").references(() => lookupOptions.id),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  attendance: integer("attendance"),
+  newContacts: integer("new_contacts"),
+  followUps: integer("follow_ups"),
+  challenges: text("challenges"),
+  prayerRequests: text("prayer_requests"),
+  nextSteps: text("next_steps"),
+  /** submitted | reviewed (draft is reserved for the save-draft flow). */
+  status: text("status").notNull().default("submitted"),
+  reviewerId: integer("reviewer_id").references(() => users.id),
+  reviewNote: text("review_note"),
+  reviewedAt: integer("reviewed_at"),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+}, (t) => ({
+  authorDateUq: uniqueIndex("activity_reports_author_date_uq").on(t.authorId, t.reportDate),
+  regionDateIdx: index("activity_reports_region_date_idx").on(t.regionId, t.reportDate),
+  statusIdx: index("activity_reports_status_idx").on(t.status),
+}));
+
 /** Per-IP login attempt log for the sliding-window rate limiter. */
 export const loginAttempts = sqliteTable(
   "login_attempts",

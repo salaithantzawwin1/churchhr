@@ -708,6 +708,15 @@ th.bar-col { width: 42%; }
 }
 .detail-item .v { font-size: 14.5px; overflow-wrap: anywhere; }
 .detail-item .v.empty { color: var(--muted); }
+/* Daily reports keep the writer's line breaks without rendering HTML. */
+.report-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 14.5px; }
+/* Dashboard daily-report summary: three compact counters above the state table. */
+.rep-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.rep-sum > div { background: var(--chip-bg); border-radius: 10px; padding: 10px 12px; }
+.rep-sum .n { font-size: 22px; font-weight: 700; line-height: 1.15; }
+.rep-sum .t { font-size: 12.5px; color: var(--muted); }
+.rep-sum .ok .n { color: var(--ok-ink); }
+.rep-sum .warn .n { color: var(--warn-ink); }
 
 /* ---------- empty state ---------- */
 td.empty-state { padding: 38px 16px; }

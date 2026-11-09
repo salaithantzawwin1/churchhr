@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { DB } from "./db/client";
+import { addDays, todayInYangon } from "./util";
 
 /** Dashboard filter bar selection (query-string driven; empty = no filter). */
 export type DashboardFilter = {
@@ -29,6 +30,15 @@ export type DashboardData = {
   ageGroups: { id: number; name: string; min_age: number; max_age: number; male: number; female: number }[];
   /** Active members with a family group assigned + distinct group count. */
   familyGroup: { members: number; groups: number };
+  /** Daily activity reports over the last 7 days, by state (State filter applies). */
+  reports: {
+    days: number;
+    totals: { submitted: number; reviewed: number; pending: number };
+    byState: {
+      id: number; name: string; name_en?: string | null;
+      submitted: number; reviewed: number; pending: number;
+    }[];
+  };
   /** Current selection, echoed back so the filter bar re-renders selected options. */
   filters: DashboardFilter;
   /** Scope-visible states for the State/Region filter. */
@@ -83,6 +93,25 @@ export async function loadDashboard(
     SELECT r.id, r.name, r.name_en AS name_en, COUNT(m.id) AS n FROM regions r
     LEFT JOIN members m ON m.region_id = r.id AND ${mfc()}
     WHERE ${regionCond} GROUP BY r.id ORDER BY r.id`);
+
+  // Daily reports for the widget: last 7 days, honouring the State filter (the
+  // member-only filters — gender/home cell/township — do not apply to reports).
+  const reportToday = todayInYangon();
+  const reportWeekStart = addDays(reportToday, -6);
+  const reportRows = await db.all<{
+    id: number; name: string; name_en: string | null; submitted: number; reviewed: number;
+  }>(sql`
+    SELECT r.id, r.name, r.name_en AS name_en,
+      COUNT(ar.id) AS submitted,
+      COALESCE(SUM(CASE WHEN ar.status = 'reviewed' THEN 1 ELSE 0 END), 0) AS reviewed
+    FROM regions r
+    LEFT JOIN activity_reports ar
+      ON ar.region_id = r.id
+      AND ar.report_date >= ${reportWeekStart} AND ar.report_date <= ${reportToday}
+    WHERE ${regionCond}
+    GROUP BY r.id
+    HAVING COUNT(ar.id) > 0
+    ORDER BY submitted DESC, r.name`);
 
   const recent = await db.all<{ id: number; name: string; state_name: string }>(sql`
     SELECT m.id,
@@ -146,6 +175,12 @@ export async function loadDashboard(
     if (row.gender === "male") male = row.n;
     if (row.gender === "female") female = row.n;
   }
+  let reportsSubmitted = 0;
+  let reportsReviewed = 0;
+  for (const row of reportRows) {
+    reportsSubmitted += Number(row.submitted);
+    reportsReviewed += Number(row.reviewed);
+  }
 
   return {
     total, byStatus, male, female,
@@ -158,6 +193,22 @@ export async function loadDashboard(
     familyGroup: {
       members: Number(familyGroupRow[0]?.members ?? 0),
       groups: Number(familyGroupRow[0]?.groups ?? 0),
+    },
+    reports: {
+      days: 7,
+      totals: {
+        submitted: reportsSubmitted,
+        reviewed: reportsReviewed,
+        pending: reportsSubmitted - reportsReviewed,
+      },
+      byState: reportRows.map((row) => {
+        const submitted = Number(row.submitted);
+        const reviewed = Number(row.reviewed);
+        return {
+          id: row.id, name: row.name, name_en: row.name_en,
+          submitted, reviewed, pending: submitted - reviewed,
+        };
+      }),
     },
     filters: f,
     filterRegions: filterRegions as any,

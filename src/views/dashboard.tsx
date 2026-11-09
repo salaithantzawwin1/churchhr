@@ -290,6 +290,55 @@ export function DashboardPage(props: {
         </section>
       </div>
 
+      {perms.has("reports.view") && (
+        <section class="card dash-card" style="margin-bottom:14px">
+          <div class="dc-head">
+            <h2>{t("dash.reports")}</h2>
+            <a href="/reports">{t("dash.viewAll")} →</a>
+          </div>
+          <div class="rep-sum">
+            <div>
+              <div class="n">{data.reports.totals.submitted}</div>
+              <div class="t">{t("dash.repSubmitted")}</div>
+            </div>
+            <div class="ok">
+              <div class="n">{data.reports.totals.reviewed}</div>
+              <div class="t">{t("dash.repReviewed")}</div>
+            </div>
+            <div class="warn">
+              <div class="n">{data.reports.totals.pending}</div>
+              <div class="t">{t("dash.repPending")}</div>
+            </div>
+          </div>
+          {data.reports.byState.length === 0 ? (
+            <p class="muted small">{t("dash.repEmpty")}</p>
+          ) : (
+            <div class="tbl-wrap">
+              <table class="list-tbl">
+                <thead>
+                  <tr>
+                    <th>{t("dash.repState")}</th>
+                    <th class="num">{t("dash.repSubmitted")}</th>
+                    <th class="num">{t("dash.repReviewed")}</th>
+                    <th class="num">{t("dash.repPending")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.reports.byState.map((r) => (
+                    <tr>
+                      <td>{stateName(r)}</td>
+                      <td class="num">{r.submitted}</td>
+                      <td class="num">{r.reviewed}</td>
+                      <td class="num">{r.pending}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       <div class="dash-cols">
         <section class="card dash-card">
           <div class="dc-head">
