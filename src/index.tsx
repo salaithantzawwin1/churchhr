@@ -16,6 +16,7 @@ import { DashboardPage } from "./views/dashboard";
 import { RegionsPage } from "./views/regions";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
+import { APP_VERSION } from "./version";
 
 const app = new Hono<AppEnv>();
 
@@ -85,6 +86,39 @@ app.use("*", async (c, next) => {
 app.get("/styles.css", (c) =>
   c.body(CSS, 200, { "Content-Type": "text/css; charset=utf-8" }),
 );
+
+/** Public deploy probe: verifies the Worker, D1 connection and the migrations
+ * this build needs, so a release can be checked without signing in. */
+app.get("/healthz", async (c) => {
+  const started = Date.now();
+  let db: "ok" | "schema-outdated" | "error" = "ok";
+  let migration: string | null = null;
+  try {
+    const applied = await c.env.DB
+      .prepare("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
+      .first<{ name: string }>();
+    migration = applied?.name ?? null;
+    // 0014 added short_code; selecting it fails loudly if the remote DB is behind.
+    await c.env.DB.prepare("SELECT short_code FROM lookup_options LIMIT 1").all();
+  } catch (err) {
+    console.error("health check failed:", err);
+    db = "error";
+  }
+  const ok = db === "ok";
+  return c.json(
+    {
+      ok,
+      service: "church-member-registry",
+      version: APP_VERSION,
+      migration,
+      db,
+      checkedAt: new Date().toISOString(),
+      latencyMs: Date.now() - started,
+    },
+    ok ? 200 : 503,
+    { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" },
+  );
+});
 
 // Public routes first so requireAuth (below) never intercepts them.
 app.route("/", publicAuthRoutes);

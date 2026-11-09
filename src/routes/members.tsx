@@ -66,6 +66,10 @@ const validMsgKeys: Record<string, string> = {
   "imp.cannotAddOption": "imp.cannotAddOption",
   "imp.badRelationship": "imp.badRelationship",
   "imp.badHousehold": "imp.badHousehold",
+  "imp.badHouseholdAddress": "imp.badHouseholdAddress",
+  "imp.badHouseholdTownship": "imp.badHouseholdTownship",
+  "imp.badHouseholdPhone": "imp.badHouseholdPhone",
+  "imp.householdNoName": "imp.householdNoName",
 };
 
 /** Marks a message as a translate-at-render key (called from sync validators). */
@@ -335,7 +339,7 @@ const EXPORT_HEADER = [
   "Blood Type", "Phone Number", "NRC Number", "Ethnicity", "Language", "Education", "Job",
   "Work Skills", "Income", "Address", "Father's Name", "Mother's Name", "Salvation Date",
   "Family Group", "Fellowship Categories", "Participating Sector", "Group", "Home Cell", "Township", "State", "Status",
-  "Household", "Relationship",
+  "Household", "Relationship", "Household Address", "Household Township", "Household Phone",
 ];
 
 membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
@@ -347,7 +351,8 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     SELECT m.*, r.name AS state_name,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
-      fam.name AS household
+      fam.name AS household, fam.address AS household_address,
+      fam.township AS household_township, fam.phone AS household_phone
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN families fam ON fam.id = m.family_id
@@ -369,7 +374,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     r.income, r.address, r.father_name, r.mother_name, r.salvation_date,
     r.family_group, r.fellowship, r.sector, r.group_label, r.home_cell, r.township, r.state_name,
     r.status ? STATUSES[r.status]?.split(" (")[0] ?? r.status : "",
-    r.household, r.relationship,
+    r.household, r.relationship, r.household_address, r.household_township, r.household_phone,
   ]);
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, ...body]);
   const today = new Date().toISOString().slice(0, 10);
@@ -390,7 +395,7 @@ membersRoutes.get("/import/template", requirePermission("members.import"), (c) =
     "", "Aung Aung", "မောင်အောင်", "male", "married", "1990-05-12", "", "O+", "0912345678",
     "12/abc(N)123456", "ဗမာ", "မြန်မာ", "Bachelor", "ဆရာဝန်", "", "300000", "ရန်ကုန်",
     "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Young Adults", "Group 1", "Cell 1",
-    "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active", "", "",
+    "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active", "", "", "", "", "",
   ];
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, sample]);
   return c.body(csv, 200, {
@@ -429,6 +434,8 @@ const IMPORT_ALIASES: Record<string, string> = {
   "township": "township", "township (မြို့နယ်)": "township",
   "status": "status",
   "household": "household", "family": "household", "household name": "household",
+  "household address": "household_address", "household township": "household_township",
+  "household phone": "household_phone", "household phone number": "household_phone",
   "relationship": "relationship", "relation": "relationship",
   "notes": "notes", "note": "notes",
 };
@@ -468,6 +475,9 @@ type ImportRow = {
   /** Household name + relationship inside it (round-trips the export columns). */
   household: string | null;
   relationship: string;
+  householdAddress: string | null;
+  householdTownship: string | null;
+  householdPhone: string | null;
 };
 
 type AnalyzeResult = { report: ImportReport; validRows: ImportRow[]; pending: Map<string, { type: string; label: string }> };
@@ -581,7 +591,16 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       else rowErrors.push(`${msg("imp.badRelationship")}: ${rec("relationship")}`);
     }
     const householdName = rec("household");
+    const householdAddress = rec("household_address");
+    const householdTownship = rec("household_township");
+    const householdPhone = rec("household_phone");
     if (householdName.length > 120) rowErrors.push(`${msg("imp.badHousehold")}: ${householdName.slice(0, 40)}`);
+    if (householdAddress.length > 200) rowErrors.push(`${msg("imp.badHouseholdAddress")}: ${householdAddress.slice(0, 40)}`);
+    if (householdTownship.length > 120) rowErrors.push(`${msg("imp.badHouseholdTownship")}: ${householdTownship.slice(0, 40)}`);
+    if (householdPhone.length > 60) rowErrors.push(`${msg("imp.badHouseholdPhone")}: ${householdPhone.slice(0, 40)}`);
+    if (!householdName && (householdAddress || householdTownship || householdPhone)) {
+      rowErrors.push(msg("imp.householdNoName"));
+    }
 
     // Township is stored on the member as its managed option label; register a
     // new township so it shows up in the cascade dropdowns after import too.
@@ -623,6 +642,9 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       key,
       household: householdName || null,
       relationship,
+      householdAddress: householdName ? householdAddress || null : null,
+      householdTownship: householdName ? householdTownship || null : null,
+      householdPhone: householdName ? householdPhone || null : null,
       data: {
         name_myanmar: nameMm || null,
         name_english: nameEn || null,
@@ -787,15 +809,29 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
         // Attach to (or create) the household named in the CSV, in the member's state.
         if (row.household) {
           const rel = row.relationship || "other";
-          const [existingFamily] = await db.all<{ id: number }>(
-            sql`SELECT id FROM families WHERE region_id = ${rowRegion} AND LOWER(name) = LOWER(${row.household}) LIMIT 1`,
+          const [existingFamily] = await db.all<{
+            id: number; address: string | null; township: string | null; phone: string | null;
+          }>(
+            sql`SELECT id, address, township, phone FROM families WHERE region_id = ${rowRegion} AND LOWER(name) = LOWER(${row.household}) LIMIT 1`,
           );
           let familyId = existingFamily?.id;
           if (!familyId) {
             const createdFamily = await db.insert(families)
-              .values({ name: row.household, regionId: rowRegion, createdBy: userId })
+              .values({
+                name: row.household, regionId: rowRegion, createdBy: userId,
+                address: row.householdAddress, township: row.householdTownship, phone: row.householdPhone,
+              })
               .returning({ id: families.id });
             familyId = createdFamily[0]!.id;
+          } else {
+            // Fill only blank details so a later import never overwrites edits.
+            const patch: Partial<typeof families.$inferInsert> = {};
+            if (!existingFamily.address && row.householdAddress) patch.address = row.householdAddress;
+            if (!existingFamily.township && row.householdTownship) patch.township = row.householdTownship;
+            if (!existingFamily.phone && row.householdPhone) patch.phone = row.householdPhone;
+            if (Object.keys(patch).length > 0) {
+              await db.update(families).set(patch).where(eq(families.id, familyId));
+            }
           }
           await db.update(members).set({ householdId: familyId, relationship: rel }).where(eq(members.id, importId));
           if (rel === "head") {

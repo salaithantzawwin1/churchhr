@@ -226,7 +226,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
                     <form method="post" action={`/admin/households/${f.id}/delete`}
                       data-confirm={t("hh.deleteConfirm")} data-confirm-title={t("hh.deleteTitle")}
                       data-confirm-yes={t("hh.delete")} style="display:inline">
-                      <button class="btn sm outline-danger" type="submit">{t("hh.delete")}</button>
+                      <button class="btn sm outline-danger" type="submit">{t("hh.deleteShort")}</button>
                     </form>
                   )}
                 </div>

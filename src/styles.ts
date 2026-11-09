@@ -990,8 +990,10 @@ td.empty-state .small { margin-top: 4px; }
 .hh-fact-value { font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
 .hh-fact-value a { color: var(--link); text-decoration: none; }
 .hh-fact-value a:hover { text-decoration: underline; }
-.hh-card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 2px; }
-.hh-card-actions .btn { flex: 1; text-align: center; }
+.hh-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 2px; }
+.hh-card-actions .btn { flex: 1 1 auto; min-width: 0; text-align: center; }
+.hh-card-actions form { display: flex; flex: 1 1 auto; min-width: 0; margin: 0; }
+.hh-card-actions form .btn { width: 100%; }
 .hh-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; padding: 34px 20px; margin-bottom: 18px; text-align: center;
