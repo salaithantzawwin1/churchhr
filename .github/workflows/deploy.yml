@@ -1,8 +1,12 @@
 name: Deploy to Cloudflare Workers
 
-# Production deploys run through Cloudflare Workers Builds (Git integration).
-# Keep this workflow for manual emergency deploys only.
+# Every push to main applies pending D1 migrations before deploying the Worker,
+# so code cannot ship ahead of the schema. Cloudflare Workers Builds is also
+# connected to main: keep its build command applying migrations too, or
+# disconnect it, so production has a single migration-first deploy path.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
