@@ -115,7 +115,7 @@ function readForm(
   const text = (values.body ?? "").trim();
   if (!text || text.length > MAX_BODY) errors.push(t("rep.errBody"));
 
-  if ((values.township ?? "").length > MAX_TOWNSHIP) errors.push(t("rep.errTownship"));
+  if ((values.township ?? "").trim().length > MAX_TOWNSHIP) errors.push(t("rep.errTownship"));
 
   const attendance = parseCount(values.attendance ?? "");
   const newContacts = parseCount(values.new_contacts ?? "");

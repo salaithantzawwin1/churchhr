@@ -43,8 +43,10 @@ export function parseDateFlexible(v: string): string | null {
   const t = v.trim();
   if (t === "") return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    const d = new Date(t + "T00:00:00");
-    return Number.isNaN(d.getTime()) ? null : t;
+    // Reject roll-over dates such as 2026-02-31, which Date would normalize.
+    const [y, m, d] = t.split("-").map(Number);
+    const dt = new Date(Date.UTC(y!, m! - 1, d!));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d ? t : null;
   }
   const m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(t);
   if (m) {

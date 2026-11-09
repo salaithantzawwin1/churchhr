@@ -40,10 +40,12 @@ function stateName(r: { state_name: string; state_name_en: string | null }, lang
   return lang !== "mm" && r.state_name_en ? r.state_name_en : r.state_name;
 }
 
-/** D1 stores unix seconds; show "YYYY-MM-DD HH:MM" like the member detail page. */
+/** D1 stores unix seconds; show "YYYY-MM-DD HH:MM" in Myanmar time (UTC+6:30),
+ * matching the report dates, instead of the Worker's UTC clock. */
+const YANGON_OFFSET_SECONDS = 6.5 * 3600;
 function stamp(unix: number | null | undefined) {
   if (!unix) return "";
-  return new Date(unix * 1000).toISOString().slice(0, 16).replace("T", " ");
+  return new Date((unix + YANGON_OFFSET_SECONDS) * 1000).toISOString().slice(0, 16).replace("T", " ");
 }
 
 function statusLabel(t: (key: string) => string, status: string) {
@@ -63,7 +65,7 @@ export function ReportsListPage(props: Common & {
   const { user, perms, flash, lang, rows, total, range, team, canCreate, canReview } = props;
   const L = lang ?? "en";
   const t = getDict(L);
-  const columns = 6 + (team ? 1 : 0);
+  const columns = 5 + (team ? 1 : 0);
   return (
     <Layout title={t("rep.title")} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
       <div class="page-head">
