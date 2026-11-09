@@ -22,6 +22,7 @@ export type MemberListItem = {
   marital_status: string;
   township: string | null;
   family_group: string | null;
+  family_group_code?: string | null;
   fellowship: string | null;
   sector: string | null;
 };
@@ -300,7 +301,7 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell">{m.home_cell ?? ""}</td>
                 <td data-col="group">{m.group_label ?? ""}</td>
-                <td data-col="familyGroup">{m.family_group ?? ""}</td>
+                <td data-col="familyGroup">{m.family_group ? (m.family_group_code ? `${m.family_group_code} · ${m.family_group}` : m.family_group) : ""}</td>
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
                 <td data-col="sector">{m.sector ?? ""}</td>
                 <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
@@ -571,6 +572,7 @@ export type MemberDetail = {
   ethnicity: string | null;
   education: string | null;
   family_group: string | null;
+  family_group_code?: string | null;
   fellowship: string | null;
   sector: string | null;
   group_label: string | null;
@@ -582,6 +584,9 @@ export type MemberDetail = {
   sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
+  household_id?: number | null;
+  household_name?: string | null;
+  relationship?: string;
 };
 
 export type MemberHistoryRow = {
@@ -649,8 +654,9 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
       rows: [
         [t("detail.state"), isEn && m.state_name_en ? m.state_name_en : m.state_name],
         [t("detail.township"), m.township ?? ""],
+        [t("hh.household"), m.household_name ?? ""],
         [t("detail.salvation"), m.salvation_date ?? ""],
-        [t("detail.familyGroup"), m.family_group ?? ""],
+        [t("detail.familyGroup"), m.family_group ? (m.family_group_code ? `${m.family_group_code} · ${m.family_group}` : m.family_group) : ""],
         [t("form.fellowship"), m.fellowship ?? ""],
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],
@@ -670,6 +676,11 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         </h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href="/members">{t("members.toList")}</a>
+          {m.household_id ? (
+            <a class="btn secondary" href={`/admin/households/${m.household_id}`}>{t("hh.viewHousehold")}</a>
+          ) : perms.has("members.create") ? (
+            <a class="btn secondary" href={`/admin/households/new?member=${m.id}`}>{t("hh.newFromMember")}</a>
+          ) : null}
           {perms.has("members.update") && (
             <a class="btn js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
           )}

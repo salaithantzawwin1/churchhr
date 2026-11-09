@@ -70,8 +70,8 @@ export function normEnum(raw: string, map: Record<string, string>): string | nul
   }
   // extra import aliases
   if (map === GENDERS) {
-    if (["m", "ကျား"].includes(t)) return "male";
-    if (["f", "မ"].includes(t)) return "female";
+    if (["male", "m", "man", "boy", "ကျား"].includes(t)) return "male";
+    if (["female", "f", "woman", "girl", "မ"].includes(t)) return "female";
   }
   if (map === STATUSES && t === "အသက်ရှင်") return "active";
   if (map === MARITAL_STATUSES) {

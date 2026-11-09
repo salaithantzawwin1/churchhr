@@ -11,7 +11,7 @@ import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { checkPasswordPolicy } from "../password";
-import { findOption, loadAllOptions, nextCodeCandidate, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, type OptionRow } from "../lookup";
+import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
 import { s } from "../util";
@@ -21,6 +21,7 @@ import {
   EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, UserFormFragment,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
+import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
 
 export const adminRoutes = new Hono<AppEnv>();
 
@@ -644,6 +645,7 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
       ? c.html(
           <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
             regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)}
+            shortCode={s(body.short_code)}
             lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} allowAllStates={isOptionsAdmin(scope)} modal />,
           400,
         )
@@ -670,9 +672,115 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   // State managers may only anchor options inside their own states. When a
   // parent is chosen its state wins — verify that state, not the picked one.
   if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
-  const code = await nextOptionCode(db, type);
-  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId, code });
+  // Township short code = prefix of its Family Group codes (INS -> INS_FG001).
+  const rawShort = s(body.short_code);
+  if (type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail(t("adm.errShortCode"));
+  let code = await nextOptionCode(db, type);
+  const shortCode = type === "township" ? (rawShort.toUpperCase() || abbrevFromLabel(label) || null) : null;
+  let familyTownship: OptionRow | null = null;
+  if (type === "family_group") {
+    // Family Groups are numbered per Township (Family Group -> Home Cell -> Township).
+    const byId = new Map(all.map((o) => [o.id, o] as const));
+    const parent = parentId != null ? all.find((o) => o.id === parentId) ?? null : null;
+    familyTownship = parent ? (parent.type === "township" ? parent : townshipOf(parent, byId)) : null;
+    const fgCodes = all.filter((o) => o.type === "family_group").map((o) => o.code ?? "");
+    code = nextFamilyGroupCode(fgCodes, familyTownship);
+  }
+  if (type === "township" && shortCode) {
+    const clashShort = await db.all<{ id: number }>(
+      sql`SELECT id FROM lookup_options WHERE type = 'township' AND region_id = ${anchorRegion} AND short_code = ${shortCode} LIMIT 1`,
+    );
+    if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
+  }
+  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId, code, shortCode });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
+});
+
+/** Township rows for the bulk short-code editor (state managers: own states only). */
+async function townshipCodeRows(db: DB, scope: OptionScope, lang: Lang): Promise<TownshipCodeRow[]> {
+  const all = await loadAllOptions(db);
+  const byId = new Map(all.map((o) => [o.id, o] as const));
+  const regionList = await loadRegionsLite(db, lang);
+  const groupCount = new Map<number, number>();
+  for (const fg of all.filter((o) => o.type === "family_group")) {
+    const township = townshipOf(fg, byId);
+    if (township) groupCount.set(township.id, (groupCount.get(township.id) ?? 0) + 1);
+  }
+  return all
+    .filter((o) => o.type === "township" && canManageOption(scope, o.regionId))
+    .map((o) => ({
+      id: o.id, label: o.label, code: o.code, shortCode: o.shortCode, regionId: o.regionId,
+      state: o.regionId === 0 ? "" : regionList.find((r) => r.id === o.regionId)?.name ?? "",
+      groups: groupCount.get(o.id) ?? 0,
+    }))
+    .sort((a, b) => a.state.localeCompare(b.state) || a.label.localeCompare(b.label));
+}
+
+adminRoutes.get("/options/township-codes", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = optionScopeOf(c);
+  const rows = await townshipCodeRows(db, scope, c.get("lang"));
+  return c.html(
+    <TownshipCodesPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      rows={rows} lang={c.get("lang")}
+    />,
+  );
+});
+
+adminRoutes.post("/options/township-codes", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = optionScopeOf(c);
+  const lang: Lang = c.get("lang");
+  const t = getDict(lang);
+  const body = await c.req.parseBody();
+  const rows = await townshipCodeRows(db, scope, lang);
+  const values: Record<number, string> = {};
+  const errors: string[] = [];
+  const taken = new Map<string, string>();
+  for (const row of rows) {
+    const raw = s(body[`short_${row.id}`]).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    values[row.id] = raw;
+    if (raw && !/^[A-Z0-9]{2,8}$/.test(raw)) {
+      errors.push(`${row.label}: ${t("adm.errShortCode")}`);
+      continue;
+    }
+    if (!raw) continue;
+    const key = `${row.regionId}|${raw}`;
+    const other = taken.get(key);
+    if (other !== undefined && other !== row.label) errors.push(`${row.label}: ${t("adm.errShortCodeDup")}`);
+    taken.set(key, row.label);
+  }
+  if (errors.length > 0) {
+    return c.html(
+      <TownshipCodesPage
+        user={c.get("user")} perms={c.get("perms")} flash={null}
+        rows={rows} values={values} errors={errors} lang={lang}
+      />,
+      400,
+    );
+  }
+
+  const all = await loadAllOptions(db);
+  const byId = new Map(all.map((o) => [o.id, o] as const));
+  for (const row of rows) {
+    const nextShort = values[row.id] || null;
+    if (nextShort === (row.shortCode ?? null)) continue;
+    await db.update(lookupOptions).set({ shortCode: nextShort }).where(eq(lookupOptions.id, row.id));
+    if (!nextShort) continue;
+    // Renumber this township's Family Groups to match the new prefix.
+    const groups = all
+      .filter((o) => o.type === "family_group" && townshipOf(o, byId)?.id === row.id)
+      .sort((a, b) => a.id - b.id);
+    for (let n = 0; n < groups.length; n++) {
+      const nextCode = `${nextShort}_FG${String(n + 1).padStart(3, "0")}`;
+      if (groups[n]!.code !== nextCode) {
+        await db.update(lookupOptions).set({ code: nextCode }).where(eq(lookupOptions.id, groups[n]!.id));
+      }
+    }
+  }
+  return c.redirect("/admin/options/township-codes?ok=option-updated", 302);
 });
 
 adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async (c) => {
@@ -698,6 +806,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
     lockRegion: !admin && stateList.length === 1,
     allowAllStates: admin,
     code: current.code ?? "",
+    shortCode: current.shortCode ?? "",
     regionId: current.regionId === 0 ? "" : String(current.regionId),
     parentId: current.parentId == null ? "" : String(current.parentId),
     parentOptions: parentType
@@ -758,6 +867,7 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
       lockRegion: !admin && stateList.length === 1,
       allowAllStates: admin,
       code: s(body.code),
+      shortCode: s(body.short_code),
       regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
       parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
     };
@@ -789,9 +899,32 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
     );
     if (clashCode[0]) return fail(t("adm.errCodeDup"));
   }
+  const rawShort = s(body.short_code);
+  if (current.type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail(t("adm.errShortCode"));
+  const shortCode = current.type === "township" ? (rawShort.toUpperCase() || null) : current.shortCode;
+  if (current.type === "township" && shortCode) {
+    const clashShort = await db.all<{ id: number }>(
+      sql`SELECT id FROM lookup_options WHERE type = 'township' AND region_id = ${anchorRegion} AND short_code = ${shortCode} AND id <> ${id} LIMIT 1`,
+    );
+    if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
+  }
   await db.update(lookupOptions)
-    .set({ label, regionId: anchorRegion, parentId, code: rawCode || null })
+    .set({ label, regionId: anchorRegion, parentId, code: rawCode || null, shortCode })
     .where(eq(lookupOptions.id, id));
+  // Changing a township's short code renumbers the Family Groups under it so the
+  // INS_FG001 sequence stays correct (only when the prefix actually changed).
+  if (current.type === "township" && shortCode && shortCode !== (current.shortCode ?? "")) {
+    const byId = new Map(allOpts.map((o) => [o.id, o] as const));
+    const groups = allOpts
+      .filter((o) => o.type === "family_group" && townshipOf(o, byId)?.id === id)
+      .sort((a, b) => a.id - b.id);
+    for (let n = 0; n < groups.length; n++) {
+      const nextCode = `${shortCode}_FG${String(n + 1).padStart(3, "0")}`;
+      if (groups[n]!.code !== nextCode) {
+        await db.update(lookupOptions).set({ code: nextCode }).where(eq(lookupOptions.id, groups[n]!.id));
+      }
+    }
+  }
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 

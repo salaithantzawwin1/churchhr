@@ -18,6 +18,8 @@ const FLASH_KEYS: Record<string, string> = {
   "hh.memberAdded": "hh.memberAdded",
   "hh.attached": "hh.attached",
   "hh.created": "hh.created",
+  "hh.updated": "hh.updated",
+  "hh.deleted": "hh.deleted",
   "hh.detached": "hh.detached",
   "hh.noMember": "hh.noMember",
   "hh.alreadyMember": "hh.alreadyMember",

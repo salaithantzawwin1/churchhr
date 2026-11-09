@@ -115,6 +115,8 @@ export const lookupOptions = sqliteTable(
     parentId: integer("parent_id"),
     /** Short code (TWP-001, CEL-014, …) shown in dropdowns/export; unique per type+region. */
     code: text("code"),
+    /** Township prefix for Family Group codes (INS -> INS_FG001); unique per type+region. */
+    shortCode: text("short_code"),
   },
   (t) => ({
     typeIdx: index("lookup_options_type_idx").on(t.type),

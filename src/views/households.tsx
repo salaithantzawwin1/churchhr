@@ -41,9 +41,15 @@ function HouseGlyph() {
 
 export type FormValues = Record<string, string | undefined>;
 
+/** Existing member that can be picked as the head of a new household. */
+export type HeadCandidate = {
+  id: number; member_code: string | null;
+  name_myanmar: string | null; name_english: string | null; township?: string | null;
+};
+
 export function HouseholdFormPage(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
-  regions: { id: number; name: string }[];
+  regions: { id: number; name: string }[]; members?: HeadCandidate[];
 }) {
   const { user, perms, lang } = props;
   const t = getDict(lang ?? "en");
@@ -60,7 +66,7 @@ export function HouseholdFormPage(props: Common & {
 export function HouseholdFormFragment(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; modal?: boolean;
-  options?: Record<string, OptionRow[]>;
+  options?: Record<string, OptionRow[]>; members?: HeadCandidate[];
 }) {
   const { values: v, errors, family, regions, modal } = props;
   const t = getDict(props.lang ?? "en");
@@ -76,6 +82,24 @@ export function HouseholdFormFragment(props: Common & {
         <div class="card">
           <h2>{t("hh.cardHeading")}</h2>
           <div class="form-grid">
+            {family === null && (
+              <label class="field" style="grid-column:1/-1">
+                <span class="lbl">{t("hh.headPick")} <span class="hint">{t("hh.headPickHint")}</span></span>
+                <select name="head_member_id">
+                  <option value="">{t("hh.headPickNone")}</option>
+                  {(props.members ?? []).map((m) => {
+                    const nm = (props.lang ?? "en") === "mm"
+                      ? (m.name_myanmar || m.name_english)
+                      : (m.name_english || m.name_myanmar);
+                    return (
+                      <option value={String(m.id)} selected={v.head_member_id === String(m.id)}>
+                        {(nm || `#${m.id}`) + (m.member_code ? ` · ${m.member_code}` : "") + (m.township ? ` · ${m.township}` : "")}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            )}
             <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
               <input type="text" name="name" required value={v.name ?? ""} /></label>
             {regionCascadeSelects({
@@ -191,11 +215,19 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
                   <div class="hh-fact"><span class="hh-fact-label">{t("detail.state")}</span><span class="hh-fact-value">{isEn && f.state_name_en ? f.state_name_en : f.state_name}</span></div>
                   <div class="hh-fact"><span class="hh-fact-label">{t("hh.townshipLabel")}</span><span class="hh-fact-value">{f.township || "—"}</span></div>
                   <div class="hh-fact"><span class="hh-fact-label">{t("form.homeCell")}</span><span class="hh-fact-value">{f.home_cell_label || "—"}</span></div>
+                  <div class="hh-fact"><span class="hh-fact-label">{t("detail.familyGroup")}</span><span class="hh-fact-value">{f.family_group_label ? (f.family_group_code ? `${f.family_group_code} · ${f.family_group_label}` : f.family_group_label) : "—"}</span></div>
                 </div>
                 <div class="hh-card-actions">
                   <a class="btn sm secondary" href={`/admin/households/${f.id}`}>{t("members.open")}</a>
                   {perms.has("members.update") && (
                     <a class="btn sm secondary js-edit-modal" href={`/admin/households/${f.id}/edit`} data-modal-title={t("hh.editTitle")}>{t("members.edit")}</a>
+                  )}
+                  {perms.has("members.delete") && (
+                    <form method="post" action={`/admin/households/${f.id}/delete`}
+                      data-confirm={t("hh.deleteConfirm")} data-confirm-title={t("hh.deleteTitle")}
+                      data-confirm-yes={t("hh.delete")} style="display:inline">
+                      <button class="btn sm outline-danger" type="submit">{t("hh.delete")}</button>
+                    </form>
                   )}
                 </div>
               </article>
@@ -236,6 +268,13 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
           {perms.has("members.update") && (
             <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")} data-modal-size="md">{t("members.edit")}</a>
           )}
+          {perms.has("members.delete") && (
+            <form method="post" action={`/admin/households/${family.id}/delete`}
+              data-confirm={t("hh.deleteConfirm")} data-confirm-title={t("hh.deleteTitle")}
+              data-confirm-yes={t("hh.delete")} style="display:inline">
+              <button class="btn outline-danger" type="submit">{t("hh.delete")}</button>
+            </form>
+          )}
         </div>
       </div>
 
@@ -262,6 +301,10 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
             <div class="hh-fact">
               <span class="hh-fact-label">{t("form.homeCell")}</span>
               <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
+            </div>
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("detail.familyGroup")}</span>
+              <span class="hh-fact-value">{family.family_group_label ? (family.family_group_code ? `${family.family_group_code} · ${family.family_group_label}` : family.family_group_label) : "—"}</span>
             </div>
           </div>
         </section>

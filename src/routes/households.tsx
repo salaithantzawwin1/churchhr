@@ -52,14 +52,33 @@ function scopedRegions(all: { id: number; name: string; nameEn: string; code: st
     }));
 }
 
-const FORM_KEYS = ["name", "head_name", "address", "township", "phone", "region_id", "notes"] as const;
+/** member scope condition (m. prefix, for head-member lookups). */
+function scopeCondM(scope: Scope) {
+  if (scope.scopeAll) return sql`1=1`;
+  if (scope.stateIds.length === 0) return sql`1=0`;
+  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
+}
+
+/** Members that can become the head of a new household: unassigned members in
+ * scope, plus the one being pre-selected from a member page. */
+async function headCandidates(db: DB, scope: Scope, includeId: number | null) {
+  return (await db.all(sql`
+    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.township
+    FROM members m
+    WHERE ${scopeCondM(scope)}
+      AND (m.family_id IS NULL ${includeId ? sql`OR m.id = ${includeId}` : sql``})
+    ORDER BY COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '')
+    LIMIT 300`)) as { id: number; member_code: string | null; name_myanmar: string | null; name_english: string | null; township: string | null }[];
+}
+
+const FORM_KEYS = ["name", "head_member_id", "address", "township", "phone", "region_id", "notes"] as const;
 
 type Validated = {
   values: HFormValues;
   errors: string[];
   data: {
     name: string; address: string | null; township: string | null; phone: string | null;
-    region_id: number; notes: string | null; head_name: string;
+    region_id: number; notes: string | null; head_member_id: number | null;
   } | null;
 };
 
@@ -73,8 +92,9 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, translate:
   if (regionId === null) errors.push(translate("hh.val.state"));
   else regionOk = scope.scopeAll || scope.stateIds.includes(regionId);
   if (regionId !== null && !regionOk) errors.push(translate("hh.val.scope"));
-  const headName = (v.head_name ?? "").trim();
-  if (headName && headName.length > 120) errors.push(translate("hh.val.headLong"));
+  const headRaw = (v.head_member_id ?? "").trim();
+  const headMemberId = headRaw ? asInt(headRaw) : null;
+  if (headRaw && headMemberId === null) errors.push(translate("hh.val.head"));
   if (errors.length > 0) return { values: v, errors, data: null };
   return {
     values: v,
@@ -86,7 +106,7 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, translate:
       phone: v.phone || null,
       region_id: regionId!,
       notes: v.notes || null,
-      head_name: headName,
+      head_member_id: headMemberId,
     },
   };
 }
@@ -121,11 +141,13 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
            head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
            head.phone AS head_phone,
            hc.label AS home_cell_label,
+           fg.label AS family_group_label, fg.code AS family_group_code,
            hm.cnt AS member_count
     FROM families f
     JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
     LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
+    LEFT JOIN lookup_options fg ON fg.id = head.family_group_id
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
     WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond}
@@ -151,12 +173,30 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
 householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
+  const lang = c.get("lang");
   const allRegions = await loadRegions(db);
   const allOptions = await loadAllOptions(db);
+  // Pre-select the member when arriving from Member detail → "New household".
+  const preMemberId = intParam(c.req.query("member"));
+  let values = defaultValues(scope);
+  if (preMemberId) {
+    const [m] = (await db.all(sql`SELECT * FROM members m WHERE m.id = ${preMemberId}`)) as any[];
+    if (m && (scope.scopeAll || scope.stateIds.includes(m.region_id))) {
+      values = {
+        name: m.name_myanmar || m.name_english || "",
+        region_id: String(m.region_id),
+        township: m.township ?? "",
+        phone: m.phone ?? "",
+        address: m.address ?? "",
+        head_member_id: String(m.id),
+      };
+    }
+  }
+  const headList = await headCandidates(db, scope, preMemberId);
   const opts = {
-    user: c.get("user"), perms: c.get("perms"), values: defaultValues(scope), errors: [] as string[],
-    family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-    options: hhFormOptions(allOptions),
+    user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
+    family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, lang), lang,
+    options: hhFormOptions(allOptions), members: headList,
   };
   if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
   return c.html(<HouseholdFormPage {...opts} />);
@@ -172,27 +212,61 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
   const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
   const allOptions = await loadAllOptions(db);
+  const headList = await headCandidates(db, scope, null);
   const render = (status: 400 | 200) => {
     const opts = {
       user: c.get("user"), perms: c.get("perms"), values, errors,
       family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-      options: hhFormOptions(allOptions),
+      options: hhFormOptions(allOptions), members: headList,
     };
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
   if (!data) return render(400);
 
+  // Optional existing member becomes the head and is attached to the new family.
+  let head: any = null;
+  if (data.head_member_id != null) {
+    const [m] = (await db.all(sql`SELECT m.* FROM members m WHERE m.id = ${data.head_member_id}`)) as any[];
+    if (!m || !(scope.scopeAll || scope.stateIds.includes(m.region_id))) {
+      errors.push(getDict(c.get("lang"))("hh.val.head"));
+      return render(400);
+    }
+    head = m;
+  }
+
   const inserted = await db
     .insert(families)
     .values({
-      name: data.name, address: data.address, township: data.township, phone: data.phone,
+      name: data.name,
+      address: data.address ?? head?.address ?? null,
+      township: data.township ?? head?.township ?? null,
+      phone: data.phone ?? head?.phone ?? null,
       regionId: data.region_id, notes: data.notes, createdBy: c.get("user").id,
     })
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
 
-  const next = `/admin/households/${familyId}/add-member?ok=hh.created`;
+  if (head) {
+    const now = Math.floor(Date.now() / 1000);
+    // If the member was head of another family, that family loses its head.
+    if (head.family_id) {
+      await db.update(families).set({ headMemberId: null })
+        .where(and(eq(families.id, head.family_id), eq(families.headMemberId, head.id)));
+    }
+    await db.update(members)
+      .set({ householdId: familyId, relationship: "head", updatedBy: c.get("user").id, updatedAt: now })
+      .where(eq(members.id, head.id));
+    await db.update(families).set({ headMemberId: head.id }).where(eq(families.id, familyId));
+    await db.insert(memberHistory).values({
+      memberId: head.id, actorId: c.get("user").id, action: "update",
+      snapshotJson: JSON.stringify({ family_id: familyId, relationship: "head", created_household: true }),
+    });
+  }
+
+  const next = head
+    ? `/admin/households/${familyId}?ok=hh.created`
+    : `/admin/households/${familyId}/add-member?ok=hh.created`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
 });
@@ -207,10 +281,12 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   const [row] = await db.all(sql`
     SELECT f.*, r.name AS state_name, r.name_en AS state_name_en,
       head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
-      hc.label AS home_cell_label
+      hc.label AS home_cell_label,
+      fg.label AS family_group_label, fg.code AS family_group_code
     FROM families f JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
     LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
+    LEFT JOIN lookup_options fg ON fg.id = head.family_group_id
     WHERE f.id = ${id}`) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
@@ -238,7 +314,7 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const allRegions = await loadRegions(db);
   const values: HFormValues = {
     name: row.name, address: row.address ?? "", township: row.township ?? "",
-    phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "", head_name: "",
+    phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "",
   };
   const allOptions = await loadAllOptions(db);
   const opts = {
@@ -508,21 +584,19 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
     .set({ householdId: id, relationship: relSafe, updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) })
     .where(eq(members.id, memberId));
 
-  // Auto-assign from head when attaching non-head members.
+  // Auto-assign from the household head; promoting a new head demotes the old one.
   const [head] = (await db.all(sql`
-    SELECT m.* FROM members m WHERE m.family_id = ${id} AND m.relationship = 'head' LIMIT 1`)) as any[];
-  if (head && relSafe !== "head" && relSafe !== "spouse" && relSafe !== "son" && relSafe !== "daughter") {
-    // non-descriptor relationships leave assignments alone
-  } else {
-    const set: Record<string, unknown> = {};
+    SELECT m.* FROM members m WHERE m.family_id = ${id} AND m.relationship = 'head' AND m.id <> ${memberId} LIMIT 1`)) as any[];
+  if (relSafe === "head") {
     if (head) {
-      if (!m.familyGroupId && head.familyGroupId) set.familyGroupId = head.familyGroupId;
-      if (!m.groupId && head.groupId) set.groupId = head.groupId;
-      if (!m.homeCellId && head.homeCellId) set.homeCellId = head.homeCellId;
+      await db.update(members).set({ relationship: "other" }).where(eq(members.id, head.id));
     }
-    if (relSafe === "head") {
-      await db.update(families).set({ headMemberId: memberId }).where(eq(families.id, id));
-    }
+    await db.update(families).set({ headMemberId: memberId }).where(eq(families.id, id));
+  } else if (head) {
+    const set: Record<string, unknown> = {};
+    if (!m.familyGroupId && head.familyGroupId) set.familyGroupId = head.familyGroupId;
+    if (!m.groupId && head.groupId) set.groupId = head.groupId;
+    if (!m.homeCellId && head.homeCellId) set.homeCellId = head.homeCellId;
     if (Object.keys(set).length > 0) {
       await db.update(members).set(set as any).where(eq(members.id, memberId));
     }

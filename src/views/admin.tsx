@@ -503,12 +503,26 @@ function optionParentField(
   );
 }
 
+/** Township short-code input: the prefix of its Family Group codes (INS_FG001…). */
+function optionShortCodeField(type: string, value: string | undefined, t: (k: string) => string) {
+  if (type !== "township") return null;
+  return (
+    <label class="field">
+      <span class="lbl">{t("adm.shortCode")}</span>
+      <input type="text" name="short_code" value={value ?? ""} maxLength={8}
+        pattern="[A-Za-z0-9]{0,8}" title={t("adm.shortCodeHint")} />
+      <span class="field-hint">{t("adm.shortCodeHint")}</span>
+    </label>
+  );
+}
+
 /** Add form for a lookup option — bare fragment for the modal (and the no-JS ?add=1 fallback). */
 export function AddOptionForm(props: {
   type: string; lang?: Lang; errors?: string[]; modal?: boolean; value?: string;
   regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
+  shortCode?: string;
 }) {
   const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
@@ -528,6 +542,7 @@ export function AddOptionForm(props: {
       </label>
       {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
       {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
+      {optionShortCodeField(props.type, props.shortCode, t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -647,7 +662,7 @@ export function EditOptionForm(props: {
   type?: string; regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
-  code?: string;
+  code?: string; shortCode?: string;
 }) {
   const t = getDict(props.lang ?? "en");
   const errors = props.errors ?? [];
@@ -674,6 +689,7 @@ export function EditOptionForm(props: {
       </div>
       {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
       {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
+      {optionShortCodeField(props.type ?? "", props.shortCode, t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -749,6 +765,9 @@ export function AdminOptionsPage(props: OptionsProps) {
         <h1>{t("adm.optionsHeading")}</h1>
         <div class="page-actions">
           <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
+          {type === "township" && (
+            <a class="btn secondary" href="/admin/options/township-codes">{t("adm.shortCodesButton")}</a>
+          )}
           <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
             + {t("adm.addOption")}
           </a>

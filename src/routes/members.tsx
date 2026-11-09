@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { memberHistory } from "../db/schema";
+import { families, memberHistory } from "../db/schema";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { findOption, loadAllOptions, nextCodeCandidate, optionsOfType, type OptionRow } from "../lookup";
+import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
@@ -64,6 +64,8 @@ const validMsgKeys: Record<string, string> = {
   "imp.tooLarge": "imp.tooLarge",
   "imp.failed": "imp.failed",
   "imp.cannotAddOption": "imp.cannotAddOption",
+  "imp.badRelationship": "imp.badRelationship",
+  "imp.badHousehold": "imp.badHousehold",
 };
 
 /** Marks a message as a translate-at-render key (called from sync validators). */
@@ -71,12 +73,17 @@ function msg(key: string): string {
   return validMsgKeys[key] ? `@${key}` : key;
 }
 
-/** Renders a message produced by validators/import: @key -> dictionary, else literal. */
+/** Renders a message produced by validators/import: @key -> dictionary, else literal.
+ * Handles the "@key: detail" form used by row errors (e.g. bad blood type value). */
 function renderMsg(raw: string, lang: Lang): string {
   if (!raw.startsWith("@")) return raw;
   const t = getDict(lang);
-  const key = validMsgKeys[raw.slice(1)];
-  return key ? t(key) : raw.slice(1);
+  const body = raw.slice(1);
+  const sep = body.indexOf(":");
+  const keyPart = (sep === -1 ? body : body.slice(0, sep)).trim();
+  const rest = sep === -1 ? "" : body.slice(sep);
+  const key = validMsgKeys[keyPart];
+  return key ? `${t(key)}${rest}` : body;
 }
 
 type Scope = { scopeAll: boolean; stateIds: number[] };
@@ -183,7 +190,8 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
            m.date_of_birth, m.marital_status, m.township,
            r.name AS state_name, r.name_en AS state_name_en,
            hc.label AS home_cell, gr.label AS group_label,
-           fg.label AS family_group, fc.label AS fellowship, sec.label AS sector
+           fg.label AS family_group, fg.code AS family_group_code,
+           fc.label AS fellowship, sec.label AS sector
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
@@ -327,6 +335,7 @@ const EXPORT_HEADER = [
   "Blood Type", "Phone Number", "NRC Number", "Ethnicity", "Language", "Education", "Job",
   "Work Skills", "Income", "Address", "Father's Name", "Mother's Name", "Salvation Date",
   "Family Group", "Fellowship Categories", "Participating Sector", "Group", "Home Cell", "Township", "State", "Status",
+  "Household", "Relationship",
 ];
 
 membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
@@ -337,9 +346,11 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
   const rows = await db.all(sql`
     SELECT m.*, r.name AS state_name,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
-      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell
+      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      fam.name AS household
     FROM members m
     JOIN regions r ON r.id = m.region_id
+    LEFT JOIN families fam ON fam.id = m.family_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
@@ -358,6 +369,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     r.income, r.address, r.father_name, r.mother_name, r.salvation_date,
     r.family_group, r.fellowship, r.sector, r.group_label, r.home_cell, r.township, r.state_name,
     r.status ? STATUSES[r.status]?.split(" (")[0] ?? r.status : "",
+    r.household, r.relationship,
   ]);
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, ...body]);
   const today = new Date().toISOString().slice(0, 10);
@@ -378,7 +390,7 @@ membersRoutes.get("/import/template", requirePermission("members.import"), (c) =
     "", "Aung Aung", "မောင်အောင်", "male", "married", "1990-05-12", "", "O+", "0912345678",
     "12/abc(N)123456", "ဗမာ", "မြန်မာ", "Bachelor", "ဆရာဝန်", "", "300000", "ရန်ကုန်",
     "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Young Adults", "Group 1", "Cell 1",
-    "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active",
+    "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active", "", "",
   ];
   const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, sample]);
   return c.body(csv, 200, {
@@ -416,8 +428,16 @@ const IMPORT_ALIASES: Record<string, string> = {
   "state": "state", "region": "state",
   "township": "township", "township (မြို့နယ်)": "township",
   "status": "status",
+  "household": "household", "family": "household", "household name": "household",
+  "relationship": "relationship", "relation": "relationship",
   "notes": "notes", "note": "notes",
 };
+
+/** Relationship keys accepted in CSV import (export writes the same keys). */
+const IMPORT_RELATIONSHIPS = [
+  "head", "spouse", "son", "daughter", "father", "mother",
+  "brother", "sister", "grandchild", "other",
+] as const;
 
 const IMPORT_OPTION_FIELDS: Record<string, string> = {
   ethnicity: "ethnicity",
@@ -445,11 +465,14 @@ type ImportRow = {
   data: Record<string, string | number | null>;
   optionLabels: Record<string, string>;
   key: string;
+  /** Household name + relationship inside it (round-trips the export columns). */
+  household: string | null;
+  relationship: string;
 };
 
 type AnalyzeResult = { report: ImportReport; validRows: ImportRow[]; pending: Map<string, { type: string; label: string }> };
 
-async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: number): Promise<AnalyzeResult> {
+async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: number, lang: Lang): Promise<AnalyzeResult> {
   const grid = parseCsv(csvText);
   if (grid.length < 2) throw new Error(msg("imp.noDataRow"));
   const idx = headerIndex(grid[0]!, IMPORT_ALIASES);
@@ -471,12 +494,16 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
   const errors: { line: number; msg: string }[] = [];
   let errorCount = 0;
   let duplicates = 0;
+  let totalRows = 0;
   const validRows: ImportRow[] = [];
   const pending = new Map<string, { type: string; label: string }>();
 
   for (let i = 1; i < grid.length; i++) {
     const row = grid[i]!;
     const line = i + 1;
+    // Blank lines (common at the end of exported sheets) are not data rows.
+    if (row.every((cell) => !cell.trim())) continue;
+    totalRows += 1;
     const rec = (k: string) => {
       const j = idx.get(k);
       return j === undefined ? "" : (row[j] ?? "").trim();
@@ -545,6 +572,26 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       else rowErrors.push(`${msg("imp.badIncome")}: ${rec("income")}`);
     }
 
+    // Household + relationship (round-trip of the export columns). Households
+    // are matched/created by name inside the member's state at commit time.
+    const relRaw = rec("relationship").toLowerCase().replace(/[\s-]+/g, "_");
+    let relationship = "";
+    if (relRaw) {
+      if ((IMPORT_RELATIONSHIPS as readonly string[]).includes(relRaw)) relationship = relRaw;
+      else rowErrors.push(`${msg("imp.badRelationship")}: ${rec("relationship")}`);
+    }
+    const householdName = rec("household");
+    if (householdName.length > 120) rowErrors.push(`${msg("imp.badHousehold")}: ${householdName.slice(0, 40)}`);
+
+    // Township is stored on the member as its managed option label; register a
+    // new township so it shows up in the cascade dropdowns after import too.
+    let township = rec("township");
+    if (township) {
+      const found = findOption(allOptions, "township", township, regionId ?? 0);
+      if (found) township = found.label;
+      else pending.set(`township:${normKey(township)}`, { type: "township", label: township });
+    }
+
     const optionLabels: Record<string, string> = {};
     for (const [field, type] of Object.entries(IMPORT_OPTION_FIELDS)) {
       const label = rec(field);
@@ -560,7 +607,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
 
     if (rowErrors.length > 0) {
       errorCount++;
-      if (errors.length < 50) errors.push({ line, msg: rowErrors.join("; ") });
+      if (errors.length < 50) errors.push({ line, msg: rowErrors.map((e) => renderMsg(e, lang)).join("; ") });
       continue;
     }
 
@@ -574,6 +621,8 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       line,
       optionLabels,
       key,
+      household: householdName || null,
+      relationship,
       data: {
         name_myanmar: nameMm || null,
         name_english: nameEn || null,
@@ -585,7 +634,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
         nrc_number: rec("nrc") || null,
         languages: rec("language") || null,
         address: rec("address") || null,
-        township: rec("township") || null,
+        township: township || null,
         father_name: rec("father") || null,
         mother_name: rec("mother") || null,
         job: rec("job") || null,
@@ -602,7 +651,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
   return {
     report: {
       done: false,
-      total: grid.length - 1,
+      total: totalRows,
       valid: validRows.length,
       inserted: 0,
       duplicates,
@@ -626,23 +675,29 @@ const TYPE_TO_COLUMN: Record<string, string> = {
 };
 
 /** Find or create an import option. Rows without a state fall back to the
- * all-states (regionId 0) option; rows with a state resolve/create region-scoped. */
+ * all-states (regionId 0) option; rows with a state resolve/create region-scoped.
+ * parentId/township let Home Cells and Family Groups keep the cascade (and the
+ * per-township INS_FG001 numbering) intact. */
 async function ensureOption(
   db: DB, cache: OptionRow[], type: string, label: string, lang: Lang, regionId = 0,
+  opts: { parentId?: number | null; township?: OptionRow | null } = {},
 ): Promise<number> {
   const hit = findOption(cache, type, label, regionId);
   if (hit) return hit.id;
   try {
-    const code = nextCodeCandidate(cache.filter((o) => o.type === type).map((o) => o.code ?? ""), type);
+    const code = type === "family_group"
+      ? nextFamilyGroupCode(cache.filter((o) => o.type === type).map((o) => o.code ?? ""), opts.township ?? null)
+      : nextCodeCandidate(cache.filter((o) => o.type === type).map((o) => o.code ?? ""), type);
+    const shortCode = type === "township" ? (abbrevFromLabel(label) || null) : null;
     const rows = await db
       .insert(lookupOptions)
-      .values({ type, label, regionId, code })
-      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId, code: lookupOptions.code });
+      .values({ type, label, regionId, parentId: opts.parentId ?? null, code, shortCode })
+      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId, code: lookupOptions.code, shortCode: lookupOptions.shortCode });
     cache.push(rows[0]!);
     return rows[0]!.id;
   } catch {
     const fresh = await db.select().from(lookupOptions)
-      .where(and(eq(lookupOptions.type, type), eq(lookupOptions.label, label))).limit(1);
+      .where(and(eq(lookupOptions.type, type), eq(lookupOptions.label, label), eq(lookupOptions.regionId, regionId))).limit(1);
     if (fresh[0]) return fresh[0].id;
     throw new Error(`${renderMsg(msg("imp.cannotAddOption"), lang)}: ${label}`);
   }
@@ -673,39 +728,93 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
       csvText = await f.text();
     }
 
-    const { report, validRows, pending } = await analyzeImport(db, csvText, scope, userId);
+    const { report, validRows, pending } = await analyzeImport(db, csvText, scope, userId, lang);
 
     if (action === "commit") {
       const optionCache = await loadAllOptions(db);
       let inserted = 0;
       for (const row of validRows) {
         const data: Record<string, string | number | null> = { ...row.data };
+        const rowRegion = Number(data.region_id ?? 0) || 0;
+
+        // Township: keep the managed dropdown in sync and use its canonical label.
+        let townshipOpt: OptionRow | null = null;
+        if (data.township) {
+          const rawTownship = String(data.township);
+          const found = findOption(optionCache, "township", rawTownship, rowRegion);
+          if (found) {
+            townshipOpt = found;
+            data.township = found.label;
+          } else {
+            const newId = await ensureOption(db, optionCache, "township", rawTownship, lang, rowRegion);
+            townshipOpt = optionCache.find((o) => o.id === newId) ?? null;
+          }
+        }
+
+        // Resolve/create options; Home Cells are parented to the row's Township.
+        let homeCellId: number | null = null;
         for (const [field, val] of Object.entries(row.optionLabels)) {
           const type = IMPORT_OPTION_FIELDS[field];
-          if (!type) continue;
-          const col = TYPE_TO_COLUMN[type];
-          if (!col) continue;
+          const col = type ? TYPE_TO_COLUMN[type] : undefined;
+          if (!type || !col || type === "family_group") continue;
           if (val.startsWith("new:")) {
             const p = pending.get(val.slice(4));
-            if (p) {
-              // Create the option in the member's state (0 when the row has no state).
-              const rowRegion = Number(data.region_id ?? 0) || 0;
-              data[col] = await ensureOption(db, optionCache, p.type, p.label, lang, rowRegion);
-            }
+            if (!p) continue;
+            // Create the option in the member's state (0 when the row has no state).
+            data[col] = await ensureOption(db, optionCache, p.type, p.label, lang, rowRegion, {
+              parentId: p.type === "home_cell" ? townshipOpt?.id ?? null : null,
+            });
           } else {
             data[col] = Number(val);
           }
+          if (type === "home_cell") homeCellId = Number(data[col]) || null;
+        }
+        // Family Groups: parent = Home Cell, code numbered per Township (INS_FG001…).
+        for (const [field, val] of Object.entries(row.optionLabels)) {
+          if (IMPORT_OPTION_FIELDS[field] !== "family_group") continue;
+          if (val.startsWith("new:")) {
+            const p = pending.get(val.slice(4));
+            if (!p) continue;
+            data.family_group_id = await ensureOption(db, optionCache, "family_group", p.label, lang, rowRegion, {
+              parentId: homeCellId, township: townshipOpt,
+            });
+          } else {
+            data.family_group_id = Number(val);
+          }
         }
         const importId = await insertMember(db, data, userId);
+
+        // Attach to (or create) the household named in the CSV, in the member's state.
+        if (row.household) {
+          const rel = row.relationship || "other";
+          const [existingFamily] = await db.all<{ id: number }>(
+            sql`SELECT id FROM families WHERE region_id = ${rowRegion} AND LOWER(name) = LOWER(${row.household}) LIMIT 1`,
+          );
+          let familyId = existingFamily?.id;
+          if (!familyId) {
+            const createdFamily = await db.insert(families)
+              .values({ name: row.household, regionId: rowRegion, createdBy: userId })
+              .returning({ id: families.id });
+            familyId = createdFamily[0]!.id;
+          }
+          await db.update(members).set({ householdId: familyId, relationship: rel }).where(eq(members.id, importId));
+          if (rel === "head") {
+            await db.update(families).set({ headMemberId: importId }).where(eq(families.id, familyId));
+          }
+        }
+
         await db.insert(memberHistory).values({
           memberId: importId, actorId: userId, action: "create",
-          snapshotJson: JSON.stringify({ source: "csv-import", ...data }),
+          snapshotJson: JSON.stringify({
+            source: "csv-import", ...data,
+            household: row.household, relationship: row.relationship,
+          }),
         });
         inserted++;
       }
       report.done = true;
       report.inserted = inserted;
-      return c.html(<ImportPage user={c.get("user")} perms={c.get("perms")} report={report} error={null} />);
+      return c.html(<ImportPage user={c.get("user")} perms={c.get("perms")} report={report} error={null} lang={lang} />);
     }
 
     if (validRows.length > 0) report.csvB64 = b64encode(csvText);
@@ -720,11 +829,14 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
 
 async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { region_id: number }) | undefined> {
   const rows = await db.all(sql`
-    SELECT m.*, r.name AS state_name, r.name_en AS state_name_en,
+    SELECT m.*, m.family_id AS household_id, r.name AS state_name, r.name_en AS state_name_en,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
-      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell
+      fg.code AS family_group_code,
+      fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      fam.name AS household_name
     FROM members m
     JOIN regions r ON r.id = m.region_id
+    LEFT JOIN families fam ON fam.id = m.family_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id

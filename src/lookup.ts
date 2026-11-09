@@ -17,6 +17,8 @@ export type OptionRow = {
   parentId: number | null;
   /** Short code (TWP-001…), null until assigned. */
   code: string | null;
+  /** Township short code used as the prefix of its Family Group codes (INS_FG001…). */
+  shortCode: string | null;
 };
 
 export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
@@ -25,7 +27,7 @@ export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
       id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label,
       active: lookupOptions.active, sortOrder: lookupOptions.sortOrder,
       regionId: lookupOptions.regionId, parentId: lookupOptions.parentId,
-      code: lookupOptions.code,
+      code: lookupOptions.code, shortCode: lookupOptions.shortCode,
     })
     .from(lookupOptions)
     .orderBy(asc(lookupOptions.type), asc(lookupOptions.sortOrder), asc(lookupOptions.label))) as OptionRow[];
@@ -116,6 +118,64 @@ export function nextCodeCandidate(existingCodes: string[], type: string): string
     code = `${prefix}-${String(n).padStart(3, "0")}`;
   }
   return code;
+}
+
+/** Latin abbreviation for a township name: "Insein Township" -> INS, null when
+ * the label has no usable Latin letters (e.g. Burmese-only names). */
+export function abbrevFromLabel(label: string): string | null {
+  const cleaned = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(township|twp|city|myo|myone)\b/gi, " ")
+    .toUpperCase();
+  const letters = cleaned.replace(/[^A-Z]/g, "");
+  return letters.length >= 2 ? letters.slice(0, 3) : null;
+}
+
+/** Prefix used for a township's Family Group codes: its short code, else an
+ * abbreviation of the name, else the TWP code (TWP-005 -> TWP005). */
+export function townshipBase(township: { shortCode?: string | null; code?: string | null; label?: string }): string {
+  const short = (township.shortCode ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (short) return short;
+  if (township.label) {
+    const ab = abbrevFromLabel(township.label);
+    if (ab) return ab;
+  }
+  const fromCode = (township.code ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return fromCode || "FG";
+}
+
+/** Township ancestor of an option (walks the parent chain, e.g. Family Group ->
+ * Home Cell -> Township). Null when the option is unparented. */
+export function townshipOf(
+  option: { parentId: number | null },
+  byId: Map<number, OptionRow>,
+): OptionRow | null {
+  let current = option.parentId != null ? byId.get(option.parentId) : undefined;
+  let hops = 0;
+  while (current && hops < 5) {
+    if (current.type === "township") return current;
+    current = current.parentId != null ? byId.get(current.parentId) : undefined;
+    hops += 1;
+  }
+  return null;
+}
+
+/** Next free Family Group code: TOWNSHIPBASE_FG001, -002, … per township. Groups
+ * without a township keep the legacy FMG-001 numbering. */
+export function nextFamilyGroupCode(
+  existingCodes: string[],
+  township: { shortCode?: string | null; code?: string | null; label?: string } | null,
+): string | null {
+  if (!township) return nextCodeCandidate(existingCodes, "family_group");
+  const prefix = `${townshipBase(township)}_FG`;
+  let max = 0;
+  for (const code of existingCodes) {
+    if (!code || !code.startsWith(prefix)) continue;
+    const n = Number(code.slice(prefix.length));
+    if (Number.isInteger(n) && n > max) max = n;
+  }
+  return `${prefix}${String(max + 1).padStart(3, "0")}`;
 }
 
 /** Raw DB column names for each option type (for GROUP BY / COUNT queries). */
