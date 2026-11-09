@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
-import { activityReports, regions } from "../db/schema";
+import { activityReports, regions, reportEdits } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
@@ -10,7 +10,7 @@ import { getDict, type Lang } from "../i18n";
 import { ForbiddenPage } from "../views/errors";
 import {
   ReportDetailPage, ReportFormPage, ReportsListPage,
-  type ReportDetail, type ReportFormValues, type ReportListRow,
+  type ReportDetail, type ReportEdit, type ReportFormValues, type ReportListRow,
 } from "../views/reports";
 
 export const reportsRoutes = new Hono<AppEnv>();
@@ -92,6 +92,29 @@ type ReportData = {
   prayer_requests: string | null;
   next_steps: string | null;
 };
+
+type ReportEditChange = { field: string; from: string | null; to: string | null };
+
+/** Changed fields between the stored report and the submitted form values. */
+function diffReport(before: ReportDetail, after: ReportData): ReportEditChange[] {
+  const asText = (value: number | null) => (value == null ? null : String(value));
+  const pairs: [string, string | null, string | null][] = [
+    ["report_date", before.report_date, after.report_date],
+    ["region_id", String(before.region_id), String(after.region_id)],
+    ["township", before.township, after.township],
+    ["title", before.title, after.title],
+    ["body", before.body, after.body],
+    ["attendance", asText(before.attendance), asText(after.attendance)],
+    ["new_contacts", asText(before.new_contacts), asText(after.new_contacts)],
+    ["follow_ups", asText(before.follow_ups), asText(after.follow_ups)],
+    ["challenges", before.challenges, after.challenges],
+    ["prayer_requests", before.prayer_requests, after.prayer_requests],
+    ["next_steps", before.next_steps, after.next_steps],
+  ];
+  return pairs
+    .filter(([, from, to]) => from !== to)
+    .map(([field, from, to]) => ({ field, from, to }));
+}
 
 /** Validate the submitted report; values are kept exactly as typed for the
  * re-rendered form, data stays null when any field fails. */
@@ -426,6 +449,11 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
     .limit(1);
   if (existing[0]) return rerender([t("rep.dup")]);
 
+  const changes = diffReport(report, data);
+  if (changes.length === 0) {
+    return c.redirect(`/reports/${id}?ok=report-unchanged`, 302);
+  }
+
   try {
     const now = Math.floor(Date.now() / 1000);
     const updated = await db
@@ -454,6 +482,12 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
     if (!updated[0]) {
       return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
     }
+    await db.insert(reportEdits).values({
+      reportId: id,
+      editorId: user.id,
+      editedAt: now,
+      changes: JSON.stringify(changes),
+    });
     return c.redirect(`/reports/${id}?ok=report-updated`, 302);
   } catch (err) {
     // The unique (author, date) index catches a date change racing the check above.
@@ -493,12 +527,27 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
 
+  const editRows = await db.all<ReportEdit>(sql`
+    SELECT e.id, e.edited_at, e.changes, u.username AS editor_name
+    FROM report_edits e JOIN users u ON u.id = e.editor_id
+    WHERE e.report_id = ${id}
+    ORDER BY e.edited_at DESC, e.id DESC
+    LIMIT 100`);
+  const regionRows = await db
+    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn })
+    .from(regions);
+  const regionNames: Record<number, string> = {};
+  for (const row of regionRows) {
+    regionNames[row.id] = lang !== "mm" && row.nameEn ? row.nameEn : row.name;
+  }
+
   return c.html(
     <ReportDetailPage
       user={user} perms={perms} flash={flashFromQuery(c.req.query(), lang)} lang={lang}
       report={report} canCreate={perms.has("reports.create")}
       canEdit={own && perms.has("reports.create") && report.status !== "reviewed"}
       canReview={perms.has("reports.review") && inScope}
+      edits={editRows} regionNames={regionNames}
     />,
   );
 });

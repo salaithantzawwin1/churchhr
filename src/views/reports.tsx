@@ -35,6 +35,53 @@ export type ReportDetail = ReportListRow & {
   reviewed_at: number | null;
 };
 
+/** One saved edit: `changes` is the JSON string written by the edit route. */
+export type ReportEdit = {
+  id: number;
+  edited_at: number;
+  editor_name: string;
+  changes: string;
+};
+
+type ReportEditChange = { field: string; from: string | null; to: string | null };
+
+const EDIT_FIELD_KEYS: Record<string, string> = {
+  report_date: "rep.date",
+  region_id: "rep.state",
+  township: "rep.township",
+  title: "rep.titleField",
+  body: "rep.body",
+  attendance: "rep.attendance",
+  new_contacts: "rep.newContacts",
+  follow_ups: "rep.followUps",
+  challenges: "rep.challenges",
+  prayer_requests: "rep.prayer",
+  next_steps: "rep.nextSteps",
+};
+const LONG_EDIT_FIELDS = new Set(["body", "challenges", "prayer_requests", "next_steps"]);
+
+function parseEditChanges(raw: string): ReportEditChange[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (c): c is ReportEditChange =>
+        !!c && typeof c.field === "string" &&
+        (typeof c.from === "string" || c.from === null) &&
+        (typeof c.to === "string" || c.to === null),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Region diffs store ids; everything else is already display text. */
+function editValue(value: string | null, field: string, regionNames: Record<number, string>): string {
+  if (value === null || value === "") return "—";
+  if (field === "region_id") return regionNames[Number(value)] ?? `#${value}`;
+  return value;
+}
+
 /** State label in the UI language (English falls back to the Myanmar name). */
 function stateName(r: { state_name: string; state_name_en: string | null }, lang: Lang) {
   return lang !== "mm" && r.state_name_en ? r.state_name_en : r.state_name;
@@ -253,8 +300,18 @@ export function ReportFormPage(props: Common & {
   );
 }
 
-export function ReportDetailPage(props: Common & { report: ReportDetail; canCreate: boolean; canReview: boolean; canEdit?: boolean }) {
-  const { user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false } = props;
+export function ReportDetailPage(props: Common & {
+  report: ReportDetail;
+  canCreate: boolean;
+  canReview: boolean;
+  canEdit?: boolean;
+  edits?: ReportEdit[];
+  regionNames?: Record<number, string>;
+}) {
+  const {
+    user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false,
+    edits = [], regionNames = {},
+  } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const facts: [string, string][] = [
@@ -361,6 +418,54 @@ export function ReportDetailPage(props: Common & { report: ReportDetail; canCrea
           <div class="report-body">{r.review_note}</div>
         </div>
       ) : null}
+
+      {edits.length > 0 && (
+        <div class="card detail-card">
+          <h2>{t("rep.history")}</h2>
+          <p class="muted small">{t("rep.historyHint")}</p>
+          <ol class="edit-hist">
+            {edits.map((entry) => {
+              const changes = parseEditChanges(entry.changes);
+              return (
+                <li>
+                  <div class="edit-meta">{stamp(entry.edited_at)} · {entry.editor_name}</div>
+                  <ul class="edit-changes">
+                    {changes.map((c) => {
+                      const label = t(EDIT_FIELD_KEYS[c.field] ?? c.field);
+                      const before = editValue(c.from, c.field, regionNames);
+                      const after = editValue(c.to, c.field, regionNames);
+                      return (
+                        <li>
+                          {LONG_EDIT_FIELDS.has(c.field) ? (
+                            <details class="edit-diff">
+                              <summary>{label}</summary>
+                              <div class="edit-pair">
+                                <span class="k">{t("rep.before")}</span>
+                                <div class="report-body">{before}</div>
+                              </div>
+                              <div class="edit-pair">
+                                <span class="k">{t("rep.after")}</span>
+                                <div class="report-body">{after}</div>
+                              </div>
+                            </details>
+                          ) : (
+                            <div class="edit-change">
+                              <span class="k">{label}</span>
+                              <span class="edit-old">{before}</span>
+                              <span class="edit-arrow" aria-hidden="true">→</span>
+                              <span class="edit-new">{after}</span>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
 
       <p class="muted small">{t("rep.updatedAt")}: {stamp(r.updated_at)}</p>
     </Layout>

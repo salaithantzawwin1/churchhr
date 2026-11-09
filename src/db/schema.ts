@@ -304,6 +304,17 @@ export const activityReports = sqliteTable("activity_reports", {
   statusIdx: index("activity_reports_status_idx").on(t.status),
 }));
 
+/** One row per successful report edit; `changes` is a JSON array of field diffs. */
+export const reportEdits = sqliteTable("report_edits", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reportId: integer("report_id").notNull().references(() => activityReports.id),
+  editorId: integer("editor_id").notNull().references(() => users.id),
+  editedAt: integer("edited_at").notNull().default(sql`(unixepoch())`),
+  changes: text("changes").notNull(),
+}, (t) => ({
+  reportIdx: index("report_edits_report_idx").on(t.reportId, t.editedAt),
+}));
+
 /** Per-IP login attempt log for the sliding-window rate limiter. */
 export const loginAttempts = sqliteTable(
   "login_attempts",

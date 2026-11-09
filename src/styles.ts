@@ -710,6 +710,22 @@ th.bar-col { width: 42%; }
 .detail-item .v.empty { color: var(--muted); }
 /* Daily reports keep the writer's line breaks without rendering HTML. */
 .report-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 14.5px; }
+/* Edit history: one row per save, with old → new for short fields. */
+.edit-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.edit-hist > li { border-top: 1px solid var(--line); padding-top: 10px; }
+.edit-hist > li:first-child { border-top: 0; padding-top: 0; }
+.edit-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.edit-changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.edit-change { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 14px; }
+.edit-change .k { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; min-width: 90px; }
+.edit-old { color: var(--muted); text-decoration: line-through; overflow-wrap: anywhere; }
+.edit-new { font-weight: 600; overflow-wrap: anywhere; }
+.edit-arrow { color: var(--muted); }
+.edit-diff { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.edit-diff summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+.edit-pair { margin-top: 6px; }
+.edit-pair .k { display: block; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.edit-pair .report-body { font-size: 13.5px; }
 /* Dashboard daily-report summary: three compact counters above the state table. */
 .rep-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .rep-sum > div { background: var(--chip-bg); border-radius: 10px; padding: 10px 12px; }
