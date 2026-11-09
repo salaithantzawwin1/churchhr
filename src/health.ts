@@ -12,7 +12,8 @@ export type HealthResult = {
 };
 
 /** Deploy probe shared by GET /healthz and the dashboard status chip: verifies
- * the Worker, D1 and the schema this build expects (0014 added short_code). */
+ * the Worker, D1 and the schema this build expects (0014 added short_code,
+ * 0015 added members.photo). */
 export async function checkHealth(env: Bindings): Promise<HealthResult> {
   const started = Date.now();
   let db: "ok" | "error" = "ok";
@@ -23,6 +24,7 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
       .first<{ name: string }>();
     migration = applied?.name ?? null;
     await env.DB.prepare("SELECT short_code FROM lookup_options LIMIT 1").all();
+    await env.DB.prepare("SELECT photo FROM members LIMIT 1").all();
   } catch (err) {
     console.error("health check failed:", err);
     db = "error";

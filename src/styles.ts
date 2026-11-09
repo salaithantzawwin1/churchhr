@@ -206,6 +206,25 @@ tbody tr:hover { background: var(--row-hover); }
 .topbar :focus-visible { outline-color: #fff; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 18px; }
 .form-grid > .span-2 { grid-column: 1 / -1; }
+.photo-field { display: flex; align-items: flex-start; gap: 16px; padding: 0 0 16px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
+.photo-preview { flex: none; width: 96px; height: 96px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--chip-bg); color: var(--muted); font-size: 32px; font-weight: 700; border: 1px solid var(--line); }
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-preview img[hidden] { display: none; }
+.photo-preview [data-photo-fallback] { line-height: 1; }
+.photo-controls { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.photo-controls > .lbl { color: var(--ink); font-weight: 600; }
+.photo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.photo-pick { position: relative; overflow: hidden; cursor: pointer; }
+.photo-pick input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.photo-status { margin: 0; min-height: 17px; font-size: 12.5px; color: var(--muted); }
+.photo-status.bad { color: var(--err-ink); }
+.member-avatar-head { display: inline-grid; place-items: center; width: 46px; height: 46px; margin-right: 10px; border-radius: 50%; overflow: hidden; vertical-align: middle; background: var(--chip-brand-bg); color: var(--brand); font-size: 20px; font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+.member-avatar-head img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.list-avatar { width: 28px; height: 28px; margin-right: 8px; border-radius: 50%; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px var(--line); }
+@media (max-width: 560px) {
+  .photo-field { flex-direction: column; align-items: center; text-align: center; }
+  .photo-actions { justify-content: center; }
+}
 input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
 label.field { display: block; font-size: 13.5px; color: var(--muted); }
 label.field span.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }

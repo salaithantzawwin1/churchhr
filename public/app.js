@@ -316,6 +316,80 @@
   }
   initHeadPicker(document);
 
+  // Member profile photo: centre-crop the chosen image, resize it to 500×500
+  // and encode WebP at quality 0.85 before the form submits.
+  function initPhotoInputs(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-photo-field]"), function (field) {
+      var input = field.querySelector("[data-photo-input]");
+      var hidden = field.querySelector("[data-photo-data]");
+      var img = field.querySelector("[data-photo-img]");
+      var fallback = field.querySelector("[data-photo-fallback]");
+      var remove = field.querySelector("[data-photo-remove]");
+      var status = field.querySelector("[data-photo-status]");
+      if (!input || !hidden) return;
+      var initial = field.getAttribute("data-initial") || "?";
+      function setStatus(text, bad) {
+        if (!status) return;
+        status.textContent = text || "";
+        status.className = "photo-status" + (bad ? " bad" : "");
+      }
+      function showFallback() {
+        if (img) { img.hidden = true; img.removeAttribute("src"); }
+        if (fallback) { fallback.hidden = false; fallback.textContent = initial; }
+      }
+      function showImage(url) {
+        if (img) { img.src = url; img.hidden = false; }
+        if (fallback) fallback.hidden = true;
+      }
+      input.addEventListener("change", function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var errorText = field.getAttribute("data-error") || "Could not process this image.";
+        if (file.type.indexOf("image/") !== 0) { setStatus(errorText, true); return; }
+        setStatus(field.getAttribute("data-processing") || "Processing…", false);
+        var objectUrl = URL.createObjectURL(file);
+        var source = new Image();
+        source.onload = function () {
+          var side = Math.min(source.naturalWidth, source.naturalHeight);
+          var sx = (source.naturalWidth - side) / 2;
+          var sy = (source.naturalHeight - side) / 2;
+          var canvas = document.createElement("canvas");
+          canvas.width = 500;
+          canvas.height = 500;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) { URL.revokeObjectURL(objectUrl); setStatus(errorText, true); return; }
+          ctx.drawImage(source, sx, sy, side, side, 0, 0, 500, 500);
+          URL.revokeObjectURL(objectUrl);
+          canvas.toBlob(function (blob) {
+            if (!blob || blob.type !== "image/webp") { setStatus(errorText, true); return; }
+            var reader = new FileReader();
+            reader.onload = function () {
+              hidden.value = String(reader.result || "");
+              showImage(hidden.value);
+              if (remove) remove.checked = false;
+              setStatus(field.getAttribute("data-ready") || "Ready", false);
+            };
+            reader.onerror = function () { setStatus(errorText, true); };
+            reader.readAsDataURL(blob);
+          }, "image/webp", 0.85);
+        };
+        source.onerror = function () {
+          URL.revokeObjectURL(objectUrl);
+          setStatus(errorText, true);
+        };
+        source.src = objectUrl;
+      });
+      if (remove) remove.addEventListener("change", function () {
+        if (!remove.checked) return;
+        hidden.value = "";
+        input.value = "";
+        showFallback();
+        setStatus("", false);
+      });
+    });
+  }
+  initPhotoInputs(document);
+
   // Member list column chooser: each checkbox shows/hides the matching th+td
   // (data-col) and the choice persists in localStorage so it survives reloads.
   (function initColChooser() {
@@ -460,6 +534,7 @@
     });
     initRegionCascade(bodyEl);
     initHeadPicker(bodyEl);
+    initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);
   }
 

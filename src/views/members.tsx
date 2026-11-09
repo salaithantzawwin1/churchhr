@@ -25,6 +25,8 @@ export type MemberListItem = {
   family_group_code?: string | null;
   fellowship: string | null;
   sector: string | null;
+  has_photo?: number | boolean;
+  updated_at?: number;
 };
 
 export type Filters = {
@@ -290,6 +292,9 @@ export function MembersListPage(props: ListProps) {
                 <td style="width:28px"><input type="checkbox" class="bulk-check" value={String(m.id)} aria-label={m.name_myanmar || m.name_english || `#${m.id}`} /></td>
                 <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
                 <td data-col="name">
+                  {m.has_photo ? (
+                    <img class="list-avatar" src={`/members/${m.id}/photo?v=${m.updated_at ?? ""}`} alt="" width="28" height="28" loading="lazy" />
+                  ) : null}
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
                   {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
                 </td>
@@ -339,7 +344,7 @@ export type FormValues = Record<string, string>;
 type FormProps = Common & {
   values: FormValues;
   errors: string[];
-  member: { id: number } | null;
+  member: { id: number; photoUrl?: string } | null;
   regions: { id: number; name: string }[];
   options: Record<string, OptionRow[]>;
 };
@@ -420,6 +425,8 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   const action = member ? `/members/${member.id}` : "/members";
   const edit = member !== null;
+  const photoUrl = member?.photoUrl;
+  const initial = Array.from((v.name_myanmar || v.name_english || "?").trim())[0] ?? "?";
   const dob = v.date_of_birth || "";
   const townshipLabelById = new Map(
     (options.township ?? []).map((o) => [o.id, o.label] as const),
@@ -436,6 +443,32 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
         {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("form.basic")}</h2>
+          <div class="photo-field" data-photo-field data-initial={initial}
+            data-processing={t("form.photoProcessing")} data-ready={t("form.photoReady")}
+            data-error={t("form.photoError")}>
+            <div class="photo-preview">
+              <img data-photo-img src={photoUrl} alt="" hidden={!photoUrl} />
+              <span data-photo-fallback hidden={!!photoUrl}>{initial}</span>
+            </div>
+            <div class="photo-controls">
+              <span class="lbl">{t("form.photo")}</span>
+              <div class="photo-actions">
+                <label class="btn sm secondary photo-pick">
+                  {t("form.photoChoose")}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input hidden />
+                </label>
+                {photoUrl && (
+                  <label class="check-chip">
+                    <input type="checkbox" name="photo_remove" value="1" data-photo-remove />
+                    {t("form.photoRemove")}
+                  </label>
+                )}
+              </div>
+              <p class="hint">{t("form.photoHint")}</p>
+              <p class="photo-status" data-photo-status role="status"></p>
+              <input type="hidden" name="photo_data" data-photo-data />
+            </div>
+          </div>
           <div class="form-grid">
             <label class="field">
               <span class="lbl">{t("form.nameMm")}</span>
@@ -587,6 +620,7 @@ export type MemberDetail = {
   household_id?: number | null;
   household_name?: string | null;
   relationship?: string;
+  has_photo?: number | boolean;
 };
 
 export type MemberHistoryRow = {
@@ -614,6 +648,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
   const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   /** Stored dates are ISO already; render timestamps the same unambiguous way. */
   const stamp = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const initial = Array.from((m.name_myanmar || m.name_english || "?").trim())[0] ?? "?";
   const sections: { title: string; rows: [string, string][] }[] = [
     {
       title: t("form.basic"),
@@ -670,6 +705,11 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
     <Layout title={m.name_myanmar || m.name_english || "Member"} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
         <h1>
+          <span class="member-avatar-head" aria-hidden="true">
+            {m.has_photo
+              ? <img src={`/members/${m.id}/photo?v=${m.updated_at}`} alt="" />
+              : initial}
+          </span>
           {m.name_myanmar || m.name_english || `#${m.id}`}
           {m.name_english && m.name_myanmar && <span class="muted small" style="margin-left:8px;font-weight:400">{m.name_english}</span>}
           <span class="count-pill">{m.member_code}</span>

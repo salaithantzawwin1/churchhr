@@ -43,6 +43,8 @@ const validMsgKeys: Record<string, string> = {
   "val.blood": "val.blood",
   "val.dob": "val.dob",
   "val.salvation": "val.salvation",
+  "photo.badType": "photo.badType",
+  "photo.tooLarge": "photo.tooLarge",
   "val.income": "val.income",
   "val.option": "val.option",
   "imp.noDataRow": "imp.noDataRow",
@@ -191,7 +193,8 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const rows = await db.all(sql`
     SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.phone, m.status,
-           m.date_of_birth, m.marital_status, m.township,
+           m.date_of_birth, m.marital_status, m.township, m.updated_at,
+           (m.photo IS NOT NULL) AS has_photo,
            r.name AS state_name, r.name_en AS state_name_en,
            hc.label AS home_cell, gr.label AS group_label,
            fg.label AS family_group, fg.code AS family_group_code,
@@ -866,6 +869,7 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
 async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { region_id: number }) | undefined> {
   const rows = await db.all(sql`
     SELECT m.*, m.family_id AS household_id, r.name AS state_name, r.name_en AS state_name_en,
+      (m.photo IS NOT NULL) AS has_photo,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fg.code AS family_group_code,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
@@ -886,6 +890,40 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
 
 function inScope(row: { region_id: number }, scope: Scope): boolean {
   return scope.scopeAll || scope.stateIds.includes(row.region_id);
+}
+
+/** Client-side canvas output is small; keep a hard cap on what reaches D1. */
+const MAX_PHOTO_BYTES = 400 * 1024;
+
+type PhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
+
+/** Reads the hidden photo_data field produced by the browser resizer. */
+function parsePhoto(body: Record<string, unknown>): PhotoInput {
+  const remove = s(body.photo_remove) === "1";
+  if (remove) return { bytes: null, touched: true, error: null };
+  const raw = s(body.photo_data);
+  if (!raw) return { bytes: null, touched: false, error: null };
+  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
+  if (!match) return { bytes: null, touched: true, error: msg("photo.badType") };
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(match[1]!.replace(/\s+/g, ""));
+    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  } catch {
+    return { bytes: null, touched: true, error: msg("photo.badType") };
+  }
+  if (bytes.length > MAX_PHOTO_BYTES) return { bytes: null, touched: true, error: msg("photo.tooLarge") };
+  const webp = bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  if (!webp) return { bytes: null, touched: true, error: msg("photo.badType") };
+  return { bytes, touched: true, error: null };
+}
+
+async function savePhoto(db: DB, id: number, bytes: Uint8Array | null): Promise<void> {
+  // D1 binds ArrayBuffer for BLOB values (a bare Uint8Array is not portable).
+  const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
+  await db.run(sql`UPDATE members SET photo = ${value} WHERE id = ${id}`);
 }
 
 const SNAKE_TO_CAMEL: Record<string, string> = {
@@ -992,6 +1030,8 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const fromModal = s(body.from_modal) === "1" || c.req.header("X-Requested-With") === "modal";
   const options = await loadAllOptions(db);
   const { values, errors, data } = readAndValidate(body, scope, options);
+  const photo = parsePhoto(body);
+  if (photo.error) errors.push(photo.error);
   const allRegions = await loadRegions(db);
   const render = (status: 400 | 200) =>
     c.html(
@@ -1012,8 +1052,9 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
           />,
       status,
     );
-  if (!data) return render(400);
+  if (!data || photo.error) return render(400);
   const id = await insertMember(db, data, c.get("user").id);
+  if (photo.touched) await savePhoto(db, id, photo.bytes);
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "create",
     snapshotJson: JSON.stringify(data),
@@ -1046,6 +1087,29 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   );
 });
 
+membersRoutes.get("/:id/photo", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.notFound();
+  const rows = await db.all<{ photo: ArrayBuffer | number[] | null; region_id: number; updated_at: number }>(sql`
+    SELECT photo, region_id, updated_at FROM members WHERE id = ${id}`);
+  const row = rows[0];
+  if (!row?.photo || !inScope(row, scope)) return c.notFound();
+  // D1 returns BLOBs as byte arrays through the driver; wrap them for Response.
+  const photo = Array.isArray(row.photo) ? Uint8Array.from(row.photo) : new Uint8Array(row.photo);
+  const etag = `W/"member-${id}-${row.updated_at}-${photo.byteLength}"`;
+  const headers: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Content-Length": String(photo.byteLength),
+    "Cache-Control": "private, no-cache",
+    "ETag": etag,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (c.req.header("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(photo, { headers });
+});
+
 membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -1057,7 +1121,11 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
   const options = await loadAllOptions(db);
   const formProps = {
     user: c.get("user"), perms: c.get("perms"), values: rowToValues(row), errors: [] as string[],
-    member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
+    member: {
+      id,
+      photoUrl: row.has_photo ? `/members/${id}/photo?v=${row.updated_at}` : undefined,
+    },
+    regions: scopedRegions(allRegions, scope, c.get("lang")),
     options: formOptions(options, (o) => o.type === "township" ? o.label === row.township : o.id === (row as any)[`${o.type}_id`]),
     lang: c.get("lang"),
   };
@@ -1128,12 +1196,18 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const fromModal = s(body.from_modal) === "1";
   const options = await loadAllOptions(db);
   const { values, errors, data } = readAndValidate(body, scope, options);
+  const photo = parsePhoto(body);
+  if (photo.error) errors.push(photo.error);
   const allRegions = await loadRegions(db);
-  if (!data) {
+  if (!data || photo.error) {
     const formProps = {
       user: c.get("user"), perms: c.get("perms"), values,
       errors: errors.map((e) => renderMsg(e, c.get("lang"))),
-      member: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")),
+      member: {
+        id,
+        photoUrl: existing.has_photo ? `/members/${id}/photo?v=${existing.updated_at}` : undefined,
+      },
+      regions: scopedRegions(allRegions, scope, c.get("lang")),
       options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
       lang: c.get("lang"),
     };
@@ -1144,6 +1218,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
     .update(members)
     .set({ ...toDrizzleValues(data), updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) } as typeof members.$inferInsert)
     .where(eq(members.id, id));
+  if (photo.touched) await savePhoto(db, id, photo.bytes);
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "update",
     snapshotJson: JSON.stringify(data),
