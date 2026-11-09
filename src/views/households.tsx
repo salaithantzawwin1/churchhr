@@ -3,7 +3,7 @@ import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 import { regionCascadeSelects } from "./hh-cascade";
-import { qs } from "../util";
+import { optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 
 /** Household relationships: stored key -> label per UI language. */
@@ -232,7 +232,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
                   <div class="hh-fact"><span class="hh-fact-label">{t("detail.state")}</span><span class="hh-fact-value">{isEn && f.state_name_en ? f.state_name_en : f.state_name}</span></div>
                   <div class="hh-fact"><span class="hh-fact-label">{t("hh.townshipLabel")}</span><span class="hh-fact-value">{f.township || "—"}</span></div>
                   <div class="hh-fact"><span class="hh-fact-label">{t("form.homeCell")}</span><span class="hh-fact-value">{f.home_cell_label || "—"}</span></div>
-                  <div class="hh-fact"><span class="hh-fact-label">{t("detail.familyGroup")}</span><span class="hh-fact-value">{f.family_group_label ? (f.family_group_code ? `${f.family_group_code} · ${f.family_group_label}` : f.family_group_label) : "—"}</span></div>
+                  <div class="hh-fact"><span class="hh-fact-label">{t("detail.familyGroup")}</span><span class="hh-fact-value">{optionText(f.family_group_code, f.family_group_label) || "—"}</span></div>
                 </div>
                 <div class="hh-card-actions">
                   <a class="btn sm secondary" href={`/admin/households/${f.id}`}>{t("members.open")}</a>
@@ -321,7 +321,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
             </div>
             <div class="hh-fact">
               <span class="hh-fact-label">{t("detail.familyGroup")}</span>
-              <span class="hh-fact-value">{family.family_group_label ? (family.family_group_code ? `${family.family_group_code} · ${family.family_group_label}` : family.family_group_label) : "—"}</span>
+              <span class="hh-fact-value">{optionText(family.family_group_code, family.family_group_label) || "—"}</span>
             </div>
           </div>
         </section>

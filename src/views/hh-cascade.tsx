@@ -1,5 +1,6 @@
 import type { OptionRow } from "../lookup";
 import type { Lang } from "../i18n";
+import { optionText } from "../util";
 
 /** Shared cascade selects for household forms, mirroring members.tsx:
  * State (data-region-select) narrows Township (data-region-filter) →
@@ -47,7 +48,7 @@ export function regionCascadeSelects(opts: {
     </>
   );
 
-  const withCode = (o: OptionRow) => (o.code ? `${o.code} · ${o.label}` : o.label);
+  const withCode = (o: OptionRow) => optionText(o.code, o.label);
 
   return (
     <>
@@ -57,7 +58,7 @@ export function regionCascadeSelects(opts: {
           <option value="">{blank}</option>
           {opts.regions.map((r) => (
             <option value={String(r.id)} selected={opts.regionId === String(r.id)}>
-              {r.code ? `${r.code} · ${r.name}` : r.name}
+              {optionText(r.code, r.name)}
             </option>
           ))}
         </select>

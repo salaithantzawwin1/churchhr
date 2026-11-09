@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
-import { ageFromDate, qs } from "../util";
+import { ageFromDate, optionText, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
 
@@ -306,7 +306,7 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell">{m.home_cell ?? ""}</td>
                 <td data-col="group">{m.group_label ?? ""}</td>
-                <td data-col="familyGroup">{m.family_group ? (m.family_group_code ? `${m.family_group_code} · ${m.family_group}` : m.family_group) : ""}</td>
+                <td data-col="familyGroup">{optionText(m.family_group_code, m.family_group)}</td>
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
                 <td data-col="sector">{m.sector ?? ""}</td>
                 <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
@@ -367,7 +367,7 @@ function opts(
         return (
           <option value={String(o.id)} selected={selected === String(o.id)}
             data-region={o.regionId === 0 ? "" : String(o.regionId)}
-            data-parent={parent}>{o.code ? `${o.code} · ${o.label}` : o.label}</option>
+            data-parent={parent}>{optionText(o.code, o.label)}</option>
         );
       })}
     </>
@@ -382,7 +382,7 @@ function townshipOpts(options: OptionRow[], selected: string, blank: string) {
       {options.map((o) => (
         <option value={o.label} selected={selected === o.label}
           data-region={o.regionId === 0 ? "" : String(o.regionId)}
-          data-parent="">{o.code ? `${o.code} · ${o.label}` : o.label}</option>
+          data-parent="">{optionText(o.code, o.label)}</option>
       ))}
     </>
   );
@@ -494,7 +494,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                   // std eight when none are active, merging so both show.
                   const opts = options.blood_type ?? [];
                   const rows = opts.length > 0
-                    ? opts.map((o) => ({ value: o.label, text: o.code ? `${o.code} · ${o.label}` : o.label }))
+                    ? opts.map((o) => ({ value: o.label, text: optionText(o.code, o.label) }))
                     : BLOOD_TYPES.map((b) => ({ value: b, text: b }));
                   if (v.blood_type && !rows.some((r) => r.value === v.blood_type)) {
                     rows.push({ value: v.blood_type, text: v.blood_type });
@@ -538,7 +538,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                 <option value="">{t("form.choose")}</option>
                 {regions.map((r) => (
                   <option value={String(r.id)} selected={v.region_id === String(r.id)}>
-                    {"code" in r && (r as any).code ? `${(r as any).code} · ${r.name}` : r.name}
+                    {optionText("code" in r ? (r as any).code : null, r.name)}
                   </option>
                 ))}
               </select>
@@ -691,7 +691,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("detail.township"), m.township ?? ""],
         [t("hh.household"), m.household_name ?? ""],
         [t("detail.salvation"), m.salvation_date ?? ""],
-        [t("detail.familyGroup"), m.family_group ? (m.family_group_code ? `${m.family_group_code} · ${m.family_group}` : m.family_group) : ""],
+        [t("detail.familyGroup"), optionText(m.family_group_code, m.family_group)],
         [t("form.fellowship"), m.fellowship ?? ""],
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],

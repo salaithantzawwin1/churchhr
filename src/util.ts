@@ -72,6 +72,15 @@ export function b64decode(b64: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+/** "CODE · label" for a lookup option, collapsed to a single value when the
+ * label already is the code (imported groups are often named by their code). */
+export function optionText(code: string | null | undefined, label: string | null | undefined): string {
+  const l = (label ?? "").trim();
+  const c = (code ?? "").trim();
+  if (!l) return c;
+  return !c || c === l ? l : `${c} · ${l}`;
+}
+
 export function normKey(v: string): string {
   return v.trim().toLowerCase().replace(/\s+/g, " ");
 }
