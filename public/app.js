@@ -287,6 +287,35 @@
   }
   initRegionCascade(document);
 
+  // Household head picker: using an existing member as head copies that
+  // member's placement (state, township, home cell, group, family group)
+  // into the new household form. The server repeats this fallback on submit.
+  function initHeadPicker(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('select[name="head_member_id"]'), function (sel) {
+      if (sel.getAttribute("data-head-bound")) return;
+      sel.setAttribute("data-head-bound", "1");
+      sel.addEventListener("change", function () {
+        var opt = sel.options[sel.selectedIndex];
+        var form = sel.form;
+        if (!opt || !opt.value || !form) return;
+        function pick(name, attr) {
+          var el = form.querySelector('select[name="' + name + '"]');
+          var val = opt.getAttribute(attr);
+          if (!el || !val) return;
+          el.value = val;
+          // Re-run the cascades so dependent options become visible.
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        pick("region_id", "data-region");
+        pick("township", "data-township");
+        pick("home_cell_id", "data-home-cell");
+        pick("group_id", "data-group");
+        pick("family_group_id", "data-family-group");
+      });
+    });
+  }
+  initHeadPicker(document);
+
   // Member list column chooser: each checkbox shows/hides the matching th+td
   // (data-col) and the choice persists in localStorage so it survives reloads.
   (function initColChooser() {
@@ -319,6 +348,14 @@
       b.addEventListener("change", apply);
     });
     apply();
+    // Match the rest of the page: clicking outside a popover dismisses it.
+    var details = chooser.querySelector("details");
+    document.addEventListener("click", function (e) {
+      if (details && details.open && !chooser.contains(e.target)) details.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && details && details.open) details.open = false;
+    });
   })();
 
   // Collapsible filter panels: open on desktop, collapsed on phones. Once the
@@ -359,10 +396,11 @@
   var lastFocus = null;
   var pendingForm = null;
 
-  function openModal(title, small) {
+  function openModal(title, size) {
     lastFocus = document.activeElement;
     titleEl.textContent = title || "";
-    card.classList.toggle("sm", !!small);
+    card.classList.toggle("sm", size === "sm");
+    card.classList.toggle("md", size === "md");
     modal.hidden = false;
     document.body.style.overflow = "hidden";
   }
@@ -404,7 +442,7 @@
     if (!f || !f.getAttribute || !f.getAttribute("data-confirm")) return;
     e.preventDefault();
     pendingForm = f;
-    openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", true);
+    openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", "sm");
     bodyEl.innerHTML =
       '<p style="margin:0 0 4px">' + f.getAttribute("data-confirm") + "</p>" +
       '<div class="actions" style="margin-top:14px">' +
@@ -421,6 +459,7 @@
       bodyEl.appendChild(document.importNode(n, true));
     });
     initRegionCascade(bodyEl);
+    initHeadPicker(bodyEl);
     initStrengthMeters(bodyEl);
   }
 
@@ -432,7 +471,7 @@
     var href = link.getAttribute("href");
     if (!href) return;
     var url = href + (href.indexOf("?") > -1 ? "&" : "?") + "modal=1";
-    openModal(link.getAttribute("data-modal-title") || "", link.getAttribute("data-modal-size") === "sm");
+    openModal(link.getAttribute("data-modal-title") || "", link.getAttribute("data-modal-size") || "");
     bodyEl.innerHTML = '<p class="muted">' + (modal.getAttribute("data-loading") || "…") + "</p>";
     fetch(url, { headers: { "X-Requested-With": "modal" } })
       .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.text(); })

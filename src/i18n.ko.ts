@@ -75,6 +75,8 @@ export const KO: Record<string, string> = {
   "profile.errMismatch": "두 비밀번호가 일치하지 않습니다.",
   "dash.membersLink": "성도 →",
   "dash.total": "전체 성도",
+  "dash.healthOk": "DB 정상",
+  "dash.healthErr": "DB 문제",
   "dash.active": "활성",
   "dash.moved": "이사",
   "dash.inactive": "비활성",

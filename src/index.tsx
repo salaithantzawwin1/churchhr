@@ -16,7 +16,7 @@ import { DashboardPage } from "./views/dashboard";
 import { RegionsPage } from "./views/regions";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
-import { APP_VERSION } from "./version";
+import { checkHealth } from "./health";
 
 const app = new Hono<AppEnv>();
 
@@ -90,34 +90,11 @@ app.get("/styles.css", (c) =>
 /** Public deploy probe: verifies the Worker, D1 connection and the migrations
  * this build needs, so a release can be checked without signing in. */
 app.get("/healthz", async (c) => {
-  const started = Date.now();
-  let db: "ok" | "schema-outdated" | "error" = "ok";
-  let migration: string | null = null;
-  try {
-    const applied = await c.env.DB
-      .prepare("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
-      .first<{ name: string }>();
-    migration = applied?.name ?? null;
-    // 0014 added short_code; selecting it fails loudly if the remote DB is behind.
-    await c.env.DB.prepare("SELECT short_code FROM lookup_options LIMIT 1").all();
-  } catch (err) {
-    console.error("health check failed:", err);
-    db = "error";
-  }
-  const ok = db === "ok";
-  return c.json(
-    {
-      ok,
-      service: "church-member-registry",
-      version: APP_VERSION,
-      migration,
-      db,
-      checkedAt: new Date().toISOString(),
-      latencyMs: Date.now() - started,
-    },
-    ok ? 200 : 503,
-    { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" },
-  );
+  const health = await checkHealth(c.env);
+  return c.json(health, health.ok ? 200 : 503, {
+    "Cache-Control": "no-store",
+    "X-Robots-Tag": "noindex",
+  });
 });
 
 // Public routes first so requireAuth (below) never intercepts them.
@@ -134,14 +111,17 @@ app.get("/", requirePermission("dashboard.view"), async (c) => {
     homeCell: intParam(q.home_cell),
     township: (q.township ?? "").trim().slice(0, 80),
   };
-  const data = await loadDashboard(db, {
-    scopeAll: c.get("scopeAll"),
-    stateIds: c.get("stateIds"),
-  }, filters);
+  const [data, health] = await Promise.all([
+    loadDashboard(db, {
+      scopeAll: c.get("scopeAll"),
+      stateIds: c.get("stateIds"),
+    }, filters),
+    checkHealth(c.env),
+  ]);
   return c.html(
     <DashboardPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      data={data} lang={c.get("lang")}
+      data={data} health={health} lang={c.get("lang")}
     />,
   );
 });

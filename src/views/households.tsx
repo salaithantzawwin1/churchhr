@@ -44,7 +44,14 @@ export type FormValues = Record<string, string | undefined>;
 /** Existing member that can be picked as the head of a new household. */
 export type HeadCandidate = {
   id: number; member_code: string | null;
-  name_myanmar: string | null; name_english: string | null; township?: string | null;
+  name_myanmar: string | null; name_english: string | null;
+  township?: string | null;
+  /** The member's current placement, offered as the new household's starting
+   * values when this member is picked as head (see the head-picker JS). */
+  region_id: number;
+  home_cell_id: number | null;
+  group_id: number | null;
+  family_group_id: number | null;
 };
 
 export function HouseholdFormPage(props: Common & {
@@ -92,7 +99,15 @@ export function HouseholdFormFragment(props: Common & {
                       ? (m.name_myanmar || m.name_english)
                       : (m.name_english || m.name_myanmar);
                     return (
-                      <option value={String(m.id)} selected={v.head_member_id === String(m.id)}>
+                      <option
+                        value={String(m.id)}
+                        selected={v.head_member_id === String(m.id)}
+                        data-region={String(m.region_id)}
+                        data-township={m.township ?? ""}
+                        data-home-cell={m.home_cell_id ? String(m.home_cell_id) : ""}
+                        data-group={m.group_id ? String(m.group_id) : ""}
+                        data-family-group={m.family_group_id ? String(m.family_group_id) : ""}
+                      >
                         {(nm || `#${m.id}`) + (m.member_code ? ` · ${m.member_code}` : "") + (m.township ? ` · ${m.township}` : "")}
                       </option>
                     );
@@ -205,10 +220,12 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
                 <div class="hh-card-head">
                   <span class="hh-avatar" aria-hidden="true"><HouseGlyph /></span>
                   <div class="hh-card-title">
-                    <a href={`/admin/households/${f.id}`}>{f.name}</a>
-                    <span class="muted small">#{f.id}</span>
+                    <a href={`/admin/households/${f.id}`} title={f.name}>{f.name}</a>
+                    <span class="hh-card-meta">
+                      <span class="muted small">#{f.id}</span>
+                      <span class="hh-count"><b>{f.member_count ?? 0}</b> {(f.member_count ?? 0) === 1 ? t("hh.memberCountOne") : t("hh.memberCount")}</span>
+                    </span>
                   </div>
-                  <span class="hh-count"><b>{f.member_count ?? 0}</b> {(f.member_count ?? 0) === 1 ? t("hh.memberCountOne") : t("hh.memberCount")}</span>
                 </div>
                 <div class="hh-facts">
                   <div class="hh-fact"><span class="hh-fact-label">{t("hh.head")}</span><span class="hh-fact-value">{headName || "—"}</span></div>

@@ -63,12 +63,17 @@ function scopeCondM(scope: Scope) {
  * scope, plus the one being pre-selected from a member page. */
 async function headCandidates(db: DB, scope: Scope, includeId: number | null) {
   return (await db.all(sql`
-    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.township
+    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.township,
+           m.region_id, m.home_cell_id, m.group_id, m.family_group_id
     FROM members m
     WHERE ${scopeCondM(scope)}
       AND (m.family_id IS NULL ${includeId ? sql`OR m.id = ${includeId}` : sql``})
     ORDER BY COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '')
-    LIMIT 300`)) as { id: number; member_code: string | null; name_myanmar: string | null; name_english: string | null; township: string | null }[];
+    LIMIT 300`)) as {
+      id: number; member_code: string | null; name_myanmar: string | null; name_english: string | null;
+      township: string | null; region_id: number; home_cell_id: number | null;
+      group_id: number | null; family_group_id: number | null;
+    }[];
 }
 
 const FORM_KEYS = ["name", "head_member_id", "address", "township", "phone", "region_id", "notes"] as const;
@@ -189,6 +194,9 @@ householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
         phone: m.phone ?? "",
         address: m.address ?? "",
         head_member_id: String(m.id),
+        home_cell_id: m.home_cell_id ? String(m.home_cell_id) : "",
+        group_id: m.group_id ? String(m.group_id) : "",
+        family_group_id: m.family_group_id ? String(m.family_group_id) : "",
       };
     }
   }
@@ -210,6 +218,19 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
   const body = await c.req.parseBody();
   const allRegions = await loadRegions(db);
   const fromModal = s(body.from_modal) === "1";
+  // Picking an existing head fills the household's placement from that member,
+  // so the form does not need the same state/township entered twice.
+  const pickedHeadId = asInt(s(body.head_member_id));
+  if (pickedHeadId != null) {
+    const [m] = (await db.all(sql`
+      SELECT region_id, township, phone, address FROM members WHERE id = ${pickedHeadId}`)) as any[];
+    if (m) {
+      if (!s(body.region_id)) body.region_id = String(m.region_id);
+      if (!s(body.township)) body.township = m.township ?? "";
+      if (!s(body.phone)) body.phone = m.phone ?? "";
+      if (!s(body.address)) body.address = m.address ?? "";
+    }
+  }
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
   const allOptions = await loadAllOptions(db);
   const headList = await headCandidates(db, scope, null);

@@ -205,6 +205,8 @@ tbody tr:hover { background: var(--row-hover); }
 :focus-visible { outline: 2px solid #7aa7e0; outline-offset: 2px; }
 .topbar :focus-visible { outline-color: #fff; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 18px; }
+.form-grid > .span-2 { grid-column: 1 / -1; }
+input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
 label.field { display: block; font-size: 13.5px; color: var(--muted); }
 label.field span.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 label.field .hint { font-weight: 400; color: var(--muted); }
@@ -390,15 +392,48 @@ th.bar-col { width: 42%; }
 .modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }
 .modal[hidden] { display: none; }
 .modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); }
-.modal-card { position: relative; background: var(--card); border-radius: 12px; width: min(760px, 100%); max-height: min(88dvh, 940px); display: flex; flex-direction: column; box-shadow: 0 24px 70px rgba(2,8,23,.35); }
+.modal-card { position: relative; background: var(--card); border-radius: 12px; width: min(720px, 100%); max-height: min(88dvh, 940px); display: flex; flex-direction: column; box-shadow: 0 24px 70px rgba(2,8,23,.35); }
 .modal-card.sm { width: min(440px, 100%); }
-.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--line); }
-.modal-head h3 { margin: 0; font-size: 16.5px; }
+.modal-card.md { width: min(620px, 100%); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h3 { margin: 0; font-size: 17px; }
 .modal-x { background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 9px; border-radius: 8px; font-family: inherit; }
 .modal-x:hover { background: var(--chip-bg); color: var(--ink); }
-.modal-body { padding: 16px 18px 16px; overflow-y: auto; }
+.modal-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; }
 .modal-body .card { margin-bottom: 14px; }
-.modal-body .actions { position: sticky; bottom: -16px; margin: 14px -18px -16px; padding: 12px 18px; background: var(--card); border-top: 1px solid var(--line); }
+/* Modal forms share one rhythm: fields stack with a steady gap, section
+   headings group related choices, and the submit bar sticks to the bottom. */
+.modal-body form { display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; }
+.modal-body form .form-grid { gap: 14px 16px; }
+.modal-body form > .actions { margin-top: 0; }
+.modal-body form > .actions:last-child {
+  position: sticky; bottom: -18px; z-index: 1; margin-top: auto;
+  margin-left: -20px; margin-right: -20px; margin-bottom: -18px; padding: 12px 20px;
+  background: var(--card); border-top: 1px solid var(--line);
+  justify-content: flex-end;
+}
+/* Cancel sits left of the primary action in the sticky bar. */
+.modal-body form > .actions:last-child .btn.secondary { order: -1; }
+.form-section { margin: 0; padding: 0; border: 0; min-width: 0; }
+.form-section + .form-section { margin-top: 2px; }
+.form-section legend {
+  padding: 0; margin-bottom: 8px; font-size: 13.5px;
+  font-weight: 600; color: var(--ink);
+}
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 8px; }
+.check-chip {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--field-bg); color: var(--ink); font-size: 13.5px;
+  line-height: 1.45; cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.check-chip:hover { border-color: var(--line-strong); background: var(--btn2-hover); }
+.check-chip:has(input:checked) { border-color: var(--brand); background: var(--chip-brand-bg); }
+.check-chip input { accent-color: var(--brand); margin: 0; flex: none; }
+.check-chip span { overflow-wrap: anywhere; }
+.check-chip-all { margin-bottom: 8px; }
+
 @media (prefers-reduced-motion: no-preference) {
   .modal-card { animation: modalIn .16s ease-out; }
   @keyframes modalIn { from { transform: translateY(10px); opacity: .55; } }
@@ -662,6 +697,18 @@ td.empty-state .small { margin-top: 4px; }
 
 /* ---------- dashboard: card layout ---------- */
 .page-sub { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+/* Deploy/schema status chip beside the dashboard title (links to /healthz). */
+.health-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 8px;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid transparent;
+  font-size: 11.5px; font-weight: 600; line-height: 1.7; white-space: nowrap;
+  vertical-align: middle; text-decoration: none;
+}
+.health-chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.health-chip.err { background: var(--err-bg); color: var(--err-ink); }
+.health-chip:hover { filter: brightness(1.04); }
+.health-chip .hc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.health-chip .hc-ver { font-weight: 400; opacity: .78; font-variant-numeric: tabular-nums; }
 
 /* Compact filter toolbar shared by the dashboard and the members list. Selects
    auto-submit and the active choices are echoed as removable chips below. */
@@ -973,10 +1020,14 @@ td.empty-state .small { margin-top: 4px; }
 .hh-card-title { flex: 1; min-width: 0; }
 .hh-card-title a {
   display: block; color: var(--ink); font-size: 16px; font-weight: 600;
-  line-height: 1.45; text-decoration: none; overflow-wrap: anywhere;
+  line-height: 1.45; text-decoration: none;
+  /* Household names stay on one line; very long ones end in an ellipsis and
+     the full name is in the link's title attribute. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hh-card-title a:hover { color: var(--link); text-decoration: underline; }
-.hh-card-title .muted { display: block; line-height: 1.4; }
+.hh-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; min-width: 0; }
+.hh-card-meta .muted { line-height: 1.4; }
 .hh-count {
   flex: none; display: inline-flex; align-items: baseline; gap: 3px;
   padding: 2px 9px; border-radius: 999px; background: var(--chip-bg);

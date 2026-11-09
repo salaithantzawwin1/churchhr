@@ -100,6 +100,8 @@ const MM: Dict = {
   // dashboard
   "dash.membersLink": "Member စာရင်း →",
   "dash.total": "စုစုပေါင်း Member",
+  "dash.healthOk": "DB ကောင်းမွန်",
+  "dash.healthErr": "DB ပြဿနာ",
   "dash.active": "Active",
   "dash.moved": "ပြောင်းသွား (Moved)",
   "dash.inactive": "ရပ်ထား (Inactive)",
@@ -607,6 +609,8 @@ const EN: Dict = {
   "profile.errMismatch": "The two passwords do not match.",
   "dash.membersLink": "Members →",
   "dash.total": "Total members",
+  "dash.healthOk": "DB ok",
+  "dash.healthErr": "DB issue",
   "dash.active": "Active",
   "dash.moved": "Moved",
   "dash.inactive": "Inactive",

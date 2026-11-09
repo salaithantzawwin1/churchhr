@@ -84,39 +84,42 @@ function userForm(v: {
             data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} /> 
         </label>
       </div>
-      <div style="margin-top:12px">
-        <strong class="small">{t("nav.roles")}:</strong>
-        <div class="form-grid" style="margin-top:6px">
+      <fieldset class="form-section">
+        <legend>{t("nav.roles")}</legend>
+        <div class="check-grid">
           {props.roles.map((r) => (
-            <label class="field" style="font-size:14px">
+            <label class="check-chip">
               <input type="checkbox" name="roles" value={String(r.id)}
-                checked={v.selectedRoles.includes(r.id)} /> {r.name}
+                checked={v.selectedRoles.includes(r.id)} /> <span>{r.name}</span>
             </label>
           ))}
         </div>
-      </div>
-      <div style="margin-top:12px">
-        <strong class="small">{t("adm.stateScope")}:</strong>
-        <label class="field" style="font-size:14px;margin-top:4px">
-          <input type="checkbox" name="all_states" value="1" checked={v.allStates} /> {t("adm.allStates")}
+      </fieldset>
+      <fieldset class="form-section">
+        <legend>{t("adm.stateScope")}</legend>
+        <label class="check-chip check-chip-all">
+          <input type="checkbox" name="all_states" value="1" checked={v.allStates} /> <span>{t("adm.allStates")}</span>
         </label>
-        <div class="form-grid" style="margin-top:4px">
+        <div class="check-grid">
           {props.regions.map((r) => (
-            <label class="field" style="font-size:14px">
+            <label class="check-chip">
               <input type="checkbox" name="states" value={String(r.id)}
-                checked={v.selectedStates.includes(r.id)} /> {r.name}
+                checked={v.selectedStates.includes(r.id)} /> <span>{r.name}</span>
             </label>
           ))}
         </div>
-      </div>
-      <div class="actions">
-        <label class="field" style="font-size:14px">
-          <input type="checkbox" name="active" value="1" checked={v.active === 1} /> {t("adm.active")}
-        </label>
-        <label class="field" style="font-size:14px">
-          <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> {t("adm.mustChange")}
-        </label>
-      </div>
+      </fieldset>
+      <fieldset class="form-section">
+        <legend>{t("members.status")}</legend>
+        <div class="check-grid">
+          <label class="check-chip">
+            <input type="checkbox" name="active" value="1" checked={v.active === 1} /> <span>{t("adm.active")}</span>
+          </label>
+          <label class="check-chip">
+            <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> <span>{t("adm.mustChange")}</span>
+          </label>
+        </div>
+      </fieldset>
       <div class="actions">
         <button class="btn" type="submit">{v.id ? t("form.save") : t("adm.create")}</button>
       </div>
@@ -535,14 +538,16 @@ export function AddOptionForm(props: {
         </div>
       )}
       <input type="hidden" name="type" value={props.type} />
-      <label class="field">
+      <label class="field span-2">
         <span class="lbl">{t("adm.optionLabel")}</span>
         <input type="text" name="label" value={props.value ?? ""} required maxLength={120} />
         <span class="field-hint">{t("adm.labelHint")}</span>
       </label>
-      {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
-      {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
-      {optionShortCodeField(props.type, props.shortCode, t)}
+      <div class="form-grid">
+        {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
+        {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
+        {optionShortCodeField(props.type, props.shortCode, t)}
+      </div>
       <div class="actions">
         <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -686,10 +691,10 @@ export function EditOptionForm(props: {
             pattern="[A-Za-z0-9._-]{0,16}" title="3-16 အက္ခရာ/ဂဏန်း/underscore/dash (အလွတ် = code မရှိ)" />
           <span class="field-hint">{t("adm.codeHint")}</span>
         </label>
+        {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
+        {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
+        {optionShortCodeField(props.type ?? "", props.shortCode, t)}
       </div>
-      {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
-      {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
-      {optionShortCodeField(props.type ?? "", props.shortCode, t)}
       <div class="actions">
         <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
@@ -768,7 +773,7 @@ export function AdminOptionsPage(props: OptionsProps) {
           {type === "township" && (
             <a class="btn secondary" href="/admin/options/township-codes">{t("adm.shortCodesButton")}</a>
           )}
-          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="sm">
+          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="md">
             + {t("adm.addOption")}
           </a>
         </div>
@@ -880,7 +885,7 @@ export function AdminOptionsPage(props: OptionsProps) {
                 </td>
                 <td style="white-space:nowrap">
                   <a class="btn sm secondary js-edit-modal" href={`/admin/options/${o.id}/edit`}
-                     data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
+                     data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="md">{t("members.edit")}</a>{" "}
                   <form method="post" action={`/admin/options/${o.id}`} style="display:inline">
                     <input type="hidden" name="toggle" value="1" />
                     <input type="hidden" name="label" value={o.label} />

@@ -2,6 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { DashboardData } from "../dashboard";
+import type { HealthResult } from "../health";
 import { getDict, type Lang } from "../i18n";
 import { GENDERS, GENDERS_EN, GENDERS_KR } from "../enums";
 import { qs } from "../util";
@@ -36,9 +37,10 @@ export function DashboardPage(props: {
   perms: Set<string>;
   flash?: Flash;
   data: DashboardData;
+  health: HealthResult;
   lang?: Lang;
 }) {
-  const { user, perms, flash, data, lang } = props;
+  const { user, perms, flash, data, health, lang } = props;
   const t = getDict(lang ?? "en");
   const isEn = (lang ?? "en") === "en";
   const stateName = (r: { name: string; name_en?: string | null }) =>
@@ -92,7 +94,21 @@ export function DashboardPage(props: {
     <Layout title={t("dash.title")} lang={lang} user={user} perms={perms} active="/" flash={flash ?? null}>
       <div class="page-head dash-head">
         <div class="dash-head-title">
-          <h1>{t("dash.title")}</h1>
+          <h1>
+            {t("dash.title")}
+            {/* Deploy/schema status at a glance; links to the public probe. */}
+            <a
+              class={`health-chip ${health.ok ? "ok" : "err"}`}
+              href="/healthz"
+              target="_blank"
+              rel="noopener"
+              title={`v${health.version} · ${health.migration ?? "no migration"} · ${health.latencyMs} ms · ${health.checkedAt}`}
+            >
+              <span class="hc-dot" aria-hidden="true" />
+              <span class="hc-ver">v{health.version}</span>
+              {health.ok ? t("dash.healthOk") : t("dash.healthErr")}
+            </a>
+          </h1>
           <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
         </div>
 
