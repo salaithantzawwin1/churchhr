@@ -14,8 +14,8 @@ export const GENDERS_KR: Record<string, string> = {
 };
 
 export const MARITAL_STATUSES: Record<string, string> = {
-  single: "အလွတ် (Single)",
-  married: "အိမ်ထောင်သည် (Married)",
+  single: "အလွတ်",
+  married: "အိမ်ထောင်သည်",
   widowed: "မုဆုံးရှင် (Widowed)",
   divorced: "ကွာရှင်းသည် (Divorced)",
 };
@@ -28,8 +28,8 @@ export const MARITAL_STATUSES_EN: Record<string, string> = {
 };
 
 export const MARITAL_STATUSES_KR: Record<string, string> = {
-  single: "미혼 (Single)",
-  married: "기혼 (Married)",
+  single: "미혼",
+  married: "기혼",
   widowed: "사별 (Widowed)",
   divorced: "이혼 (Divorced)",
 };
