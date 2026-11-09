@@ -6,6 +6,7 @@ const FLASH_KEYS: Record<string, string> = {
   "member-created": "flash.memberCreated",
   "report-created": "flash.reportCreated",
   "report-reviewed": "flash.reportReviewed",
+  "report-updated": "flash.reportUpdated",
   "member-updated": "flash.memberUpdated",
   "member-deleted": "flash.memberDeleted",
   "user-created": "flash.userCreated",

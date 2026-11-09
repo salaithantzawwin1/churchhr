@@ -152,16 +152,22 @@ export function ReportFormPage(props: Common & {
   errors: string[];
   regions: { id: number; name: string }[];
   maxDate: string;
+  mode?: "create" | "edit";
+  reportId?: number;
 }) {
-  const { user, perms, flash, lang, values: v, errors, regions, maxDate } = props;
+  const { user, perms, flash, lang, values: v, errors, regions, maxDate, mode = "create", reportId } = props;
   const t = getDict(lang ?? "en");
+  const editing = mode === "edit";
   const num = (key: string) => v[key] ?? "";
+  const action = editing ? `/reports/${reportId}/edit` : "/reports";
   return (
-    <Layout title={t("rep.newTitle")} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
+    <Layout title={editing ? t("rep.editTitle") : t("rep.newTitle")} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("rep.newTitle")}</h1>
+        <h1>{editing ? t("rep.editTitle") : t("rep.newTitle")}</h1>
         <a class="btn secondary" href="/reports">{t("rep.backToList")}</a>
       </div>
+
+      {editing && <p class="muted small">{t("rep.editHint")}</p>}
 
       {errors.length > 0 && (
         <div class="flash err">
@@ -170,7 +176,7 @@ export function ReportFormPage(props: Common & {
         </div>
       )}
 
-      <form method="post" action="/reports">
+      <form method="post" action={action}>
         <div class="card">
           <h2>{t("rep.details")}</h2>
           <div class="form-grid">
@@ -239,7 +245,7 @@ export function ReportFormPage(props: Common & {
         </div>
 
         <div class="actions">
-          <button class="btn" type="submit">{t("rep.submit")}</button>
+          <button class="btn" type="submit">{editing ? t("rep.update") : t("rep.submit")}</button>
           <a class="btn secondary" href="/reports">{t("rep.cancel")}</a>
         </div>
       </form>
@@ -247,8 +253,8 @@ export function ReportFormPage(props: Common & {
   );
 }
 
-export function ReportDetailPage(props: Common & { report: ReportDetail; canCreate: boolean; canReview: boolean }) {
-  const { user, perms, flash, lang, report: r, canCreate, canReview } = props;
+export function ReportDetailPage(props: Common & { report: ReportDetail; canCreate: boolean; canReview: boolean; canEdit?: boolean }) {
+  const { user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const facts: [string, string][] = [
@@ -276,6 +282,7 @@ export function ReportDetailPage(props: Common & { report: ReportDetail; canCrea
         </h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href="/reports">{t("rep.backToList")}</a>
+          {canEdit && <a class="btn secondary" href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>}
           {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
         </div>
       </div>
