@@ -42,3 +42,23 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Verify production health
+        run: |
+          set -euo pipefail
+          expected_version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/version.ts)
+          expected_migration=$(basename "$(ls migrations/*.sql | sort | tail -n 1)")
+          echo "Expecting version $expected_version and migration $expected_migration"
+          for attempt in $(seq 1 12); do
+            body=$(curl -fsS --max-time 10 https://www.mmgoodnewshr.online/healthz || true)
+            echo "$body"
+            if printf '%s' "$body" | grep -q "\"version\":\"$expected_version\"" \
+              && printf '%s' "$body" | grep -q "\"migration\":\"$expected_migration\"" \
+              && printf '%s' "$body" | grep -q '"db":"ok"'; then
+              echo "Production health probe passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production health probe failed: expected $expected_version / $expected_migration with db ok" >&2
+          exit 1
