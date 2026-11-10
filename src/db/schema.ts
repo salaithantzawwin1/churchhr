@@ -190,6 +190,9 @@ export const families = sqliteTable("families", {
   address: text("address"),
   township: text("township"),
   phone: text("phone"),
+  homeCellId: integer("home_cell_id").references(() => lookupOptions.id),
+  groupId: integer("group_id").references(() => lookupOptions.id),
+  familyGroupId: integer("family_group_id").references(() => lookupOptions.id),
   regionId: integer("region_id")
     .notNull()
     .references(() => regions.id),

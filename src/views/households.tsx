@@ -135,7 +135,9 @@ export function HouseholdFormFragment(props: Common & {
               groupOpts: props.options?.group ?? [],
               familyGroupId: v.family_group_id ?? "",
               familyGroupOpts: props.options?.family_group ?? [],
+              showFamilyGroup: false,
             })}
+            <p class="hint" style="grid-column:1/-1;margin:0">{t("hh.familyGroupAuto")}</p>
 
             <label class="field"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
@@ -569,7 +571,9 @@ export function HouseholdAddMemberPage(props: Common & {
               groupOpts: props.options?.group ?? [],
               familyGroupId: v.family_group_id ?? "",
               familyGroupOpts: props.options?.family_group ?? [],
+              showFamilyGroup: false,
             })}
+            <p class="hint" style="grid-column:1/-1;margin:0">{t("hh.familyGroupAuto")}</p>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span>
               <select name="fellowship_category_id">
                 <option value="">{t("form.choose")}</option>

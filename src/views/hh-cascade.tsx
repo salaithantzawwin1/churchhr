@@ -18,6 +18,9 @@ export function regionCascadeSelects(opts: {
   groupOpts: OptionRow[];
   familyGroupId: string;
   familyGroupOpts: OptionRow[];
+  /** Households derive their Family Group from the Home Cell; member forms
+   * still let the admin pick one explicitly. */
+  showFamilyGroup?: boolean;
 }) {
   const t = (en: string, mm: string, kr: string) =>
     opts.lang === "mm" ? mm : opts.lang === "kr" ? kr : en;
@@ -97,12 +100,14 @@ export function regionCascadeSelects(opts: {
           {filteredOpts(opts.groupOpts, opts.groupId)}
         </select>
       </label>
-      <label class="field">
-        <span class="lbl">{t("Family Group", "မိသားစုအဖွဲ့", "가족 그룹")}</span>
-        <select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">
-          {filteredOpts(opts.familyGroupOpts, opts.familyGroupId, true)}
-        </select>
-      </label>
+      {opts.showFamilyGroup !== false && (
+        <label class="field">
+          <span class="lbl">{t("Family Group", "မိသားစုအဖွဲ့", "가족 그룹")}</span>
+          <select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">
+            {filteredOpts(opts.familyGroupOpts, opts.familyGroupId, true)}
+          </select>
+        </label>
+      )}
     </>
   );
 }

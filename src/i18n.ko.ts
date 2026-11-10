@@ -327,6 +327,7 @@ export const KO: Record<string, string> = {
   "hh.headSearch": "이름을 입력해 검색…",
   "hh.headNoMatch": "일치하는 성도가 없습니다.",
   "hh.headClear": "선택한 가장 지우기",
+  "hh.familyGroupAuto": "홈셀에 따라 가족 그룹이 자동으로 생성되어 이 가정의 성도에게 지정됩니다.",
   "hh.val.head": "선택한 가장이 올바르지 않습니다.",
   "hh.household": "가정",
   "hh.viewHousehold": "가정 보기",

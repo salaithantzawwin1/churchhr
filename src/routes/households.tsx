@@ -5,7 +5,7 @@ import { getDb, type DB } from "../db/client";
 import { families, lookupOptions, memberHistory, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { loadAllOptions, type OptionRow } from "../lookup";
+import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
 import { asInt, intParam, normKey, s } from "../util";
 import { getDict, type Lang } from "../i18n";
 import {
@@ -76,7 +76,7 @@ async function headCandidates(db: DB, scope: Scope, includeId: number | null) {
     }[];
 }
 
-const FORM_KEYS = ["name", "head_member_id", "address", "township", "phone", "region_id", "notes"] as const;
+const FORM_KEYS = ["name", "head_member_id", "address", "township", "phone", "region_id", "home_cell_id", "group_id", "notes"] as const;
 
 type Validated = {
   values: HFormValues;
@@ -84,6 +84,7 @@ type Validated = {
   data: {
     name: string; address: string | null; township: string | null; phone: string | null;
     region_id: number; notes: string | null; head_member_id: number | null;
+    home_cell_id: number | null; group_id: number | null;
   } | null;
 };
 
@@ -112,6 +113,8 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, translate:
       region_id: regionId!,
       notes: v.notes || null,
       head_member_id: headMemberId,
+      home_cell_id: asInt(v.home_cell_id ?? ""),
+      group_id: asInt(v.group_id ?? ""),
     },
   };
 }
@@ -129,6 +132,78 @@ async function householdMembers(db: DB, familyId: number) {
            m.updated_at, (m.photo IS NOT NULL) AS has_photo
     FROM members m WHERE m.family_id = ${familyId}
     ORDER BY CASE WHEN m.relationship = 'head' THEN 0 ELSE 1 END, m.id ASC`)) as any[];
+}
+
+type HouseholdPlacement = { homeCellId: number | null; groupId: number | null; familyGroupId: number | null };
+
+/** Household placement, preferring the household's own columns and falling
+ * back to the head for rows created before those columns existed. */
+async function householdPlacement(db: DB, family: any): Promise<HouseholdPlacement> {
+  const [head] = (await db.all(sql`
+    SELECT home_cell_id, group_id, family_group_id FROM members
+    WHERE family_id = ${family.id} AND relationship = 'head' LIMIT 1`)) as any[];
+  return {
+    homeCellId: family.home_cell_id ?? head?.home_cell_id ?? null,
+    groupId: family.group_id ?? head?.group_id ?? null,
+    familyGroupId: family.family_group_id ?? head?.family_group_id ?? null,
+  };
+}
+
+/** Creates a Family Group named after its Home Cell: YGN_INS3_FG03 with the
+ * township-prefixed code YGN_INS_FG003. */
+async function createFamilyGroupForCell(
+  db: DB, regionId: number, homeCell: OptionRow, allOptions: OptionRow[],
+): Promise<number | null> {
+  const byId = new Map(allOptions.map((o) => [o.id, o] as const));
+  const township = townshipOf(homeCell, byId);
+  const existing = allOptions.filter((o) => o.type === "family_group" && o.regionId === regionId);
+  const labels = new Set(existing.map((o) => o.label.trim().toLowerCase()));
+  const nextCode = nextFamilyGroupCode(existing.map((o) => o.code ?? ""), township);
+  let seq = Number(/_FG(\d+)$/.exec(nextCode ?? "")?.[1] ?? existing.length + 1);
+  let label = `${homeCell.label}_FG${String(seq).padStart(2, "0")}`;
+  while (labels.has(label.toLowerCase())) {
+    seq += 1;
+    label = `${homeCell.label}_FG${String(seq).padStart(2, "0")}`;
+  }
+  const code = nextCode && /_FG\d+$/.test(nextCode)
+    ? nextCode.replace(/_FG\d+$/, `_FG${String(seq).padStart(3, "0")}`)
+    : nextCode;
+  const maxSort = Math.max(0, ...existing.map((o) => o.sortOrder));
+  const inserted = await db.insert(lookupOptions).values({
+    type: "family_group", label, code, active: 1, sortOrder: maxSort + 1,
+    regionId, parentId: homeCell.id,
+  }).returning({ id: lookupOptions.id });
+  return inserted[0]?.id ?? null;
+}
+
+/** Makes sure a household has the Family Group for its Home Cell. Reuses the
+ * household's existing group when it still belongs to that cell, otherwise
+ * creates one and assigns it to every household member. */
+async function ensureHouseholdFamilyGroup(
+  db: DB, familyId: number, regionId: number,
+  homeCellId: number | null, preferredId: number | null,
+  groupId: number | null, allOptions: OptionRow[],
+): Promise<number | null> {
+  if (!homeCellId) return preferredId;
+  const byId = new Map(allOptions.map((o) => [o.id, o] as const));
+  const cell = byId.get(homeCellId);
+  if (!cell || cell.type !== "home_cell") return preferredId;
+  const preferred = preferredId ? byId.get(preferredId) : undefined;
+  let familyGroupId = preferred && preferred.type === "family_group"
+    && (preferred.parentId == null || preferred.parentId === homeCellId)
+    ? preferred.id : null;
+  if (!familyGroupId) familyGroupId = await createFamilyGroupForCell(db, regionId, cell, allOptions);
+  await db.update(families)
+    .set({ homeCellId, groupId, familyGroupId })
+    .where(eq(families.id, familyId));
+  if (familyGroupId) {
+    await db.run(sql`
+      UPDATE members SET family_group_id = ${familyGroupId},
+        home_cell_id = ${homeCellId},
+        group_id = COALESCE(${groupId}, group_id)
+      WHERE family_id = ${familyId}`);
+  }
+  return familyGroupId;
 }
 
 // ---------- GET /admin/households ----------
@@ -152,8 +227,8 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
     FROM families f
     JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
-    LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
-    LEFT JOIN lookup_options fg ON fg.id = head.family_group_id
+    LEFT JOIN lookup_options hc ON hc.id = COALESCE(f.home_cell_id, head.home_cell_id)
+    LEFT JOIN lookup_options fg ON fg.id = COALESCE(f.family_group_id, head.family_group_id)
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
     WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond}
@@ -224,12 +299,14 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
   const pickedHeadId = asInt(s(body.head_member_id));
   if (pickedHeadId != null) {
     const [m] = (await db.all(sql`
-      SELECT region_id, township, phone, address FROM members WHERE id = ${pickedHeadId}`)) as any[];
+      SELECT region_id, township, phone, address, home_cell_id, group_id FROM members WHERE id = ${pickedHeadId}`)) as any[];
     if (m) {
       if (!s(body.region_id)) body.region_id = String(m.region_id);
       if (!s(body.township)) body.township = m.township ?? "";
       if (!s(body.phone)) body.phone = m.phone ?? "";
       if (!s(body.address)) body.address = m.address ?? "";
+      if (!s(body.home_cell_id) && m.home_cell_id) body.home_cell_id = String(m.home_cell_id);
+      if (!s(body.group_id) && m.group_id) body.group_id = String(m.group_id);
     }
   }
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
@@ -264,6 +341,8 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
       address: data.address ?? head?.address ?? null,
       township: data.township ?? head?.township ?? null,
       phone: data.phone ?? head?.phone ?? null,
+      homeCellId: data.home_cell_id ?? head?.home_cell_id ?? null,
+      groupId: data.group_id ?? head?.group_id ?? null,
       regionId: data.region_id, notes: data.notes, createdBy: c.get("user").id,
     })
     .returning({ id: families.id });
@@ -286,6 +365,14 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     });
   }
 
+  await ensureHouseholdFamilyGroup(
+    db, familyId, data.region_id,
+    data.home_cell_id ?? head?.home_cell_id ?? null,
+    null,
+    data.group_id ?? head?.group_id ?? null,
+    allOptions,
+  );
+
   const next = head
     ? `/admin/households/${familyId}?ok=hh.created`
     : `/admin/households/${familyId}/add-member?ok=hh.created`;
@@ -307,8 +394,8 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
       fg.label AS family_group_label, fg.code AS family_group_code
     FROM families f JOIN regions r ON r.id = f.region_id
     LEFT JOIN members head ON head.id = f.head_member_id
-    LEFT JOIN lookup_options hc ON hc.id = head.home_cell_id
-    LEFT JOIN lookup_options fg ON fg.id = head.family_group_id
+    LEFT JOIN lookup_options hc ON hc.id = COALESCE(f.home_cell_id, head.home_cell_id)
+    LEFT JOIN lookup_options fg ON fg.id = COALESCE(f.family_group_id, head.family_group_id)
     WHERE f.id = ${id}`) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
@@ -329,7 +416,10 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [row] = (await db.all(sql`
+    SELECT f.*, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
+    FROM families f LEFT JOIN members head ON head.id = f.head_member_id
+    WHERE f.id = ${id}`)) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -337,6 +427,8 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const values: HFormValues = {
     name: row.name, address: row.address ?? "", township: row.township ?? "",
     phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "",
+    home_cell_id: row.home_cell_id ?? row.head_home_cell_id ?? "",
+    group_id: row.group_id ?? row.head_group_id ?? "",
   };
   const allOptions = await loadAllOptions(db);
   const opts = {
@@ -374,13 +466,20 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
   if (!data) return render(400);
+  const placement = await householdPlacement(db, row);
+  const homeCellId = data.home_cell_id ?? placement.homeCellId;
+  const groupId = data.group_id ?? placement.groupId;
   await db
     .update(families)
     .set({
       name: data.name, address: data.address, township: data.township, phone: data.phone,
+      homeCellId, groupId,
       regionId: data.region_id, notes: data.notes,
     })
     .where(eq(families.id, id));
+  await ensureHouseholdFamilyGroup(
+    db, id, data.region_id, homeCellId, placement.familyGroupId, groupId, allOptions,
+  );
   const next = `/admin/households/${id}?ok=hh.updated`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
@@ -507,24 +606,25 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const now = Math.floor(Date.now() / 1000);
   const isHead = rel === "head";
 
-  // Auto-assign: an existing head's family_group / group / home_cell are copied
-  // onto the new member so dropdown assignments follow the household.
-  let familyGroupId: number | null = null;
-  let groupId: number | null = null;
-  let homeCellId: number | null = null;
-  if (isHead) {
+  // The household's Home Cell and Family Group win; a new head may seed them
+  // when the household was created before those columns existed.
+  const allOptions = await loadAllOptions(db);
+  const placement = await householdPlacement(db, family);
+  const postedHome = asInt(values.home_cell_id);
+  const postedGroup = asInt(values.group_id);
+  const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
+  const groupId = family.group_id ?? placement.groupId ?? postedGroup;
+  let familyGroupId = family.family_group_id ?? placement.familyGroupId;
+  if (!familyGroupId && homeCellId) {
+    familyGroupId = await ensureHouseholdFamilyGroup(
+      db, id, family.region_id, homeCellId, null, groupId, allOptions,
+    );
+  } else if (!familyGroupId && isHead) {
     familyGroupId = asInt(values.family_group_id);
-    groupId = asInt(values.group_id);
-    homeCellId = asInt(values.home_cell_id);
-  } else {
-    const [head] = (await db.all(sql`
-      SELECT m.* FROM members m
-      WHERE m.family_id = ${id} AND m.relationship = 'head' LIMIT 1`)) as any[];
-    if (head) {
-      familyGroupId = head.family_group_id;
-      groupId = head.group_id;
-      homeCellId = head.home_cell_id;
-    }
+  }
+  if (isHead && !family.home_cell_id && postedHome) {
+    await db.update(families).set({ homeCellId: postedHome, groupId: postedGroup })
+      .where(eq(families.id, id));
   }
 
   const inserted = await db
@@ -606,7 +706,15 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
     .set({ householdId: id, relationship: relSafe, updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) })
     .where(eq(members.id, memberId));
 
-  // Auto-assign from the household head; promoting a new head demotes the old one.
+  // Auto-assign from the household placement; promoting a new head demotes the old one.
+  const allOptions = await loadAllOptions(db);
+  const placement = await householdPlacement(db, family);
+  let familyGroupId = family.family_group_id ?? placement.familyGroupId;
+  if (!familyGroupId && placement.homeCellId) {
+    familyGroupId = await ensureHouseholdFamilyGroup(
+      db, id, family.region_id, placement.homeCellId, null, placement.groupId, allOptions,
+    );
+  }
   const [head] = (await db.all(sql`
     SELECT m.* FROM members m WHERE m.family_id = ${id} AND m.relationship = 'head' AND m.id <> ${memberId} LIMIT 1`)) as any[];
   if (relSafe === "head") {
@@ -622,6 +730,13 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
     if (Object.keys(set).length > 0) {
       await db.update(members).set(set as any).where(eq(members.id, memberId));
     }
+  }
+  if (familyGroupId) {
+    await db.update(members).set({
+      familyGroupId,
+      ...(placement.homeCellId ? { homeCellId: placement.homeCellId } : {}),
+      ...(placement.groupId ? { groupId: placement.groupId } : {}),
+    }).where(eq(members.id, memberId));
   }
   await db.insert(memberHistory).values({
     memberId, actorId: c.get("user").id, action: "update",
