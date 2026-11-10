@@ -5,7 +5,8 @@ import type { OptionRow } from "../lookup";
 import { ageFromDate, optionText, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
-import { HOME_CELL_POSITIONS, positionLabel } from "../positions";
+import { CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS, positionLabel, positionLabels } from "../positions";
+import { departmentName, type DepartmentRow } from "../departments";
 
 export type MemberListItem = {
   id: number;
@@ -18,7 +19,7 @@ export type MemberListItem = {
   state_name_en?: string | null;
   home_cell: string | null;
   home_cell_id?: number | null;
-  position?: string | null;
+  positions?: string | null;
   group_label: string | null;
   status: string;
   date_of_birth: string | null;
@@ -114,6 +115,9 @@ export function MembersListPage(props: ListProps) {
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
+  const roleBadges = (csv: string | null | undefined) => positionLabels(csv, L).map((label) => (
+    <span class="badge position">{label}</span>
+  ));
   const filtered = hasFilters(f);
   /** Current list query, used to build "remove this filter" links. */
   const activeParams = {
@@ -301,18 +305,15 @@ export function MembersListPage(props: ListProps) {
                   ) : null}
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
                   {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
-                  {(m.position || canUpdate) && (
+                  {(m.positions || canUpdate) && (
                     <span class="member-role-inline">
-                      {m.position && <span class="badge position">{positionLabel(m.position, L)}</span>}
-                      {canUpdate && (m.home_cell_id ? (
+                      {roleBadges(m.positions)}
+                      {canUpdate && (
                         <a class="position-edit js-edit-modal" href={`/members/${m.id}/position`}
-                          data-modal-title={t("org.assignTitle")} data-modal-size="sm">
-                          {m.position ? t("org.change") : t("org.assign")}
+                          data-modal-title={t("org.assignTitle")} data-modal-size="md">
+                          {m.positions ? t("org.change") : t("org.assign")}
                         </a>
-                      ) : (
-                        <a class="position-edit js-edit-modal" href={`/members/${m.id}/edit`}
-                          data-modal-title={t("form.editTitle")}>{t("org.setHomeCell")}</a>
-                      ))}
+                      )}
                     </span>
                   )}
                 </td>
@@ -324,20 +325,15 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell">{m.home_cell ?? ""}</td>
                 <td data-col="role" class="position-cell">
-                  {m.position
-                    ? <span class="badge position">{positionLabel(m.position, L)}</span>
-                    : <span class="muted small">—</span>}
-                  {canUpdate && (m.home_cell_id ? (
+                  {m.positions ? roleBadges(m.positions) : <span class="muted small">—</span>}
+                  {canUpdate && (
                     <a
                       class="position-edit js-edit-modal"
                       href={`/members/${m.id}/position`}
                       data-modal-title={t("org.assignTitle")}
                       data-modal-size="sm"
-                    >{m.position ? t("org.change") : t("org.assign")}</a>
-                  ) : (
-                    <a class="position-edit js-edit-modal" href={`/members/${m.id}/edit`}
-                      data-modal-title={t("form.editTitle")}>{t("org.setHomeCell")}</a>
-                  ))}
+                    >{m.positions ? t("org.change") : t("org.assign")}</a>
+                  )}
                 </td>
                 <td data-col="group">{m.group_label ?? ""}</td>
                 <td data-col="familyGroup">{optionText(m.family_group_code, m.family_group)}</td>
@@ -609,11 +605,24 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   );
 }
 
-export function MemberPositionPage(props: Common & {
+export type PositionFormAssignments = {
+  homeCell: string;
+  department: string;
+  departmentId: number | null;
+  church: string;
+};
+
+type PositionFormProps = {
   member: { id: number; name: string; homeCell: string | null; homeCellId: number | null };
-  position: string;
-}) {
-  const { user, perms, flash, lang, member, position } = props;
+  assignments: PositionFormAssignments;
+  departments: DepartmentRow[];
+  canManageDepartments: boolean;
+  error?: string | null;
+  lang?: Lang;
+};
+
+export function MemberPositionPage(props: Common & PositionFormProps) {
+  const { user, perms, flash, lang, member, assignments, departments, canManageDepartments } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -622,46 +631,101 @@ export function MemberPositionPage(props: Common & {
         <a class="btn secondary" href={`/members/${member.id}`}>{t("members.back")}</a>
       </div>
       <div class="card">
-        <MemberPositionForm member={member} position={position} lang={lang} />
+        <MemberPositionForm
+          member={member} assignments={assignments} departments={departments}
+          canManageDepartments={canManageDepartments} lang={lang}
+        />
       </div>
     </Layout>
   );
 }
 
-export function MemberPositionForm(props: {
-  member: { id: number; name: string; homeCell: string | null; homeCellId: number | null };
-  position: string;
-  error?: string | null;
-  lang?: Lang;
-}) {
-  const { member, position, error, lang } = props;
-  const t = getDict(lang ?? "en");
+export function MemberPositionForm(props: PositionFormProps) {
+  const { member, assignments, departments, canManageDepartments, error, lang } = props;
+  const L = lang ?? "en";
+  const t = getDict(L);
   return (
     <div class="position-form">
       <p class="position-member"><strong>{member.name}</strong></p>
       {error && <div class="flash err">{error}</div>}
-      {!member.homeCellId ? (
-        <div class="flash err">{t("org.noHomeCell")}</div>
-      ) : (
-        <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
-          <p class="muted small">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>
+      <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
+        <section class="position-section">
+          <h3>{t("org.homeCellSection")}</h3>
+          {!member.homeCellId ? (
+            <div class="flash err">{t("org.noHomeCell")}</div>
+          ) : (
+            <>
+              <p class="muted small">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>
+              <label class="field">
+                <span class="lbl">{t("org.position")}</span>
+                <select name="home_cell_position">
+                  <option value="">{t("org.noPosition")}</option>
+                  {HOME_CELL_POSITIONS.map((p) => (
+                    <option value={p.value} selected={assignments.homeCell === p.value}>
+                      {positionLabel(p.value, L)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+        </section>
+
+        <section class="position-section">
+          <h3>{t("org.departmentSection")}</h3>
+          {departments.length === 0 ? (
+            <p class="hint">
+              {t("org.noDepartments")}
+              {canManageDepartments && <> <a href="/organization/departments">{t("org.manageDepartments")}</a></>}
+            </p>
+          ) : (
+            <div class="form-grid">
+              <label class="field">
+                <span class="lbl">{t("org.department")}</span>
+                <select name="department_id">
+                  <option value="">{t("org.noDepartment")}</option>
+                  {departments.map((d) => (
+                    <option value={String(d.id)} selected={assignments.departmentId === d.id}>
+                      {departmentName(d, L)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label class="field">
+                <span class="lbl">{t("org.departmentPosition")}</span>
+                <select name="department_position">
+                  <option value="">{t("org.noPosition")}</option>
+                  {DEPARTMENT_POSITIONS.map((p) => (
+                    <option value={p.value} selected={assignments.department === p.value}>
+                      {positionLabel(p.value, L)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+        </section>
+
+        <section class="position-section">
+          <h3>{t("org.churchSection")}</h3>
           <label class="field">
-            <span class="lbl">{t("org.position")}</span>
-            <select name="position">
+            <span class="lbl">{t("org.churchLeadership")}</span>
+            <select name="church_position">
               <option value="">{t("org.noPosition")}</option>
-              {HOME_CELL_POSITIONS.map((p) => (
-                <option value={p.value} selected={position === p.value}>
-                  {positionLabel(p.value, lang ?? "en")}
+              {CHURCH_POSITIONS.map((p) => (
+                <option value={p.value} selected={assignments.church === p.value}>
+                  {positionLabel(p.value, L)}
                 </option>
               ))}
             </select>
           </label>
-          <p class="hint">{t("org.positionHint")}</p>
-          <div class="actions">
-            <button class="btn" type="submit">{t("org.savePosition")}</button>
-          </div>
-        </form>
-      )}
+        </section>
+
+        <p class="hint">{t("org.positionHint")}</p>
+        <div class="actions">
+          <button class="btn" type="submit">{t("org.savePosition")}</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -708,8 +772,7 @@ export type MemberDetail = {
   sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
-  position?: string | null;
-  position_home_cell_id?: number | null;
+  positions?: string | null;
   household_id?: number | null;
   household_name?: string | null;
   relationship?: string;
@@ -790,7 +853,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],
         [t("form.homeCell"), m.home_cell ?? ""],
-        [t("org.position"), m.position ? positionLabel(m.position, L) : ""],
+        [t("org.position"), positionLabels(m.positions, L).join(" · ")],
         [t("detail.status"), S[m.status] ?? m.status],
         [t("detail.notes"), m.notes ?? ""],
       ],
@@ -817,8 +880,8 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
             <a class="btn secondary" href={`/admin/households/new?member=${m.id}`}>{t("hh.newFromMember")}</a>
           ) : null}
           {perms.has("members.update") && (
-            <a class="btn secondary js-edit-modal" href={`/members/${m.id}/position`} data-modal-title={t("org.assignTitle")} data-modal-size="sm">
-              {m.position ? t("org.changePosition") : t("org.assignPosition")}
+            <a class="btn secondary js-edit-modal" href={`/members/${m.id}/position`} data-modal-title={t("org.assignTitle")} data-modal-size="md">
+              {m.positions ? t("org.changePosition") : t("org.assignPosition")}
             </a>
           )}
           {perms.has("members.update") && (

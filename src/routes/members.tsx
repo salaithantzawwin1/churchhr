@@ -8,7 +8,12 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
-import { getHomeCellPosition, isHomeCellPosition, positionTaken, setHomeCellPosition } from "../positions";
+import {
+  CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS,
+  getMemberPositions, isPositionForScope, positionTaken, setHomeCellPosition, setMemberPositions,
+  type PositionAssignment,
+} from "../positions";
+import { loadDepartments } from "../departments";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
 function multi(v: unknown): string[] {
@@ -163,7 +168,7 @@ const SORT_EXPR: Record<string, string> = {
   township: "m.township",
   marital: "m.marital_status",
   homeCell: "hc.label",
-  role: "mp.position",
+  role: "(SELECT MIN(position) FROM member_positions WHERE member_id = m.id)",
   group: "gr.label",
   familyGroup: "fg.label",
   fellowship: "fc.label",
@@ -200,7 +205,8 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
            r.name AS state_name, r.name_en AS state_name_en,
            m.home_cell_id, hc.label AS home_cell, gr.label AS group_label,
            fg.label AS family_group, fg.code AS family_group_code,
-           fc.label AS fellowship, sec.label AS sector, mp.position
+           fc.label AS fellowship, sec.label AS sector,
+           (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
@@ -208,7 +214,6 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
     LEFT JOIN lookup_options sec ON sec.id = m.sector_id
-    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
     WHERE ${cond}
     ORDER BY ${sql.raw(orderByFrom(c.req.query()))}
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
@@ -876,11 +881,10 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fg.code AS family_group_code,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
-      mp.position, mp.scope_id AS position_home_cell_id,
+      (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions,
       fam.name AS household_name
     FROM members m
     JOIN regions r ON r.id = m.region_id
-    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
     LEFT JOIN families fam ON fam.id = m.family_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
@@ -1092,7 +1096,29 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   );
 });
 
-// ---------- Home Cell position assignment (list modal) ----------
+// ---------- Service position assignment (list modal) ----------
+
+async function positionFormState(db: DB, memberId: number, row: { home_cell: string | null; home_cell_id: number | null }) {
+  const current = await getMemberPositions(db, memberId);
+  const home = current.find((p) => p.scopeType === "home_cell");
+  const department = current.find((p) => p.scopeType === "department");
+  const church = current.find((p) => p.scopeType === "church");
+  return {
+    member: {
+      id: memberId,
+      name: "",
+      homeCell: row.home_cell,
+      homeCellId: row.home_cell_id,
+    },
+    assignments: {
+      homeCell: home?.position ?? "",
+      department: department?.position ?? "",
+      departmentId: department?.departmentId ?? null,
+      church: church?.position ?? "",
+    },
+    departments: await loadDepartments(db),
+  };
+}
 
 membersRoutes.get("/:id/position", requirePermission("members.update"), async (c) => {
   const db = getDb(c.env);
@@ -1101,21 +1127,22 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
   if (!Number.isInteger(id) || id < 1) return c.redirect("/members?err=err-notfound", 302);
   const row = await loadMemberDetail(db, id);
   if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
-  const current = await getHomeCellPosition(db, id);
-  const member = {
-    id, name: row.name_myanmar || row.name_english || `#${id}`,
-    homeCell: row.home_cell, homeCellId: row.home_cell_id,
-  };
+  const state = await positionFormState(db, id, row);
+  const member = { ...state.member, name: row.name_myanmar || row.name_english || `#${id}` };
   if (c.req.query("modal") !== "1") {
     return c.html(
       <MemberPositionPage
         user={c.get("user")} perms={c.get("perms")} lang={c.get("lang")}
-        member={member} position={current?.position ?? ""}
+        member={member} assignments={state.assignments} departments={state.departments}
+        canManageDepartments={c.get("perms").has("options.manage")}
       />,
     );
   }
   return c.html(
-    <MemberPositionForm member={member} position={current?.position ?? ""} lang={c.get("lang")} />,
+    <MemberPositionForm
+      member={member} assignments={state.assignments} departments={state.departments}
+      canManageDepartments={c.get("perms").has("options.manage")} lang={c.get("lang")}
+    />,
   );
 });
 
@@ -1123,8 +1150,6 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
-  // The modal posts with fetch; this header makes it follow the flash redirect
-  // instead of treating the final page as a form to inject into the dialog.
   const back = (url: string) => {
     c.header("X-Redirect-To", url);
     return c.redirect(url, 303);
@@ -1133,28 +1158,71 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const row = await loadMemberDetail(db, id);
   if (!row || !inScope(row, scope)) return back("/members?err=err-notfound");
   const body = await c.req.parseBody();
-  const position = s(body.position);
   const t = getDict(c.get("lang"));
+  const departments = await loadDepartments(db);
+  const homePosition = s(body.home_cell_position) || s(body.position);
+  const departmentPosition = s(body.department_position);
+  const churchPosition = s(body.church_position);
+  const departmentRaw = s(body.department_id);
+  const departmentId = departmentRaw && /^\d+$/.test(departmentRaw) ? Number(departmentRaw) : null;
+  const state = {
+    homeCell: homePosition,
+    department: departmentPosition,
+    departmentId: departmentId ?? departments[0]?.id ?? null,
+    church: churchPosition,
+  };
   const renderError = (message: string) => c.html(
     <MemberPositionForm
       member={{ id, name: row.name_myanmar || row.name_english || `#${id}`, homeCell: row.home_cell, homeCellId: row.home_cell_id }}
-      position={position} error={message} lang={c.get("lang")}
+      assignments={state} departments={departments}
+      canManageDepartments={c.get("perms").has("options.manage")}
+      error={message} lang={c.get("lang")}
     />,
     400,
   );
-  if (position && !isHomeCellPosition(position)) return renderError(t("flash.positionInvalid"));
-  if (position && !row.home_cell_id) return renderError(t("flash.positionNoHomeCell"));
-  if (position && row.home_cell_id && await positionTaken(db, row.home_cell_id, position, id)) {
-    return renderError(t("flash.positionTaken"));
+
+  if (homePosition && !isPositionForScope(homePosition, "home_cell")) {
+    return renderError(t("flash.positionInvalid"));
   }
+  if (homePosition && !row.home_cell_id) return renderError(t("flash.positionNoHomeCell"));
+  if (departmentPosition && !isPositionForScope(departmentPosition, "department")) {
+    return renderError(t("flash.positionInvalid"));
+  }
+  if (departmentPosition && (!departmentId || !departments.some((d) => d.id === departmentId))) {
+    return renderError(t("flash.departmentRequired"));
+  }
+  if (churchPosition && !isPositionForScope(churchPosition, "church")) {
+    return renderError(t("flash.positionInvalid"));
+  }
+
+  const assignments: PositionAssignment[] = [];
+  if (homePosition && row.home_cell_id) {
+    if (await positionTaken(db, "home_cell", homePosition, { homeCellId: row.home_cell_id, exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "home_cell", position: homePosition, homeCellId: row.home_cell_id });
+  }
+  if (departmentPosition && departmentId) {
+    if (await positionTaken(db, "department", departmentPosition, { departmentId, exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "department", position: departmentPosition, departmentId });
+  }
+  if (churchPosition) {
+    if (await positionTaken(db, "church", churchPosition, { exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "church", position: churchPosition });
+  }
+
   try {
-    await setHomeCellPosition(db, id, position, row.home_cell_id, c.get("user").id);
+    await setMemberPositions(db, id, assignments, c.get("user").id);
   } catch {
     return renderError(t("flash.positionTaken"));
   }
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "position",
-    snapshotJson: JSON.stringify({ position, home_cell_id: row.home_cell_id }),
+    snapshotJson: JSON.stringify({ assignments, home_cell_id: row.home_cell_id }),
   });
   return back("/members?ok=member-position");
 });

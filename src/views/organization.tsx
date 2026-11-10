@@ -1,7 +1,8 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
-import { HOME_CELL_POSITIONS, positionLabel } from "../positions";
+import { CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS, positionLabel } from "../positions";
+import { departmentName } from "../departments";
 
 export type OrgCell = {
   id: number;
@@ -16,6 +17,23 @@ export type OrgCell = {
   assistant_name: string | null;
   secretary_name: string | null;
   treasurer_name: string | null;
+};
+
+export type OrgDepartment = {
+  id: number;
+  name: string;
+  name_en: string | null;
+  sort_order: number;
+  head_name: string | null;
+  assistant_name: string | null;
+  secretary_name: string | null;
+  treasurer_name: string | null;
+};
+
+export type OrgChurchLeader = {
+  position: string;
+  member_id: number;
+  member_name: string | null;
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -51,6 +69,14 @@ function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
   return [...states.values()];
 }
 
+function departmentRoleName(department: OrgDepartment, position: string): string | null {
+  if (position === "department_head") return department.head_name;
+  if (position === "department_assistant") return department.assistant_name;
+  if (position === "department_secretary") return department.secretary_name;
+  if (position === "department_treasurer") return department.treasurer_name;
+  return null;
+}
+
 function roleName(cell: OrgCell, position: string): string | null {
   if (position === "home_cell_leader") return cell.leader_name;
   if (position === "home_cell_assistant") return cell.assistant_name;
@@ -62,9 +88,12 @@ function roleName(cell: OrgCell, position: string): string | null {
 export function OrganizationPage(props: Common & {
   tab: "church" | "home-cells";
   cells: OrgCell[];
+  departments: OrgDepartment[];
+  churchLeaders: OrgChurchLeader[];
+  canManageDepartments: boolean;
   unassignedMembers: number;
 }) {
-  const { user, perms, flash, lang, tab, cells, unassignedMembers } = props;
+  const { user, perms, flash, lang, tab, cells, departments, churchLeaders, canManageDepartments, unassignedMembers } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const states = groupCells(cells, L);
@@ -98,62 +127,136 @@ export function OrganizationPage(props: Common & {
         <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
       </div>
 
-      {cells.length === 0 ? (
+      {tab === "church" ? (
+        <>
+          <section class="card org-leadership">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.churchLeadership")}</h2>
+                <p class="muted small">{t("org.churchLeadershipHint")}</p>
+              </div>
+            </div>
+            <div class="org-lead-grid">
+              {CHURCH_POSITIONS.map((p) => {
+                const leader = churchLeaders.find((l) => l.position === p.value);
+                return (
+                  <div class={`org-lead${leader ? "" : " org-vacant"}`}>
+                    <span class="org-lead-role">{positionLabel(p.value, L)}</span>
+                    {leader
+                      ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>
+                      : <span class="muted">{t("org.vacant")}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section class="org-departments">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.departments")}</h2>
+                <p class="muted small">{t("org.departmentsHint")}</p>
+              </div>
+              {canManageDepartments && (
+                <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
+              )}
+            </div>
+            {departments.length === 0 ? (
+              <div class="card org-empty org-empty-small">
+                <p class="muted">{t("org.noDepartments")}</p>
+                {canManageDepartments && (
+                  <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
+                )}
+              </div>
+            ) : (
+              <div class="org-grid org-dept-grid">
+                {departments.map((d) => (
+                  <article class="card org-card org-dept-card">
+                    <div class="org-card-head">
+                      <h3>{departmentName(d, L)}</h3>
+                      <span class="org-code">{t("org.department")}</span>
+                    </div>
+                    <dl class="org-roles">
+                      {DEPARTMENT_POSITIONS.map((p) => {
+                        const name = departmentRoleName(d, p.value);
+                        return (
+                          <div class={name ? "" : "org-vacant"}>
+                            <dt>{positionLabel(p.value, L)}</dt>
+                            <dd>{name || "—"}</dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {cells.length === 0 ? (
+            <div class="card org-empty">
+              <h2>{t("org.emptyTitle")}</h2>
+              <p class="muted">{t("org.emptyBody")}</p>
+              {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
+            </div>
+          ) : (
+            <div class="org-church">
+              {states.map((state) => {
+                const stateMembers = state.cells.reduce((sum, c) => sum + c.member_count, 0);
+                const stateLeaders = state.cells.filter((c) => Boolean(c.leader_name)).length;
+                return (
+                  <section class="card org-state">
+                    <div class="org-state-head">
+                      <div>
+                        <h2>{state.name}</h2>
+                        <p class="muted small">
+                          {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")} · {stateLeaders} {t("org.leadersShort")}
+                        </p>
+                      </div>
+                    </div>
+                    {state.townships.map((town) => (
+                      <details class="org-township" open={town.cells.length <= 4}>
+                        <summary>
+                          <span class="org-township-name">{town.name}</span>
+                          <span class="muted small">{town.cells.length} {t("org.cells")}</span>
+                          <span class="chev" aria-hidden="true">▾</span>
+                        </summary>
+                        <div class="org-cell-list">
+                          {town.cells.map((cell) => (
+                            <div class="org-cell-row">
+                              <div class="org-cell-name">
+                                <a href={cellHref(cell.id)}>{cell.label}</a>
+                                {cell.code && <span class="org-code">{cell.code}</span>}
+                              </div>
+                              <div class="org-cell-leader">
+                                {cell.leader_name ? (
+                                  <>
+                                    <span class="org-role-label">{t("org.leader")}</span>
+                                    <span>{cell.leader_name}</span>
+                                  </>
+                                ) : (
+                                  <span class="badge inactive">{t("org.noLeader")}</span>
+                                )}
+                              </div>
+                              <a class="org-cell-count" href={cellHref(cell.id)}>
+                                {cell.member_count} {t("org.membersShort")}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : cells.length === 0 ? (
         <div class="card org-empty">
           <h2>{t("org.emptyTitle")}</h2>
           <p class="muted">{t("org.emptyBody")}</p>
           {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
-        </div>
-      ) : tab === "church" ? (
-        <div class="org-church">
-          {states.map((state) => {
-            const stateMembers = state.cells.reduce((sum, c) => sum + c.member_count, 0);
-            const stateLeaders = state.cells.filter((c) => Boolean(c.leader_name)).length;
-            return (
-              <section class="card org-state">
-                <div class="org-state-head">
-                  <div>
-                    <h2>{state.name}</h2>
-                    <p class="muted small">
-                      {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")} · {stateLeaders} {t("org.leadersShort")}
-                    </p>
-                  </div>
-                </div>
-                {state.townships.map((town) => (
-                  <details class="org-township" open={town.cells.length <= 4}>
-                    <summary>
-                      <span class="org-township-name">{town.name}</span>
-                      <span class="muted small">{town.cells.length} {t("org.cells")}</span>
-                      <span class="chev" aria-hidden="true">▾</span>
-                    </summary>
-                    <div class="org-cell-list">
-                      {town.cells.map((cell) => (
-                        <div class="org-cell-row">
-                          <div class="org-cell-name">
-                            <a href={cellHref(cell.id)}>{cell.label}</a>
-                            {cell.code && <span class="org-code">{cell.code}</span>}
-                          </div>
-                          <div class="org-cell-leader">
-                            {cell.leader_name ? (
-                              <>
-                                <span class="org-role-label">{t("org.leader")}</span>
-                                <span>{cell.leader_name}</span>
-                              </>
-                            ) : (
-                              <span class="badge inactive">{t("org.noLeader")}</span>
-                            )}
-                          </div>
-                          <a class="org-cell-count" href={cellHref(cell.id)}>
-                            {cell.member_count} {t("org.membersShort")}
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </section>
-            );
-          })}
         </div>
       ) : (
         <div class="org-grid">

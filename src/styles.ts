@@ -1217,6 +1217,55 @@ td.empty-state .small { margin-top: 4px; }
 }
 .org-empty { text-align: center; padding: 34px 20px; }
 .org-empty h2 { margin-top: 0; }
+.org-empty-small { padding: 20px; }
+.org-section-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.org-section-head h2 { margin: 0 0 2px; }
+.org-section-head p { margin: 0; }
+.org-leadership { margin-bottom: 18px; padding: 18px 20px; }
+.org-lead-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
+}
+.org-lead {
+  display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--row-alt, rgba(15,23,42,.025));
+}
+.org-lead a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-lead a:hover { color: var(--link); text-decoration: underline; }
+.org-lead-role { color: var(--muted); font-size: 11.5px; }
+.org-lead.org-vacant { border-style: dashed; }
+.org-departments { margin: 0 0 18px; }
+.org-dept-grid { margin-top: 0; }
+.org-dept-card { gap: 10px; }
+.org-dept-card .org-card-head h3 { margin: 0; }
+.position-section { margin: 0 0 16px; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
+.position-section h3 { margin: 0 0 10px; font-size: 14px; }
+.position-section .field { margin-bottom: 0; }
+.position-section .form-grid { margin-top: 0; }
+.dept-add { margin-bottom: 18px; padding: 18px 20px; }
+.dept-add h2 { margin: 0 0 2px; }
+.dept-list { display: grid; gap: 14px; }
+.dept-row { padding: 16px 18px; }
+.dept-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.dept-row-head h3 { margin: 0 0 2px; font-size: 16px; }
+.dept-row-head p { margin: 0; }
+.dept-roles { display: grid; gap: 4px; margin: 10px 0; }
+.dept-roles > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dept-roles dt { color: var(--muted); font-size: 12px; }
+.dept-roles dd { margin: 0; font-size: 13px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.dept-fields { gap: 10px 14px; }
+.dept-active { display: flex; align-items: center; gap: 8px; align-self: end; min-height: 38px; font-size: 13px; }
+.dept-active input { width: auto; }
+.dept-inactive { opacity: .75; }
+.dept-row .actions { margin-top: 12px; }
+@media (max-width: 640px) {
+  .org-leadership, .dept-add, .dept-row { padding: 14px 16px; }
+  .org-lead-grid { grid-template-columns: 1fr 1fr; }
+  .dept-row .form-grid { grid-template-columns: 1fr; }
+  .dept-active { align-self: start; }
+}
 .member-role-inline { display: none; }
 @media (max-width: 760px) {
   /* The member table scrolls sideways on phones; surface the role under the

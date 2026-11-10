@@ -256,8 +256,24 @@ export const members = sqliteTable(
   }),
 );
 
-/** Service position held by a member (Home Cell Leader, Second Leader, …).
- * scope_type/scope_id are generic so church-level roles can reuse the table. */
+/** Church departments live above Home Cells and are managed independently of
+ * member records, so a department can exist before it has leaders. */
+export const churchDepartments = sqliteTable(
+  "church_departments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    nameEn: text("name_en"),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({ nameUq: uniqueIndex("church_departments_name_uq").on(t.name) }),
+);
+
+/** Service position held by a member (Home Cell Leader, Department Head, …).
+ * scope_type/scope_id/department_id are generic so church-level roles can
+ * reuse the table without another schema change. */
 export const memberPositions = sqliteTable(
   "member_positions",
   {
@@ -268,6 +284,7 @@ export const memberPositions = sqliteTable(
     position: text("position").notNull(),
     scopeType: text("scope_type").notNull().default("home_cell"),
     scopeId: integer("scope_id").references(() => lookupOptions.id),
+    departmentId: integer("department_id").references(() => churchDepartments.id),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),

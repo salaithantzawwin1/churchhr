@@ -1,53 +1,138 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { memberPositions } from "./db/schema";
 
-/** Code-defined position catalogue. Adding a future Home Cell position only
- * needs an entry here; the assignment form and structure pages pick it up. */
-export const HOME_CELL_POSITIONS = [
-  { value: "home_cell_leader", mm: "အိမ်အသင်းခေါင်းဆောင်", en: "Home Cell Leader", kr: "홈셀 리더" },
-  { value: "home_cell_assistant", mm: "ဒုတိယခေါင်းဆောင်", en: "Second Leader", kr: "부리더" },
-  { value: "home_cell_secretary", mm: "အတွင်းရေးမှူး", en: "Secretary", kr: "서기" },
-  { value: "home_cell_treasurer", mm: "ဘဏ္ဍာရေးမှူး", en: "Treasurer", kr: "회계" },
-] as const;
+export type PositionScope = "home_cell" | "department" | "church";
 
-export type HomeCellPositionCode = (typeof HOME_CELL_POSITIONS)[number]["value"];
+export type PositionDef = {
+  value: string;
+  scope: PositionScope;
+  mm: string;
+  en: string;
+  kr: string;
+};
 
-export function isHomeCellPosition(value: string): value is HomeCellPositionCode {
-  return HOME_CELL_POSITIONS.some((p) => p.value === value);
+/** Code-defined position catalogue. Adding a future role only needs an entry
+ * here; assignment forms and organization views filter by scope. */
+export const POSITIONS: PositionDef[] = [
+  { value: "home_cell_leader", scope: "home_cell", mm: "အိမ်အသင်းခေါင်းဆောင်", en: "Home Cell Leader", kr: "홈셀 리더" },
+  { value: "home_cell_assistant", scope: "home_cell", mm: "ဒုတိယခေါင်းဆောင်", en: "Second Leader", kr: "부리더" },
+  { value: "home_cell_secretary", scope: "home_cell", mm: "အတွင်းရေးမှူး", en: "Secretary", kr: "서기" },
+  { value: "home_cell_treasurer", scope: "home_cell", mm: "ဘဏ္ဍာရေးမှူး", en: "Treasurer", kr: "회계" },
+  { value: "department_head", scope: "department", mm: "ဌာနမှူး", en: "Department Head", kr: "부서장" },
+  { value: "department_assistant", scope: "department", mm: "ဒုတိယဌာနမှူး", en: "Assistant Department Head", kr: "부서 부장" },
+  { value: "department_secretary", scope: "department", mm: "ဌာန အတွင်းရေးမှူး", en: "Department Secretary", kr: "부서 서기" },
+  { value: "department_treasurer", scope: "department", mm: "ဌာန ဘဏ္ဍာရေးမှူး", en: "Department Treasurer", kr: "부서 회계" },
+  { value: "church_senior_pastor", scope: "church", mm: "သင်းအုပ်ဆရာ", en: "Senior Pastor", kr: "담임 목사" },
+  { value: "church_assistant_pastor", scope: "church", mm: "ဒုတိယသင်းအုပ်ဆရာ", en: "Assistant Pastor", kr: "부목사" },
+  { value: "church_secretary", scope: "church", mm: "အသင်းအတွင်းရေးမှူး", en: "Church Secretary", kr: "교회 서기" },
+  { value: "church_treasurer", scope: "church", mm: "အသင်းဘဏ္ဍာရေးမှူး", en: "Church Treasurer", kr: "교회 회계" },
+];
+
+export const HOME_CELL_POSITIONS = POSITIONS.filter((p) => p.scope === "home_cell");
+export const DEPARTMENT_POSITIONS = POSITIONS.filter((p) => p.scope === "department");
+export const CHURCH_POSITIONS = POSITIONS.filter((p) => p.scope === "church");
+
+export function positionsForScope(scope: PositionScope): PositionDef[] {
+  return POSITIONS.filter((p) => p.scope === scope);
+}
+
+export function positionScope(value: string): PositionScope | null {
+  return POSITIONS.find((p) => p.value === value)?.scope ?? null;
+}
+
+export function isPositionForScope(value: string, scope: PositionScope): boolean {
+  return positionScope(value) === scope;
+}
+
+export function isHomeCellPosition(value: string): boolean {
+  return isPositionForScope(value, "home_cell");
 }
 
 export function positionLabel(value: string | null | undefined, lang: string): string {
-  const found = HOME_CELL_POSITIONS.find((p) => p.value === value);
+  const found = POSITIONS.find((p) => p.value === value);
   if (!found) return value ?? "";
   if (lang === "mm") return found.mm;
   if (lang === "kr") return found.kr;
   return found.en;
 }
 
-/** Current Home Cell assignment for one member (one row per scope by schema). */
-export async function getHomeCellPosition(db: DB, memberId: number) {
-  const rows = await db
+/** Comma-separated DB aggregate -> human labels (used by the member list). */
+export function positionLabels(csv: string | null | undefined, lang: string): string[] {
+  if (!csv) return [];
+  return csv.split(",").map((v) => v.trim()).filter(Boolean).map((v) => positionLabel(v, lang));
+}
+
+export type MemberPositionRow = {
+  id: number;
+  memberId: number;
+  position: string;
+  scopeType: string;
+  scopeId: number | null;
+  departmentId: number | null;
+};
+
+/** All positions for a member (at most one per scope, enforced by schema). */
+export async function getMemberPositions(db: DB, memberId: number): Promise<MemberPositionRow[]> {
+  return (await db
     .select({
       id: memberPositions.id,
       memberId: memberPositions.memberId,
       position: memberPositions.position,
+      scopeType: memberPositions.scopeType,
       scopeId: memberPositions.scopeId,
+      departmentId: memberPositions.departmentId,
     })
     .from(memberPositions)
-    .where(and(eq(memberPositions.memberId, memberId), eq(memberPositions.scopeType, "home_cell")))
-    .limit(1);
-  return rows[0] ?? null;
+    .where(eq(memberPositions.memberId, memberId))) as MemberPositionRow[];
 }
 
-/** Replace a member's Home Cell position. Empty position clears it. */
+export async function getHomeCellPosition(db: DB, memberId: number): Promise<MemberPositionRow | null> {
+  const rows = await getMemberPositions(db, memberId);
+  return rows.find((r) => r.scopeType === "home_cell") ?? null;
+}
+
+export type PositionAssignment = {
+  scopeType: PositionScope;
+  position: string;
+  /** Home Cell id (scope_id). */
+  homeCellId?: number | null;
+  /** Department id. */
+  departmentId?: number | null;
+};
+
+/** Replace every position for a member with the supplied valid assignments.
+ * Route validation runs first so a rejected form never reaches this helper. */
+export async function setMemberPositions(
+  db: DB,
+  memberId: number,
+  assignments: PositionAssignment[],
+  actorId: number,
+): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  await db.delete(memberPositions).where(eq(memberPositions.memberId, memberId));
+  const rows = assignments.filter((a) => a.position && isPositionForScope(a.position, a.scopeType));
+  if (rows.length === 0) return;
+  await db.insert(memberPositions).values(rows.map((a) => ({
+    memberId,
+    position: a.position,
+    scopeType: a.scopeType,
+    scopeId: a.scopeType === "home_cell" ? a.homeCellId ?? null : null,
+    departmentId: a.scopeType === "department" ? a.departmentId ?? null : null,
+    createdBy: actorId,
+    createdAt: now,
+    updatedAt: now,
+  })));
+}
+
+/** Replace only the Home Cell position, leaving department/church roles intact. */
 export async function setHomeCellPosition(
   db: DB,
   memberId: number,
   position: string,
   homeCellId: number | null,
   actorId: number,
-) {
+): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   await db
     .delete(memberPositions)
@@ -58,27 +143,37 @@ export async function setHomeCellPosition(
     position,
     scopeType: "home_cell",
     scopeId: homeCellId,
+    departmentId: null,
     createdBy: actorId,
     createdAt: now,
     updatedAt: now,
   });
 }
 
-/** Another member already holding this position in the cell (excluding self). */
+/** Is this slot already held by a different member? */
 export async function positionTaken(
   db: DB,
-  homeCellId: number,
+  scopeType: PositionScope,
   position: string,
-  exceptMemberId: number,
-) {
+  opts: { homeCellId?: number | null; departmentId?: number | null; exceptMemberId: number },
+): Promise<boolean> {
+  const conditions = [
+    eq(memberPositions.scopeType, scopeType),
+    eq(memberPositions.position, position),
+    ne(memberPositions.memberId, opts.exceptMemberId),
+  ];
+  if (scopeType === "home_cell") {
+    if (!opts.homeCellId) return false;
+    conditions.push(eq(memberPositions.scopeId, opts.homeCellId));
+  }
+  if (scopeType === "department") {
+    if (!opts.departmentId) return false;
+    conditions.push(eq(memberPositions.departmentId, opts.departmentId));
+  }
   const rows = await db
     .select({ memberId: memberPositions.memberId })
     .from(memberPositions)
-    .where(and(
-      eq(memberPositions.scopeType, "home_cell"),
-      eq(memberPositions.scopeId, homeCellId),
-      eq(memberPositions.position, position),
-    ))
-    .limit(5);
-  return rows.some((r) => r.memberId !== exceptMemberId);
+    .where(and(...conditions))
+    .limit(1);
+  return rows.length > 0;
 }
