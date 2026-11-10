@@ -60,7 +60,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const unassignedRows = await db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM members m
-    WHERE m.home_cell_id IS NULL
+    WHERE m.home_cell_id IS NULL AND m.status = 'active'
       AND (${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
         ? sql`1=0`
         : sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`})`);
