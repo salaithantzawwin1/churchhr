@@ -250,7 +250,7 @@ export function MembersListPage(props: ListProps) {
           <input type="hidden" name="ids" value="" id="bulk-ids" />
           <div class="card" id="bulk-bar" data-selected-label={t("bulk.selected")} style="display:none;align-items:center;gap:10px;flex-wrap:wrap">
             <strong class="small bulk-count" id="bulk-count">0</strong>
-            <select name="bulk_action" required aria-label={t("bulk.action")}>
+            <select name="bulk_action" aria-label={t("bulk.action")}>
               <option value="">{t("bulk.action")}</option>
               <option value="status_active">{t("bulk.statusActive")}</option>
               <option value="status_inactive">{t("bulk.statusInactive")}</option>
@@ -259,6 +259,10 @@ export function MembersListPage(props: ListProps) {
             <select name="group_id" aria-label={t("bulk.assignGroupOpt")}>
               <option value="">{t("bulk.assignGroupOpt")}</option>
               {groups.map((o) => <option value={String(o.id)}>{o.label}</option>)}
+            </select>
+            <select name="department_id" aria-label={t("bulk.assignDepartmentOpt")}>
+              <option value="">{t("bulk.assignDepartmentOpt")}</option>
+              {departments.map((d) => <option value={String(d.id)}>{departmentName(d, L)}</option>)}
             </select>
             <button class="btn sm" type="submit" data-confirm={t("bulk.confirm")}>{t("bulk.apply")}</button>
             <button class="btn sm secondary" type="button" data-bulk-clear="1">{t("members.clear")}</button>

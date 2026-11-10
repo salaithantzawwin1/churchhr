@@ -1308,9 +1308,16 @@ membersRoutes.post("/bulk", requirePermission("members.update"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const action = s(body.bulk_action);
   const groupId = intParam(s(body.group_id) || undefined);
+  const departmentId = intParam(s(body.department_id) || undefined);
   const ids = ([] as number[]).concat(...(multi(body.ids).map((v) => ints([v]))));
   if (!ids.length) return c.redirect("/members?err=" + encodeURIComponent("bulk.noSelection"), 302);
-  if (!action && !groupId) return c.redirect("/members?err=" + encodeURIComponent("bulk.noAction"), 302);
+  if (!action && !groupId && !departmentId) return c.redirect("/members?err=" + encodeURIComponent("bulk.noAction"), 302);
+  if (departmentId) {
+    const departments = await loadDepartments(db);
+    if (!departments.some((d) => d.id === departmentId)) {
+      return c.redirect("/members?err=" + encodeURIComponent("bulk.badDepartment"), 302);
+    }
+  }
   const canDeleteRows = c.get("perms").has("members.delete");
 
   // Restrict to rows visible inside the caller's state scope.
@@ -1334,12 +1341,15 @@ membersRoutes.post("/bulk", requirePermission("members.update"), async (c) => {
     if (action === "status_active") set.status = "active";
     if (action === "status_inactive") set.status = "inactive";
     if (groupId) set.groupId = groupId;
+    if (departmentId) set.departmentId = departmentId;
     if (Object.keys(set).length > 2) {
       await db.update(members).set(set as any).where(inArray(members.id, allowed));
+      // bulk_group is the generic label for bulk assignment (group or department).
+      const historyAction = !action && (groupId || departmentId) ? "bulk_group" : "bulk_status";
       for (const mid of allowed) {
         await db.insert(memberHistory).values({
-          memberId: mid, actorId, action: groupId && !action ? "bulk_group" : "bulk_status",
-          snapshotJson: JSON.stringify({ id: mid, status: set.status ?? null, groupId: groupId ?? null, bulk: true }),
+          memberId: mid, actorId, action: historyAction,
+          snapshotJson: JSON.stringify({ id: mid, status: set.status ?? null, groupId: groupId ?? null, departmentId: departmentId ?? null, bulk: true }),
         });
       }
       flash = "bulk.updated";

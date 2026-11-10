@@ -53,6 +53,7 @@ const FLASH_KEYS: Record<string, string> = {
   "bulk.deleted": "flash.bulkDeleted",
   "bulk.noSelection": "flash.bulkNoSelection",
   "bulk.noAction": "flash.bulkNoAction",
+  "bulk.badDepartment": "flash.bulkBadDepartment",
 };
 
 export function flashFromQuery(q: Record<string, string | undefined>, lang?: Lang): Flash {
