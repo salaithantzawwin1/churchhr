@@ -58,7 +58,7 @@
   (function initAdminMenus() {
     var menus = Array.prototype.slice.call(document.querySelectorAll("details.nav-admin"));
     if (!menus.length) return;
-    var narrow = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+    var narrow = window.matchMedia ? window.matchMedia("(max-width: 1180px)") : null;
 
     function menuFor(d) { return d.querySelector(".nav-menu"); }
     function clearPosition(d) {

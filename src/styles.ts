@@ -89,8 +89,8 @@ a { color: var(--link); }
 }
 .topbar nav a:hover, .topbar nav a.active { background: rgba(255,255,255,.16); opacity: 1; }
 .topbar nav .sep { opacity: .35; padding: 5px 2px; }
-/* Administration: a dropdown on wide screens, inline links once the nav moves
-   to its own scrolling row (a dropdown there would be clipped by overflow). */
+/* Administration: one dropdown at every width. On narrow screens app.js keeps
+   the menu in fixed coordinates so the nav's row cannot clip it. */
 .nav-admin { position: relative; display: block; }
 .nav-admin > summary {
   display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
@@ -112,15 +112,6 @@ a { color: var(--link); }
 .topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: 7px; font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
 .topbar nav .nav-menu a.active { background: var(--chip-brand-bg); color: var(--link); font-weight: 600; }
-.nav-admin-inline { display: none; align-items: center; gap: 2px; flex: none; }
-.nav-admin-inline .nav-group-label {
-  color: var(--brand-ink); opacity: .62; font-size: 11.5px; font-weight: 600;
-  letter-spacing: .04em; text-transform: uppercase; padding: 0 4px 0 7px; white-space: nowrap;
-}
-@media (max-width: 1180px) {
-  .nav-admin { display: none; }
-  .nav-admin-inline { display: flex; }
-}
 .topbar .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .topbar .who form { margin: 0; }
 .container { max-width: 1100px; margin: 22px auto; padding: 0 16px; }
@@ -1026,38 +1017,22 @@ td.empty-state .small { margin-top: 4px; }
   .donut { width: 116px; height: 116px; }
   .donut .d-center b { font-size: 20px; }
 }
-/* ---------- phones/tablets: whole admin nav visible, no sideways scrolling ---------- */
-@media (max-width: 900px) {
-  /* The nav gets its own full-width row (≤1180px already does this); let it
-     wrap instead of scrolling so every link, including Administration, shows. */
+/* ---------- phones/tablets: whole nav visible, no sideways scrolling ---------- */
+@media (max-width: 1180px) {
+  /* The nav gets its own full-width row (see above); let it wrap instead of
+     scrolling so the Administration dropdown is never pushed out of view. */
   .topbar nav {
     flex-wrap: wrap; overflow: visible; padding-right: 0; gap: 2px;
     -webkit-mask-image: none; mask-image: none;
   }
   .topbar nav a { padding: 5px 8px; }
-  /* Phones/tablets: show the admin links inline (they wrap with the rest of
-     the nav) instead of hiding them behind a dropdown that needs an extra tap
-     and can cover the page content. */
-  .nav-admin { display: none; }
-  .nav-admin-inline { display: flex; flex-wrap: wrap; max-width: 100%; }
-  .nav-admin-inline .sep { display: none; }
 }
 @media (max-width: 640px) {
   .nav-admin .nav-menu { min-width: 180px; }
   /* Phone nav: keep the five primary links on one row and put the admin group
-     on its own clearly-labelled row. The desktop-sized type made Reports wrap
-     into the admin links, which is what looked like a broken dropdown. */
+     on its own clearly-labelled row below them. */
   .topbar nav { column-gap: 1px; }
   .topbar nav a { padding: 5px 6px; font-size: 13px; line-height: 1.6; }
-  .nav-admin-inline {
-    flex-basis: 100%; flex-wrap: wrap; padding: 3px 0 0 7px;
-    border-left: 1px solid rgba(255,255,255,.3);
-  }
-  .nav-admin-inline .nav-group-label {
-    display: inline; font-size: 10px; line-height: 1.6;
-    padding: 0 2px 0 1px; letter-spacing: .03em;
-  }
-  .nav-admin-inline a { padding: 3px 6px; }
   /* Logo only: the language switch now has three options, so the brand text
      would push the controls past the viewport on a phone. */
   .topbar .brand-name { display: none; }
@@ -1468,9 +1443,15 @@ td.empty-state .small { margin-top: 4px; }
   .org-code { display: none; }
 }
 
-/* On phones the admin group becomes a compact Administration dropdown. The
-   menu is positioned by app.js with fixed coordinates so the horizontally
-   scrolling nav cannot clip it. */
+/* On tablets and phones app.js places the menu with viewport coordinates, so
+   neither the scrolling nav nor its mask can clip it. */
+@media (max-width: 1180px) {
+  .nav-admin .nav-menu {
+    position: fixed; top: 0; left: 0; right: auto; z-index: 90; min-width: 0;
+  }
+}
+
+/* On phones the Administration row sits below the five primary links. */
 @media (max-width: 640px) {
   .nav-admin {
     display: block; flex-basis: 100%; order: 20;
@@ -1479,8 +1460,6 @@ td.empty-state .small { margin-top: 4px; }
   }
   .nav-admin > summary { display: inline-flex; padding: 4px 6px; font-size: 12px; line-height: 1.6; }
   .nav-admin .chev { font-size: 9px; }
-  .nav-admin .nav-menu { position: fixed; top: 0; left: 0; right: auto; z-index: 90; min-width: 0; }
-  .nav-admin-inline { display: none; }
 }
 
 /* ---------- touch photo lightbox ---------- */

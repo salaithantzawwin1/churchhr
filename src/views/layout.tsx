@@ -86,7 +86,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
               ))}
               {adminItems.length > 0 && (
                 <>
-                  {/* Desktop: a tidy Administration dropdown. */}
+                  {/* One Administration dropdown at every width. */}
                   <details class={`nav-admin${adminActive ? " active" : ""}`}>
                     <summary aria-current={adminActive ? "page" : undefined}>
                       {t("nav.admin")} <span class="chev" aria-hidden="true">▾</span>
@@ -103,21 +103,6 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
                       ))}
                     </div>
                   </details>
-                  {/* Narrow screens: the dropdown would be clipped by the scrolling
-                      nav, so the same links sit inline after a group label. */}
-                  <span class="nav-admin-inline">
-                    <span class="sep" aria-hidden="true">|</span>
-                    <span class="nav-group-label">{t("nav.adminShort")}</span>
-                    {adminItems.map((n) => (
-                      <a
-                        href={n.href}
-                        class={active === n.href ? "active" : ""}
-                        aria-current={active === n.href ? "page" : undefined}
-                      >
-                        {n.label}
-                      </a>
-                    ))}
-                  </span>
                 </>
               )}
             </nav>

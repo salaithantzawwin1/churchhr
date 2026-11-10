@@ -17,7 +17,6 @@ export const KO: Record<string, string> = {
   "nav.skip": "본문으로 건너뛰기",
   "nav.main": "주 메뉴",
   "nav.admin": "관리",
-  "nav.adminShort": "관리",
   "nav.profile": "내 계정",
   "nav.theme": "화면 모드 전환",
   "nav.themeDark": "어두운 화면으로 전환",
