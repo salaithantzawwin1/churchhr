@@ -526,6 +526,12 @@ th.bar-col { width: 42%; }
   .filters .actions .btn { flex: 1; }
   th, td { padding: 8px 10px; font-size: 13px; }
   table.list-tbl { min-width: 760px; }
+  /* Reports only has five/six columns: fit the phone instead of forcing the
+     member list's scroll width. Township stays on the report detail page. */
+  table.list-tbl.reports-tbl { min-width: 0; }
+  .reports-tbl th, .reports-tbl td { white-space: normal; padding: 8px 7px; }
+  .reports-tbl th:nth-child(4), .reports-tbl td:nth-child(4) { display: none; }
+  .reports-tbl td:nth-child(2) { min-width: 0; }
   .tbl-wrap { -webkit-overflow-scrolling: touch; }
   /* Keep cell content on one line inside the horizontal scroller — wrapping a
      name one syllable per line is unreadable. Scoped to the member list: on

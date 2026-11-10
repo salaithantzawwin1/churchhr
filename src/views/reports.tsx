@@ -154,7 +154,7 @@ export function ReportsListPage(props: Common & {
       <p class="muted small">{t("rep.hint")}</p>
 
       <div class="tbl-wrap">
-        <table class="list-tbl">
+        <table class="list-tbl reports-tbl">
           <thead>
             <tr>
               <th>{t("rep.date")}</th>
