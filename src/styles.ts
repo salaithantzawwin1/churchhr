@@ -1457,6 +1457,17 @@ td.empty-state .small { margin-top: 4px; }
   .report-form-actions .btn { flex: 1 1 0; min-height: 44px; }
 }
 
+/* On narrow phones the five English nav labels no longer fit at 13px. Keep
+   the primary row intact, compact the report range chips so they do not leave
+   one chip stranded, and drop the long generated Home Cell code from the row. */
+@media (max-width: 420px) {
+  .topbar nav { column-gap: 0; }
+  .topbar nav a { padding: 5px 4px; font-size: 12px; }
+  .quick-ranges { gap: 4px; }
+  .quick-chip { padding: 6px 7px; font-size: 12px; }
+  .org-code { display: none; }
+}
+
 /* ---------- hover preview for member photos ---------- */
 .photo-preview-float {
   position: fixed; left: 0; top: 0; z-index: 90;
