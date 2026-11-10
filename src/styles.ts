@@ -526,12 +526,6 @@ th.bar-col { width: 42%; }
   .filters .actions .btn { flex: 1; }
   th, td { padding: 8px 10px; font-size: 13px; }
   table.list-tbl { min-width: 760px; }
-  /* Reports only has five/six columns: fit the phone instead of forcing the
-     member list's scroll width. Township stays on the report detail page. */
-  table.list-tbl.reports-tbl { min-width: 0; }
-  .reports-tbl th, .reports-tbl td { white-space: normal; padding: 8px 7px; }
-  .reports-tbl th:nth-child(4), .reports-tbl td:nth-child(4) { display: none; }
-  .reports-tbl td:nth-child(2) { min-width: 0; }
   .tbl-wrap { -webkit-overflow-scrolling: touch; }
   /* Keep cell content on one line inside the horizontal scroller — wrapping a
      name one syllable per line is unreadable. Scoped to the member list: on
@@ -1164,5 +1158,67 @@ td.empty-state .small { margin-top: 4px; }
   .hh-member { flex-wrap: wrap; }
   .hh-member-actions { width: 100%; margin-left: 0; }
   .hh-member-actions .btn { flex: 1; }
+}
+/* ---------- reports: phone layout ---------- */
+/* Five table columns are hard to scan on a phone, so each report becomes a
+   card with labelled facts. Desktop keeps the compact table. */
+@media (max-width: 640px) {
+  .reports-filter-box { margin-bottom: 10px; }
+  .reports-filter-box > form.filters {
+    padding: 12px; margin: 0; background: var(--card);
+    border: 1px solid var(--line); border-top: 0;
+    border-radius: 0 0 12px 12px;
+  }
+  .reports-filter-box > form.filters .actions { margin-top: 0; }
+  .reports-filter-box > form.filters input,
+  .reports-filter-box > form.filters .actions .btn { min-height: 44px; }
+  .reports-filter-box > summary .range {
+    margin-left: 4px; color: var(--muted); font-size: 12.5px; font-weight: 500;
+  }
+
+  .reports-wrap { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+  table.list-tbl.reports-tbl { min-width: 0; border: 0; background: transparent; }
+  .reports-tbl thead { display: none; }
+  .reports-tbl tbody { display: grid; gap: 10px; }
+  .reports-tbl tr {
+    display: block; padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .reports-tbl td {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 14px; padding: 3px 0; border: 0; white-space: normal;
+    text-align: right; font-size: 13px; overflow-wrap: anywhere;
+  }
+  .reports-tbl td::before {
+    content: attr(data-label); flex: none; text-align: left;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+  }
+  /* The first-column sticky treatment is only for wide member tables. */
+  .reports-tbl td:first-child { position: static; background: transparent; box-shadow: none; }
+  .reports-tbl td.report-date, .reports-tbl td.report-title { display: block; padding: 0; text-align: left; }
+  .reports-tbl td.report-date::before, .reports-tbl td.report-title::before { display: none; }
+  .reports-tbl td.report-date { color: var(--muted); font-size: 12px; }
+  .reports-tbl td.report-title { margin: 2px 0 8px; font-size: 15.5px; font-weight: 600; line-height: 1.45; }
+  .reports-tbl td.report-title a { color: var(--link); text-decoration: none; }
+  .reports-tbl td.report-title a:hover { color: var(--link); text-decoration: underline; }
+  .reports-tbl td.report-status { margin-top: 7px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .reports-tbl tr.empty-row { padding: 0; background: transparent; border: 0; box-shadow: none; }
+  .reports-tbl tr.empty-row td {
+    display: block; padding: 30px 16px; text-align: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .reports-tbl tr.empty-row td::before { display: none; }
+  .empty-action { margin-top: 12px; }
+
+  /* The form is long; keep its submit action reachable while scrolling. */
+  .report-form input, .report-form select { min-height: 44px; }
+  .report-form-actions {
+    position: sticky; bottom: max(8px, env(safe-area-inset-bottom)); z-index: 8;
+    margin-top: 18px; padding: 10px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 26px rgba(2,8,23,.18);
+  }
+  .report-form-actions .btn { flex: 1 1 0; min-height: 44px; }
 }
 `; // end of stylesheet

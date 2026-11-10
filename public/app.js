@@ -732,6 +732,22 @@
       .catch(function () { form.submit(); });
   });
 
+  // Long forms (daily reports) ask before a reload or tab close discards
+  // unsaved input; submitting the form clears the guard first.
+  (function initUnsavedGuards() {
+    Array.prototype.forEach.call(document.querySelectorAll("form[data-unsaved-guard]"), function (form) {
+      var dirty = false;
+      form.addEventListener("input", function () { dirty = true; });
+      form.addEventListener("change", function () { dirty = true; });
+      form.addEventListener("submit", function () { dirty = false; });
+      window.addEventListener("beforeunload", function (e) {
+        if (!dirty) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+    });
+  })();
+
   // Swipeable tab strip (Options page): bring the active tab into view so a
   // deep-linked tab (?type=...) is not hidden off the right edge on phones.
   (function revealActiveTab() {

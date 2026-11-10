@@ -136,24 +136,30 @@ export function ReportsListPage(props: Common & {
         </div>
       )}
 
-      <form method="get" action="/reports" class="filters">
-        {team && <input type="hidden" name="scope" value="team" />}
-        <label class="field">
-          <span class="lbl">{t("rep.from")}</span>
-          <input type="date" name="from" value={range.from} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("rep.to")}</span>
-          <input type="date" name="to" value={range.to} />
-        </label>
-        <div class="actions">
-          <button class="btn secondary" type="submit">{t("rep.filter")}</button>
-        </div>
-      </form>
+      <details class="filter-box reports-filter-box" open>
+        <summary>
+          <span>{t("rep.filter")} <span class="range">{range.from} → {range.to}</span></span>
+          <span class="chev" aria-hidden="true">▾</span>
+        </summary>
+        <form method="get" action="/reports" class="filters">
+          {team && <input type="hidden" name="scope" value="team" />}
+          <label class="field">
+            <span class="lbl">{t("rep.from")}</span>
+            <input type="date" name="from" value={range.from} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("rep.to")}</span>
+            <input type="date" name="to" value={range.to} />
+          </label>
+          <div class="actions">
+            <button class="btn secondary" type="submit">{t("rep.filter")}</button>
+          </div>
+        </form>
+      </details>
 
       <p class="muted small">{t("rep.hint")}</p>
 
-      <div class="tbl-wrap">
+      <div class="tbl-wrap reports-wrap">
         <table class="list-tbl reports-tbl">
           <thead>
             <tr>
@@ -167,21 +173,28 @@ export function ReportsListPage(props: Common & {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr>
+              <tr class="empty-row">
                 <td colSpan={columns} class="empty-state">
                   <strong>{t("rep.empty")}</strong>
-                  {canCreate && <div class="small">{t("rep.emptyHint")}</div>}
+                  {canCreate && (
+                    <>
+                      <div class="small">{t("rep.emptyHint")}</div>
+                      <a class="btn sm empty-action" href="/reports/new">{t("rep.new")}</a>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
               rows.map((r) => (
                 <tr>
-                  <td>{r.report_date}</td>
-                  <td class="cell-wrap"><a href={`/reports/${r.id}`}>{r.title}</a></td>
-                  <td>{stateName(r, L)}</td>
-                  <td>{r.township ?? ""}</td>
-                  {team && <td>{r.author_name}</td>}
-                  <td>
+                  <td class="report-date" data-label={t("rep.date")}>{r.report_date}</td>
+                  <td class="cell-wrap report-title" data-label={t("rep.titleField")}>
+                    <a href={`/reports/${r.id}`}>{r.title}</a>
+                  </td>
+                  <td data-label={t("rep.state")}>{stateName(r, L)}</td>
+                  <td data-label={t("rep.township")}>{r.township ?? ""}</td>
+                  {team && <td data-label={t("rep.author")}>{r.author_name}</td>}
+                  <td class="report-status" data-label={t("rep.status")}>
                     <span class={`badge${r.status === "reviewed" ? " active" : ""}`}>{statusLabel(t, r.status)}</span>
                   </td>
                 </tr>
@@ -223,7 +236,7 @@ export function ReportFormPage(props: Common & {
         </div>
       )}
 
-      <form method="post" action={action}>
+      <form method="post" action={action} class="report-form" data-unsaved-guard="1">
         <div class="card">
           <h2>{t("rep.details")}</h2>
           <div class="form-grid">
@@ -256,15 +269,15 @@ export function ReportFormPage(props: Common & {
           <div class="form-grid">
             <label class="field">
               <span class="lbl">{t("rep.attendance")}</span>
-              <input type="number" name="attendance" min="0" max="100000" step="1" value={num("attendance")} />
+              <input type="number" name="attendance" inputmode="numeric" min="0" max="100000" step="1" value={num("attendance")} />
             </label>
             <label class="field">
               <span class="lbl">{t("rep.newContacts")}</span>
-              <input type="number" name="new_contacts" min="0" max="100000" step="1" value={num("new_contacts")} />
+              <input type="number" name="new_contacts" inputmode="numeric" min="0" max="100000" step="1" value={num("new_contacts")} />
             </label>
             <label class="field">
               <span class="lbl">{t("rep.followUps")}</span>
-              <input type="number" name="follow_ups" min="0" max="100000" step="1" value={num("follow_ups")} />
+              <input type="number" name="follow_ups" inputmode="numeric" min="0" max="100000" step="1" value={num("follow_ups")} />
             </label>
           </div>
         </div>
@@ -291,7 +304,7 @@ export function ReportFormPage(props: Common & {
           </div>
         </div>
 
-        <div class="actions">
+        <div class="actions report-form-actions">
           <button class="btn" type="submit">{editing ? t("rep.update") : t("rep.submit")}</button>
           <a class="btn secondary" href="/reports">{t("rep.cancel")}</a>
         </div>
