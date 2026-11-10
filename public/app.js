@@ -499,6 +499,112 @@
   }
   initHeadPicker(document);
 
+  // Type-ahead for the household "Add existing member" page. The server already
+  // renders the full result list for ?q=, so typing just fetches that page and
+  // drops its result block under the field. This keeps every result form,
+  // relationship choice and translated label identical to the no-JS page.
+  (function initHouseholdMemberSearch() {
+    var wrap = document.querySelector("[data-live-search]");
+    if (!wrap) return;
+    var form = wrap.querySelector("form.hh-pick-search");
+    var input = wrap.querySelector("[data-live-search-input]");
+    var panel = wrap.querySelector(".hh-live-results");
+    var msg = wrap.querySelector("[data-live-search-msg]");
+    var items = wrap.querySelector("[data-live-search-items]");
+    if (!form || !input || !panel || !msg || !items) return;
+    if (!window.fetch || !window.DOMParser || !window.URL || !window.AbortController) return;
+
+    var timer = null;
+    var controller = null;
+    var seq = 0;
+    var searching = wrap.getAttribute("data-searching") || "Searching…";
+    var failed = wrap.getAttribute("data-search-error") || "Could not search members.";
+
+    function expanded(open) {
+      input.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    function close() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (controller) { controller.abort(); controller = null; }
+      seq++;
+      panel.hidden = true;
+      panel.removeAttribute("aria-busy");
+      msg.hidden = true;
+      msg.textContent = "";
+      items.innerHTML = "";
+      expanded(false);
+    }
+    function open() {
+      panel.hidden = false;
+      expanded(true);
+    }
+    function showMessage(text) {
+      msg.textContent = text;
+      msg.hidden = false;
+      items.innerHTML = "";
+      open();
+    }
+    function load(q) {
+      var target = new URL(form.getAttribute("action") || location.pathname, location.href);
+      target.searchParams.set("q", q);
+      var mine = ++seq;
+      if (controller) controller.abort();
+      controller = new AbortController();
+      panel.setAttribute("aria-busy", "true");
+      showMessage(searching);
+      fetch(target.toString(), {
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Accept": "text/html" },
+        signal: controller.signal,
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error("http " + r.status);
+          return r.text();
+        })
+        .then(function (html) {
+          if (mine !== seq) return;
+          var doc = new DOMParser().parseFromString(html, "text/html");
+          var results = doc.querySelector("[data-hh-results]");
+          if (!results) throw new Error("no results");
+          msg.hidden = true;
+          msg.textContent = "";
+          items.innerHTML = results.innerHTML;
+          panel.removeAttribute("aria-busy");
+          open();
+        })
+        .catch(function (e) {
+          if (mine !== seq || (e && e.name === "AbortError")) return;
+          panel.removeAttribute("aria-busy");
+          showMessage(failed);
+        });
+    }
+    function schedule() {
+      var q = input.value.trim();
+      if (!q) { close(); return; }
+      // Stop an older request from painting results for a previous query.
+      if (controller) { controller.abort(); controller = null; seq++; }
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () { timer = null; load(q); }, 220);
+    }
+
+    input.addEventListener("input", schedule);
+    input.addEventListener("search", schedule);
+    input.addEventListener("focus", function () {
+      if (input.value.trim() && panel.hidden) schedule();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); close(); }
+    });
+    form.addEventListener("submit", close);
+    document.addEventListener("click", function (e) {
+      if (!panel.hidden && !wrap.contains(e.target)) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !panel.hidden) { close(); input.focus(); }
+    });
+  })();
+
   // Member profile photo: centre-crop the chosen image, resize it to 500×500
   // and encode WebP at quality 0.85 before the form submits.
   function initPhotoInputs(root) {

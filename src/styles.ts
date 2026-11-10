@@ -1042,9 +1042,22 @@ td.empty-state .small { margin-top: 4px; }
   .topbar .langswitch a { padding: 2px 6px; min-height: 28px; }
 }
 /* ---------- household member picker: search existing members ---------- */
+.hh-pick-search-wrap { position: relative; }
 .hh-pick-search { display: flex; gap: 8px; align-items: flex-end; }
 .hh-pick-search label.field { flex: 1 1 auto; min-width: 0; margin: 0; }
 .hh-pick-search .btn { flex: none; }
+.hh-live-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 50;
+  max-height: min(62vh, 440px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px; background: var(--card); border: 1px solid var(--line-strong);
+  border-radius: 12px; box-shadow: 0 18px 40px rgba(2, 8, 23, .2);
+}
+.hh-live-msg { margin: 8px 6px; }
+.hh-live-results .hh-pick { margin-bottom: 8px; }
+.hh-live-results .hh-pick:last-child { margin-bottom: 0; }
+.hh-live-results .hh-empty.card {
+  margin: 0; padding: 18px 10px; border: 0; background: transparent; box-shadow: none;
+}
 .hh-pick {
   display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
   justify-content: space-between; padding: 12px 14px; margin-bottom: 10px;

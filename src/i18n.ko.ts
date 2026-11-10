@@ -296,6 +296,8 @@ export const KO: Record<string, string> = {
   "hh.pick.placeholder": "성도 이름을 입력하세요…",
   "hh.pick.noQuery": "기존 성도를 찾으려면 이름을 입력하세요.",
   "hh.pick.empty": "검색과 일치하는 성도가 없습니다.",
+  "hh.pick.searching": "검색 중…",
+  "hh.pick.searchError": "성도 검색에 실패했습니다. 다시 시도하세요.",
   "hh.pick.current": "현재 가정",
   "hh.pick.none": "가정 없음",
   "hh.pick.move": "이 가정으로 이동",

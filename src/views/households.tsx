@@ -426,66 +426,80 @@ export function HouseholdSearchMemberPage(props: Common & {
 
       <div class="card">
         <p class="muted small" style="margin-top:0">{t("hh.pick.hint")}</p>
-        <form method="get" action={`/admin/households/${family.id}/add-member`} class="hh-pick-search">
-          <label class="field">
-            <span class="lbl">{t("hh.pick.searchLabel")}</span>
-            <input type="search" name="q" value={q} placeholder={t("hh.pick.placeholder")} />
-          </label>
-          <button class="btn" type="submit">{t("members.searchBtn")}</button>
-        </form>
+        <div class="hh-pick-search-wrap"
+          data-live-search
+          data-searching={t("hh.pick.searching")}
+          data-search-error={t("hh.pick.searchError")}>
+          <form method="get" action={`/admin/households/${family.id}/add-member`} class="hh-pick-search">
+            <label class="field">
+              <span class="lbl">{t("hh.pick.searchLabel")}</span>
+              <input type="search" name="q" value={q} placeholder={t("hh.pick.placeholder")}
+                autocomplete="off" data-live-search-input
+                aria-controls="hh-live-results" aria-expanded="false" />
+            </label>
+            <button class="btn" type="submit">{t("members.searchBtn")}</button>
+          </form>
+          <div class="hh-live-results" id="hh-live-results" role="region"
+            aria-label={t("hh.pick.searchLabel")} aria-live="polite" hidden>
+            <p class="muted small hh-live-msg" data-live-search-msg hidden></p>
+            <div data-live-search-items></div>
+          </div>
+        </div>
       </div>
 
-      {!searched ? (
-        <div class="card hh-empty hh-empty-sm">
-          <p class="muted small" style="margin:0">{t("hh.pick.noQuery")}</p>
-          <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
-        </div>
-      ) : results.length === 0 ? (
-        <div class="card hh-empty hh-empty-sm">
-          <p class="muted small" style="margin:0">{t("hh.pick.empty")}</p>
-          <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
-        </div>
-      ) : (
-        <div>
-          {results.map((m) => {
-            const primary = L === "mm"
-              ? (m.name_myanmar || m.name_english)
-              : (m.name_english || m.name_myanmar);
-            const secondary = primary === m.name_myanmar ? m.name_english : m.name_myanmar;
-            return (
-              <div class="hh-pick">
-                <div class="hh-pick-main">
-                  <div>
-                    <a class="hh-pick-name" href={`/members/${m.id}`}>{primary}</a>
-                    {m.member_code && <span class="muted small" style="margin-left:6px">{m.member_code}</span>}
+      <div data-hh-results>
+        {!searched ? (
+          <div class="card hh-empty hh-empty-sm">
+            <p class="muted small" style="margin:0">{t("hh.pick.noQuery")}</p>
+            <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
+          </div>
+        ) : results.length === 0 ? (
+          <div class="card hh-empty hh-empty-sm">
+            <p class="muted small" style="margin:0">{t("hh.pick.empty")}</p>
+            <p class="small" style="margin:6px 0 0"><a href="/members">{t("hh.membersLink")}</a></p>
+          </div>
+        ) : (
+          <div>
+            {results.map((m) => {
+              const primary = L === "mm"
+                ? (m.name_myanmar || m.name_english)
+                : (m.name_english || m.name_myanmar);
+              const secondary = primary === m.name_myanmar ? m.name_english : m.name_myanmar;
+              return (
+                <div class="hh-pick">
+                  <div class="hh-pick-main">
+                    <div>
+                      <a class="hh-pick-name" href={`/members/${m.id}`}>{primary}</a>
+                      {m.member_code && <span class="muted small" style="margin-left:6px">{m.member_code}</span>}
+                    </div>
+                    <div class="hh-pick-meta">
+                      {secondary && secondary !== primary && <span>{secondary} · </span>}
+                      {isEn && m.state_name_en ? m.state_name_en : m.state_name}
+                      {m.phone && <span> · {m.phone}</span>}
+                    </div>
+                    <div style="margin-top:4px">
+                      {m.family_id
+                        ? <span class="badge moved">{t("hh.pick.current")}: {m.family_name}</span>
+                        : <span class="muted small">{t("hh.pick.none")}</span>}
+                    </div>
                   </div>
-                  <div class="hh-pick-meta">
-                    {secondary && secondary !== primary && <span>{secondary} · </span>}
-                    {isEn && m.state_name_en ? m.state_name_en : m.state_name}
-                    {m.phone && <span> · {m.phone}</span>}
-                  </div>
-                  <div style="margin-top:4px">
-                    {m.family_id
-                      ? <span class="badge moved">{t("hh.pick.current")}: {m.family_name}</span>
-                      : <span class="muted small">{t("hh.pick.none")}</span>}
-                  </div>
+                  <form method="post" action={`/admin/households/${family.id}/attach`} class="hh-pick-actions">
+                    <input type="hidden" name="member_id" value={String(m.id)} />
+                    <select name="relationship" aria-label={t("hh.relationship")}>
+                      {relOptions.map(([k, label]) => (
+                        <option value={k} selected={k === defaultRel}>{label}</option>
+                      ))}
+                    </select>
+                    <button class="btn sm" type="submit" aria-label={`${m.family_id ? t("hh.pick.move") : t("form.add")}: ${primary}`}>
+                      {m.family_id ? t("hh.pick.move") : t("form.add")}
+                    </button>
+                  </form>
                 </div>
-                <form method="post" action={`/admin/households/${family.id}/attach`} class="hh-pick-actions">
-                  <input type="hidden" name="member_id" value={String(m.id)} />
-                  <select name="relationship" aria-label={t("hh.relationship")}>
-                    {relOptions.map(([k, label]) => (
-                      <option value={k} selected={k === defaultRel}>{label}</option>
-                    ))}
-                  </select>
-                  <button class="btn sm" type="submit" aria-label={`${m.family_id ? t("hh.pick.move") : t("form.add")}: ${primary}`}>
-                    {m.family_id ? t("hh.pick.move") : t("form.add")}
-                  </button>
-                </form>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }
