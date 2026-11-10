@@ -427,8 +427,10 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const values: HFormValues = {
     name: row.name, address: row.address ?? "", township: row.township ?? "",
     phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "",
-    home_cell_id: row.home_cell_id ?? row.head_home_cell_id ?? "",
-    group_id: row.group_id ?? row.head_group_id ?? "",
+    home_cell_id: row.home_cell_id != null ? String(row.home_cell_id)
+      : row.head_home_cell_id != null ? String(row.head_home_cell_id) : "",
+    group_id: row.group_id != null ? String(row.group_id)
+      : row.head_group_id != null ? String(row.head_group_id) : "",
   };
   const allOptions = await loadAllOptions(db);
   const opts = {
