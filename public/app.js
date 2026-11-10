@@ -58,6 +58,45 @@
   (function initAdminMenus() {
     var menus = Array.prototype.slice.call(document.querySelectorAll("details.nav-admin"));
     if (!menus.length) return;
+    var narrow = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+
+    function menuFor(d) { return d.querySelector(".nav-menu"); }
+    function clearPosition(d) {
+      var menu = menuFor(d);
+      if (!menu) return;
+      menu.style.position = "";
+      menu.style.top = "";
+      menu.style.left = "";
+      menu.style.right = "";
+      menu.style.width = "";
+      menu.style.minWidth = "";
+      menu.style.maxHeight = "";
+      menu.style.overflowY = "";
+    }
+    function position(d) {
+      if (!narrow || !narrow.matches || !d.open) return;
+      var summary = d.querySelector("summary");
+      var menu = menuFor(d);
+      if (!summary || !menu) return;
+      var r = summary.getBoundingClientRect();
+      var width = Math.min(320, window.innerWidth - 20);
+      var left = Math.max(10, Math.min(r.left, window.innerWidth - width - 10));
+      menu.style.position = "fixed";
+      menu.style.top = Math.round(r.bottom + 6) + "px";
+      menu.style.left = Math.round(left) + "px";
+      menu.style.right = "auto";
+      menu.style.width = Math.round(width) + "px";
+      menu.style.minWidth = "0";
+      menu.style.maxHeight = Math.max(120, window.innerHeight - r.bottom - 18) + "px";
+      menu.style.overflowY = "auto";
+    }
+
+    menus.forEach(function (d) {
+      d.addEventListener("toggle", function () {
+        if (d.open) position(d);
+        else if (narrow && !narrow.matches) clearPosition(d);
+      });
+    });
     document.addEventListener("click", function (e) {
       menus.forEach(function (d) {
         if (d.open && !d.contains(e.target)) d.open = false;
@@ -72,6 +111,20 @@
         if (summary) summary.focus();
       });
     });
+    if (narrow) {
+      var onChange = function () {
+        menus.forEach(function (d) {
+          if (narrow.matches) position(d);
+          else clearPosition(d);
+        });
+      };
+      if (narrow.addEventListener) narrow.addEventListener("change", onChange);
+      else if (narrow.addListener) narrow.addListener(onChange);
+    }
+    window.addEventListener("resize", function () { menus.forEach(position); });
+    window.addEventListener("scroll", function () {
+      menus.forEach(function (d) { if (d.open) d.open = false; });
+    }, { passive: true });
   })();
 
   // Caps Lock warning under password fields. The browser only exposes the
@@ -812,6 +865,67 @@
     });
 
     window.addEventListener("scroll", hide, { passive: true });
+  })();
+
+  // Touch has no hover, so a tap opens a full-screen photo preview. Member-list
+  // thumbnails sit next to the name link, not inside it, so this does not take
+  // away navigation. Linked photos are left alone.
+  (function initPhotoLightbox() {
+    if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) return;
+    var box = document.createElement("div");
+    box.className = "photo-lightbox";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", "Photo preview");
+
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "photo-lightbox-close";
+    close.setAttribute("aria-label", "Close photo preview");
+    close.textContent = "\u00d7";
+
+    var big = document.createElement("img");
+    big.alt = "";
+    box.appendChild(close);
+    box.appendChild(big);
+    document.body.appendChild(box);
+
+    var lastFocus = null;
+
+    function open(source) {
+      lastFocus = document.activeElement;
+      big.src = source.currentSrc || source.src;
+      box.classList.add("on");
+      document.body.classList.add("photo-lightbox-open");
+      close.focus();
+    }
+
+    function dismiss() {
+      box.classList.remove("on");
+      document.body.classList.remove("photo-lightbox-open");
+      if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+      lastFocus = null;
+    }
+
+    document.addEventListener("click", function (e) {
+      var target = e.target;
+      if (!target || !target.closest) return;
+      if (target.closest(".photo-lightbox")) return;
+      var img = target.closest('img[src*="/photo"]');
+      if (!img || img.closest("a")) return;
+      e.preventDefault();
+      open(img);
+    });
+
+    box.addEventListener("click", function (e) {
+      if (e.target === box || e.target === close) dismiss();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (!box.classList.contains("on")) return;
+      if (e.key === "Escape") dismiss();
+      if (e.key === "Tab") { e.preventDefault(); close.focus(); }
+    });
   })();
 
   // Swipeable tab strip (Options page): bring the active tab into view so a

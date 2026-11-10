@@ -1468,6 +1468,41 @@ td.empty-state .small { margin-top: 4px; }
   .org-code { display: none; }
 }
 
+/* On phones the admin group becomes a compact Administration dropdown. The
+   menu is positioned by app.js with fixed coordinates so the horizontally
+   scrolling nav cannot clip it. */
+@media (max-width: 640px) {
+  .nav-admin {
+    display: block; flex-basis: 100%; order: 20;
+    margin: 3px 0 0 7px; padding-left: 7px;
+    border-left: 1px solid rgba(255,255,255,.3);
+  }
+  .nav-admin > summary { display: inline-flex; padding: 4px 6px; font-size: 12px; line-height: 1.6; }
+  .nav-admin .chev { font-size: 9px; }
+  .nav-admin .nav-menu { position: fixed; top: 0; left: 0; right: auto; z-index: 90; min-width: 0; }
+  .nav-admin-inline { display: none; }
+}
+
+/* ---------- touch photo lightbox ---------- */
+.photo-lightbox {
+  position: fixed; inset: 0; z-index: 120; display: none; place-items: center;
+  padding: 18px; background: rgba(2, 8, 23, .78);
+}
+.photo-lightbox.on { display: grid; }
+.photo-lightbox img {
+  display: block; max-width: 100%; max-height: calc(100vh - 96px);
+  width: auto; height: auto; border-radius: 12px; background: var(--card);
+  box-shadow: 0 22px 54px rgba(2, 8, 23, .4);
+}
+.photo-lightbox-close {
+  position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px;
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border: 1px solid rgba(255,255,255,.45); border-radius: 999px;
+  background: rgba(0,0,0,.35); color: #fff; font-size: 26px; line-height: 1;
+  cursor: pointer;
+}
+body.photo-lightbox-open { overflow: hidden; }
+
 /* ---------- hover preview for member photos ---------- */
 .photo-preview-float {
   position: fixed; left: 0; top: 0; z-index: 90;
