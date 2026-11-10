@@ -95,6 +95,13 @@ export function optionText(code: string | null | undefined, label: string | null
   return !c || c === l ? l : `${c} · ${l}`;
 }
 
+/** Label-only formatter for lookup options whose generated code is redundant
+ * and long on phones (Family Groups already carry their township code in the
+ * label). Falls back to the code when an older option has no label. */
+export function optionLabel(code: string | null | undefined, label: string | null | undefined): string {
+  return (label ?? "").trim() || (code ?? "").trim();
+}
+
 export function normKey(v: string): string {
   return v.trim().toLowerCase().replace(/\s+/g, " ");
 }

@@ -1,6 +1,6 @@
 import type { OptionRow } from "../lookup";
 import type { Lang } from "../i18n";
-import { optionText } from "../util";
+import { optionLabel, optionText } from "../util";
 
 /** Shared cascade selects for household forms, mirroring members.tsx:
  * State (data-region-select) narrows Township (data-region-filter) →
@@ -27,7 +27,7 @@ export function regionCascadeSelects(opts: {
   const blank = t("Select…", "ရွေးချယ်ပါ", "선택…");
   const townshipLabelById = new Map(opts.townshipOpts.map((o) => [o.id, o.label] as const));
 
-  const filteredOpts = (list: OptionRow[], selected: string, useParentOfTownship = false) => (
+  const filteredOpts = (list: OptionRow[], selected: string, useParentOfTownship = false, labelOnly = false) => (
     <>
       <option value="">{blank}</option>
       {list
@@ -44,7 +44,7 @@ export function regionCascadeSelects(opts: {
               data-region={o.regionId === 0 ? "" : String(o.regionId)}
               data-parent={useParentOfTownship ? parent : undefined}
             >
-              {withCode(o)}
+              {labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}
             </option>
           );
         })}
@@ -104,7 +104,7 @@ export function regionCascadeSelects(opts: {
         <label class="field">
           <span class="lbl">{t("Family Group", "မိသားစုအဖွဲ့", "가족 그룹")}</span>
           <select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">
-            {filteredOpts(opts.familyGroupOpts, opts.familyGroupId, true)}
+            {filteredOpts(opts.familyGroupOpts, opts.familyGroupId, true, true)}
           </select>
         </label>
       )}

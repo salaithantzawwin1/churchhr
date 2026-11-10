@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
-import { ageFromDate, optionText, qs } from "../util";
+import { ageFromDate, optionLabel, optionText, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
 import { CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS, positionLabel, positionLabels } from "../positions";
@@ -352,7 +352,7 @@ export function MembersListPage(props: ListProps) {
                   )}
                 </td>
                 <td data-col="group">{m.group_label ?? ""}</td>
-                <td data-col="familyGroup">{optionText(m.family_group_code, m.family_group)}</td>
+                <td data-col="familyGroup">{optionLabel(m.family_group_code, m.family_group)}</td>
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
                 <td data-col="sector">{m.sector ?? ""}</td>
                 <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
@@ -400,6 +400,8 @@ function opts(
   options: OptionRow[], selected: string, blank: string,
   /** township id -> label, so Home Cell options carry their township's label. */
   townshipLabelById?: Map<number, string>,
+  /** Family Groups show their label only; the generated code is long/redundant. */
+  labelOnly = false,
 ) {
   return (
     <>
@@ -414,7 +416,7 @@ function opts(
         return (
           <option value={String(o.id)} selected={selected === String(o.id)}
             data-region={o.regionId === 0 ? "" : String(o.regionId)}
-            data-parent={parent}>{optionText(o.code, o.label)}</option>
+            data-parent={parent}>{labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}</option>
         );
       })}
     </>
@@ -611,7 +613,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               </select>
             </label>
             <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id" data-region-filter="1">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
-            <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"))}</select></label>
+            <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"), undefined, true)}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.sector")}</span><select name="sector_id">{opts(options.sector ?? [], v.sector_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} /></label>
@@ -876,7 +878,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("detail.township"), m.township ?? ""],
         [t("hh.household"), m.household_name ?? ""],
         [t("detail.salvation"), m.salvation_date ?? ""],
-        [t("detail.familyGroup"), optionText(m.family_group_code, m.family_group)],
+        [t("detail.familyGroup"), optionLabel(m.family_group_code, m.family_group)],
         [t("form.fellowship"), m.fellowship ?? ""],
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],

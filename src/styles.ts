@@ -1044,11 +1044,20 @@ td.empty-state .small { margin-top: 4px; }
 }
 @media (max-width: 640px) {
   .nav-admin .nav-menu { min-width: 180px; }
-  /* Keep the admin group compact: the section label is redundant once the
-     links wrap, and a shorter line box saves a whole nav row on Myanmar. */
-  .nav-admin-inline .nav-group-label { display: none; }
-  .nav-admin-inline { padding-left: 5px; border-left: 1px solid rgba(255,255,255,.22); }
-  .topbar nav a { line-height: 1.6; }
+  /* Phone nav: keep the five primary links on one row and put the admin group
+     on its own clearly-labelled row. The desktop-sized type made Reports wrap
+     into the admin links, which is what looked like a broken dropdown. */
+  .topbar nav { column-gap: 1px; }
+  .topbar nav a { padding: 5px 6px; font-size: 13px; line-height: 1.6; }
+  .nav-admin-inline {
+    flex-basis: 100%; flex-wrap: wrap; padding: 3px 0 0 7px;
+    border-left: 1px solid rgba(255,255,255,.3);
+  }
+  .nav-admin-inline .nav-group-label {
+    display: inline; font-size: 10px; line-height: 1.6;
+    padding: 0 2px 0 1px; letter-spacing: .03em;
+  }
+  .nav-admin-inline a { padding: 3px 6px; }
   /* Logo only: the language switch now has three options, so the brand text
      would push the controls past the viewport on a phone. */
   .topbar .brand-name { display: none; }
@@ -1437,14 +1446,33 @@ td.empty-state .small { margin-top: 4px; }
   .reports-tbl tr.empty-row td::before { display: none; }
   .empty-action { margin-top: 12px; }
 
-  /* The form is long; keep its submit action reachable while scrolling. */
+  /* Keep form controls comfortable to tap. The action row stays in the normal
+     flow: a sticky bar covered the Township/title fields while the long form
+     was being filled on a phone. */
   .report-form input, .report-form select { min-height: 44px; }
   .report-form-actions {
-    position: sticky; bottom: max(8px, env(safe-area-inset-bottom)); z-index: 8;
     margin-top: 18px; padding: 10px; background: var(--card);
     border: 1px solid var(--line); border-radius: 12px;
-    box-shadow: 0 10px 26px rgba(2,8,23,.18);
   }
   .report-form-actions .btn { flex: 1 1 0; min-height: 44px; }
+}
+
+/* ---------- hover preview for member photos ---------- */
+.photo-preview-float {
+  position: fixed; left: 0; top: 0; z-index: 90;
+  width: 240px; height: 240px; overflow: hidden; pointer-events: none;
+  background: var(--card); border: 3px solid var(--card); border-radius: 18px;
+  box-shadow: 0 0 0 1px var(--line), 0 22px 54px rgba(2, 8, 23, .3);
+  opacity: 0; transform: scale(.92);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.photo-preview-float.on { opacity: 1; transform: scale(1); }
+.photo-preview-float img { display: block; width: 100%; height: 100%; object-fit: cover; }
+img.photo-previewing { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (hover: none), (pointer: coarse) {
+  .photo-preview-float { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-preview-float { transition: none; }
 }
 `; // end of stylesheet

@@ -748,6 +748,72 @@
     });
   })();
 
+  // Enlarged member-photo preview on hover. Works for every member photo
+  // (member list, detail, household roster, organization, departments) without
+  // adding duplicate markup; fixed positioning keeps it outside table scroll
+  // containers and it is skipped on touch/coarse pointers.
+  (function initPhotoPreview() {
+    if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    var box = document.createElement("div");
+    box.className = "photo-preview-float";
+    box.setAttribute("aria-hidden", "true");
+    var big = document.createElement("img");
+    big.alt = "";
+    box.appendChild(big);
+    document.body.appendChild(box);
+    var active = null;
+    var photoSelector = 'img[src*="/photo"]';
+
+    function place(x, y) {
+      var size = box.offsetWidth || 240;
+      var gap = 18;
+      var margin = 12;
+      var left = x + gap;
+      if (left + size > window.innerWidth - margin) left = x - size - gap;
+      left = Math.max(margin, Math.min(left, window.innerWidth - size - margin));
+      var top = y - size / 2;
+      top = Math.max(margin, Math.min(top, window.innerHeight - size - margin));
+      box.style.left = Math.round(left) + "px";
+      box.style.top = Math.round(top) + "px";
+    }
+
+    function show(img, x, y) {
+      if (active === img) return;
+      if (active) active.classList.remove("photo-previewing");
+      active = img;
+      big.src = img.currentSrc || img.src;
+      active.classList.add("photo-previewing");
+      place(x, y);
+      box.classList.add("on");
+    }
+
+    function hide() {
+      if (active) active.classList.remove("photo-previewing");
+      active = null;
+      box.classList.remove("on");
+    }
+
+    document.addEventListener("pointerover", function (e) {
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      var target = e.target && e.target.closest ? e.target.closest(photoSelector) : null;
+      if (!target) return;
+      show(target, e.clientX, e.clientY);
+    });
+
+    document.addEventListener("pointermove", function (e) {
+      if (active && e.pointerType === "mouse") place(e.clientX, e.clientY);
+    });
+
+    document.addEventListener("pointerout", function (e) {
+      if (!active || e.target !== active) return;
+      var to = e.relatedTarget;
+      if (to && to.closest && to.closest(photoSelector)) return;
+      hide();
+    });
+
+    window.addEventListener("scroll", hide, { passive: true });
+  })();
+
   // Swipeable tab strip (Options page): bring the active tab into view so a
   // deep-linked tab (?type=...) is not hidden off the right edge on phones.
   (function revealActiveTab() {
