@@ -511,6 +511,15 @@ async function optionsPage(c: any, type: string, opts: {
         sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
       );
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
+  // A Home Cell can have a leadership assignment even when no member currently
+  // uses it, so count positions too before offering delete.
+  const positionUsage = new Map<number, number>();
+  if (type === "home_cell") {
+    const rows = await db.all<{ oid: number; n: number }>(sql`
+      SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
+      WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`);
+    for (const row of rows) positionUsage.set(row.oid, row.n);
+  }
   const stateNames = stateListAll;
   const stateName = (id: number | null) =>
     id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;
@@ -518,7 +527,10 @@ async function optionsPage(c: any, type: string, opts: {
   const options: OptionUsage[] = list.map((o) => ({
     id: o.id, label: o.label, active: o.active,
     code: o.code ?? null,
-    used: usage.get(labelStored ? o.label : o.id) ?? 0,
+    used: Math.max(
+      usage.get(labelStored ? o.label : o.id) ?? 0,
+      positionUsage.get(o.id) ?? 0,
+    ),
     state: stateName(o.regionId ?? null),
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
   }));
@@ -950,7 +962,10 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
     : column
       ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
       : [{ n: 0 }];
-  if ((used[0]?.n ?? 0) > 0) {
+  const positionUsed = current.type === "home_cell"
+    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM member_positions WHERE scope_type = 'home_cell' AND scope_id = ${id}`)
+    : [{ n: 0 }];
+  if ((used[0]?.n ?? 0) > 0 || (positionUsed[0]?.n ?? 0) > 0) {
     await db.update(lookupOptions).set({ active: 0 }).where(eq(lookupOptions.id, id));
     return c.redirect(`${back}&err=${encodeURIComponent("err-used")}`, 302);
   }

@@ -8,6 +8,7 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
+import { getHomeCellPosition, isHomeCellPosition, positionTaken, setHomeCellPosition } from "../positions";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
 function multi(v: unknown): string[] {
@@ -25,7 +26,7 @@ import {
 import { BLOOD_TYPES, GENDERS, MARITAL_STATUSES, STATUSES, normEnum } from "../enums";
 import { getDict, type Lang } from "../i18n";
 import {
-  ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MembersListPage,
+  ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MemberPositionForm, MemberPositionPage, MembersListPage,
   type Filters, type FormValues, type ImportReport, type MemberDetail,
 } from "../views/members";
 
@@ -162,6 +163,7 @@ const SORT_EXPR: Record<string, string> = {
   township: "m.township",
   marital: "m.marital_status",
   homeCell: "hc.label",
+  role: "mp.position",
   group: "gr.label",
   familyGroup: "fg.label",
   fellowship: "fc.label",
@@ -196,9 +198,9 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
            m.date_of_birth, m.marital_status, m.township, m.updated_at,
            (m.photo IS NOT NULL) AS has_photo,
            r.name AS state_name, r.name_en AS state_name_en,
-           hc.label AS home_cell, gr.label AS group_label,
+           m.home_cell_id, hc.label AS home_cell, gr.label AS group_label,
            fg.label AS family_group, fg.code AS family_group_code,
-           fc.label AS fellowship, sec.label AS sector
+           fc.label AS fellowship, sec.label AS sector, mp.position
     FROM members m
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
@@ -206,6 +208,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id
     LEFT JOIN lookup_options fc ON fc.id = m.fellowship_category_id
     LEFT JOIN lookup_options sec ON sec.id = m.sector_id
+    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
     WHERE ${cond}
     ORDER BY ${sql.raw(orderByFrom(c.req.query()))}
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
@@ -873,9 +876,11 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fg.code AS family_group_code,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      mp.position, mp.scope_id AS position_home_cell_id,
       fam.name AS household_name
     FROM members m
     JOIN regions r ON r.id = m.region_id
+    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
     LEFT JOIN families fam ON fam.id = m.family_id
     LEFT JOIN lookup_options e ON e.id = m.ethnicity_id
     LEFT JOIN lookup_options ed ON ed.id = m.education_id
@@ -1087,6 +1092,73 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   );
 });
 
+// ---------- Home Cell position assignment (list modal) ----------
+
+membersRoutes.get("/:id/position", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/members?err=err-notfound", 302);
+  const row = await loadMemberDetail(db, id);
+  if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
+  const current = await getHomeCellPosition(db, id);
+  const member = {
+    id, name: row.name_myanmar || row.name_english || `#${id}`,
+    homeCell: row.home_cell, homeCellId: row.home_cell_id,
+  };
+  if (c.req.query("modal") !== "1") {
+    return c.html(
+      <MemberPositionPage
+        user={c.get("user")} perms={c.get("perms")} lang={c.get("lang")}
+        member={member} position={current?.position ?? ""}
+      />,
+    );
+  }
+  return c.html(
+    <MemberPositionForm member={member} position={current?.position ?? ""} lang={c.get("lang")} />,
+  );
+});
+
+membersRoutes.post("/:id/position", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  // The modal posts with fetch; this header makes it follow the flash redirect
+  // instead of treating the final page as a form to inject into the dialog.
+  const back = (url: string) => {
+    c.header("X-Redirect-To", url);
+    return c.redirect(url, 303);
+  };
+  if (!Number.isInteger(id) || id < 1) return back("/members?err=err-notfound");
+  const row = await loadMemberDetail(db, id);
+  if (!row || !inScope(row, scope)) return back("/members?err=err-notfound");
+  const body = await c.req.parseBody();
+  const position = s(body.position);
+  const t = getDict(c.get("lang"));
+  const renderError = (message: string) => c.html(
+    <MemberPositionForm
+      member={{ id, name: row.name_myanmar || row.name_english || `#${id}`, homeCell: row.home_cell, homeCellId: row.home_cell_id }}
+      position={position} error={message} lang={c.get("lang")}
+    />,
+    400,
+  );
+  if (position && !isHomeCellPosition(position)) return renderError(t("flash.positionInvalid"));
+  if (position && !row.home_cell_id) return renderError(t("flash.positionNoHomeCell"));
+  if (position && row.home_cell_id && await positionTaken(db, row.home_cell_id, position, id)) {
+    return renderError(t("flash.positionTaken"));
+  }
+  try {
+    await setHomeCellPosition(db, id, position, row.home_cell_id, c.get("user").id);
+  } catch {
+    return renderError(t("flash.positionTaken"));
+  }
+  await db.insert(memberHistory).values({
+    memberId: id, actorId: c.get("user").id, action: "position",
+    snapshotJson: JSON.stringify({ position, home_cell_id: row.home_cell_id }),
+  });
+  return back("/members?ok=member-position");
+});
+
 membersRoutes.get("/:id/photo", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -1218,6 +1290,11 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
     .update(members)
     .set({ ...toDrizzleValues(data), updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) } as typeof members.$inferInsert)
     .where(eq(members.id, id));
+  // A leadership row is tied to the member's current Home Cell. Moving the
+  // member to another cell must not leave a leader assigned to the old cell.
+  if ((existing.home_cell_id ?? null) !== (data.home_cell_id ?? null)) {
+    await setHomeCellPosition(db, id, "", null, c.get("user").id);
+  }
   if (photo.touched) await savePhoto(db, id, photo.bytes);
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "update",

@@ -47,6 +47,23 @@ function rangeFromQuery(q: Record<string, string | undefined>): { from: string; 
   return from <= to ? { from, to } : { from: to, to: from };
 }
 
+const REPORT_STATUSES = ["submitted", "reviewed", "draft"] as const;
+
+function statusFromQuery(q: Record<string, string | undefined>): string {
+  return (REPORT_STATUSES as readonly string[]).includes(q.status ?? "") ? q.status! : "";
+}
+
+/** Quick date ranges shown above the report list. Keeping them server-rendered
+ * means the current status filter and team/my scope survive a single tap. */
+function quickRanges(today: string, t: (key: string) => string) {
+  return [
+    { key: "7d", label: t("rep.last7"), from: addDays(today, -6), to: today },
+    { key: "30d", label: t("rep.last30"), from: addDays(today, -29), to: today },
+    { key: "month", label: t("rep.thisMonth"), from: `${today.slice(0, 8)}01`, to: today },
+    { key: "all", label: t("rep.allTime"), from: EARLIEST, to: today },
+  ];
+}
+
 /** SQL fragment: restrict rows to the assigned states (all-state users see all). */
 function scopeCond(scope: Scope) {
   if (scope.scopeAll) return sql`1=1`;
@@ -197,13 +214,15 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
   const range = rangeFromQuery(q);
   const canReview = perms.has("reports.review");
   const team = canReview && q.scope === "team";
+  const status = statusFromQuery(q);
   const where = team ? scopeCond(scope) : sql`ar.author_id = ${user.id}`;
+  const statusCond = status ? sql`ar.status = ${status}` : sql`1=1`;
 
   const countRows = await db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n
     FROM activity_reports ar
     WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
-      AND ${where}`);
+      AND ${where} AND ${statusCond}`);
   const total = countRows[0]?.n ?? 0;
 
   const rows = await db.all<ReportListRow>(sql`
@@ -215,14 +234,15 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
     JOIN regions r ON r.id = ar.region_id
     JOIN users u ON u.id = ar.author_id
     WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
-      AND ${where}
+      AND ${where} AND ${statusCond}
     ORDER BY ar.report_date DESC, ar.id DESC
     LIMIT ${LIST_LIMIT}`);
 
   return c.html(
     <ReportsListPage
       user={user} perms={perms} flash={flashFromQuery(c.req.query(), lang)} lang={lang}
-      rows={rows} total={total} range={range} team={team}
+      rows={rows} total={total} range={range} team={team} status={status}
+      quickRanges={quickRanges(todayInYangon(), getDict(lang))}
       canCreate={perms.has("reports.create")} canReview={canReview}
     />,
   );

@@ -801,6 +801,14 @@ td.empty-state .small { margin-top: 4px; }
   text-decoration: none; white-space: nowrap;
 }
 .filter-clear:hover { color: var(--ink); text-decoration: underline; }
+.quick-ranges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.quick-chip {
+  display: inline-flex; align-items: center; min-height: 38px; padding: 6px 13px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--ink); font-size: 13.5px; font-weight: 600; text-decoration: none;
+}
+.quick-chip:hover { border-color: var(--muted); text-decoration: none; }
+.quick-chip.active { border-color: var(--link); background: var(--accent-soft, #e8f0fb); color: var(--link); }
 .filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
 .filter-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 4px;
@@ -1159,6 +1167,82 @@ td.empty-state .small { margin-top: 4px; }
   .hh-member-actions { width: 100%; margin-left: 0; }
   .hh-member-actions .btn { flex: 1; }
 }
+/* ---------- organization structure ---------- */
+.org-stats { margin: 0 0 18px; }
+.org-church { display: grid; gap: 14px; }
+.org-state { padding: 18px 20px; }
+.org-state-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.org-state-head h2 { margin: 0 0 2px; }
+.org-state-head p { margin: 0 0 12px; }
+.org-township { border-top: 1px solid var(--line); }
+.org-township > summary {
+  display: flex; align-items: center; gap: 10px; min-height: 46px;
+  cursor: pointer; list-style: none; font-weight: 600;
+}
+.org-township > summary::-webkit-details-marker { display: none; }
+.org-township > summary .chev { margin-left: auto; color: var(--muted); }
+.org-township-name { font-size: 14px; }
+.org-cell-list { display: grid; gap: 2px; padding: 0 0 12px; }
+.org-cell-row {
+  display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) auto;
+  align-items: center; gap: 10px 14px; padding: 9px 10px;
+  border-radius: 8px; background: var(--row-alt, rgba(15,23,42,.025));
+}
+.org-cell-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.org-cell-name a { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-cell-name a:hover { text-decoration: underline; }
+.org-code {
+  flex: none; padding: 1px 7px; border-radius: 999px; background: var(--chip-bg);
+  color: var(--muted); font-size: 11px; white-space: nowrap;
+}
+.org-cell-leader { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; }
+.org-role-label { flex: none; color: var(--muted); font-size: 11.5px; }
+.org-cell-count { color: var(--muted); font-size: 12.5px; white-space: nowrap; text-decoration: none; }
+.org-cell-count:hover { color: var(--link); text-decoration: underline; }
+.org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.org-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px; }
+.org-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.org-card-head h3 { margin: 0 0 2px; font-size: 16px; line-height: 1.4; }
+.org-card-head h3 a { color: var(--ink); text-decoration: none; }
+.org-card-head h3 a:hover { color: var(--link); text-decoration: underline; }
+.org-card-head p { margin: 0; }
+.org-roles { display: grid; gap: 6px; margin: 0; }
+.org-roles > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.org-roles dt { color: var(--muted); font-size: 12px; }
+.org-roles dd { margin: 0; text-align: right; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.org-roles .org-vacant dd { color: var(--muted); font-weight: 400; }
+.org-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line);
+}
+.org-empty { text-align: center; padding: 34px 20px; }
+.org-empty h2 { margin-top: 0; }
+.member-role-inline { display: none; }
+@media (max-width: 760px) {
+  /* The member table scrolls sideways on phones; surface the role under the
+     name so assigning it never needs a horizontal swipe. */
+  .member-role-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .member-role-inline .position-edit { margin-left: 0; }
+}
+.position-cell { white-space: nowrap; }
+.position-cell .position-edit { margin-left: 6px; font-size: 12px; }
+.position-member { margin: 0 0 10px; font-size: 15px; }
+.position-form .actions { margin-top: 14px; }
+.badge.position { background: var(--chip-brand-bg); color: var(--link); }
+@media (max-width: 760px) {
+  .org-grid { grid-template-columns: 1fr; }
+  .org-cell-row { grid-template-columns: 1fr auto; }
+  .org-cell-leader { grid-column: 1 / -1; grid-row: 2; }
+  .org-cell-count { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 640px) {
+  .org-state { padding: 14px 16px; }
+  .org-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .org-card { padding: 14px; }
+  .quick-ranges { margin-bottom: 10px; }
+  .quick-chip { min-height: 44px; }
+}
+
 /* ---------- reports: phone layout ---------- */
 /* Five table columns are hard to scan on a phone, so each report becomes a
    card with labelled facts. Desktop keeps the compact table. */

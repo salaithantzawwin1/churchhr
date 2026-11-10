@@ -106,13 +106,20 @@ export function ReportsListPage(props: Common & {
   total: number;
   range: { from: string; to: string };
   team: boolean;
+  status: string;
+  quickRanges: { key: string; label: string; from: string; to: string }[];
   canCreate: boolean;
   canReview: boolean;
 }) {
-  const { user, perms, flash, lang, rows, total, range, team, canCreate, canReview } = props;
+  const { user, perms, flash, lang, rows, total, range, team, status, quickRanges, canCreate, canReview } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const columns = 5 + (team ? 1 : 0);
+  const allTime = range.from === "2000-01-01";
+  const rangeText = allTime ? t("rep.allTime") : `${range.from} → ${range.to}`;
+  const linkQs = (from: string, to: string, withTeam = team) => qs({
+    from, to, scope: withTeam ? "team" : null, status: status || null,
+  });
   return (
     <Layout title={t("rep.title")} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
       <div class="page-head">
@@ -126,19 +133,29 @@ export function ReportsListPage(props: Common & {
       {canReview && (
         <div class="page-toolbar">
           <div class="tabs">
-            <a class={`btn sm ${team ? "secondary" : ""}`} href={`/reports${qs({ from: range.from, to: range.to })}`}>
+            <a class={`btn sm ${team ? "secondary" : ""}`} href={`/reports${linkQs(range.from, range.to, false)}`}>
               {t("rep.mine")}
             </a>
-            <a class={`btn sm ${team ? "" : "secondary"}`} href={`/reports${qs({ from: range.from, to: range.to, scope: "team" })}`}>
+            <a class={`btn sm ${team ? "" : "secondary"}`} href={`/reports${linkQs(range.from, range.to, true)}`}>
               {t("rep.team")}
             </a>
           </div>
         </div>
       )}
 
+      <div class="quick-ranges" aria-label={t("rep.quickRanges")}>
+        {quickRanges.map((r) => (
+          <a
+            class={`quick-chip${r.from === range.from && r.to === range.to ? " active" : ""}`}
+            href={`/reports${linkQs(r.from, r.to)}`}
+            aria-current={r.from === range.from && r.to === range.to ? "true" : undefined}
+          >{r.label}</a>
+        ))}
+      </div>
+
       <details class="filter-box reports-filter-box" open>
         <summary>
-          <span>{t("rep.filter")} <span class="range">{range.from} → {range.to}</span></span>
+          <span>{t("rep.filter")} <span class="range">{rangeText}</span>{status && <span class="range"> · {statusLabel(t, status)}</span>}</span>
           <span class="chev" aria-hidden="true">▾</span>
         </summary>
         <form method="get" action="/reports" class="filters">
@@ -150,6 +167,15 @@ export function ReportsListPage(props: Common & {
           <label class="field">
             <span class="lbl">{t("rep.to")}</span>
             <input type="date" name="to" value={range.to} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("rep.status")}</span>
+            <select name="status">
+              <option value="">{t("rep.allStatuses")}</option>
+              <option value="submitted" selected={status === "submitted"}>{t("rep.statusSubmitted")}</option>
+              <option value="reviewed" selected={status === "reviewed"}>{t("rep.statusReviewed")}</option>
+              <option value="draft" selected={status === "draft"}>{t("rep.statusDraft")}</option>
+            </select>
           </label>
           <div class="actions">
             <button class="btn secondary" type="submit">{t("rep.filter")}</button>

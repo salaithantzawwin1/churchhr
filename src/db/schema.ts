@@ -256,6 +256,29 @@ export const members = sqliteTable(
   }),
 );
 
+/** Service position held by a member (Home Cell Leader, Second Leader, …).
+ * scope_type/scope_id are generic so church-level roles can reuse the table. */
+export const memberPositions = sqliteTable(
+  "member_positions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    position: text("position").notNull(),
+    scopeType: text("scope_type").notNull().default("home_cell"),
+    scopeId: integer("scope_id").references(() => lookupOptions.id),
+    createdBy: integer("created_by").references(() => users.id),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    memberIdx: index("member_positions_member_idx").on(t.memberId),
+    scopeIdx: index("member_positions_scope_idx").on(t.scopeType, t.scopeId),
+    memberScopeUq: uniqueIndex("member_positions_member_scope_uq").on(t.memberId, t.scopeType),
+  }),
+);
+
 /** Member change history — one row per mutating action on a member.
  * Kept without an FK on member_id so history survives member deletion. */
 export const memberHistory = sqliteTable(

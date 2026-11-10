@@ -32,6 +32,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
   const PRIMARY_NAV: { href: string; label: string; perm: Permission }[] = [
     { href: "/", label: t("nav.dashboard"), perm: "dashboard.view" },
     { href: "/members", label: t("nav.members"), perm: "members.view" },
+    { href: "/organization", label: t("nav.organization"), perm: "members.view" },
     { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
     { href: "/reports", label: t("nav.reports"), perm: "reports.view" },
   ];

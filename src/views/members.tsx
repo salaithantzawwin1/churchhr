@@ -5,6 +5,7 @@ import type { OptionRow } from "../lookup";
 import { ageFromDate, optionText, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
+import { HOME_CELL_POSITIONS, positionLabel } from "../positions";
 
 export type MemberListItem = {
   id: number;
@@ -16,6 +17,8 @@ export type MemberListItem = {
   state_name: string;
   state_name_en?: string | null;
   home_cell: string | null;
+  home_cell_id?: number | null;
+  position?: string | null;
   group_label: string | null;
   status: string;
   date_of_birth: string | null;
@@ -76,7 +79,7 @@ function sortQs(f: Filters, sort: string, dir: string): string {
 /** Member list columns (data-col keys shared by <th>/<td> and the chooser JS). */
 const SORTABLE = new Set([
   "id", "name", "gender", "age", "phone", "state", "township", "marital",
-  "homeCell", "group", "familyGroup", "fellowship", "sector", "status",
+  "homeCell", "role", "group", "familyGroup", "fellowship", "sector", "status",
 ]);
 const LIST_COLS = (t: (k: string) => string) => [
   { key: "id", label: t("members.thId") },
@@ -88,6 +91,7 @@ const LIST_COLS = (t: (k: string) => string) => [
   { key: "township", label: t("members.township") },
   { key: "marital", label: t("members.thMarital") },
   { key: "homeCell", label: t("members.thHomeCell") },
+  { key: "role", label: t("org.position") },
   { key: "group", label: t("members.thGroup") },
   { key: "familyGroup", label: t("members.thFamilyGroup") },
   { key: "fellowship", label: t("form.fellowship") },
@@ -297,6 +301,20 @@ export function MembersListPage(props: ListProps) {
                   ) : null}
                   <a href={`/members/${m.id}`}>{m.name_myanmar || m.name_english || t("members.noName")}</a>
                   {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
+                  {(m.position || canUpdate) && (
+                    <span class="member-role-inline">
+                      {m.position && <span class="badge position">{positionLabel(m.position, L)}</span>}
+                      {canUpdate && (m.home_cell_id ? (
+                        <a class="position-edit js-edit-modal" href={`/members/${m.id}/position`}
+                          data-modal-title={t("org.assignTitle")} data-modal-size="sm">
+                          {m.position ? t("org.change") : t("org.assign")}
+                        </a>
+                      ) : (
+                        <a class="position-edit js-edit-modal" href={`/members/${m.id}/edit`}
+                          data-modal-title={t("form.editTitle")}>{t("org.setHomeCell")}</a>
+                      ))}
+                    </span>
+                  )}
                 </td>
                 <td data-col="gender">{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
                 <td data-col="age">{ageFromDate(m.date_of_birth) ?? ""}</td>
@@ -305,6 +323,22 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="township">{m.township ?? ""}</td>
                 <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell">{m.home_cell ?? ""}</td>
+                <td data-col="role" class="position-cell">
+                  {m.position
+                    ? <span class="badge position">{positionLabel(m.position, L)}</span>
+                    : <span class="muted small">—</span>}
+                  {canUpdate && (m.home_cell_id ? (
+                    <a
+                      class="position-edit js-edit-modal"
+                      href={`/members/${m.id}/position`}
+                      data-modal-title={t("org.assignTitle")}
+                      data-modal-size="sm"
+                    >{m.position ? t("org.change") : t("org.assign")}</a>
+                  ) : (
+                    <a class="position-edit js-edit-modal" href={`/members/${m.id}/edit`}
+                      data-modal-title={t("form.editTitle")}>{t("org.setHomeCell")}</a>
+                  ))}
+                </td>
                 <td data-col="group">{m.group_label ?? ""}</td>
                 <td data-col="familyGroup">{optionText(m.family_group_code, m.family_group)}</td>
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
@@ -575,6 +609,63 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   );
 }
 
+export function MemberPositionPage(props: Common & {
+  member: { id: number; name: string; homeCell: string | null; homeCellId: number | null };
+  position: string;
+}) {
+  const { user, perms, flash, lang, member, position } = props;
+  const t = getDict(lang ?? "en");
+  return (
+    <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>{t("org.assignTitle")}</h1>
+        <a class="btn secondary" href={`/members/${member.id}`}>{t("members.back")}</a>
+      </div>
+      <div class="card">
+        <MemberPositionForm member={member} position={position} lang={lang} />
+      </div>
+    </Layout>
+  );
+}
+
+export function MemberPositionForm(props: {
+  member: { id: number; name: string; homeCell: string | null; homeCellId: number | null };
+  position: string;
+  error?: string | null;
+  lang?: Lang;
+}) {
+  const { member, position, error, lang } = props;
+  const t = getDict(lang ?? "en");
+  return (
+    <div class="position-form">
+      <p class="position-member"><strong>{member.name}</strong></p>
+      {error && <div class="flash err">{error}</div>}
+      {!member.homeCellId ? (
+        <div class="flash err">{t("org.noHomeCell")}</div>
+      ) : (
+        <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
+          <p class="muted small">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>
+          <label class="field">
+            <span class="lbl">{t("org.position")}</span>
+            <select name="position">
+              <option value="">{t("org.noPosition")}</option>
+              {HOME_CELL_POSITIONS.map((p) => (
+                <option value={p.value} selected={position === p.value}>
+                  {positionLabel(p.value, lang ?? "en")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p class="hint">{t("org.positionHint")}</p>
+          <div class="actions">
+            <button class="btn" type="submit">{t("org.savePosition")}</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export type MemberDetail = {
   id: number;
   member_code: string | null;
@@ -617,6 +708,8 @@ export type MemberDetail = {
   sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
+  position?: string | null;
+  position_home_cell_id?: number | null;
   household_id?: number | null;
   household_name?: string | null;
   relationship?: string;
@@ -640,6 +733,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
     bulk_status: { mm: "Bulk status", en: "Bulk status", ko: "일괄 상태 변경", cls: "" },
     bulk_delete: { mm: "Bulk delete", en: "Bulk delete", ko: "일괄 삭제", cls: "inactive" },
     bulk_group: { mm: "Bulk assign", en: "Bulk assign", ko: "일괄 지정", cls: "" },
+    position: { mm: "ရာထူး သတ်မှတ်", en: "Position assigned", ko: "직책 지정", cls: "active" },
   };
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -696,6 +790,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],
         [t("form.homeCell"), m.home_cell ?? ""],
+        [t("org.position"), m.position ? positionLabel(m.position, L) : ""],
         [t("detail.status"), S[m.status] ?? m.status],
         [t("detail.notes"), m.notes ?? ""],
       ],
@@ -721,6 +816,11 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
           ) : perms.has("members.create") ? (
             <a class="btn secondary" href={`/admin/households/new?member=${m.id}`}>{t("hh.newFromMember")}</a>
           ) : null}
+          {perms.has("members.update") && (
+            <a class="btn secondary js-edit-modal" href={`/members/${m.id}/position`} data-modal-title={t("org.assignTitle")} data-modal-size="sm">
+              {m.position ? t("org.changePosition") : t("org.assignPosition")}
+            </a>
+          )}
           {perms.has("members.update") && (
             <a class="btn js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
           )}
