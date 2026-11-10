@@ -13,10 +13,6 @@ export type OrgCell = {
   state_name_en: string | null;
   township: string | null;
   member_count: number;
-  leader_name: string | null;
-  assistant_name: string | null;
-  secretary_name: string | null;
-  treasurer_name: string | null;
 };
 
 export type OrgDepartment = {
@@ -24,16 +20,18 @@ export type OrgDepartment = {
   name: string;
   name_en: string | null;
   sort_order: number;
-  head_name: string | null;
-  assistant_name: string | null;
-  secretary_name: string | null;
-  treasurer_name: string | null;
+  member_count: number;
 };
 
-export type OrgChurchLeader = {
+export type OrgLeader = {
   position: string;
+  scope_type: string;
+  scope_id: number | null;
+  department_id: number | null;
   member_id: number;
   member_name: string | null;
+  has_photo: number | boolean;
+  updated_at: number;
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -69,39 +67,62 @@ function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
   return [...states.values()];
 }
 
-function departmentRoleName(department: OrgDepartment, position: string): string | null {
-  if (position === "department_head") return department.head_name;
-  if (position === "department_assistant") return department.assistant_name;
-  if (position === "department_secretary") return department.secretary_name;
-  if (position === "department_treasurer") return department.treasurer_name;
-  return null;
+function initialOf(name: string | null | undefined): string {
+  return Array.from((name ?? "").trim())[0] ?? "?";
 }
 
-function roleName(cell: OrgCell, position: string): string | null {
-  if (position === "home_cell_leader") return cell.leader_name;
-  if (position === "home_cell_assistant") return cell.assistant_name;
-  if (position === "home_cell_secretary") return cell.secretary_name;
-  if (position === "home_cell_treasurer") return cell.treasurer_name;
-  return null;
+function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm" }) {
+  const { leader, size } = props;
+  if (!leader) return <span class={`org-avatar ${size} vacant`} aria-hidden="true">?</span>;
+  return (
+    <span class={`org-avatar ${size}`} aria-hidden="true">
+      {leader.has_photo
+        ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" />
+        : initialOf(leader.member_name)}
+    </span>
+  );
+}
+
+function LeaderLink(props: { leader: OrgLeader | null; empty: string }) {
+  const { leader, empty } = props;
+  if (!leader) return <span class="muted">{empty}</span>;
+  return <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>;
+}
+
+function leaderFor(
+  leaders: OrgLeader[], scopeType: string, position: string,
+  opts: { scopeId?: number | null; departmentId?: number | null } = {},
+): OrgLeader | null {
+  return leaders.find((l) =>
+    l.scope_type === scopeType && l.position === position &&
+    (opts.scopeId === undefined || l.scope_id === opts.scopeId) &&
+    (opts.departmentId === undefined || l.department_id === opts.departmentId)
+  ) ?? null;
 }
 
 export function OrganizationPage(props: Common & {
   tab: "church" | "home-cells";
   cells: OrgCell[];
   departments: OrgDepartment[];
-  churchLeaders: OrgChurchLeader[];
+  leaders: OrgLeader[];
   canManageDepartments: boolean;
   unassignedMembers: number;
 }) {
-  const { user, perms, flash, lang, tab, cells, departments, churchLeaders, canManageDepartments, unassignedMembers } = props;
+  const { user, perms, flash, lang, tab, cells, departments, leaders, canManageDepartments, unassignedMembers } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const states = groupCells(cells, L);
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
-  const withLeader = cells.filter((c) => Boolean(c.leader_name)).length;
+  const withLeader = cells.filter((c) => leaderFor(leaders, "home_cell", "home_cell_leader", { scopeId: c.id })).length;
   const canEdit = perms.has("members.update");
   const canManageOptions = perms.has("options.manage");
   const cellHref = (id: number) => `/members?home_cell=${id}`;
+
+  const churchRole = (position: string) => leaderFor(leaders, "church", position);
+  const departmentRole = (departmentId: number, position: string) =>
+    leaderFor(leaders, "department", position, { departmentId });
+  const homeRole = (cellId: number, position: string) =>
+    leaderFor(leaders, "home_cell", position, { scopeId: cellId });
 
   return (
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -129,22 +150,36 @@ export function OrganizationPage(props: Common & {
 
       {tab === "church" ? (
         <>
-          <section class="card org-leadership">
+          <section class="card org-chart">
             <div class="org-section-head">
               <div>
                 <h2>{t("org.churchLeadership")}</h2>
                 <p class="muted small">{t("org.churchLeadershipHint")}</p>
               </div>
             </div>
-            <div class="org-lead-grid">
-              {CHURCH_POSITIONS.map((p) => {
-                const leader = churchLeaders.find((l) => l.position === p.value);
+
+            <div class="org-chart-level org-chart-level-top">
+              {(() => {
+                const leader = churchRole("church_senior_pastor");
                 return (
-                  <div class={`org-lead${leader ? "" : " org-vacant"}`}>
-                    <span class="org-lead-role">{positionLabel(p.value, L)}</span>
-                    {leader
-                      ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>
-                      : <span class="muted">{t("org.vacant")}</span>}
+                  <div class="org-node org-node-lead">
+                    <LeaderAvatar leader={leader} size="lg" />
+                    <span class="org-node-role">{positionLabel("church_senior_pastor", L)}</span>
+                    <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div class="org-chart-connector" aria-hidden="true" />
+            <div class="org-chart-level org-chart-level-team">
+              {CHURCH_POSITIONS.filter((p) => p.value !== "church_senior_pastor").map((p) => {
+                const leader = churchRole(p.value);
+                return (
+                  <div class={`org-node${leader ? "" : " org-node-vacant"}`}>
+                    <LeaderAvatar leader={leader} size="md" />
+                    <span class="org-node-role">{positionLabel(p.value, L)}</span>
+                    <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
                   </div>
                 );
               })}
@@ -161,6 +196,7 @@ export function OrganizationPage(props: Common & {
                 <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
               )}
             </div>
+
             {departments.length === 0 ? (
               <div class="card org-empty org-empty-small">
                 <p class="muted">{t("org.noDepartments")}</p>
@@ -170,25 +206,43 @@ export function OrganizationPage(props: Common & {
               </div>
             ) : (
               <div class="org-grid org-dept-grid">
-                {departments.map((d) => (
-                  <article class="card org-card org-dept-card">
-                    <div class="org-card-head">
-                      <h3>{departmentName(d, L)}</h3>
-                      <span class="org-code">{t("org.department")}</span>
-                    </div>
-                    <dl class="org-roles">
-                      {DEPARTMENT_POSITIONS.map((p) => {
-                        const name = departmentRoleName(d, p.value);
-                        return (
-                          <div class={name ? "" : "org-vacant"}>
-                            <dt>{positionLabel(p.value, L)}</dt>
-                            <dd>{name || "—"}</dd>
+                {departments.map((d) => {
+                  const head = departmentRole(d.id, "department_head");
+                  const departmentLeaders = DEPARTMENT_POSITIONS
+                    .filter((p) => p.value !== "department_head")
+                    .map((p) => ({ position: p.value, leader: departmentRole(d.id, p.value) }));
+                  return (
+                    <article class="card org-dept-card">
+                      <div class="org-dept-head">
+                        <LeaderAvatar leader={head} size="md" />
+                        <div class="org-dept-title">
+                          <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
+                          <span class="muted small">
+                            {d.member_count} {t("org.membersShort")}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="org-dept-lead">
+                        <span class="org-node-role">{positionLabel("department_head", L)}</span>
+                        <LeaderLink leader={head} empty={t("org.vacant")} />
+                      </div>
+                      <div class="org-mini-list">
+                        {departmentLeaders.map((p) => (
+                          <div class={`org-mini${p.leader ? "" : " org-vacant"}`}>
+                            <LeaderAvatar leader={p.leader} size="sm" />
+                            <div>
+                              <span class="org-mini-role">{positionLabel(p.position, L)}</span>
+                              <LeaderLink leader={p.leader} empty={t("org.vacant")} />
+                            </div>
                           </div>
-                        );
-                      })}
-                    </dl>
-                  </article>
-                ))}
+                        ))}
+                      </div>
+                      <a class="org-card-link" href={`/organization/departments/${d.id}`}>
+                        {t("org.viewDepartment")} <span aria-hidden="true">→</span>
+                      </a>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -203,7 +257,7 @@ export function OrganizationPage(props: Common & {
             <div class="org-church">
               {states.map((state) => {
                 const stateMembers = state.cells.reduce((sum, c) => sum + c.member_count, 0);
-                const stateLeaders = state.cells.filter((c) => Boolean(c.leader_name)).length;
+                const stateLeaders = state.cells.filter((c) => homeRole(c.id, "home_cell_leader")).length;
                 return (
                   <section class="card org-state">
                     <div class="org-state-head">
@@ -222,27 +276,31 @@ export function OrganizationPage(props: Common & {
                           <span class="chev" aria-hidden="true">▾</span>
                         </summary>
                         <div class="org-cell-list">
-                          {town.cells.map((cell) => (
-                            <div class="org-cell-row">
-                              <div class="org-cell-name">
-                                <a href={cellHref(cell.id)}>{cell.label}</a>
-                                {cell.code && <span class="org-code">{cell.code}</span>}
+                          {town.cells.map((cell) => {
+                            const leader = homeRole(cell.id, "home_cell_leader");
+                            return (
+                              <div class="org-cell-row">
+                                <div class="org-cell-name">
+                                  <LeaderAvatar leader={leader} size="sm" />
+                                  <a href={cellHref(cell.id)}>{cell.label}</a>
+                                  {cell.code && <span class="org-code">{cell.code}</span>}
+                                </div>
+                                <div class="org-cell-leader">
+                                  {leader ? (
+                                    <>
+                                      <span class="org-role-label">{t("org.leader")}</span>
+                                      <LeaderLink leader={leader} empty={t("org.noLeader")} />
+                                    </>
+                                  ) : (
+                                    <span class="badge inactive">{t("org.noLeader")}</span>
+                                  )}
+                                </div>
+                                <a class="org-cell-count" href={cellHref(cell.id)}>
+                                  {cell.member_count} {t("org.membersShort")}
+                                </a>
                               </div>
-                              <div class="org-cell-leader">
-                                {cell.leader_name ? (
-                                  <>
-                                    <span class="org-role-label">{t("org.leader")}</span>
-                                    <span>{cell.leader_name}</span>
-                                  </>
-                                ) : (
-                                  <span class="badge inactive">{t("org.noLeader")}</span>
-                                )}
-                              </div>
-                              <a class="org-cell-count" href={cellHref(cell.id)}>
-                                {cell.member_count} {t("org.membersShort")}
-                              </a>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </details>
                     ))}
@@ -260,37 +318,50 @@ export function OrganizationPage(props: Common & {
         </div>
       ) : (
         <div class="org-grid">
-          {cells.map((cell) => (
-            <article class="card org-card">
-              <div class="org-card-head">
-                <div>
-                  <h3><a href={cellHref(cell.id)}>{cell.label}</a></h3>
-                  <p class="muted small">
-                    {L !== "mm" && cell.state_name_en ? cell.state_name_en : cell.state_name}
-                    {cell.township ? ` · ${cell.township}` : ""}
-                  </p>
+          {cells.map((cell) => {
+            const leader = homeRole(cell.id, "home_cell_leader");
+            return (
+              <article class="card org-card org-cell-card">
+                <div class="org-cell-card-head">
+                  <LeaderAvatar leader={leader} size="lg" />
+                  <div>
+                    <h3><a href={cellHref(cell.id)}>{cell.label}</a></h3>
+                    <p class="muted small">
+                      {L !== "mm" && cell.state_name_en ? cell.state_name_en : cell.state_name}
+                      {cell.township ? ` · ${cell.township}` : ""}
+                    </p>
+                    <span class="org-member-count">
+                      {cell.member_count} {t("org.membersShort")}
+                    </span>
+                  </div>
                 </div>
-                {cell.code && <span class="org-code">{cell.code}</span>}
-              </div>
-              <dl class="org-roles">
-                {HOME_CELL_POSITIONS.map((p) => {
-                  const name = roleName(cell, p.value);
-                  return (
-                    <div class={name ? "" : "org-vacant"}>
-                      <dt>{positionLabel(p.value, L)}</dt>
-                      <dd>{name || "—"}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-              <div class="org-card-foot">
-                <a class="org-cell-count" href={cellHref(cell.id)}>
-                  {cell.member_count} {t("org.membersShort")} →
-                </a>
-                {canEdit && <a class="small" href={cellHref(cell.id)}>{t("org.viewMembers")}</a>}
-              </div>
-            </article>
-          ))}
+                <div class="org-cell-lead">
+                  <span class="org-role-label">{positionLabel("home_cell_leader", L)}</span>
+                  <LeaderLink leader={leader} empty={t("org.noLeader")} />
+                </div>
+                <div class="org-mini-list">
+                  {HOME_CELL_POSITIONS.filter((p) => p.value !== "home_cell_leader").map((p) => {
+                    const member = homeRole(cell.id, p.value);
+                    return (
+                      <div class={`org-mini${member ? "" : " org-vacant"}`}>
+                        <LeaderAvatar leader={member} size="sm" />
+                        <div>
+                          <span class="org-mini-role">{positionLabel(p.value, L)}</span>
+                          <LeaderLink leader={member} empty={t("org.vacant")} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div class="org-card-foot">
+                  <a class="org-cell-count" href={cellHref(cell.id)}>
+                    {cell.member_count} {t("org.membersShort")} →
+                  </a>
+                  {canEdit && <a class="small" href={cellHref(cell.id)}>{t("org.viewMembers")}</a>}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </Layout>

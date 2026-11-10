@@ -14,7 +14,7 @@ export type HealthResult = {
 /** Deploy probe shared by GET /healthz and the dashboard status chip: verifies
  * the Worker, D1 and the schema this build expects (0014 added short_code,
  * 0015 members.photo, 0016 activity_reports, 0017 report_edits, 0018 families
- * placement, 0019 member_positions, 0021 church_departments). */
+ * placement, 0019 member_positions, 0021 church_departments, 0022 member departments). */
 export async function checkHealth(env: Bindings): Promise<HealthResult> {
   const started = Date.now();
   let db: "ok" | "error" = "ok";
@@ -31,6 +31,7 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
     await env.DB.prepare("SELECT report_id FROM report_edits LIMIT 1").all();
     await env.DB.prepare("SELECT position, department_id FROM member_positions LIMIT 1").all();
     await env.DB.prepare("SELECT name FROM church_departments LIMIT 1").all();
+    await env.DB.prepare("SELECT department_id FROM members LIMIT 1").all();
   } catch (err) {
     console.error("health check failed:", err);
     db = "error";

@@ -2,12 +2,13 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { DEPARTMENT_POSITIONS, positionLabel } from "../positions";
-import type { DepartmentRow } from "../departments";
+import { departmentName, type DepartmentRow } from "../departments";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
 export type AdminDepartmentRow = DepartmentRow & {
   role_count: number;
+  member_count: number;
   head_name: string | null;
   assistant_name: string | null;
   secretary_name: string | null;
@@ -38,6 +39,88 @@ function DepartmentFields(props: { department?: AdminDepartmentRow; lang: Lang }
         </label>
       )}
     </>
+  );
+}
+
+export type DepartmentDetailLeader = {
+  position: string;
+  member_id: number;
+  member_name: string | null;
+  has_photo: number | boolean;
+  updated_at: number;
+};
+
+export type DepartmentDetailData = {
+  id: number;
+  name: string;
+  name_en: string | null;
+  member_count: number;
+};
+
+export function DepartmentDetailPage(props: Common & {
+  department: DepartmentDetailData;
+  leaders: DepartmentDetailLeader[];
+  canManage: boolean;
+}) {
+  const { user, perms, flash, lang, department, leaders, canManage } = props;
+  const L = lang ?? "en";
+  const t = getDict(L);
+  const leaderFor = (position: string) => leaders.find((l) => l.position === position) ?? null;
+  const initial = (name: string | null | undefined) => Array.from((name ?? "").trim())[0] ?? "?";
+
+  return (
+    <Layout title={departmentName(department, L)} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
+      <div class="page-head">
+        <h1>
+          {departmentName(department, L)}
+          <span class="count-pill">{department.member_count} {t("org.membersShort")}</span>
+        </h1>
+        <div class="actions" style="margin:0">
+          <a class="btn secondary" href="/organization">{t("dept.back")}</a>
+          {canManage && <a class="btn secondary" href="/organization/departments">{t("org.manageDepartments")}</a>}
+        </div>
+      </div>
+      <p class="muted small">{t("dept.detailIntro")}</p>
+
+      <section class="card dept-detail-leaders">
+        <div class="org-section-head">
+          <div>
+            <h2>{t("dept.leaders")}</h2>
+            <p class="muted small">{t("dept.leadersHint")}</p>
+          </div>
+        </div>
+        <div class="org-lead-grid">
+          {DEPARTMENT_POSITIONS.map((p) => {
+            const leader = leaderFor(p.value);
+            return (
+              <div class={`org-lead dept-leader${leader ? "" : " org-vacant"}`}>
+                <span class="org-avatar md" aria-hidden="true">
+                  {leader?.has_photo
+                    ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" />
+                    : initial(leader?.member_name)}
+                </span>
+                <span class="org-lead-role">{positionLabel(p.value, L)}</span>
+                {leader
+                  ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>
+                  : <span class="muted">{t("org.vacant")}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section class="card dept-members-card">
+        <div>
+          <h2>{t("dept.membersTitle")}</h2>
+          <p class="muted small">{t("dept.membersHint")}</p>
+        </div>
+        <div class="dept-members-count">
+          <strong>{department.member_count}</strong>
+          <span>{t("org.membersShort")}</span>
+        </div>
+        <a class="btn" href={`/members?department=${department.id}`}>{t("dept.viewMembers")}</a>
+      </section>
+    </Layout>
   );
 }
 
@@ -87,7 +170,7 @@ export function DepartmentsPage(props: Common & {
                 <div>
                   <h3>{L !== "mm" && d.nameEn ? d.nameEn : d.name}</h3>
                   <p class="muted small">
-                    {d.role_count} / {DEPARTMENT_POSITIONS.length} {t("dept.rolesFilled")}
+                    {d.member_count} {t("org.membersShort")} · {d.role_count} / {DEPARTMENT_POSITIONS.length} {t("dept.rolesFilled")}
                   </p>
                 </div>
                 <span class={`badge ${d.active ? "active" : "inactive"}`}>

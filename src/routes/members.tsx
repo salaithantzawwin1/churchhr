@@ -53,6 +53,7 @@ const validMsgKeys: Record<string, string> = {
   "photo.tooLarge": "photo.tooLarge",
   "val.income": "val.income",
   "val.option": "val.option",
+  "val.department": "val.department",
   "imp.noDataRow": "imp.noDataRow",
   "imp.noNameColumn": "imp.noNameColumn",
   "imp.noName": "imp.noName",
@@ -121,6 +122,7 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     gender: q.gender && q.gender in GENDERS ? q.gender : "",
     status: q.status && q.status in STATUSES ? q.status : "",
     homeCell: intParam(q.home_cell),
+    department: intParam(q.department),
     group: intParam(q.group),
     fellowship: intParam(q.fellowship),
   };
@@ -136,6 +138,7 @@ function listCond(scope: Scope, f: Filters) {
   if (f.gender) cond = sql`${cond} AND m.gender = ${f.gender}`;
   if (f.status) cond = sql`${cond} AND m.status = ${f.status}`;
   if (f.homeCell) cond = sql`${cond} AND m.home_cell_id = ${f.homeCell}`;
+  if (f.department) cond = sql`${cond} AND m.department_id = ${f.department}`;
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
   if (f.fellowship) cond = sql`${cond} AND m.fellowship_category_id = ${f.fellowship}`;
   return cond;
@@ -220,6 +223,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const allRegions = await loadRegions(db);
   const allOptions = await loadAllOptions(db);
+  const departments = await loadDepartments(db, true);
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -228,6 +232,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
       dir={c.req.query("dir") === "desc" ? "desc" : "asc"}
       regions={scopedRegions(allRegions, scope, c.get("lang"))}
       homeCells={optionsOfType(allOptions, "home_cell")}
+      departments={departments}
       groups={optionsOfType(allOptions, "group")}
       fellowships={optionsOfType(allOptions, "fellowship_category")}
       lang={c.get("lang")}
@@ -251,13 +256,13 @@ const FORM_KEYS = [
   "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
   "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
   "family_group_id", "ethnicity_id", "education_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id", "sector_id",
+  "region_id", "township", "home_cell_id", "department_id", "group_id", "fellowship_category_id", "sector_id",
   "salvation_date", "status", "notes",
 ] as const;
 
 type Validated = { values: FormValues; errors: string[]; data: Record<string, string | number | null> | null };
 
-function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[]): Validated {
+function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[], departments: { id: number }[] = []): Validated {
   const v: FormValues = {};
   for (const k of FORM_KEYS) v[k] = s(body[k]);
   const errors: string[] = [];
@@ -298,6 +303,15 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
 
   const status = v.status && v.status in STATUSES ? v.status : "active";
 
+  let departmentId: number | null = null;
+  if (v.department_id) {
+    departmentId = asInt(v.department_id);
+    if (departmentId === null || !departments.some((d) => d.id === departmentId)) {
+      errors.push(msg("val.department"));
+      departmentId = null;
+    }
+  }
+
   const optionIds: Record<string, number | null> = {};
   for (const [field, type] of Object.entries(OPTION_FIELD)) {
     const raw = v[field];
@@ -332,6 +346,7 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
       status,
       notes: v.notes || null,
       region_id: regionId,
+      department_id: departmentId,
       ...optionIds,
     },
   };
@@ -349,7 +364,7 @@ const EXPORT_HEADER = [
   "ID", "Name English", "Name Myanmar", "Gender", "Married Status", "Date of Birth", "Age",
   "Blood Type", "Phone Number", "NRC Number", "Ethnicity", "Language", "Education", "Job",
   "Work Skills", "Income", "Address", "Father's Name", "Mother's Name", "Salvation Date",
-  "Family Group", "Fellowship Categories", "Participating Sector", "Group", "Home Cell", "Township", "State", "Status",
+  "Family Group", "Fellowship Categories", "Participating Sector", "Group", "Home Cell", "Department", "Township", "State", "Status",
   "Household", "Relationship", "Household Address", "Household Township", "Household Phone",
 ];
 
@@ -362,6 +377,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     SELECT m.*, r.name AS state_name,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      cd.name AS department,
       fam.name AS household, fam.address AS household_address,
       fam.township AS household_township, fam.phone AS household_phone
     FROM members m
@@ -374,6 +390,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN church_departments cd ON cd.id = m.department_id
     WHERE ${cond}
     ORDER BY m.id ASC`);
   const body = rows.map((r: any) => [
@@ -383,7 +400,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
     r.date_of_birth ?? "", ageFromDate(r.date_of_birth) ?? "", r.blood_type,
     r.phone, r.nrc_number, r.ethnicity, r.languages, r.education, r.job, r.work_skills,
     r.income, r.address, r.father_name, r.mother_name, r.salvation_date,
-    r.family_group, r.fellowship, r.sector, r.group_label, r.home_cell, r.township, r.state_name,
+    r.family_group, r.fellowship, r.sector, r.group_label, r.home_cell, r.department, r.township, r.state_name,
     r.status ? STATUSES[r.status]?.split(" (")[0] ?? r.status : "",
     r.household, r.relationship, r.household_address, r.household_township, r.household_phone,
   ]);
@@ -408,7 +425,10 @@ membersRoutes.get("/import/template", requirePermission("members.import"), (c) =
     "ဦးအောင်", "ဒေါ်ခင်", "2010-01-05", "Family A", "Youth", "Young Adults", "Group 1", "Cell 1",
     "အင်းစိန်မြို့နယ်", "ရန်ကုန်တိုင်း", "active", "", "", "", "", "",
   ];
-  const csv = "\uFEFF" + buildCsv([EXPORT_HEADER, sample]);
+  // Department membership is managed in the app; keep it out of the CSV
+  // template until the importer can resolve department names.
+  const templateHeader = EXPORT_HEADER.filter((h) => h !== "Department");
+  const csv = "\uFEFF" + buildCsv([templateHeader, sample]);
   return c.body(csv, 200, {
     "Content-Type": "text/csv; charset=utf-8",
     "Content-Disposition": 'attachment; filename="members-template.csv"',
@@ -881,6 +901,7 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fg.code AS family_group_code,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      cd.name AS department, m.department_id,
       (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions,
       fam.name AS household_name
     FROM members m
@@ -893,6 +914,7 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
     LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN church_departments cd ON cd.id = m.department_id
     WHERE m.id = ${id}`);
   return rows[0] as any;
 }
@@ -942,6 +964,7 @@ const SNAKE_TO_CAMEL: Record<string, string> = {
   salvation_date: "salvationDate", region_id: "regionId", ethnicity_id: "ethnicityId",
   education_id: "educationId", family_group_id: "familyGroupId",
   fellowship_category_id: "fellowshipCategoryId", sector_id: "sectorId", group_id: "groupId", home_cell_id: "homeCellId",
+  department_id: "departmentId",
 };
 
 /** Drizzle keys by TS property names (camelCase); our form data uses DB column names. */
@@ -991,6 +1014,7 @@ function rowToValues(row: MemberDetail): FormValues {
     sector_id: num(row.sector_id),
     group_id: num(row.group_id),
     home_cell_id: num(row.home_cell_id),
+    department_id: num(row.department_id ?? null),
   };
 }
 
@@ -1010,13 +1034,14 @@ membersRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const scope = scopeOf(c);
   const allRegions = await loadRegions(db);
   const options = await loadAllOptions(db);
+  const departments = await loadDepartments(db, false);
   const modal = c.req.query("modal") === "1";
   const render = (status: 400 | 200) =>
     c.html(
       <MemberFormFragment
         user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope, allRegions)}
         errors={[]} member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-        options={formOptions(options)}
+        options={formOptions(options)} departments={departments}
         lang={c.get("lang")} modal={modal}
       />,
       status,
@@ -1026,7 +1051,7 @@ membersRoutes.get("/new", requirePermission("members.create"), async (c) => {
     <MemberFormPage
       user={c.get("user")} perms={c.get("perms")} values={defaultValues(scope, allRegions)}
       errors={[]} member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-      options={formOptions(options)}
+      options={formOptions(options)} departments={departments}
       lang={c.get("lang")}
     />,
   );
@@ -1038,7 +1063,8 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const body = await c.req.parseBody();
   const fromModal = s(body.from_modal) === "1" || c.req.header("X-Requested-With") === "modal";
   const options = await loadAllOptions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options);
+  const departments = await loadDepartments(db, false);
+  const { values, errors, data } = readAndValidate(body, scope, options, departments);
   const photo = parsePhoto(body);
   if (photo.error) errors.push(photo.error);
   const allRegions = await loadRegions(db);
@@ -1049,14 +1075,14 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
             user={c.get("user")} perms={c.get("perms")} values={values}
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-            options={formOptions(options)}
+            options={formOptions(options)} departments={departments}
             lang={c.get("lang")} modal
           />
         : <MemberFormPage
             user={c.get("user")} perms={c.get("perms")} values={values}
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
-            options={formOptions(options)}
+            options={formOptions(options)} departments={departments}
             lang={c.get("lang")}
           />,
       status,
@@ -1259,6 +1285,7 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
   if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
   const allRegions = await loadRegions(db);
   const options = await loadAllOptions(db);
+  const departments = await loadDepartments(db, false);
   const formProps = {
     user: c.get("user"), perms: c.get("perms"), values: rowToValues(row), errors: [] as string[],
     member: {
@@ -1267,6 +1294,7 @@ membersRoutes.get("/:id/edit", requirePermission("members.update"), async (c) =>
     },
     regions: scopedRegions(allRegions, scope, c.get("lang")),
     options: formOptions(options, (o) => o.type === "township" ? o.label === row.township : o.id === (row as any)[`${o.type}_id`]),
+    departments,
     lang: c.get("lang"),
   };
   if (c.req.query("modal") === "1") return c.html(<MemberFormFragment {...formProps} modal />);
@@ -1335,7 +1363,8 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const body = await c.req.parseBody();
   const fromModal = s(body.from_modal) === "1";
   const options = await loadAllOptions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options);
+  const departments = await loadDepartments(db, false);
+  const { values, errors, data } = readAndValidate(body, scope, options, departments);
   const photo = parsePhoto(body);
   if (photo.error) errors.push(photo.error);
   const allRegions = await loadRegions(db);
@@ -1349,6 +1378,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
       },
       regions: scopedRegions(allRegions, scope, c.get("lang")),
       options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
+      departments,
       lang: c.get("lang"),
     };
     if (fromModal) return c.html(<MemberFormFragment {...formProps} modal />, 400);

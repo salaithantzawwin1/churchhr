@@ -39,6 +39,7 @@ export type Filters = {
   gender: string;
   status: string;
   homeCell: number | null;
+  department: number | null;
   group: number | null;
   fellowship: number | null;
 };
@@ -54,6 +55,7 @@ type ListProps = Common & {
   dir: "asc" | "desc";
   regions: { id: number; name: string }[];
   homeCells: OptionRow[];
+  departments: DepartmentRow[];
   groups: OptionRow[];
   fellowships: OptionRow[];
 };
@@ -61,13 +63,13 @@ type ListProps = Common & {
 function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, group: f.group, fellowship: f.fellowship, page: page ?? null,
+    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship, page: page ?? null,
   });
 }
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.group || f.fellowship);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -101,7 +103,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, groups, fellowships, lang } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   // Korean uses the English data labels (region names etc.); only MM differs.
@@ -122,7 +124,7 @@ export function MembersListPage(props: ListProps) {
   /** Current list query, used to build "remove this filter" links. */
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, group: f.group, fellowship: f.fellowship,
+    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
     sort: sort || null, dir: sort ? dir : null,
   };
   const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
@@ -137,6 +139,10 @@ export function MembersListPage(props: ListProps) {
   if (f.homeCell) {
     const cell = homeCells.find((o) => o.id === f.homeCell);
     if (cell) chips.push({ label: cell.label, href: withoutFilter("home_cell") });
+  }
+  if (f.department) {
+    const department = departments.find((d) => d.id === f.department);
+    if (department) chips.push({ label: departmentName(department, L), href: withoutFilter("department") });
   }
   if (f.group) {
     const group = groups.find((o) => o.id === f.group);
@@ -188,6 +194,12 @@ export function MembersListPage(props: ListProps) {
           {homeCells.map((o) => (
             <option value={String(o.id)} selected={f.homeCell === o.id}
               data-region={o.regionId === 0 ? "" : String(o.regionId)}>{o.label}</option>
+          ))}
+        </select>
+        <select name="department" aria-label={t("members.department")}>
+          <option value="">{t("members.allDepartments")}</option>
+          {departments.map((d) => (
+            <option value={String(d.id)} selected={f.department === d.id}>{departmentName(d, L)}</option>
           ))}
         </select>
         <select name="group" data-region-filter="1" aria-label={t("members.thGroup")}>
@@ -377,6 +389,7 @@ type FormProps = Common & {
   member: { id: number; photoUrl?: string } | null;
   regions: { id: number; name: string }[];
   options: Record<string, OptionRow[]>;
+  departments: DepartmentRow[];
 };
 
 function opts(
@@ -446,7 +459,7 @@ export function MemberFormPage(props: FormProps) {
 
 /** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
-  const { values: v, errors, member, regions, options, lang, modal } = props;
+  const { values: v, errors, member, regions, options, departments, lang, modal } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -584,6 +597,15 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               </select>
             </label>
             <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById)}</select></label>
+            <label class="field">
+              <span class="lbl">{t("form.department")}</span>
+              <select name="department_id">
+                <option value="">{t("form.choose")}</option>
+                {departments.map((d) => (
+                  <option value={String(d.id)} selected={v.department_id === String(d.id)}>{departmentName(d, L)}</option>
+                ))}
+              </select>
+            </label>
             <label class="field"><span class="lbl">{t("form.group")}</span><select name="group_id" data-region-filter="1">{opts(options.group ?? [], v.group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
@@ -772,6 +794,8 @@ export type MemberDetail = {
   sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
+  department_id?: number | null;
+  department?: string | null;
   positions?: string | null;
   household_id?: number | null;
   household_name?: string | null;
@@ -853,6 +877,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("form.sector"), m.sector ?? ""],
         [t("form.group"), m.group_label ?? ""],
         [t("form.homeCell"), m.home_cell ?? ""],
+        [t("form.department"), m.department ?? ""],
         [t("org.position"), positionLabels(m.positions, L).join(" · ")],
         [t("detail.status"), S[m.status] ?? m.status],
         [t("detail.notes"), m.notes ?? ""],

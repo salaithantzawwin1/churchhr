@@ -5,8 +5,8 @@ import { getDb } from "../db/client";
 import { churchDepartments } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { OrganizationPage, type OrgCell, type OrgChurchLeader, type OrgDepartment } from "../views/organization";
-import { DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
+import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
+import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { asInt, intParam, s } from "../util";
 
 export const organizationRoutes = new Hono<AppEnv>();
@@ -34,27 +34,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
            r.name AS state_name, r.name_en AS state_name_en,
            t.label AS township,
            (SELECT COUNT(*) FROM members m
-             WHERE m.home_cell_id = hc.id AND m.status = 'active') AS member_count,
-           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-              FROM members m JOIN member_positions mp ON mp.member_id = m.id
-             WHERE mp.scope_type = 'home_cell' AND mp.scope_id = hc.id
-               AND mp.position = 'home_cell_leader' AND m.status = 'active'
-             LIMIT 1) AS leader_name,
-           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-              FROM members m JOIN member_positions mp ON mp.member_id = m.id
-             WHERE mp.scope_type = 'home_cell' AND mp.scope_id = hc.id
-               AND mp.position = 'home_cell_assistant' AND m.status = 'active'
-             LIMIT 1) AS assistant_name,
-           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-              FROM members m JOIN member_positions mp ON mp.member_id = m.id
-             WHERE mp.scope_type = 'home_cell' AND mp.scope_id = hc.id
-               AND mp.position = 'home_cell_secretary' AND m.status = 'active'
-             LIMIT 1) AS secretary_name,
-           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-              FROM members m JOIN member_positions mp ON mp.member_id = m.id
-             WHERE mp.scope_type = 'home_cell' AND mp.scope_id = hc.id
-               AND mp.position = 'home_cell_treasurer' AND m.status = 'active'
-             LIMIT 1) AS treasurer_name
+             WHERE m.home_cell_id = hc.id AND m.status = 'active') AS member_count
     FROM lookup_options hc
     JOIN regions r ON r.id = hc.region_id
     LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
@@ -63,36 +43,20 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const departments = await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_head' AND m.status = 'active'
-        LIMIT 1) AS head_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_assistant' AND m.status = 'active'
-        LIMIT 1) AS assistant_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_secretary' AND m.status = 'active'
-        LIMIT 1) AS secretary_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_treasurer' AND m.status = 'active'
-        LIMIT 1) AS treasurer_name
+      (SELECT COUNT(*) FROM members m
+        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
     FROM church_departments d
     WHERE d.active = 1
     ORDER BY d.sort_order, d.name`);
 
-  const churchLeaders = await db.all<OrgChurchLeader>(sql`
-    SELECT mp.position, m.id AS member_id,
-           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name
+  const leaders = await db.all<OrgLeader>(sql`
+    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id,
+           m.id AS member_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
+           (m.photo IS NOT NULL) AS has_photo, m.updated_at
     FROM member_positions mp
     JOIN members m ON m.id = mp.member_id
-    WHERE mp.scope_type = 'church' AND m.status = 'active'
+    WHERE m.status = 'active'
     ORDER BY mp.position`);
 
   const unassignedRows = await db.all<{ n: number }>(sql`
@@ -106,9 +70,40 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     <OrganizationPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells}
-      departments={departments} churchLeaders={churchLeaders}
+      departments={departments} leaders={leaders}
       canManageDepartments={c.get("perms").has("options.manage")}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
+    />,
+  );
+});
+
+// ---------- Department detail ----------
+
+organizationRoutes.get("/departments/:id", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.notFound();
+  const department = (await db.all<OrgDepartment>(sql`
+    SELECT d.id, d.name, d.name_en, d.sort_order,
+      (SELECT COUNT(*) FROM members m
+        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
+    FROM church_departments d WHERE d.id = ${id} LIMIT 1`))[0];
+  if (!department) return c.notFound();
+  const leaders = await db.all<OrgLeader>(sql`
+    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id,
+           m.id AS member_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
+           (m.photo IS NOT NULL) AS has_photo, m.updated_at
+    FROM member_positions mp
+    JOIN members m ON m.id = mp.member_id
+    WHERE mp.scope_type = 'department' AND mp.department_id = ${id} AND m.status = 'active'
+    ORDER BY mp.position`);
+  return c.html(
+    <DepartmentDetailPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} department={department} leaders={leaders}
+      canManage={c.get("perms").has("options.manage")}
     />,
   );
 });
@@ -139,7 +134,9 @@ async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<Admin
           AND mp.position = 'department_treasurer' AND m.status = 'active'
         LIMIT 1) AS treasurer_name,
       (SELECT COUNT(*) FROM member_positions mp
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id) AS role_count
+        WHERE mp.scope_type = 'department' AND mp.department_id = d.id) AS role_count,
+      (SELECT COUNT(*) FROM members m
+        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
     FROM church_departments d
     ORDER BY d.active DESC, d.sort_order, d.name`);
 }
@@ -207,8 +204,11 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   const active = s(body.active) === "1" ? 1 : 0;
   if (current.active === 1 && active === 0) {
     const assigned = await db.all<{ n: number }>(sql`
-      SELECT COUNT(*) AS n FROM member_positions
-       WHERE scope_type = 'department' AND department_id = ${id}`);
+      SELECT
+        (SELECT COUNT(*) FROM member_positions
+          WHERE scope_type = 'department' AND department_id = ${id}) +
+        (SELECT COUNT(*) FROM members
+          WHERE department_id = ${id}) AS n`);
     if ((assigned[0]?.n ?? 0) > 0) {
       return c.redirect("/organization/departments?err=department-in-use", 303);
     }

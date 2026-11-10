@@ -233,6 +233,7 @@ export const members = sqliteTable(
     sectorId: integer("sector_id").references(() => lookupOptions.id),
     groupId: integer("group_id").references(() => lookupOptions.id),
     homeCellId: integer("home_cell_id").references(() => lookupOptions.id),
+    departmentId: integer("department_id").references(() => churchDepartments.id),
     householdId: integer("family_id"),
     relationship: text("relationship").notNull().default(""),
     regionId: integer("region_id")
@@ -252,6 +253,7 @@ export const members = sqliteTable(
     groupIdx: index("members_group_idx").on(t.groupId),
     sectorIdx: index("members_sector_idx").on(t.sectorId),
     homeCellIdx: index("members_home_cell_idx").on(t.homeCellId),
+    departmentIdx: index("members_department_idx").on(t.departmentId),
     townshipIdx: index("members_township_idx").on(t.township),
   }),
 );
