@@ -287,17 +287,96 @@
   }
   initRegionCascade(document);
 
-  // Household head picker: using an existing member as head copies that
-  // member's placement (state, township, home cell, group, family group)
-  // into the new household form. The server repeats this fallback on submit.
+  // Household head picker: the native select stays as the no-JS fallback, but
+  // when JS runs it becomes a type-to-search combobox. Picking a head copies
+  // that member's placement (state, township, home cell, group, family group)
+  // into the new household form and fills the household name with theirs. The
+  // server repeats the placement fallback on submit.
   function initHeadPicker(root) {
-    Array.prototype.forEach.call(root.querySelectorAll('select[name="head_member_id"]'), function (sel) {
-      if (sel.getAttribute("data-head-bound")) return;
-      sel.setAttribute("data-head-bound", "1");
+    Array.prototype.forEach.call(root.querySelectorAll("[data-head-picker]"), function (picker) {
+      if (picker.getAttribute("data-head-bound")) return;
+      picker.setAttribute("data-head-bound", "1");
+      var sel = picker.querySelector("select[data-head-select]");
+      var search = picker.querySelector("[data-head-search]");
+      var clear = picker.querySelector("[data-head-clear]");
+      if (!sel || !search) return;
+
+      var list = document.createElement("div");
+      list.className = "head-list";
+      list.setAttribute("role", "listbox");
+      list.hidden = true;
+      list.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      var noMatch = document.createElement("div");
+      noMatch.className = "head-empty";
+      noMatch.textContent = picker.getAttribute("data-no-match") || "No matching member";
+      noMatch.hidden = true;
+
+      var items = [];
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        if (!opt.value) return;
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "head-option";
+        item.setAttribute("role", "option");
+        item.textContent = opt.textContent;
+        item._opt = opt;
+        item.addEventListener("click", function () { choose(opt); });
+        list.appendChild(item);
+        items.push(item);
+      });
+      list.appendChild(noMatch);
+      picker.appendChild(list);
+      picker.classList.add("is-ready");
+
+      function labelOf(opt) { return (opt && opt.textContent || "").trim(); }
+      function open() {
+        filter();
+        list.hidden = false;
+        search.setAttribute("aria-expanded", "true");
+      }
+      function close() {
+        list.hidden = true;
+        search.setAttribute("aria-expanded", "false");
+        items.forEach(function (b) { b.classList.remove("active"); });
+      }
+      function filter() {
+        var q = search.value.trim().toLowerCase();
+        var shown = 0;
+        items.forEach(function (b) {
+          var match = !q || b.textContent.toLowerCase().indexOf(q) > -1;
+          var visible = match && shown < 60;
+          b.hidden = !visible;
+          if (visible) shown++;
+          b.classList.toggle("selected", b._opt.value === sel.value);
+        });
+        noMatch.hidden = shown > 0;
+      }
+      function choose(opt) {
+        sel.value = opt.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        search.value = labelOf(opt);
+        if (clear) clear.hidden = false;
+        close();
+      }
+      function resetSelection() {
+        sel.value = "";
+        var form = sel.form;
+        if (!form) return;
+        var nameInput = form.querySelector('input[name="name"]');
+        var prev = form.getAttribute("data-head-name");
+        if (nameInput && prev && nameInput.value === prev) nameInput.value = "";
+        form.removeAttribute("data-head-name");
+      }
+
+      // Placement + household name follow the picked head.
       sel.addEventListener("change", function () {
         var opt = sel.options[sel.selectedIndex];
         var form = sel.form;
-        if (!opt || !opt.value || !form) return;
+        if (!form) return;
+        if (!opt || !opt.value) {
+          resetSelection();
+          return;
+        }
         function pick(name, attr) {
           var el = form.querySelector('select[name="' + name + '"]');
           var val = opt.getAttribute(attr);
@@ -311,7 +390,58 @@
         pick("home_cell_id", "data-home-cell");
         pick("group_id", "data-group");
         pick("family_group_id", "data-family-group");
+
+        var nameInput = form.querySelector('input[name="name"]');
+        var headName = opt.getAttribute("data-name") || "";
+        var prev = form.getAttribute("data-head-name") || "";
+        if (nameInput && headName && (!nameInput.value.trim() || nameInput.value === prev)) {
+          nameInput.value = headName;
+          form.setAttribute("data-head-name", headName);
+        }
       });
+
+      search.addEventListener("focus", open);
+      search.addEventListener("input", function () {
+        var current = sel.options[sel.selectedIndex];
+        if (sel.value && (!current || search.value.trim() !== labelOf(current))) {
+          resetSelection();
+          if (clear) clear.hidden = false;
+        }
+        if (clear) clear.hidden = !search.value;
+        open();
+      });
+      search.addEventListener("blur", function () { setTimeout(close, 120); });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") { close(); return; }
+        if (e.key === "Enter") {
+          var active = list.querySelector(".head-option.active");
+          if (active) { e.preventDefault(); active.click(); }
+          return;
+        }
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        e.preventDefault();
+        var visible = items.filter(function (b) { return !b.hidden; });
+        if (!visible.length) return;
+        var current = visible.indexOf(list.querySelector(".head-option.active"));
+        var next = e.key === "ArrowDown" ? Math.min(current + 1, visible.length - 1) : Math.max(current - 1, 0);
+        items.forEach(function (b) { b.classList.remove("active"); });
+        visible[next].classList.add("active");
+        visible[next].scrollIntoView({ block: "nearest" });
+      });
+      if (clear) clear.addEventListener("click", function () {
+        search.value = "";
+        resetSelection();
+        clear.hidden = true;
+        close();
+        search.focus();
+      });
+
+      // Preselected head (e.g. arrived from a member page).
+      var initial = sel.options[sel.selectedIndex];
+      if (initial && initial.value) {
+        search.value = labelOf(initial);
+        if (clear) clear.hidden = false;
+      }
     });
   }
   initHeadPicker(document);

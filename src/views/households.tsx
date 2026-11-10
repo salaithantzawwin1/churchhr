@@ -92,27 +92,33 @@ export function HouseholdFormFragment(props: Common & {
             {family === null && (
               <label class="field" style="grid-column:1/-1">
                 <span class="lbl">{t("hh.headPick")} <span class="hint">{t("hh.headPickHint")}</span></span>
-                <select name="head_member_id">
-                  <option value="">{t("hh.headPickNone")}</option>
-                  {(props.members ?? []).map((m) => {
-                    const nm = (props.lang ?? "en") === "mm"
-                      ? (m.name_myanmar || m.name_english)
-                      : (m.name_english || m.name_myanmar);
-                    return (
-                      <option
-                        value={String(m.id)}
-                        selected={v.head_member_id === String(m.id)}
-                        data-region={String(m.region_id)}
-                        data-township={m.township ?? ""}
-                        data-home-cell={m.home_cell_id ? String(m.home_cell_id) : ""}
-                        data-group={m.group_id ? String(m.group_id) : ""}
-                        data-family-group={m.family_group_id ? String(m.family_group_id) : ""}
-                      >
-                        {(nm || `#${m.id}`) + (m.member_code ? ` · ${m.member_code}` : "") + (m.township ? ` · ${m.township}` : "")}
-                      </option>
-                    );
-                  })}
-                </select>
+                <div class="head-picker" data-head-picker data-no-match={t("hh.headNoMatch")}>
+                  <input type="search" data-head-search placeholder={t("hh.headSearch")}
+                    aria-label={t("hh.headSearch")} autocomplete="off" role="combobox" aria-expanded="false" />
+                  <button type="button" class="head-clear" data-head-clear aria-label={t("hh.headClear")} hidden>×</button>
+                  <select name="head_member_id" data-head-select>
+                    <option value="">{t("hh.headPickNone")}</option>
+                    {(props.members ?? []).map((m) => {
+                      const nm = (props.lang ?? "en") === "mm"
+                        ? (m.name_myanmar || m.name_english)
+                        : (m.name_english || m.name_myanmar);
+                      return (
+                        <option
+                          value={String(m.id)}
+                          selected={v.head_member_id === String(m.id)}
+                          data-name={nm ?? ""}
+                          data-region={String(m.region_id)}
+                          data-township={m.township ?? ""}
+                          data-home-cell={m.home_cell_id ? String(m.home_cell_id) : ""}
+                          data-group={m.group_id ? String(m.group_id) : ""}
+                          data-family-group={m.family_group_id ? String(m.family_group_id) : ""}
+                        >
+                          {(nm || `#${m.id}`) + (m.member_code ? ` · ${m.member_code}` : "") + (m.township ? ` · ${m.township}` : "")}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </label>
             )}
             <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
@@ -361,7 +367,11 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
               const initial = nm.trim().charAt(0) || "?";
               return (
                 <div class="hh-member">
-                  <span class="hh-avatar sm" aria-hidden="true">{initial}</span>
+                  <span class="hh-avatar sm" aria-hidden="true">
+                    {m.has_photo
+                      ? <img src={`/members/${m.id}/photo?v=${m.updated_at ?? ""}`} alt="" loading="lazy" />
+                      : initial}
+                  </span>
                   <div class="hh-member-main">
                     <a href={`/members/${m.id}`}>{nm}</a>
                     <div class="small muted">

@@ -125,7 +125,8 @@ function defaultValues(scope: Scope): HFormValues {
 /** Members of a household, head first; used by detail card. */
 async function householdMembers(db: DB, familyId: number) {
   return (await db.all(sql`
-    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.status, m.relationship, m.date_of_birth
+    SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.status, m.relationship, m.date_of_birth,
+           m.updated_at, (m.photo IS NOT NULL) AS has_photo
     FROM members m WHERE m.family_id = ${familyId}
     ORDER BY CASE WHEN m.relationship = 'head' THEN 0 ELSE 1 END, m.id ASC`)) as any[];
 }

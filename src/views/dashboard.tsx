@@ -389,7 +389,11 @@ export function DashboardPage(props: {
             <ul class="recent-list">
               {data.recent.map((m) => (
                 <li>
-                  <span class="avatar" aria-hidden="true">{Array.from(m.name.trim())[0] ?? "?"}</span>
+                  <span class="avatar" aria-hidden="true">
+                    {m.has_photo
+                      ? <img src={`/members/${m.id}/photo?v=${m.updated_at ?? ""}`} alt="" width="32" height="32" loading="lazy" />
+                      : Array.from(m.name.trim())[0] ?? "?"}
+                  </span>
                   <div class="rn">
                     {canView
                       ? <a href={`/members/${m.id}`}>{m.name}</a>

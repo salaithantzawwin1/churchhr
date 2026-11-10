@@ -23,7 +23,7 @@ export type DashboardData = {
   male: number;
   female: number;
   byState: { id: number; name: string; name_en?: string | null; n: number }[];
-  recent: { id: number; name: string; state_name: string; state_name_en?: string | null }[];
+  recent: { id: number; name: string; state_name: string; state_name_en?: string | null; has_photo?: number | boolean; updated_at?: number }[];
   scopeAll: boolean;
   stateCount: number;
   /** Active members per admin-defined age group, split by gender. */
@@ -116,6 +116,7 @@ export async function loadDashboard(
   const recent = await db.all<{ id: number; name: string; state_name: string }>(sql`
     SELECT m.id,
       COALESCE(NULLIF(m.name_myanmar, ''), NULLIF(m.name_english, ''), '—') AS name,
+      (m.photo IS NOT NULL) AS has_photo, m.updated_at,
       r.name AS state_name, r.name_en AS state_name_en
     FROM members m JOIN regions r ON r.id = m.region_id
     WHERE ${scopeM} AND ${mfc()} ORDER BY m.id DESC LIMIT 5`);
