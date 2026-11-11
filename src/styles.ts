@@ -1418,9 +1418,22 @@ td.empty-state .small { margin-top: 4px; }
 .role-card-text { min-width: 0; }
 .role-card-actions { flex-wrap: nowrap; }
 
+.settings-filters { margin-top: 12px; }
+.settings-filters input[type="search"] { flex: 1 1 240px; min-width: 0; max-width: 360px; }
+.settings-filters select { flex: 0 1 180px; }
+.settings-filters .actions { margin-left: 0; }
+
 @media (max-width: 640px) {
   .role-card, .regional-card { padding: 14px 16px; }
   .role-card-actions .btn { min-height: 36px; padding: 5px 12px; }
+  .settings-filters {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    gap: 8px; margin-top: 10px;
+  }
+  .settings-filters input[type="search"] { grid-column: 1 / -1; width: 100%; max-width: none; }
+  .settings-filters select { width: 100%; }
+  .settings-filters .actions { margin: 0; }
+  .settings-filters .actions .btn { width: 100%; }
 }
 
 .regional-attached { display: grid; gap: 6px; margin-top: 10px; }

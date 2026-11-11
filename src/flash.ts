@@ -72,6 +72,14 @@ const FLASH_KEYS: Record<string, string> = {
   "bulk.badDepartment": "flash.bulkBadDepartment",
 };
 
+/** Message for a flash/err code, or the code itself when unknown. */
+export function flashText(code: string | undefined | null, lang?: Lang): string | null {
+  if (!code) return null;
+  const t = getDict(normalizeLang(lang));
+  const key = FLASH_KEYS[code];
+  return key ? t(key) : code;
+}
+
 export function flashFromQuery(q: Record<string, string | undefined>, lang?: Lang): Flash {
   const t = getDict(normalizeLang(lang));
   const ok = q.ok;

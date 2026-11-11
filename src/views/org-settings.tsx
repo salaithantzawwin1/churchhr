@@ -70,16 +70,23 @@ function PositionFields(props: { values: PositionValues; lang: Lang; editing: bo
 
 /** Bare position form served for the add/edit modal; it submits natively so
  *  server flashes and validation errors land on the list after the reload. */
-export function PositionModal(props: { scope: ConfigurablePositionScope; def?: PositionDefRow; lang?: Lang }) {
-  const { scope, def } = props;
+export function PositionModal(props: {
+  scope: ConfigurablePositionScope;
+  def?: PositionDefRow;
+  values?: PositionValues;
+  error?: string | null;
+  lang?: Lang;
+}) {
+  const { scope, def, error } = props;
   const L = props.lang ?? "en";
   const t = getDict(L);
   const inUse = (def?.usageCount ?? 0) > 0;
   return (
     <>
-      <form method="post" action={def ? `/organization/positions/${def.id}` : "/organization/positions"} data-plain-submit>
+      {error && <div class="modal-error" role="alert">{error}</div>}
+      <form method="post" action={def ? `/organization/positions/${def.id}` : "/organization/positions"} data-modal-ajax>
         {!def && <input type="hidden" name="scope" value={scope} />}
-        <PositionFields values={positionValues(def)} lang={L} editing={Boolean(def)} />
+        <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} />
         <div class="actions">
           <button class="btn" type="submit">{def ? t("dept.save") : t("form.add")}</button>
         </div>
@@ -104,16 +111,37 @@ export function PositionModal(props: { scope: ConfigurablePositionScope; def?: P
   );
 }
 
+export type ListStatus = "all" | "active" | "inactive";
+
+/** Case-insensitive substring match over the labels a row can be found by. */
+function matchesQuery(q: string, fields: (string | null | undefined)[]): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return fields.some((f) => (f ?? "").toLowerCase().includes(needle));
+}
+
+function statusMatches(status: ListStatus, active: boolean): boolean {
+  return status === "all" || (status === "active" ? active : !active);
+}
+
 export function PositionsPage(props: Common & {
   scope: ConfigurablePositionScope;
   defs: PositionDefRow[];
+  q?: string;
+  status?: ListStatus;
 }) {
   const { user, perms, flash, lang, scope, defs } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  const q = props.q ?? "";
+  const status = props.status ?? "all";
   const current = defs
     .filter((d) => d.scopeType === scope)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+  const visible = current.filter((d) =>
+    statusMatches(status, d.active === 1) &&
+    matchesQuery(q, [d.nameMyanmar, d.nameEnglish, d.nameKorean, d.code]));
+  const filtered = q.trim().length > 0 || status !== "all";
   const counts = Object.fromEntries(
     CONFIGURABLE_POSITION_SCOPES.map((s) => [s, defs.filter((d) => d.scopeType === s).length]),
   ) as Record<ConfigurablePositionScope, number>;
@@ -122,7 +150,7 @@ export function PositionsPage(props: Common & {
     <Layout title={t("org.positionsTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("org.positionsTitle")}<span class="count-pill">{current.length}</span></h1>
+          <h1>{t("org.positionsTitle")}<span class="count-pill">{visible.length}</span></h1>
           <p class="page-sub">{t("org.positionsIntro")}</p>
         </div>
         <div class="page-head-actions">
@@ -149,13 +177,30 @@ export function PositionsPage(props: Common & {
         </div>
       </div>
 
-      {current.length === 0 ? (
+      <form class="filters settings-filters" method="get" action="/organization/positions" data-auto-submit="1">
+        <input type="hidden" name="scope" value={scope} />
+        <input type="search" name="q" value={q} placeholder={t("org.searchPositions")}
+          aria-label={t("members.search")} enterkeyhint="search" />
+        <select name="status" aria-label={t("members.status")}>
+          <option value="" selected={status === "all"}>{t("members.allStatuses")}</option>
+          <option value="active" selected={status === "active"}>{t("dept.active")}</option>
+          <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
+        </select>
+        <div class="actions">
+          <button class="btn sm" type="submit">{t("members.search")}</button>
+        </div>
+      </form>
+
+      {visible.length === 0 ? (
         <div class="card org-empty org-empty-small">
-          <p class="muted">{t("org.noPositions")}</p>
+          <p class="muted">{filtered ? t("org.filterEmpty") : t("org.noPositions")}</p>
+          {filtered && (
+            <p class="small"><a href={`/organization/positions?scope=${scope}`}>{t("members.clearFilters")}</a></p>
+          )}
         </div>
       ) : (
         <div class="role-list">
-          {current.map((def) => (
+          {visible.map((def) => (
             <article class={`card role-card${def.active ? "" : " is-inactive"}`}>
               <header class="role-card-head">
                 <div class="role-card-text">
@@ -338,10 +383,18 @@ export function RegionalChurchesPage(props: Common & {
   churches: RegionalChurchRow[];
   regions: { id: number; name: string }[];
   homeCells: HomeCellOption[];
+  q?: string;
+  status?: ListStatus;
 }) {
   const { user, perms, flash, lang, churches, regions, homeCells } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  const q = props.q ?? "";
+  const status = props.status ?? "all";
+  const visible = churches.filter((c) =>
+    statusMatches(status, c.active === 1) &&
+    matchesQuery(q, [c.name, c.nameEn, c.stateName, c.stateNameEn]));
+  const filtered = q.trim().length > 0 || status !== "all";
   const attachedCount = homeCells.filter((c) => c.regionalChurchId != null).length;
   const unattachedCount = homeCells.length - attachedCount;
 
@@ -349,7 +402,7 @@ export function RegionalChurchesPage(props: Common & {
     <Layout title={t("org.regionalTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("org.regionalTitle")}<span class="count-pill">{churches.length}</span></h1>
+          <h1>{t("org.regionalTitle")}<span class="count-pill">{visible.length}</span></h1>
           <p class="page-sub">{t("org.regionalIntro")}</p>
         </div>
         <div class="page-head-actions">
@@ -369,13 +422,29 @@ export function RegionalChurchesPage(props: Common & {
         <div class="stat"><div class="n">{unattachedCount}</div><div class="t">{t("org.unattachedCells")}</div></div>
       </div>
 
-      {churches.length === 0 ? (
+      <form class="filters settings-filters" method="get" action="/organization/regional-churches" data-auto-submit="1">
+        <input type="search" name="q" value={q} placeholder={t("org.searchRegional")}
+          aria-label={t("members.search")} enterkeyhint="search" />
+        <select name="status" aria-label={t("members.status")}>
+          <option value="" selected={status === "all"}>{t("members.allStatuses")}</option>
+          <option value="active" selected={status === "active"}>{t("dept.active")}</option>
+          <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
+        </select>
+        <div class="actions">
+          <button class="btn sm" type="submit">{t("members.search")}</button>
+        </div>
+      </form>
+
+      {visible.length === 0 ? (
         <div class="card org-empty org-empty-small">
-          <p class="muted">{t("org.noRegionalChurch")}</p>
+          <p class="muted">{filtered ? t("org.filterEmpty") : t("org.noRegionalChurch")}</p>
+          {filtered && (
+            <p class="small"><a href="/organization/regional-churches">{t("members.clearFilters")}</a></p>
+          )}
         </div>
       ) : (
         <div class="regional-list">
-          {churches.map((church) => {
+          {visible.map((church) => {
             const cells = homeCells.filter((c) => c.regionalChurchId === church.id);
             const attachedGroups = groupCellsByTownship(cells, t("org.townshipUnassigned"));
 

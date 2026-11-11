@@ -1041,6 +1041,42 @@
   bodyEl.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form || form.tagName !== "FORM") return;
+    // Settings forms keep the dialog open when the server rejects the input:
+    // the reply is the form again with an error line; a valid save returns
+    // only the address to land on so the list reloads with its flash.
+    if (form.hasAttribute("data-modal-ajax")) {
+      e.preventDefault();
+      var ajaxBtn = form.querySelector('button[type="submit"]');
+      if (ajaxBtn) ajaxBtn.disabled = true;
+      fetch(form.getAttribute("action") || location.href, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "modal" },
+      })
+        .then(function (r) {
+          if (r.ok && (r.headers.get("content-type") || "").indexOf("application/json") > -1) {
+            return r.json().then(function (data) {
+              if (data && data.redirect) location.assign(data.redirect);
+              else location.reload();
+            });
+          }
+          return r.text().then(function (html) {
+            var doc = new DOMParser().parseFromString(html, "text/html");
+            if (!doc.querySelector("form")) {
+              if (ajaxBtn) ajaxBtn.disabled = false;
+              form.submit();
+              return;
+            }
+            setModalHtml(doc);
+            var alertEl = bodyEl.querySelector(".modal-error");
+            var first = bodyEl.querySelector("input:not([type=hidden]), select, textarea");
+            if (alertEl) { alertEl.setAttribute("tabindex", "-1"); alertEl.focus(); }
+            else if (first) first.focus();
+          });
+        })
+        .catch(function () { form.submit(); });
+      return;
+    }
     // Settings forms submit natively so the server redirect (and its ok/err
     // flash) replaces the page; confirm-marked forms are handled below.
     if (form.hasAttribute("data-plain-submit") || form.hasAttribute("data-confirm")) return;

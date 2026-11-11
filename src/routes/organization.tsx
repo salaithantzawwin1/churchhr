@@ -4,10 +4,10 @@ import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { churchDepartments } from "../db/schema";
 import { requirePermission } from "../middleware";
-import { flashFromQuery } from "../flash";
+import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
-import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal } from "../views/org-settings";
+import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus } from "../views/org-settings";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
@@ -269,6 +269,14 @@ function positionScopeFrom(value: string | undefined): ConfigurablePositionScope
   return isConfigurableScope(value) ? value : "church";
 }
 
+function listQuery(raw: string | undefined): string {
+  return (raw ?? "").slice(0, 80);
+}
+
+function listStatus(raw: string | undefined): ListStatus {
+  return raw === "active" || raw === "inactive" ? raw : "all";
+}
+
 function positionNameError(nameMm: string, nameEn: string): string | null {
   if (!nameMm) return "position-name-mm";
   if (nameMm.length > 100 || nameEn.length > 100) return "position-name-long";
@@ -290,6 +298,7 @@ organizationRoutes.get("/positions", requirePermission("options.manage"), async 
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} scope={scope} defs={defs}
+      q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
     />,
   );
 });
@@ -317,10 +326,17 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), async
   const nameMm = s(body.name_myanmar).slice(0, 100);
   const nameEn = s(body.name_english).slice(0, 100);
   const nameKr = s(body.name_korean).slice(0, 100);
-  const invalid = positionNameError(nameMm, nameEn);
-  if (invalid) return c.redirect(`${back}&err=${invalid}`, 303);
-  if (!nameEn) return c.redirect(`${back}&err=position-name-en`, 303);
   const sortOrder = departmentSortOrder(s(body.sort_order));
+  const values = { nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true };
+  // A modal submit gets the form back with the error instead of a redirect, so
+  // the dialog stays open and keeps what was typed.
+  const modal = modalRequest(c);
+  const fail = (err: string) => modal
+    ? c.html(<PositionModal scope={scope} values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")} />, 422)
+    : c.redirect(`${back}&err=${err}`, 303);
+  const invalid = positionNameError(nameMm, nameEn);
+  if (invalid) return fail(invalid);
+  if (!nameEn) return fail("position-name-en");
 
   const base = codeFromEnglishName(scope, nameEn);
   let code = base;
@@ -335,7 +351,7 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), async
       INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order)
       VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder})`);
   } catch {
-    return c.redirect(`${back}&err=position-code-taken`, 303);
+    return fail("position-code-taken");
   }
   const created = (await db.all<{ id: number }>(sql`
     SELECT id FROM position_defs WHERE scope_type = ${scope} AND code = ${code} LIMIT 1`))[0];
@@ -344,7 +360,8 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), async
     scopeType: scope, code, positionDefId: created?.id ?? null,
     summary: nameEn || nameMm,
   });
-  return c.redirect(`${back}&ok=position-created`, 303);
+  const landing = `${back}&ok=position-created`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/positions/:id", requirePermission("options.manage"), async (c) => {
@@ -362,16 +379,30 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), a
   const nameMm = s(body.name_myanmar).slice(0, 100);
   const nameEn = s(body.name_english).slice(0, 100);
   const nameKr = s(body.name_korean).slice(0, 100);
-  const invalid = positionNameError(nameMm, nameEn);
-  if (invalid) return c.redirect(`${back}&err=${invalid}`, 303);
   const active = s(body.active) === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const values = {
+    nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr,
+    sortOrder, active: active === 1,
+  };
+  const modal = modalRequest(c);
+  const fail = async (err: string) => {
+    if (!modal) return c.redirect(`${back}&err=${err}`, 303);
+    const def = (await adminPositionDefs(db)).find((d) => d.id === id);
+    return c.html(
+      <PositionModal scope={current.scopeType} def={def} values={values}
+        error={flashText(err, c.get("lang"))} lang={c.get("lang")} />,
+      422,
+    );
+  };
+  const invalid = positionNameError(nameMm, nameEn);
+  if (invalid) return await fail(invalid);
   if (current.active === 1 && active === 0) {
     const used = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM member_positions
       WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
-    if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
+    if ((used[0]?.n ?? 0) > 0) return await fail("position-in-use");
   }
-  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   await db.run(sql`
     UPDATE position_defs
        SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
@@ -388,7 +419,8 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), a
       summary: nameEn || nameMm, changes,
     });
   }
-  return c.redirect(`${back}&ok=position-updated`, 303);
+  const landing = `${back}&ok=position-updated`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/positions/:id/delete", requirePermission("options.manage"), async (c) => {
@@ -526,6 +558,7 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} churches={churches} regions={regions} homeCells={homeCells}
+      q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
     />,
   );
 });

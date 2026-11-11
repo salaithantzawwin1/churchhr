@@ -688,6 +688,9 @@ const MM: Dict = {
   "org.editRegional": "အချက်အလက်နှင့် Home Cell ပြင်ရန်",
   "org.deleteRoleHint": "ဒီရာထူးကို Member များ သတ်မှတ်ထားသဖြင့် ဖျက်၍ မရပါ။ မလိုအပ်ပါက ပိတ်ထားနိုင်ပါသည်။",
   "org.deleteRegionalHint": "ဒီ Regional Church တွင် Home Cell သို့မဟုတ် ရာထူး သတ်မှတ်ချက် ကျန်ရှိနေပါသည်။",
+  "org.searchPositions": "ရာထူးအမည် / ကုဒ် ရှာရန်",
+  "org.searchRegional": "Regional Church အမည် ရှာရန်",
+  "org.filterEmpty": "ရှာဖွေမှုနှင့် ကိုက်ညီသည့် ရလဒ် မရှိပါ",
   // position change history
   "history.title": "ရာထူး ပြောင်းလဲမှု မှတ်တမ်း",
   "history.intro": "ရာထူး ထည့်/ပြင်/ဖျက်ခြင်းနှင့် Member ရာထူး သတ်မှတ်ခြင်းများကို မည်သူ လုပ်ဆောင်ခဲ့သည်ကို ကြည့်နိုင်ပါသည်။",
@@ -1501,6 +1504,9 @@ const EN: Dict = {
   "org.editRegional": "Edit details & Home Cells",
   "org.deleteRoleHint": "Members currently hold this role, so it cannot be deleted. Deactivate it instead.",
   "org.deleteRegionalHint": "This regional church still has Home Cells or assigned positions.",
+  "org.searchPositions": "Search by name or code",
+  "org.searchRegional": "Search by church name",
+  "org.filterEmpty": "No results match these filters.",
   // position change history
   "history.title": "Position change history",
   "history.intro": "See who added, renamed, deactivated or removed a role, and who changed a member's assignments.",
