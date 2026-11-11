@@ -6,6 +6,7 @@ import { positionLabel as fallbackPositionLabel } from "./positions";
 export const CONFIGURABLE_POSITION_SCOPES = [
   "church",
   "regional_church",
+  "cluster",
   "home_cell",
   "township",
   "department",
@@ -28,8 +29,9 @@ export type PositionDefRow = {
 const SCOPE_LABEL_FALLBACK: Record<ConfigurablePositionScope, string> = {
   church: "Church",
   regional_church: "Regional Church",
+  cluster: "Supervision Cluster",
   home_cell: "Home Cell",
-  township: "Home Cell Supervision",
+  township: "Township Supervision",
   department: "Department",
 };
 

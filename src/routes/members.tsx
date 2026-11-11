@@ -14,7 +14,7 @@ import {
 } from "../positions";
 import { isDefinedForScope, loadPositionDefs, positionDefLabel, type PositionDefRow } from "../position-catalog";
 import { recordPositionHistory } from "../position-history";
-import { loadRegionalChurches } from "../org-units";
+import { loadRegionalChurches, loadSupervisionClusters } from "../org-units";
 import { loadDepartments } from "../departments";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
@@ -1149,6 +1149,7 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
   const church = current.find((p) => p.scopeType === "church");
   const regional = current.find((p) => p.scopeType === "regional_church");
   const township = current.find((p) => p.scopeType === "township");
+  const cluster = current.find((p) => p.scopeType === "cluster");
   const townshipId = row.home_cell_township_id ?? null;
   return {
     member: {
@@ -1168,10 +1169,15 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       regionalChurch: regional?.position ?? "",
       regionalChurchId: regional?.regionalChurchId ?? null,
       township: township?.position ?? "",
+      cluster: cluster?.position ?? "",
+      clusterId: cluster?.supervisionClusterId ?? null,
     },
     departments: await loadDepartments(db),
     defs: await loadPositionDefs(db),
     regionalChurches: await loadRegionalChurches(db, {
+      regionId: row.region_id, activeOnly: true,
+    }),
+    clusters: await loadSupervisionClusters(db, {
       regionId: row.region_id, activeOnly: true,
     }),
   };
@@ -1188,7 +1194,7 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
   const member = { ...state.member, name: row.name_myanmar || row.name_english || `#${id}` };
   const formProps = {
     member, assignments: state.assignments, departments: state.departments,
-    positionDefs: state.defs, regionalChurches: state.regionalChurches,
+    positionDefs: state.defs, regionalChurches: state.regionalChurches, clusters: state.clusters,
     canManageDepartments: c.get("perms").has("options.manage") && scope.scopeAll,
     canManagePositions: c.get("perms").has("options.manage") && scope.scopeAll,
     canManageRegional: c.get("perms").has("options.manage"), lang: c.get("lang"),
@@ -1220,8 +1226,12 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const departments = await loadDepartments(db);
   const defs = await loadPositionDefs(db);
   const regionalChurches = await loadRegionalChurches(db, { regionId: row.region_id, activeOnly: true });
+  const clusters = await loadSupervisionClusters(db, { regionId: row.region_id, activeOnly: true });
   const homePosition = s(body.home_cell_position) || s(body.position);
   const townshipPosition = s(body.township_position);
+  const clusterPosition = s(body.cluster_position);
+  const clusterRaw = s(body.supervision_cluster_id);
+  const clusterId = clusterRaw && /^\d+$/.test(clusterRaw) ? Number(clusterRaw) : null;
   const regionalPosition = s(body.regional_church_position);
   const regionalRaw = s(body.regional_church_id);
   const regionalChurchId = regionalRaw && /^\d+$/.test(regionalRaw) ? Number(regionalRaw) : null;
@@ -1232,6 +1242,8 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const state = {
     homeCell: homePosition,
     township: townshipPosition,
+    cluster: clusterPosition,
+    clusterId: clusterId ?? null,
     regionalChurch: regionalPosition,
     regionalChurchId: regionalChurchId ?? row.home_cell_regional_church_id ?? null,
     department: departmentPosition,
@@ -1249,7 +1261,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     <MemberPositionForm
       member={memberState}
       assignments={state} departments={departments}
-      positionDefs={defs} regionalChurches={regionalChurches}
+      positionDefs={defs} regionalChurches={regionalChurches} clusters={clusters}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageRegional={c.get("perms").has("options.manage")}
@@ -1268,6 +1280,12 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   if (townshipPosition) {
     if (!validFor(townshipPosition, "township")) return renderError(t("flash.positionInvalid"));
     if (!row.home_cell_township_id) return renderError(t("flash.positionNoHomeCell"));
+  }
+  if (clusterPosition) {
+    if (!validFor(clusterPosition, "cluster")) return renderError(t("flash.positionInvalid"));
+    if (!clusterId || !clusters.some((cluster) => cluster.id === clusterId)) {
+      return renderError(t("flash.positionClusterRequired"));
+    }
   }
   if (regionalPosition) {
     if (!validFor(regionalPosition, "regional_church")) return renderError(t("flash.positionInvalid"));
@@ -1297,6 +1315,12 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       return renderError(t("flash.positionTaken"));
     }
     assignments.push({ scopeType: "township", position: townshipPosition, homeCellId: row.home_cell_township_id });
+  }
+  if (clusterPosition && clusterId) {
+    if (await positionTaken(db, "cluster", clusterPosition, { supervisionClusterId: clusterId, exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "cluster", position: clusterPosition, supervisionClusterId: clusterId });
   }
   if (regionalPosition && regionalChurchId) {
     if (await positionTaken(db, "regional_church", regionalPosition, { regionalChurchId, exceptMemberId: id })) {
@@ -1337,6 +1361,10 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     switch (a.scopeType) {
       case "home_cell": return `${roleLabel(a.position, "home_cell")} · ${row.home_cell ?? ""}`;
       case "township": return `${roleLabel(a.position, "township")} · ${row.home_cell_township ?? ""}`;
+      case "cluster": {
+        const cluster = clusters.find((r) => r.id === a.supervisionClusterId);
+        return `${roleLabel(a.position, "cluster")} · ${cluster?.nameEn || cluster?.name || ""}`;
+      }
       case "regional_church": {
         const church = regionalChurches.find((r) => r.id === a.regionalChurchId);
         return `${roleLabel(a.position, "regional_church")} · ${church?.nameEn || church?.name || ""}`;

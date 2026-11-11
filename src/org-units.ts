@@ -13,6 +13,18 @@ export type RegionalChurchRow = {
   cellCount?: number;
 };
 
+export type SupervisionClusterRow = {
+  id: number;
+  name: string;
+  nameEn: string | null;
+  regionId: number;
+  stateName: string;
+  stateNameEn: string | null;
+  active: number;
+  sortOrder: number;
+  cellCount?: number;
+};
+
 export type TownshipRow = {
   id: number;
   label: string;
@@ -51,6 +63,34 @@ export async function loadRegionalChurches(db: DB, opts: LoadRegionalOptions = {
 }
 
 export function regionalChurchName(row: Pick<RegionalChurchRow, "name" | "nameEn">, lang: string): string {
+  return lang !== "mm" && row.nameEn ? row.nameEn : row.name;
+}
+
+/** Load Home Cell supervision clusters, optionally limited to one state or
+ * the signed-in user's assigned states. */
+export async function loadSupervisionClusters(db: DB, opts: LoadRegionalOptions = {}): Promise<SupervisionClusterRow[]> {
+  const conditions = [sql`1=1`];
+  if (opts.activeOnly !== false) conditions.push(sql`sc.active = 1`);
+  if (opts.regionId) conditions.push(sql`sc.region_id = ${opts.regionId}`);
+  if (!opts.scopeAll && opts.stateIds) {
+    if (opts.stateIds.length === 0) conditions.push(sql`1=0`);
+    else conditions.push(sql`sc.region_id IN (${sql.join(opts.stateIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
+  return db.all<SupervisionClusterRow>(sql`
+    SELECT sc.id, sc.name, sc.name_en AS nameEn, sc.region_id AS regionId,
+           r.name AS stateName, r.name_en AS stateNameEn,
+           sc.active, sc.sort_order AS sortOrder,
+           (SELECT COUNT(*) FROM lookup_options hc
+             WHERE hc.supervision_cluster_id = sc.id
+               AND hc.type = 'home_cell' AND hc.active = 1) AS cellCount
+    FROM supervision_clusters sc
+    JOIN regions r ON r.id = sc.region_id
+    WHERE ${sql.join(conditions, sql` AND `)}
+    ORDER BY sc.active DESC, sc.sort_order, sc.name`);
+}
+
+/** Display name for a supervision cluster, falling back to the Myanmar name. */
+export function clusterName(row: Pick<SupervisionClusterRow, "name" | "nameEn">, lang: string): string {
   return lang !== "mm" && row.nameEn ? row.nameEn : row.name;
 }
 

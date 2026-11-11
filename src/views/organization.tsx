@@ -2,7 +2,7 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { positionDefLabel, defsForScope, type PositionDefRow } from "../position-catalog";
-import { regionalChurchName, type RegionalChurchRow } from "../org-units";
+import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName } from "../departments";
 
 export type OrgCell = {
@@ -15,6 +15,7 @@ export type OrgCell = {
   state_name: string;
   state_name_en: string | null;
   township: string | null;
+  supervision_cluster_id: number | null;
   member_count: number;
 };
 
@@ -32,6 +33,7 @@ export type OrgLeader = {
   scope_id: number | null;
   department_id: number | null;
   regional_church_id: number | null;
+  supervision_cluster_id: number | null;
   member_id: number;
   member_name: string | null;
   has_photo: number | boolean;
@@ -41,7 +43,11 @@ export type OrgLeader = {
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
 type TownshipGroup = { id: number | null; name: string; cells: OrgCell[] };
-type StateGroup = { id: number; name: string; cells: OrgCell[]; townships: TownshipGroup[] };
+type SupervisionGroup = {
+  kind: "cluster" | "township"; id: number | null; name: string; cells: OrgCell[];
+  cluster: SupervisionClusterRow | null;
+};
+type StateGroup = { id: number; name: string; cells: OrgCell[]; townships: TownshipGroup[]; groups: SupervisionGroup[] };
 
 /** Group cells by township; cells without a township keep their own unnamed
  * cluster so supervisors and their cells stay together inside a regional church. */
@@ -59,7 +65,7 @@ function groupByTownship(cells: OrgCell[], fallbackName: string): TownshipGroup[
   return [...groups.values()];
 }
 
-function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
+function groupCells(cells: OrgCell[], clusters: SupervisionClusterRow[], lang: Lang): StateGroup[] {
   const states = new Map<number, StateGroup>();
   for (const cell of cells) {
     let state = states.get(cell.region_id);
@@ -69,6 +75,7 @@ function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
         name: lang !== "mm" && cell.state_name_en ? cell.state_name_en : cell.state_name,
         cells: [],
         townships: [],
+        groups: [],
       };
       states.set(cell.region_id, state);
     }
@@ -86,6 +93,28 @@ function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
       group.cells.push(cell);
     }
     state.townships = [...towns.values()];
+    const clusterById = new Map(clusters.map((c) => [c.id, c]));
+    const groups = new Map<string, SupervisionGroup>();
+    for (const cell of state.cells) {
+      const cluster = cell.supervision_cluster_id
+        ? clusterById.get(cell.supervision_cluster_id) ?? null
+        : null;
+      const key = cluster
+        ? `cluster:${cluster.id}`
+        : `township:${cell.township_id ?? "none"}:${cell.township ?? "-"}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          kind: cluster ? "cluster" : "township",
+          id: cluster ? cluster.id : cell.township_id,
+          name: cluster ? clusterName(cluster, lang) : cell.township || "—",
+          cells: [], cluster,
+        };
+        groups.set(key, group);
+      }
+      group.cells.push(cell);
+    }
+    state.groups = [...groups.values()];
   }
   return [...states.values()];
 }
@@ -114,13 +143,14 @@ function LeaderLink(props: { leader: OrgLeader | null; empty: string }) {
 
 function leaderFor(
   leaders: OrgLeader[], scopeType: string, position: string,
-  opts: { scopeId?: number | null; departmentId?: number | null; regionalChurchId?: number | null } = {},
+  opts: { scopeId?: number | null; departmentId?: number | null; regionalChurchId?: number | null; supervisionClusterId?: number | null } = {},
 ): OrgLeader | null {
   return leaders.find((l) =>
     l.scope_type === scopeType && l.position === position &&
     (opts.scopeId === undefined || l.scope_id === opts.scopeId) &&
     (opts.departmentId === undefined || l.department_id === opts.departmentId) &&
-    (opts.regionalChurchId === undefined || l.regional_church_id === opts.regionalChurchId)
+    (opts.regionalChurchId === undefined || l.regional_church_id === opts.regionalChurchId) &&
+    (opts.supervisionClusterId === undefined || l.supervision_cluster_id === opts.supervisionClusterId)
   ) ?? null;
 }
 
@@ -136,19 +166,22 @@ export function OrganizationPage(props: Common & {
   departments: OrgDepartment[];
   leaders: OrgLeader[];
   regionalChurches: RegionalChurchRow[];
+  clusters: SupervisionClusterRow[];
   positionDefs: PositionDefRow[];
   canManageDepartments: boolean;
   canManageStructure: boolean;
+  canManageClusters: boolean;
   canManagePositions: boolean;
   unassignedMembers: number;
 }) {
   const {
     user, perms, flash, lang, tab, cells, departments, leaders,
-    regionalChurches, positionDefs, canManageDepartments, canManageStructure, canManagePositions, unassignedMembers,
+    regionalChurches, clusters, positionDefs, canManageDepartments, canManageStructure,
+    canManageClusters, canManagePositions, unassignedMembers,
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
-  const states = groupCells(cells, L);
+  const states = groupCells(cells, clusters, L);
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -170,6 +203,8 @@ export function OrganizationPage(props: Common & {
     leaderFor(leaders, "home_cell", position, { scopeId: cellId });
   const townshipRole = (townshipId: number | null, position: string) =>
     townshipId == null ? null : leaderFor(leaders, "township", position, { scopeId: townshipId });
+  const clusterRole = (clusterId: number | null, position: string) =>
+    clusterId == null ? null : leaderFor(leaders, "cluster", position, { supervisionClusterId: clusterId });
   const regionalRole = (churchId: number, position: string) =>
     leaderFor(leaders, "regional_church", position, { regionalChurchId: churchId });
 
@@ -180,6 +215,9 @@ export function OrganizationPage(props: Common & {
       )}
       {canManageStructure && (
         <a class="btn secondary sm" href="/organization/regional-churches">{t("org.manageRegional")}</a>
+      )}
+      {canManageClusters && (
+        <a class="btn secondary sm" href="/organization/clusters">{t("org.manageClusters")}</a>
       )}
     </div>
   );
@@ -248,6 +286,90 @@ export function OrganizationPage(props: Common & {
     );
   };
 
+  const renderSupervisionGroup = (group: SupervisionGroup) => {
+    const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
+    const role = (position: string) => group.kind === "cluster"
+      ? clusterRole(group.id, position)
+      : townshipRole(group.id, position);
+    const supervisor = defs[0] ?? null;
+    const assistants = defs.slice(1);
+    return (
+      <div class="org-supervision-group">
+        <div class="org-supervision-group-head">
+          <div>
+            <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
+            <h3>{group.name}</h3>
+          </div>
+          <span class="muted small">{group.cells.length} {t("org.cells")}</span>
+        </div>
+        <div class="org-supervision-team">
+          {supervisor && (
+            <div class="org-supervision-person is-lead">
+              <LeaderAvatar leader={role(supervisor.code)} size="md" />
+              <div>
+                <span class="org-node-role">{positionDefLabel(supervisor, L)}</span>
+                <LeaderLink leader={role(supervisor.code)} empty={t("org.vacant")} />
+              </div>
+            </div>
+          )}
+          {assistants.map((def) => (
+            <div class="org-supervision-person">
+              <LeaderAvatar leader={role(def.code)} size="sm" />
+              <div>
+                <span class="org-node-role">{positionDefLabel(def, L)}</span>
+                <LeaderLink leader={role(def.code)} empty={t("org.vacant")} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div class="org-supervision-cells">
+          {group.cells.map((cell) => (
+            <div class="org-supervision-cell">
+              <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
+              <div class="org-supervision-cell-main">
+                <a href={cellHref(cell.id)}>{cell.label}</a>
+                <span class="muted small">
+                  {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
+                </span>
+              </div>
+              <div class="org-supervision-cell-roles">
+                {cellRows.lead && (
+                  <span class="org-cell-leader">
+                    <span class="org-role-label">{positionDefLabel(cellRows.lead, L)}</span>
+                    <LeaderLink leader={homeRole(cell.id, cellRows.lead.code)} empty={t("org.noLeader")} />
+                  </span>
+                )}
+                {cellRows.all.slice(1).map((p) => (
+                  <span class="org-cell-leader">
+                    <span class="org-role-label">{positionDefLabel(p, L)}</span>
+                    <LeaderLink leader={homeRole(cell.id, p.code)} empty={t("org.vacant")} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderStateHierarchy = (state: StateGroup) => {
+    const stateMembers = state.cells.reduce((sum, cell) => sum + cell.member_count, 0);
+    return (
+      <section class="card org-state org-state-hierarchy">
+        <div class="org-state-head">
+          <div>
+            <h2>{state.name}</h2>
+            <p class="muted small">
+              {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")}
+            </p>
+          </div>
+        </div>
+        {state.groups.map(renderSupervisionGroup)}
+      </section>
+    );
+  };
+
   return (
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
@@ -257,8 +379,8 @@ export function OrganizationPage(props: Common & {
         </div>
         <div class="page-head-actions">
           {manageLinks}
-          <a class="btn secondary" href="/organization/vacancies">{t("vacancy.link")}</a>
-          <a class="btn secondary" href="/members">{t("org.membersLink")}</a>
+          <a class="btn secondary sm" href="/organization/vacancies">{t("vacancy.link")}</a>
+          <a class="btn secondary sm" href="/members">{t("org.membersLink")}</a>
         </div>
       </div>
 
@@ -570,6 +692,8 @@ export function OrganizationPage(props: Common & {
           {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
         </div>
       ) : (
+        <>
+          <div class="org-state-list">{states.map(renderStateHierarchy)}</div>
         <div class="org-grid">
           {cells.map((cell) => {
             const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
@@ -630,6 +754,7 @@ export function OrganizationPage(props: Common & {
             );
           })}
         </div>
+        </>
       )}
     </Layout>
   );

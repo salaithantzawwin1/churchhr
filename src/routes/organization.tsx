@@ -10,12 +10,13 @@ import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } fr
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
+import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
 import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
-import { loadRegionalChurches, type RegionalChurchRow } from "../org-units";
+import { clusterName, loadRegionalChurches, loadSupervisionClusters, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
@@ -62,6 +63,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
            hc.regional_church_id,
            r.name AS state_name, r.name_en AS state_name_en,
            t.label AS township,
+           hc.supervision_cluster_id,
            (SELECT COUNT(*) FROM members m
              WHERE m.home_cell_id = hc.id AND m.status = 'active') AS member_count
     FROM lookup_options hc
@@ -71,6 +73,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     ORDER BY r.id, t.sort_order, t.label, hc.sort_order, hc.label`);
 
   const regionalChurches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const clusters = await loadSupervisionClusters(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const positionDefs = await loadPositionDefs(db);
 
   const departments = await db.all<OrgDepartment>(sql`
@@ -83,6 +86,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
+           mp.supervision_cluster_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
            (m.photo IS NOT NULL) AS has_photo, m.updated_at
@@ -103,9 +107,10 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells}
       departments={departments} leaders={leaders}
-      regionalChurches={regionalChurches} positionDefs={positionDefs}
+      regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageStructure={c.get("perms").has("options.manage")}
+      canManageClusters={c.get("perms").has("options.manage")}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
@@ -127,6 +132,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
+           mp.supervision_cluster_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
            (m.photo IS NOT NULL) AS has_photo, m.updated_at
@@ -509,6 +515,7 @@ organizationRoutes.get("/vacancies.csv", requirePermission("members.view"), asyn
   const scopeLabels: Record<VacancyScope, string> = {
     church: t("vacancy.scopeChurch"),
     regional_church: t("vacancy.scopeRegional"),
+    cluster: t("vacancy.scopeCluster"),
     home_cell: t("vacancy.scopeHomeCell"),
     township: t("vacancy.scopeSupervision"),
     department: t("vacancy.scopeDepartment"),
@@ -548,7 +555,10 @@ async function orgRegions(db: DB, scope: Scope, lang: string): Promise<{ id: num
     FROM regions WHERE ${sql.join(conditions, sql` AND `)} ORDER BY id`);
 }
 
-type AdminHomeCell = { id: number; label: string; regionId: number; regionalChurchId: number | null; township: string | null };
+type AdminHomeCell = {
+  id: number; label: string; regionId: number; regionalChurchId: number | null;
+  supervisionClusterId: number | null; township: string | null;
+};
 
 async function loadAdminHomeCells(db: DB, scope: Scope): Promise<AdminHomeCell[]> {
   const conditions = [sql`hc.type = 'home_cell'`, sql`hc.active = 1`];
@@ -558,7 +568,7 @@ async function loadAdminHomeCells(db: DB, scope: Scope): Promise<AdminHomeCell[]
   }
   return db.all<AdminHomeCell>(sql`
     SELECT hc.id, hc.label, hc.region_id AS regionId, hc.regional_church_id AS regionalChurchId,
-           t.label AS township
+           hc.supervision_cluster_id AS supervisionClusterId, t.label AS township
     FROM lookup_options hc
     LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
     WHERE ${sql.join(conditions, sql` AND `)}
@@ -792,4 +802,173 @@ organizationRoutes.post("/regional-churches/:id/delete", requirePermission("opti
   if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/regional-churches?err=regional-in-use", 303);
   await db.run(sql`DELETE FROM regional_churches WHERE id = ${id}`);
   return c.redirect("/organization/regional-churches?ok=regional-deleted", 303);
+});
+
+// ---------- Home Cell supervision clusters ----------
+
+async function adminClusters(db: DB, scope: Scope): Promise<SupervisionClusterRow[]> {
+  return loadSupervisionClusters(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+}
+
+async function clusterNameTaken(db: DB, name: string, regionId: number, exceptId?: number): Promise<boolean> {
+  const rows = await db.all<{ id: number }>(sql`
+    SELECT id FROM supervision_clusters
+     WHERE lower(name) = lower(${name}) AND region_id = ${regionId} LIMIT 1`);
+  return rows.some((r) => r.id !== exceptId);
+}
+
+organizationRoutes.get("/clusters", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  return c.html(
+    <SupervisionClustersPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} clusters={await adminClusters(db, scope)}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+      q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
+    />,
+  );
+});
+
+organizationRoutes.get("/clusters/new", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  if (!modalRequest(c)) return c.redirect("/organization/clusters", 303);
+  return c.html(
+    <SupervisionClusterModal
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/clusters/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  const cluster = id ? (await adminClusters(db, scope)).find((r) => r.id === id) : undefined;
+  if (!cluster) return c.redirect("/organization/clusters?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect("/organization/clusters", 303);
+  return c.html(
+    <SupervisionClusterModal
+      cluster={cluster}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.post("/clusters", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const name = s(body.name).slice(0, 80);
+  const nameEn = s(body.name_en).slice(0, 120);
+  const regionId = asInt(s(body.region_id));
+  const sortOrder = departmentSortOrder(s(body.sort_order));
+  if (!name) return c.redirect("/organization/clusters?err=cluster-name-required", 303);
+  if (!regionId) return c.redirect("/organization/clusters?err=cluster-state-required", 303);
+  const allowed = await orgRegions(db, scope, c.get("lang"));
+  if (!allowed.some((r) => r.id === regionId)) return c.redirect("/organization/clusters?err=err-scope", 303);
+  if (await clusterNameTaken(db, name, regionId)) return c.redirect("/organization/clusters?err=cluster-name-taken", 303);
+  await db.run(sql`
+    INSERT INTO supervision_clusters (name, name_en, region_id, active, sort_order)
+    VALUES (${name}, ${nameEn || null}, ${regionId}, 1, ${sortOrder})`);
+  return c.redirect("/organization/clusters?ok=cluster-created", 303);
+});
+
+organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/clusters?err=err-notfound", 303);
+  const current = (await db.all<{ id: number; regionId: number; active: number; sortOrder: number }>(sql`
+    SELECT id, region_id AS regionId, active, sort_order AS sortOrder
+    FROM supervision_clusters WHERE id = ${id} LIMIT 1`))[0];
+  if (!current || !regionInScope(scope, current.regionId)) {
+    return c.redirect("/organization/clusters?err=err-notfound", 303);
+  }
+  const body = await c.req.parseBody();
+  const name = s(body.name).slice(0, 80);
+  const nameEn = s(body.name_en).slice(0, 120);
+  const regionId = asInt(s(body.region_id)) ?? current.regionId;
+  const active = s(body.active) === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  if (!name) return c.redirect("/organization/clusters?err=cluster-name-required", 303);
+  const allowed = await orgRegions(db, scope, c.get("lang"));
+  if (!allowed.some((r) => r.id === regionId)) return c.redirect("/organization/clusters?err=err-scope", 303);
+  if (await clusterNameTaken(db, name, regionId, id)) return c.redirect("/organization/clusters?err=cluster-name-taken", 303);
+  const attached = await db.all<{ n: number }>(sql`
+    SELECT
+      (SELECT COUNT(*) FROM lookup_options WHERE supervision_cluster_id = ${id}) +
+      (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) AS n`);
+  const used = attached[0]?.n ?? 0;
+  if (regionId !== current.regionId && used > 0) return c.redirect("/organization/clusters?err=cluster-state-locked", 303);
+  if (current.active === 1 && active === 0 && used > 0) return c.redirect("/organization/clusters?err=cluster-in-use", 303);
+  await db.run(sql`
+    UPDATE supervision_clusters
+       SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
+           active = ${active}, sort_order = ${sortOrder}
+     WHERE id = ${id}`);
+  return c.redirect("/organization/clusters?ok=cluster-updated", 303);
+});
+
+organizationRoutes.post("/clusters/:id/cells", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/clusters?err=err-notfound", 303);
+  const cluster = (await db.all<{ regionId: number }>(sql`
+    SELECT region_id AS regionId FROM supervision_clusters WHERE id = ${id} LIMIT 1`))[0];
+  if (!cluster || !regionInScope(scope, cluster.regionId)) {
+    return c.redirect("/organization/clusters?err=err-notfound", 303);
+  }
+  let ids: number[] = [];
+  try {
+    const form = await c.req.formData();
+    ids = form.getAll("home_cell_ids")
+      .map((v) => Number(String(v)))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  } catch {
+    ids = [];
+  }
+  if (ids.length > 0) {
+    const valid = await db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM lookup_options
+      WHERE type = 'home_cell' AND region_id = ${cluster.regionId}
+        AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== ids.length) {
+      return c.redirect("/organization/clusters?err=cluster-cell-invalid", 303);
+    }
+  }
+  await db.run(sql`UPDATE lookup_options SET supervision_cluster_id = NULL WHERE supervision_cluster_id = ${id}`);
+  if (ids.length > 0) {
+    await db.run(sql`
+      UPDATE lookup_options SET supervision_cluster_id = ${id}
+      WHERE id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
+  }
+  return c.redirect("/organization/clusters?ok=cluster-cells", 303);
+});
+
+organizationRoutes.post("/clusters/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/clusters?err=err-notfound", 303);
+  const cluster = (await db.all<{ regionId: number }>(sql`
+    SELECT region_id AS regionId FROM supervision_clusters WHERE id = ${id} LIMIT 1`))[0];
+  if (!cluster || !regionInScope(scope, cluster.regionId)) {
+    return c.redirect("/organization/clusters?err=err-notfound", 303);
+  }
+  const used = await db.all<{ n: number }>(sql`
+    SELECT
+      (SELECT COUNT(*) FROM lookup_options WHERE supervision_cluster_id = ${id}) +
+      (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) AS n`);
+  if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/clusters?err=cluster-in-use", 303);
+  await db.run(sql`DELETE FROM supervision_clusters WHERE id = ${id}`);
+  return c.redirect("/organization/clusters?ok=cluster-deleted", 303);
 });

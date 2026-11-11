@@ -115,6 +115,8 @@ export const lookupOptions = sqliteTable(
     parentId: integer("parent_id"),
     /** Optional Regional Church for Home Cell options. */
     regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
+    /** Optional supervision cluster; a cluster can span townships in one state. */
+    supervisionClusterId: integer("supervision_cluster_id").references(() => supervisionClusters.id),
     /** Short code (TWP-001, CEL-014, …) shown in dropdowns/export; unique per type+region. */
     code: text("code"),
     /** Township prefix for Family Group codes (INS -> INS_FG001); unique per type+region. */
@@ -125,6 +127,7 @@ export const lookupOptions = sqliteTable(
     typeLabelUq: uniqueIndex("lookup_options_type_label_uq").on(t.type, t.label, t.regionId),
     regionIdx: index("lookup_options_region_idx").on(t.regionId),
     parentIdx: index("lookup_options_parent_idx").on(t.parentId),
+    supervisionClusterIdx: index("lookup_options_supervision_cluster_idx").on(t.supervisionClusterId),
   }),
 );
 
@@ -317,6 +320,25 @@ export const regionalChurches = sqliteTable(
   }),
 );
 
+/** A state-scoped supervision cluster can group Home Cells from several
+ * townships, so one supervisor team can cover four or five cells. */
+export const supervisionClusters = sqliteTable(
+  "supervision_clusters",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    nameEn: text("name_en"),
+    regionId: integer("region_id").notNull().references(() => regions.id),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    nameRegionUq: uniqueIndex("supervision_clusters_name_region_uq").on(t.name, t.regionId),
+    regionIdx: index("supervision_clusters_region_idx").on(t.regionId, t.active, t.sortOrder),
+  }),
+);
+
 /** Service position held by a member (Home Cell Leader, Department Head, …).
  * scope_type/scope_id/department_id are generic so church-level roles can
  * reuse the table without another schema change. */
@@ -332,6 +354,7 @@ export const memberPositions = sqliteTable(
     scopeId: integer("scope_id").references(() => lookupOptions.id),
     departmentId: integer("department_id").references(() => churchDepartments.id),
     regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
+    supervisionClusterId: integer("supervision_cluster_id").references(() => supervisionClusters.id),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
@@ -339,6 +362,7 @@ export const memberPositions = sqliteTable(
   (t) => ({
     memberIdx: index("member_positions_member_idx").on(t.memberId),
     scopeIdx: index("member_positions_scope_idx").on(t.scopeType, t.scopeId),
+    supervisionClusterIdx: index("member_positions_supervision_cluster_idx").on(t.supervisionClusterId),
     memberScopeUq: uniqueIndex("member_positions_member_scope_uq").on(t.memberId, t.scopeType),
   }),
 );

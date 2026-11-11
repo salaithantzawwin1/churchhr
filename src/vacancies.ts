@@ -9,6 +9,7 @@ export type VacancyScope = ConfigurablePositionScope;
 export const VACANCY_SCOPES: VacancyScope[] = [
   "church",
   "regional_church",
+  "cluster",
   "home_cell",
   "township",
   "department",
@@ -67,12 +68,15 @@ function positionKey(row: {
   scope_id: number | null;
   department_id: number | null;
   regional_church_id: number | null;
+  supervision_cluster_id: number | null;
 }): string {
   switch (row.scope_type) {
     case "regional_church":
       return assignedKey("regional_church", row.position, row.regional_church_id);
     case "department":
       return assignedKey("department", row.position, row.department_id);
+    case "cluster":
+      return assignedKey("cluster", row.position, row.supervision_cluster_id);
     case "home_cell":
     case "township":
       return assignedKey(row.scope_type, row.position, row.scope_id);
@@ -97,6 +101,7 @@ export async function loadVacancyReport(
   const defsByScope: Record<VacancyScope, PositionDefRow[]> = {
     church: defsForScope(defs, "church"),
     regional_church: defsForScope(defs, "regional_church"),
+    cluster: defsForScope(defs, "cluster"),
     home_cell: defsForScope(defs, "home_cell"),
     township: defsForScope(defs, "township"),
     department: defsForScope(defs, "department"),
@@ -109,8 +114,10 @@ export async function loadVacancyReport(
     scope_id: number | null;
     department_id: number | null;
     regional_church_id: number | null;
+    supervision_cluster_id: number | null;
   }>(sql`
-    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id
+    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
+           mp.supervision_cluster_id
     FROM member_positions mp
     JOIN members m ON m.id = mp.member_id
     WHERE m.status = 'active'`);
@@ -136,6 +143,15 @@ export async function loadVacancyReport(
     LEFT JOIN regional_churches rc ON rc.id = hc.regional_church_id
     WHERE hc.type = 'home_cell' AND hc.active = 1 AND ${stateFilter(scope, "hc.region_id")}
     ORDER BY r.id, t.sort_order, t.label, hc.sort_order, hc.label`);
+
+  const clusterRows = await db.all<StructureRow>(sql`
+    SELECT sc.id, sc.name, sc.name_en AS nameEn,
+           r.name AS stateName, r.name_en AS stateNameEn,
+           NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
+    FROM supervision_clusters sc
+    JOIN regions r ON r.id = sc.region_id
+    WHERE sc.active = 1 AND ${stateFilter(scope, "sc.region_id")}
+    ORDER BY r.id, sc.sort_order, sc.name`);
 
   const townshipRows = await db.all<StructureRow>(sql`
     SELECT t.id, t.label AS name, NULL AS nameEn,
@@ -182,6 +198,7 @@ export async function loadVacancyReport(
 
   push("church", null, null, opts.lang === "mm" ? "အသင်း" : "Church");
   for (const row of regionalRows) push("regional_church", row.id, row, localized(row.name, row.nameEn));
+  for (const row of clusterRows) push("cluster", row.id, row, localized(row.name, row.nameEn));
   for (const row of homeCellRows) push("home_cell", row.id, row, row.name);
   for (const row of townshipRows) push("township", row.id, row, row.name);
   for (const row of departmentRows) push("department", row.id, row, localized(row.name, row.nameEn));

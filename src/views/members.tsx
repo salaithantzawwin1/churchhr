@@ -7,7 +7,7 @@ import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL
 import { getDict, type Lang } from "../i18n";
 import { positionLabels } from "../positions";
 import { defsForScope, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
-import { regionalChurchName, type RegionalChurchRow } from "../org-units";
+import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
 
 export type MemberListItem = {
@@ -641,6 +641,8 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
 export type PositionFormAssignments = {
   homeCell: string;
   township: string;
+  cluster: string;
+  clusterId: number | null;
   regionalChurch: string;
   regionalChurchId: number | null;
   department: string;
@@ -664,6 +666,7 @@ type PositionFormProps = {
   departments: DepartmentRow[];
   positionDefs: PositionDefRow[];
   regionalChurches: RegionalChurchRow[];
+  clusters: SupervisionClusterRow[];
   canManageDepartments: boolean;
   canManagePositions: boolean;
   canManageRegional: boolean;
@@ -672,7 +675,7 @@ type PositionFormProps = {
 };
 
 export function MemberPositionPage(props: Common & PositionFormProps) {
-  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, canManagePositions, canManageRegional } = props;
+  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -683,7 +686,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
       <div class="card">
         <MemberPositionForm
           member={member} assignments={assignments} departments={departments}
-          positionDefs={positionDefs} regionalChurches={regionalChurches}
+          positionDefs={positionDefs} regionalChurches={regionalChurches} clusters={clusters}
           canManageDepartments={canManageDepartments} canManagePositions={canManagePositions}
           canManageRegional={canManageRegional} lang={lang}
         />
@@ -693,13 +696,14 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
 }
 
 export function MemberPositionForm(props: PositionFormProps) {
-  const { member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, canManagePositions, canManageRegional, error, lang } = props;
+  const { member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, error, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
   const department = departments.find((d) => d.id === assignments.departmentId);
   const homeDefs = defsForScope(positionDefs, "home_cell");
   const townshipDefs = defsForScope(positionDefs, "township");
+  const clusterDefs = defsForScope(positionDefs, "cluster");
   const regionalDefs = defsForScope(positionDefs, "regional_church");
   const departmentDefs = defsForScope(positionDefs, "department");
   const churchDefs = defsForScope(positionDefs, "church");
@@ -715,7 +719,7 @@ export function MemberPositionForm(props: PositionFormProps) {
 
   const tabs = [
     { key: "home", label: t("org.tabHomeCell"), available: true },
-    { key: "supervision", label: t("org.tabSupervision"), available: Boolean(member.townshipId) },
+    { key: "supervision", label: t("org.tabSupervision"), available: Boolean(member.townshipId || clusters.length > 0 || assignments.cluster) },
     { key: "regional", label: t("org.tabRegional"), available: regionalDefs.length > 0 || regionalChurches.length > 0 },
     { key: "department", label: t("org.tabDepartment"), available: departmentDefs.length > 0 || departments.length > 0 },
     { key: "church", label: t("org.tabChurch"), available: churchDefs.length > 0 },
@@ -803,6 +807,31 @@ export function MemberPositionForm(props: PositionFormProps) {
                 <p class="hint">{t("org.supervisionSectionHint")}</p>
               </div>
             </div>
+            {clusters.length > 0 && clusterDefs.length > 0 && (
+              <div class="position-subsection">
+                <h4>{t("org.clusterSection")}</h4>
+                <p class="hint">{t("org.clusterHint")}</p>
+                <div class="form-grid">
+                  <label class="field">
+                    <span class="lbl">{t("org.clusterLabel")}</span>
+                    <select name="supervision_cluster_id">
+                      <option value="">{t("org.noCluster")}</option>
+                      {clusters.map((cluster) => (
+                        <option value={String(cluster.id)} selected={assignments.clusterId === cluster.id}>
+                          {clusterName(cluster, L)} · {L !== "mm" && cluster.stateNameEn ? cluster.stateNameEn : cluster.stateName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="lbl">{t("org.position")}</span>
+                    <select name="cluster_position">
+                      {positionOptions(clusterDefs, assignments.cluster)}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )}
             {!member.townshipId ? (
               <div class="position-notice">
                 <p>{t("org.noSupervision")}</p>
@@ -813,7 +842,7 @@ export function MemberPositionForm(props: PositionFormProps) {
             ) : (
               <>
                 <p class="position-scope">
-                  {t("org.supervision")}: <strong>{member.townshipName ?? `#${member.townshipId}`}</strong>
+                  {t("org.townshipSupervision")}: <strong>{member.townshipName ?? `#${member.townshipId}`}</strong>
                 </p>
                 <label class="field">
                   <span class="lbl">{t("org.position")}</span>

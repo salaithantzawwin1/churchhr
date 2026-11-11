@@ -2,7 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { memberPositions } from "./db/schema";
 
-export type PositionScope = "home_cell" | "department" | "church" | "regional_church" | "township";
+export type PositionScope = "home_cell" | "department" | "church" | "regional_church" | "township" | "cluster";
 
 export type PositionDef = {
   value: string;
@@ -27,6 +27,8 @@ export const POSITIONS: PositionDef[] = [
   { value: "church_assistant_pastor", scope: "church", mm: "ဒုတိယသင်းအုပ်ဆရာ", en: "Assistant Pastor", kr: "부목사" },
   { value: "church_secretary", scope: "church", mm: "အသင်းအတွင်းရေးမှူး", en: "Church Secretary", kr: "교회 서기" },
   { value: "church_treasurer", scope: "church", mm: "အသင်းဘဏ္ဍာရေးမှူး", en: "Church Treasurer", kr: "교회 회계" },
+  { value: "cluster_supervisor", scope: "cluster", mm: "ကြီးကြပ်မှူး", en: "Supervisor", kr: "감독" },
+  { value: "cluster_assistant_supervisor", scope: "cluster", mm: "ဒုတိယ ကြီးကြပ်မှူး", en: "Assistant Supervisor", kr: "부감독" },
 ];
 
 export const HOME_CELL_POSITIONS = POSITIONS.filter((p) => p.scope === "home_cell");
@@ -71,6 +73,7 @@ export type MemberPositionRow = {
   scopeId: number | null;
   departmentId: number | null;
   regionalChurchId: number | null;
+  supervisionClusterId: number | null;
 };
 
 /** All positions for a member (at most one per scope, enforced by schema). */
@@ -84,6 +87,7 @@ export async function getMemberPositions(db: DB, memberId: number): Promise<Memb
       scopeId: memberPositions.scopeId,
       departmentId: memberPositions.departmentId,
       regionalChurchId: memberPositions.regionalChurchId,
+      supervisionClusterId: memberPositions.supervisionClusterId,
     })
     .from(memberPositions)
     .where(eq(memberPositions.memberId, memberId))) as MemberPositionRow[];
@@ -103,6 +107,8 @@ export type PositionAssignment = {
   departmentId?: number | null;
   /** Regional Church id. */
   regionalChurchId?: number | null;
+  /** Supervision cluster id. */
+  supervisionClusterId?: number | null;
 };
 
 /** Replace every position for a member with the supplied valid assignments.
@@ -124,6 +130,7 @@ export async function setMemberPositions(
     scopeId: a.scopeType === "home_cell" || a.scopeType === "township" ? a.homeCellId ?? null : null,
     departmentId: a.scopeType === "department" ? a.departmentId ?? null : null,
     regionalChurchId: a.scopeType === "regional_church" ? a.regionalChurchId ?? null : null,
+    supervisionClusterId: a.scopeType === "cluster" ? a.supervisionClusterId ?? null : null,
     createdBy: actorId,
     createdAt: now,
     updatedAt: now,
@@ -164,6 +171,7 @@ export async function positionTaken(
     homeCellId?: number | null;
     departmentId?: number | null;
     regionalChurchId?: number | null;
+    supervisionClusterId?: number | null;
     exceptMemberId: number;
   },
 ): Promise<boolean> {
@@ -183,6 +191,10 @@ export async function positionTaken(
   if (scopeType === "regional_church") {
     if (!opts.regionalChurchId) return false;
     conditions.push(eq(memberPositions.regionalChurchId, opts.regionalChurchId));
+  }
+  if (scopeType === "cluster") {
+    if (!opts.supervisionClusterId) return false;
+    conditions.push(eq(memberPositions.supervisionClusterId, opts.supervisionClusterId));
   }
   const rows = await db
     .select({ memberId: memberPositions.memberId })

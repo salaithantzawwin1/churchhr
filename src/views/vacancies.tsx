@@ -8,6 +8,7 @@ type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lan
 const SCOPE_KEYS: Record<VacancyScope, string> = {
   church: "org.scopeChurch",
   regional_church: "org.scopeRegional",
+  cluster: "org.scopeCluster",
   home_cell: "org.scopeHomeCell",
   township: "org.scopeSupervision",
   department: "org.scopeDepartment",
@@ -16,6 +17,7 @@ const SCOPE_KEYS: Record<VacancyScope, string> = {
 const SCOPE_SHORT: Record<VacancyScope, string> = {
   church: "vacancy.scopeChurch",
   regional_church: "vacancy.scopeRegional",
+  cluster: "vacancy.scopeCluster",
   home_cell: "vacancy.scopeHomeCell",
   township: "vacancy.scopeSupervision",
   department: "vacancy.scopeDepartment",
@@ -118,7 +120,9 @@ export function VacancyReportPage(props: Common & {
                           ? <a href={`/members?home_cell=${row.id}`}>{row.name}</a>
                           : row.scope === "department"
                             ? <a href={`/organization/departments/${row.id}`}>{row.name}</a>
-                            : row.name}
+                            : row.scope === "cluster"
+                              ? <a href="/organization/clusters">{row.name}</a>
+                              : row.name}
                       </h3>
                       <p class="muted small">
                         {[locationOf(row), row.regionalChurchName].filter(Boolean).join(" · ") || t("vacancy.noLocation")}
