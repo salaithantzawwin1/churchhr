@@ -1141,10 +1141,10 @@
     });
   })();
 
-  // Enlarged member-photo preview on hover. Works for every member photo
-  // (member list, detail, household roster, organization, departments) without
-  // adding duplicate markup; fixed positioning keeps it outside table scroll
-  // containers and it is skipped on touch/coarse pointers.
+  // Enlarged member-photo preview on hover. Works for member photos and for
+  // name links that expose a data-photo-preview URL (Home Cell role names);
+  // fixed positioning keeps it outside table scroll containers and it is
+  // skipped on touch/coarse pointers.
   (function initPhotoPreview() {
     if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
     var box = document.createElement("div");
@@ -1155,7 +1155,7 @@
     box.appendChild(big);
     document.body.appendChild(box);
     var active = null;
-    var photoSelector = 'img[src*="/photo"]';
+    var photoSelector = 'img[src*="/photo"], [data-photo-preview]';
 
     function place(x, y) {
       var size = box.offsetWidth || 240;
@@ -1170,11 +1170,11 @@
       box.style.top = Math.round(top) + "px";
     }
 
-    function show(img, x, y) {
-      if (active === img) return;
+    function show(source, url, x, y) {
+      if (active === source) return;
       if (active) active.classList.remove("photo-previewing");
-      active = img;
-      big.src = img.currentSrc || img.src;
+      active = source;
+      big.src = url;
       active.classList.add("photo-previewing");
       place(x, y);
       box.classList.add("on");
@@ -1190,7 +1190,11 @@
       if (e.pointerType && e.pointerType !== "mouse") return;
       var target = e.target && e.target.closest ? e.target.closest(photoSelector) : null;
       if (!target) return;
-      show(target, e.clientX, e.clientY);
+      var url = target.tagName === "IMG"
+        ? (target.currentSrc || target.src)
+        : target.getAttribute("data-photo-preview");
+      if (!url) return;
+      show(target, url, e.clientX, e.clientY);
     });
 
     document.addEventListener("pointermove", function (e) {

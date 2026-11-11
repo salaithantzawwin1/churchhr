@@ -135,10 +135,17 @@ function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm
   );
 }
 
-function LeaderLink(props: { leader: OrgLeader | null; empty: string }) {
-  const { leader, empty } = props;
+function LeaderLink(props: { leader: OrgLeader | null; empty: string; photoPreview?: boolean }) {
+  const { leader, empty, photoPreview } = props;
   if (!leader) return <span class="muted">{empty}</span>;
-  return <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>;
+  const previewUrl = photoPreview && leader.has_photo
+    ? `/members/${leader.member_id}/photo?v=${leader.updated_at}`
+    : undefined;
+  return (
+    <a href={`/members/${leader.member_id}`} data-photo-preview={previewUrl}>
+      {leader.member_name || "—"}
+    </a>
+  );
 }
 
 function leaderFor(
@@ -334,6 +341,7 @@ export function OrganizationPage(props: Common & {
                     <LeaderLink
                       leader={homeRole(cell.id, p.code)}
                       empty={p.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
+                      photoPreview
                     />
                   </span>
                 ))}
