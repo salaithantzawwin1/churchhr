@@ -927,19 +927,27 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   if (!current || !regionInScope(scope, current.regionId)) {
     return c.redirect("/organization/clusters?err=err-notfound", 303);
   }
-  const body = await c.req.parseBody();
-  const name = s(body.name).slice(0, 80);
-  const nameEn = s(body.name_en).slice(0, 120);
-  const regionId = asInt(s(body.region_id)) ?? current.regionId;
-  const active = s(body.active) === "1" ? 1 : 0;
-  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
-  const pastorId = asInt(s(body.pastor_member_id));
+  // The editor is one form now, so read the raw form data once and keep every
+  // ticked Home Cell instead of only the last repeated value.
+  const form = await c.req.formData();
+  const field = (key: string) => String(form.get(key) ?? "");
+  const name = field("name").slice(0, 80);
+  const nameEn = field("name_en").slice(0, 120);
+  const regionId = asInt(field("region_id")) ?? current.regionId;
+  const active = field("active") === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(field("sort_order"), current.sortOrder);
+  const pastorId = asInt(field("pastor_member_id"));
+  const selectedCellIds = form.getAll("home_cell_ids")
+    .map((v) => Number(String(v)))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  const cellsPresent = form.has("cells_present");
   const values: ClusterValues = {
     name, nameEn, regionId, sortOrder, active: active === 1, pastorMemberId: pastorId ?? "",
   };
   const modal = modalRequest(c);
-  const fail = async (err: string) => {
-    if (!modal) return c.redirect(`/organization/clusters?err=${err}`, 303);
+  const fail = async (err: string | null, cellErr?: string) => {
+    const code = cellErr || err || "err-notfound";
+    if (!modal) return c.redirect(`/organization/clusters?err=${code}`, 303);
     const cluster = (await adminClusters(db, scope)).find((r) => r.id === id);
     return c.html(
       <SupervisionClusterModal
@@ -947,7 +955,11 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
         pastorCandidates={await clusterPastorCandidates(db, regionId)}
-        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+        values={values}
+        error={err ? flashText(err, c.get("lang")) : null}
+        cellError={cellErr ? flashText(cellErr, c.get("lang")) : null}
+        selectedCellIds={selectedCellIds}
+        lang={c.get("lang")}
       />,
       422,
     );
@@ -970,6 +982,15 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   const used = attached[0]?.n ?? 0;
   if (regionId !== current.regionId && used > 0) return await fail("cluster-state-locked");
   if (current.active === 1 && active === 0 && used > 0) return await fail("cluster-in-use");
+  if (cellsPresent && selectedCellIds.length > 0) {
+    const valid = await db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM lookup_options
+      WHERE type = 'home_cell' AND region_id = ${regionId}
+        AND id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== selectedCellIds.length) {
+      return await fail(null, "cluster-cell-invalid");
+    }
+  }
   await db.run(sql`
     UPDATE supervision_clusters
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
@@ -984,59 +1005,15 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   } else {
     await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
   }
-  const landing = "/organization/clusters?ok=cluster-updated";
-  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
-});
-
-organizationRoutes.post("/clusters/:id/cells", requirePermission("options.manage"), async (c) => {
-  const db = getDb(c.env);
-  const scope = scopeOf(c);
-  const id = intParam(c.req.param("id"));
-  if (!id) return c.redirect("/organization/clusters?err=err-notfound", 303);
-  const cluster = (await db.all<{ regionId: number }>(sql`
-    SELECT region_id AS regionId FROM supervision_clusters WHERE id = ${id} LIMIT 1`))[0];
-  if (!cluster || !regionInScope(scope, cluster.regionId)) {
-    return c.redirect("/organization/clusters?err=err-notfound", 303);
-  }
-  let ids: number[] = [];
-  try {
-    const form = await c.req.formData();
-    ids = form.getAll("home_cell_ids")
-      .map((v) => Number(String(v)))
-      .filter((n) => Number.isInteger(n) && n > 0);
-  } catch {
-    ids = [];
-  }
-  const modal = modalRequest(c);
-  if (ids.length > 0) {
-    const valid = await db.all<{ n: number }>(sql`
-      SELECT COUNT(*) AS n FROM lookup_options
-      WHERE type = 'home_cell' AND region_id = ${cluster.regionId}
-        AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
-    if ((valid[0]?.n ?? 0) !== ids.length) {
-      if (!modal) return c.redirect("/organization/clusters?err=cluster-cell-invalid", 303);
-      const row = (await adminClusters(db, scope)).find((r) => r.id === id);
-      return c.html(
-        <SupervisionClusterModal
-          cluster={row}
-          regions={await orgRegions(db, scope, c.get("lang"))}
-          homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
-          pastorCandidates={await clusterPastorCandidates(db, row?.regionId ?? cluster.regionId)}
-          cellError={flashText("cluster-cell-invalid", c.get("lang"))}
-          selectedCellIds={ids}
-          lang={c.get("lang")}
-        />,
-        422,
-      );
+  if (cellsPresent) {
+    await db.run(sql`UPDATE lookup_options SET supervision_cluster_id = NULL WHERE supervision_cluster_id = ${id}`);
+    if (selectedCellIds.length > 0) {
+      await db.run(sql`
+        UPDATE lookup_options SET supervision_cluster_id = ${id}
+        WHERE id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
     }
   }
-  await db.run(sql`UPDATE lookup_options SET supervision_cluster_id = NULL WHERE supervision_cluster_id = ${id}`);
-  if (ids.length > 0) {
-    await db.run(sql`
-      UPDATE lookup_options SET supervision_cluster_id = ${id}
-      WHERE id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
-  }
-  const landing = "/organization/clusters?ok=cluster-cells";
+  const landing = "/organization/clusters?ok=cluster-updated";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 

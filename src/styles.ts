@@ -1484,26 +1484,37 @@ td.empty-state .small { margin-top: 4px; }
 .cluster-township-line .town { font-weight: 600; }
 .cluster-empty-line { margin: 0; padding: 9px 18px 11px; border-top: 1px solid var(--line); }
 
-/* Cluster editor: two clear sections, with both saves kept in the flow rather
-   than two competing sticky footers. */
-.modal-body .cluster-main-form > .actions:last-child,
-.modal-body .cluster-cells-form > .actions:last-child {
+/* Cluster editor: one form and one Save. The Home Cell picker is a bounded
+   grid of township columns, so a state with many cells scrolls inside its own
+   panel instead of stretching the dialog. */
+.modal-body .cluster-main-form > .actions:last-child {
   position: static; margin: 0; padding: 0; border: 0; background: none;
 }
-/* Let the two cluster forms keep their natural height. Stretching them made a
-   short editor fill the whole sheet and pushed the cell save far from its
-   fields, which read as two unrelated buttons. Tighter gaps keep the whole
-   editor inside a laptop-height dialog instead of ending on a cut-off line. */
-.modal-body .cluster-main-form,
-.modal-body .cluster-cells-form { flex: 0 0 auto; }
-.modal-body .cluster-main-form { gap: 12px; }
+.modal-body .cluster-main-form { flex: 0 0 auto; gap: 12px; }
 .modal-body .cluster-main-form .form-grid { gap: 10px 16px; }
-.cluster-cells-form { gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.cluster-cells-section { display: grid; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.cluster-cells-section .modal-error { margin: 0; }
 .cluster-section-head { display: grid; gap: 2px; }
 .cluster-section-title { display: flex; align-items: center; gap: 8px; }
 .cluster-section-title strong { font-size: 14px; }
 .cluster-section-head p { margin: 0; }
-.cluster-section-head .count-pill { font-size: 11px; }
+.cluster-cell-groups {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px; max-height: 240px; overflow-y: auto; overscroll-behavior: contain;
+  padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--field-bg);
+}
+.cluster-cell-group {
+  min-width: 0; padding: 8px 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--card);
+}
+.cluster-cell-group h4 {
+  margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere;
+}
+.cluster-cell-group .check-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 5px;
+}
+.cluster-cell-group .check-chip { padding: 5px 7px; border-radius: 7px; font-size: 12px; gap: 6px; }
 .cluster-modal-foot { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .modal-body .cluster-modal-foot form.modal-danger { margin: 0; padding: 0; border: 0; }
 .modal-body .cluster-modal-foot form.modal-danger > .actions { margin: 0; padding: 0; border: 0; }
@@ -1514,6 +1525,7 @@ td.empty-state .small { margin-top: 4px; }
   .cluster-card-actions { align-self: start; }
   .cluster-cell-strip { padding: 8px 14px 10px; }
   .cluster-empty-line { padding: 8px 14px 10px; }
+  .cluster-cell-groups { grid-template-columns: 1fr; max-height: 220px; }
 }
 
 /* ---------- supervision + regional cards on the organization page ---------- */

@@ -103,8 +103,8 @@ function groupHomeCells(cells: ClusterHomeCell[], noTownship: string) {
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Bare form for the add/edit modal. Native submission keeps redirects and
- *  validation errors on the list, like the regional-church editor. */
+/** Bare form for the add/edit modal. It submits through the settings modal so
+ *  validation stays in the dialog and one Save writes both halves. */
 export function SupervisionClusterModal(props: {
   cluster?: SupervisionClusterRow;
   regions: { id: number; name: string }[];
@@ -146,19 +146,13 @@ export function SupervisionClusterModal(props: {
           lang={L}
           editing={Boolean(cluster)}
         />
-        <div class="actions">
-          <button class="btn" type="submit">{cluster ? t("dept.save") : t("form.add")}</button>
-        </div>
-      </form>
 
-      {cluster && (
-        <>
-          <form method="post" action={`/organization/clusters/${cluster.id}/cells`}
-            class="cluster-cells-form" data-modal-ajax>
+        {cluster && (
+          <section class="cluster-cells-section" aria-labelledby="cluster-cells-title">
+            <input type="hidden" name="cells_present" value="1" />
             <div class="cluster-section-head">
               <div class="cluster-section-title">
-                <strong>{t("org.clusterCellAssignment")}</strong>
-                <span class="count-pill">{cells.length}</span>
+                <strong id="cluster-cells-title">{t("org.clusterCellAssignment")}</strong>
               </div>
               <p class="muted small">{t("org.clusterCellHint")}</p>
             </div>
@@ -166,9 +160,9 @@ export function SupervisionClusterModal(props: {
             {candidates.length === 0 ? (
               <p class="muted small">{t("org.clusterCandidatesEmpty")}</p>
             ) : (
-              <div class="regional-cell-groups">
+              <div class="cluster-cell-groups">
                 {groupHomeCells(candidates, t("org.townshipUnassigned")).map((group) => (
-                  <div class="regional-candidate-group">
+                  <div class="cluster-cell-group">
                     <h4>{group.name}</h4>
                     <div class="check-grid">
                       {group.cells.map((cell) => (
@@ -183,30 +177,33 @@ export function SupervisionClusterModal(props: {
                 ))}
               </div>
             )}
-            <div class="actions">
-              <button class="btn sm secondary" type="submit">{t("org.clusterSaveCells")}</button>
-            </div>
-          </form>
+          </section>
+        )}
 
-          <div class="cluster-modal-foot">
-            {cells.length === 0 ? (
-              <form
-                method="post"
-                action={`/organization/clusters/${cluster.id}/delete`}
-                class="modal-danger"
-                data-confirm={t("org.clusterDeleteConfirm")}
-                data-confirm-title={t("members.delete")}
-                data-confirm-yes={t("members.delete")}
-              >
-                <div class="actions">
-                  <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-                </div>
-              </form>
-            ) : (
-              <p class="muted small modal-note">{t("org.clusterDeleteHint")}</p>
-            )}
-          </div>
-        </>
+        <div class="actions">
+          <button class="btn" type="submit">{cluster ? t("dept.save") : t("form.add")}</button>
+        </div>
+      </form>
+
+      {cluster && (
+        <div class="cluster-modal-foot">
+          {cells.length === 0 ? (
+            <form
+              method="post"
+              action={`/organization/clusters/${cluster.id}/delete`}
+              class="modal-danger"
+              data-confirm={t("org.clusterDeleteConfirm")}
+              data-confirm-title={t("members.delete")}
+              data-confirm-yes={t("members.delete")}
+            >
+              <div class="actions">
+                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+              </div>
+            </form>
+          ) : (
+            <p class="muted small modal-note">{t("org.clusterDeleteHint")}</p>
+          )}
+        </div>
       )}
     </>
   );
