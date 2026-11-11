@@ -231,7 +231,7 @@ export function PositionsPage(props: Common & {
   );
 }
 
-type RegionalValues = {
+export type RegionalValues = {
   name: string;
   nameEn: string;
   regionId: number | "";
@@ -307,12 +307,14 @@ export function RegionalChurchModal(props: {
   church?: RegionalChurchRow;
   regions: { id: number; name: string }[];
   homeCells: HomeCellOption[];
+  values?: RegionalValues;
+  error?: string | null;
   lang?: Lang;
 }) {
-  const { church, regions, homeCells } = props;
+  const { church, regions, homeCells, error } = props;
   const L = props.lang ?? "en";
   const t = getDict(L);
-  const values = regionalValues(church);
+  const values = props.values ?? regionalValues(church);
   const cells = church ? homeCells.filter((c) => c.regionalChurchId === church.id) : [];
   const candidates = church
     ? homeCells.filter((c) => c.regionId === church.regionId && (c.regionalChurchId == null || c.regionalChurchId === church.id))
@@ -320,7 +322,8 @@ export function RegionalChurchModal(props: {
 
   return (
     <>
-      <form method="post" action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-plain-submit>
+      {error && <div class="modal-error" role="alert">{error}</div>}
+      <form method="post" action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
         <RegionalFields values={values} regions={regions} lang={L} editing={Boolean(church)} />
         <div class="actions">
           <button class="btn" type="submit">{church ? t("dept.save") : t("form.add")}</button>

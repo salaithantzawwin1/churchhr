@@ -7,7 +7,7 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
-import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus } from "../views/org-settings";
+import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
@@ -605,17 +605,34 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
   const name = s(body.name).slice(0, 80);
   const nameEn = s(body.name_en).slice(0, 120);
   const regionId = asInt(s(body.region_id));
-  if (!name) return c.redirect("/organization/regional-churches?err=regional-name-required", 303);
-  if (!regionId) return c.redirect("/organization/regional-churches?err=regional-state-required", 303);
-  if (await regionalChurchNameTaken(db, name)) return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
+  const sortOrder = departmentSortOrder(s(body.sort_order));
+  const values: RegionalValues = { name, nameEn, regionId: regionId ?? "", sortOrder, active: true };
+  // A modal submit gets the sheet back with the error so the dialog stays open
+  // and keeps what was typed; a valid save only returns where to land.
+  const modal = modalRequest(c);
+  const fail = async (err: string) => {
+    if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
+    return c.html(
+      <RegionalChurchModal
+        regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db)}
+        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+      />,
+      422,
+    );
+  };
+  if (!name) return await fail("regional-name-required");
+  if (!regionId) return await fail("regional-state-required");
+  if (await regionalChurchNameTaken(db, name)) return await fail("regional-name-taken");
   try {
     await db.run(sql`
       INSERT INTO regional_churches (name, name_en, region_id, active, sort_order)
-      VALUES (${name}, ${nameEn || null}, ${regionId}, 1, ${departmentSortOrder(s(body.sort_order))})`);
+      VALUES (${name}, ${nameEn || null}, ${regionId}, 1, ${sortOrder})`);
   } catch {
-    return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
+    return await fail("regional-name-taken");
   }
-  return c.redirect("/organization/regional-churches?ok=regional-created", 303);
+  const landing = "/organization/regional-churches?ok=regional-created";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/regional-churches/:id", requirePermission("options.manage"), async (c) => {
@@ -630,22 +647,40 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   const name = s(body.name).slice(0, 80);
   const nameEn = s(body.name_en).slice(0, 120);
   const regionId = asInt(s(body.region_id)) ?? current.regionId;
-  if (!name) return c.redirect("/organization/regional-churches?err=regional-name-required", 303);
-  if (await regionalChurchNameTaken(db, name, id)) return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
   const active = s(body.active) === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const values: RegionalValues = { name, nameEn, regionId, sortOrder, active: active === 1 };
+  const modal = modalRequest(c);
+  const fail = async (err: string) => {
+    if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
+    const church = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] }))
+      .find((r) => r.id === id);
+    return c.html(
+      <RegionalChurchModal
+        church={church}
+        regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db)}
+        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+      />,
+      422,
+    );
+  };
+  if (!name) return await fail("regional-name-required");
+  if (await regionalChurchNameTaken(db, name, id)) return await fail("regional-name-taken");
   if (current.active === 1 && active === 0) {
     const used = await db.all<{ n: number }>(sql`
       SELECT
         (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
         (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
-    if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/regional-churches?err=regional-in-use", 303);
+    if ((used[0]?.n ?? 0) > 0) return await fail("regional-in-use");
   }
   await db.run(sql`
     UPDATE regional_churches
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
-           active = ${active}, sort_order = ${departmentSortOrder(s(body.sort_order), current.sortOrder)}
+           active = ${active}, sort_order = ${sortOrder}
      WHERE id = ${id}`);
-  return c.redirect("/organization/regional-churches?ok=regional-updated", 303);
+  const landing = "/organization/regional-churches?ok=regional-updated";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/regional-churches/:id/cells", requirePermission("options.manage"), async (c) => {
