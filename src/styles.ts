@@ -1064,6 +1064,10 @@ td.empty-state .small { margin-top: 4px; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--card);
 }
 .hh-pick-main { flex: 1 1 230px; min-width: 0; }
+.hh-pick.is-active {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--chip-brand-bg);
+}
 .hh-pick-name { font-weight: 600; }
 .hh-pick-meta { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 .hh-pick-actions { display: flex; gap: 8px; align-items: center; margin: 0; }
@@ -1078,7 +1082,49 @@ td.empty-state .small { margin-top: 4px; }
 /* ---------- households: responsive cards, detail panels, member roster ---------- */
 .back-link { display: inline-block; margin: 0 0 2px; color: var(--muted); font-size: 13px; text-decoration: none; }
 .back-link:hover { color: var(--link); text-decoration: underline; }
+.hh-list-actions { gap: 8px; }
+.hh-view-toggle {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+}
+.hh-view-toggle button {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 30px;
+  padding: 4px 9px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.hh-view-toggle button:hover { color: var(--ink); background: var(--btn2-hover); }
+.hh-view-toggle button[aria-pressed="true"] { color: var(--link); background: var(--chip-brand-bg); }
+.hh-view-toggle svg { width: 14px; height: 14px; flex: none; }
 .hh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-bottom: 18px; }
+/* List view reuses the card markup: a wide row with identity, facts and actions.
+   The preference is stored by app.js, so no server round-trip is needed. */
+.hh-grid.is-list { grid-template-columns: 1fr; gap: 9px; }
+.hh-grid.is-list .hh-card {
+  display: grid; grid-template-columns: minmax(170px, 1.15fr) minmax(0, 2.2fr) auto;
+  align-items: center; gap: 10px 16px; padding: 10px 12px;
+}
+.hh-grid.is-list .hh-card-head { gap: 9px; }
+.hh-grid.is-list .hh-avatar { width: 32px; height: 32px; border-radius: 9px; }
+.hh-grid.is-list .hh-avatar svg { width: 17px; height: 17px; }
+.hh-grid.is-list .hh-card-title a { font-size: 14.5px; }
+.hh-grid.is-list .hh-facts { grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px 12px; }
+.hh-grid.is-list .hh-fact-label { font-size: 10.5px; }
+.hh-grid.is-list .hh-fact-value {
+  font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hh-grid.is-list .hh-card-actions { margin: 0; padding: 0; flex-wrap: nowrap; justify-content: flex-end; gap: 6px; }
+.hh-grid.is-list .hh-card-actions .btn { flex: 0 0 auto; }
+.hh-grid.is-list .hh-card-actions form { flex: 0 0 auto; }
+.hh-grid.is-list .hh-card-actions form .btn { width: auto; }
+@media (max-width: 1180px) {
+  .hh-grid.is-list .hh-card { grid-template-columns: minmax(0, 1fr) auto; }
+  .hh-grid.is-list .hh-card-head { grid-column: 1; }
+  .hh-grid.is-list .hh-card-actions { grid-column: 2; grid-row: 1; align-self: center; }
+  .hh-grid.is-list .hh-facts {
+    grid-column: 1 / -1; padding-top: 8px; border-top: 1px dashed var(--line);
+  }
+}
 .hh-card {
   display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 15px 16px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
@@ -1158,6 +1204,10 @@ td.empty-state .small { margin-top: 4px; }
 @media (max-width: 640px) {
   .hh-card { padding: 14px; }
   .hh-facts { gap: 8px 12px; }
+  .hh-list-actions { justify-content: space-between; }
+  .hh-view-toggle button { min-height: 34px; }
+  .hh-grid.is-list .hh-card { padding: 12px; }
+  .hh-grid.is-list .hh-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page-head .actions.hh-page-actions { width: auto; }
   .hh-page-actions .btn { flex: 0 0 auto; min-height: 34px; padding: 5px 14px; }
   .hh-member { flex-wrap: wrap; }
@@ -1237,10 +1287,47 @@ td.empty-state .small { margin-top: 4px; }
 .org-dept-grid { margin-top: 0; }
 .org-dept-card { gap: 10px; }
 .org-dept-card .org-card-head h3 { margin: 0; }
-.position-section { margin: 0 0 16px; padding: 0 0 14px; border-bottom: 1px solid var(--line); }
-.position-section h3 { margin: 0 0 10px; font-size: 14px; }
+/* Position assignment modal: a compact identity summary followed by three
+   clearly numbered role areas. */
+.position-hero {
+  display: flex; align-items: flex-start; gap: 11px; margin-bottom: 10px;
+  padding: 12px 13px; border: 1px solid var(--line); border-radius: 11px;
+  background: linear-gradient(135deg, var(--chip-brand-bg), transparent 78%);
+}
+.position-avatar {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; background: var(--card); color: var(--link);
+  font-size: 16px; font-weight: 700; box-shadow: inset 0 0 0 1px var(--line);
+}
+.position-hero-main { flex: 1; min-width: 0; }
+.position-hero-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.position-hero-title h4 { margin: 0; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.position-hero-home { color: var(--muted); font-size: 12px; }
+.position-hero-home strong { color: var(--ink); font-weight: 600; }
+.position-role-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.position-role-chips .badge { font-size: 11.5px; }
+.position-intro { margin: 0 0 12px; }
+.position-section {
+  margin: 0 0 11px; padding: 12px 13px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--field-bg);
+}
+.position-section-head { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px; }
+.position-step {
+  width: 22px; height: 22px; flex: none; display: grid; place-items: center;
+  border-radius: 50%; background: var(--chip-brand-bg); color: var(--link);
+  font-size: 11.5px; font-weight: 700; line-height: 1;
+}
+.position-section h3 { margin: 1px 0 0; font-size: 14px; }
+.position-section-head .hint { margin: 2px 0 0; }
 .position-section .field { margin-bottom: 0; }
 .position-section .form-grid { margin-top: 0; }
+.position-section select:disabled { opacity: .55; cursor: not-allowed; }
+.position-notice {
+  padding: 9px 11px; border-radius: 8px;
+  background: var(--warn-bg); color: var(--warn-ink); font-size: 12.5px; line-height: 1.6;
+}
+.position-notice p { margin: 0 0 8px; }
+.position-notice .btn { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
 .dept-add { margin-bottom: 18px; padding: 18px 20px; }
 .dept-add h2 { margin: 0 0 2px; }
 .dept-list { display: grid; gap: 14px; }

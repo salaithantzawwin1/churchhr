@@ -517,11 +517,55 @@
     var timer = null;
     var controller = null;
     var seq = 0;
+    var active = -1;
     var searching = wrap.getAttribute("data-searching") || "Searching…";
     var failed = wrap.getAttribute("data-search-error") || "Could not search members.";
+    items.setAttribute("role", "listbox");
+    var label = wrap.querySelector("label .lbl");
+    if (label) items.setAttribute("aria-label", label.textContent.trim());
 
+    function rows() {
+      return items.querySelectorAll(".hh-pick");
+    }
     function expanded(open) {
       input.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    function setActive(index) {
+      var nodes = rows();
+      if (!nodes.length) { active = -1; return; }
+      if (index < 0) index = nodes.length - 1;
+      if (index >= nodes.length) index = 0;
+      for (var i = 0; i < nodes.length; i++) {
+        var on = i === index;
+        nodes[i].classList.toggle("is-active", on);
+        nodes[i].setAttribute("aria-selected", on ? "true" : "false");
+      }
+      active = index;
+      input.setAttribute("aria-activedescendant", nodes[index].id);
+      nodes[index].scrollIntoView({ block: "nearest" });
+    }
+    function clearActive() {
+      active = -1;
+      input.removeAttribute("aria-activedescendant");
+      Array.prototype.forEach.call(rows(), function (row) {
+        row.classList.remove("is-active");
+        row.setAttribute("aria-selected", "false");
+      });
+    }
+    function prepareResults() {
+      Array.prototype.forEach.call(rows(), function (row, i) {
+        row.id = "hh-live-option-" + i;
+        row.setAttribute("role", "option");
+        row.setAttribute("aria-selected", "false");
+      });
+      clearActive();
+    }
+    function choose(row) {
+      if (!row) return;
+      // Enter on a highlighted result performs that row's Add/Move action with
+      // the relationship already selected in the row.
+      var button = row.querySelector('form.hh-pick-actions button[type="submit"]');
+      if (button) button.click();
     }
     function close() {
       if (timer) { clearTimeout(timer); timer = null; }
@@ -532,6 +576,7 @@
       msg.hidden = true;
       msg.textContent = "";
       items.innerHTML = "";
+      clearActive();
       expanded(false);
     }
     function open() {
@@ -542,6 +587,7 @@
       msg.textContent = text;
       msg.hidden = false;
       items.innerHTML = "";
+      clearActive();
       open();
     }
     function load(q) {
@@ -570,6 +616,7 @@
           msg.hidden = true;
           msg.textContent = "";
           items.innerHTML = results.innerHTML;
+          prepareResults();
           panel.removeAttribute("aria-busy");
           open();
         })
@@ -594,7 +641,27 @@
       if (input.value.trim() && panel.hidden) schedule();
     });
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); close(); }
+      if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); close(); return; }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        var nodes = rows();
+        if (!nodes.length) return;
+        e.preventDefault();
+        if (panel.hidden) open();
+        if (e.key === "ArrowDown") setActive(active < 0 ? 0 : active + 1);
+        else setActive(active < 0 ? nodes.length - 1 : active - 1);
+        return;
+      }
+      if (e.key === "Home" || e.key === "End") {
+        var all = rows();
+        if (!all.length || panel.hidden) return;
+        e.preventDefault();
+        setActive(e.key === "Home" ? 0 : all.length - 1);
+        return;
+      }
+      if (e.key === "Enter" && active >= 0 && !panel.hidden) {
+        var row = rows()[active];
+        if (row) { e.preventDefault(); choose(row); }
+      }
     });
     form.addEventListener("submit", close);
     document.addEventListener("click", function (e) {
@@ -751,6 +818,51 @@
     });
   })();
 
+  // Household card/list preference. Both views use the same server markup; the
+  // choice is stored locally so it survives navigation without changing URLs.
+  (function initHouseholdView() {
+    var grid = document.querySelector("[data-hh-grid]");
+    var toggle = document.querySelector("[data-hh-view-switch]");
+    if (!grid || !toggle) return;
+    var buttons = toggle.querySelectorAll("[data-hh-view]");
+    var saved = "card";
+    try { if (localStorage.getItem("hh-view") === "list") saved = "list"; } catch (e) {}
+    function apply(view, persist) {
+      var list = view === "list";
+      grid.classList.toggle("is-list", list);
+      Array.prototype.forEach.call(buttons, function (b) {
+        b.setAttribute("aria-pressed", b.getAttribute("data-hh-view") === view ? "true" : "false");
+      });
+      if (persist) {
+        try { localStorage.setItem("hh-view", view); } catch (e) {}
+      }
+    }
+    Array.prototype.forEach.call(buttons, function (b) {
+      b.addEventListener("click", function () { apply(b.getAttribute("data-hh-view"), true); });
+    });
+    apply(saved, false);
+  })();
+
+  // Department role depends on a chosen department; keep the second select
+  // disabled until there is a department to attach the role to.
+  function initDepartmentPosition(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-dept-position]"), function (scope) {
+      if (scope.getAttribute("data-dept-bound")) return;
+      scope.setAttribute("data-dept-bound", "1");
+      var dept = scope.querySelector('select[name="department_id"]');
+      var pos = scope.querySelector('select[name="department_position"]');
+      if (!dept || !pos) return;
+      function sync() {
+        var hasDepartment = Boolean(dept.value);
+        pos.disabled = !hasDepartment;
+        if (!hasDepartment) pos.value = "";
+      }
+      dept.addEventListener("change", sync);
+      sync();
+    });
+  }
+  initDepartmentPosition(document);
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
@@ -823,6 +935,7 @@
     });
     initRegionCascade(bodyEl);
     initHeadPicker(bodyEl);
+    initDepartmentPosition(bodyEl);
     initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);
   }

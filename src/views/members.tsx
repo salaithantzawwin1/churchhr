@@ -672,42 +672,76 @@ export function MemberPositionForm(props: PositionFormProps) {
   const { member, assignments, departments, canManageDepartments, error, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  const initial = member.name.trim().charAt(0) || "?";
+  const department = departments.find((d) => d.id === assignments.departmentId);
+  const currentRoles = [
+    assignments.homeCell && positionLabel(assignments.homeCell, L),
+    assignments.department && department && positionLabel(assignments.department, L),
+    assignments.church && positionLabel(assignments.church, L),
+  ].filter(Boolean) as string[];
   return (
     <div class="position-form">
-      <p class="position-member"><strong>{member.name}</strong></p>
+      <div class="position-hero">
+        <span class="position-avatar" aria-hidden="true">{initial}</span>
+        <div class="position-hero-main">
+          <div class="position-hero-title">
+            <h4>{member.name}</h4>
+            <span class="position-hero-home">
+              {t("org.homeCell")}: <strong>{member.homeCellId ? member.homeCell : t("org.vacant")}</strong>
+            </span>
+          </div>
+          <div class="position-role-chips" aria-label={t("org.currentRoles")}>
+            {currentRoles.length === 0
+              ? <span class="muted small">{t("org.noPosition")}</span>
+              : currentRoles.map((role) => (
+                <span class="badge position">{role}</span>
+              ))}
+          </div>
+        </div>
+      </div>
+      <p class="hint position-intro">{t("org.positionIntro")}</p>
       {error && <div class="flash err">{error}</div>}
       <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
         <section class="position-section">
-          <h3>{t("org.homeCellSection")}</h3>
+          <div class="position-section-head">
+            <span class="position-step" aria-hidden="true">1</span>
+            <div>
+              <h3>{t("org.homeCellSection")}</h3>
+              {member.homeCellId && <p class="hint">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>}
+            </div>
+          </div>
           {!member.homeCellId ? (
-            <div class="flash err">{t("org.noHomeCell")}</div>
+            <div class="position-notice">
+              <p>{t("org.noHomeCell")}</p>
+              <a class="btn sm secondary" href={`/members/${member.id}/edit`}>{t("org.changeHomeCell")}</a>
+            </div>
           ) : (
-            <>
-              <p class="muted small">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>
-              <label class="field">
-                <span class="lbl">{t("org.position")}</span>
-                <select name="home_cell_position">
-                  <option value="">{t("org.noPosition")}</option>
-                  {HOME_CELL_POSITIONS.map((p) => (
-                    <option value={p.value} selected={assignments.homeCell === p.value}>
-                      {positionLabel(p.value, L)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
+            <label class="field">
+              <span class="lbl">{t("org.position")}</span>
+              <select name="home_cell_position">
+                <option value="">{t("org.noPosition")}</option>
+                {HOME_CELL_POSITIONS.map((p) => (
+                  <option value={p.value} selected={assignments.homeCell === p.value}>
+                    {positionLabel(p.value, L)}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
         </section>
 
         <section class="position-section">
-          <h3>{t("org.departmentSection")}</h3>
+          <div class="position-section-head">
+            <span class="position-step" aria-hidden="true">2</span>
+            <div><h3>{t("org.departmentSection")}</h3></div>
+          </div>
           {departments.length === 0 ? (
             <p class="hint">
               {t("org.noDepartments")}
               {canManageDepartments && <> <a href="/organization/departments">{t("org.manageDepartments")}</a></>}
             </p>
           ) : (
-            <div class="form-grid">
+            <div class="form-grid" data-dept-position>
               <label class="field">
                 <span class="lbl">{t("org.department")}</span>
                 <select name="department_id">
@@ -721,7 +755,7 @@ export function MemberPositionForm(props: PositionFormProps) {
               </label>
               <label class="field">
                 <span class="lbl">{t("org.departmentPosition")}</span>
-                <select name="department_position">
+                <select name="department_position" disabled={!assignments.departmentId}>
                   <option value="">{t("org.noPosition")}</option>
                   {DEPARTMENT_POSITIONS.map((p) => (
                     <option value={p.value} selected={assignments.department === p.value}>
@@ -735,7 +769,10 @@ export function MemberPositionForm(props: PositionFormProps) {
         </section>
 
         <section class="position-section">
-          <h3>{t("org.churchSection")}</h3>
+          <div class="position-section-head">
+            <span class="position-step" aria-hidden="true">3</span>
+            <div><h3>{t("org.churchSection")}</h3></div>
+          </div>
           <label class="field">
             <span class="lbl">{t("org.churchLeadership")}</span>
             <select name="church_position">
@@ -749,7 +786,6 @@ export function MemberPositionForm(props: PositionFormProps) {
           </label>
         </section>
 
-        <p class="hint">{t("org.positionHint")}</p>
         <div class="actions">
           <button class="btn" type="submit">{t("org.savePosition")}</button>
         </div>

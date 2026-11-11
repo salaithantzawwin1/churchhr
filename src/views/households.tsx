@@ -171,7 +171,17 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
           <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
           <p class="page-sub">{t("hh.listSub")}</p>
         </div>
-        <div class="actions">
+        <div class="actions hh-list-actions">
+          <div class="hh-view-toggle" role="group" aria-label={t("hh.viewLabel")} data-hh-view-switch>
+            <button type="button" data-hh-view="card" aria-pressed="true" title={t("hh.cardView")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2" /></svg>
+              <span>{t("hh.cardView")}</span>
+            </button>
+            <button type="button" data-hh-view="list" aria-pressed="false" title={t("hh.listView")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12" /><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none" /><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none" /></svg>
+              <span>{t("hh.listView")}</span>
+            </button>
+          </div>
           {perms.has("members.create") && (
             <a class="btn js-add-modal" href="/admin/households/new" data-modal-title={t("hh.newHeading")}>+ {t("hh.newHeading")}</a>
           )}
@@ -218,7 +228,7 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
           ) : null}
         </div>
       ) : (
-        <div class="hh-grid">
+        <div class="hh-grid" data-hh-grid>
           {rows.map((f) => {
             const headName = isEn
               ? (f.head_name_en || f.head_name_mm)
@@ -434,15 +444,15 @@ export function HouseholdSearchMemberPage(props: Common & {
             <label class="field">
               <span class="lbl">{t("hh.pick.searchLabel")}</span>
               <input type="search" name="q" value={q} placeholder={t("hh.pick.placeholder")}
-                autocomplete="off" data-live-search-input
-                aria-controls="hh-live-results" aria-expanded="false" />
+                autocomplete="off" data-live-search-input role="combobox" aria-autocomplete="list"
+                aria-haspopup="listbox" aria-controls="hh-live-results-items" aria-expanded="false" />
             </label>
             <button class="btn" type="submit">{t("members.searchBtn")}</button>
           </form>
           <div class="hh-live-results" id="hh-live-results" role="region"
             aria-label={t("hh.pick.searchLabel")} aria-live="polite" hidden>
             <p class="muted small hh-live-msg" data-live-search-msg hidden></p>
-            <div data-live-search-items></div>
+            <div id="hh-live-results-items" data-live-search-items></div>
           </div>
         </div>
       </div>
