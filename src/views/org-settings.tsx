@@ -103,7 +103,9 @@ export function PositionModal(props: {
             data-confirm-title={t("members.delete")}
             data-confirm-yes={t("members.delete")}
           >
-            <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+            <div class="actions">
+              <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+            </div>
           </form>
         )
       )}
@@ -377,7 +379,9 @@ export function RegionalChurchModal(props: {
               data-confirm-title={t("members.delete")}
               data-confirm-yes={t("members.delete")}
             >
-              <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+              <div class="actions">
+                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+              </div>
             </form>
           ) : (
             <p class="muted small modal-note">{t("org.deleteRegionalHint")}</p>

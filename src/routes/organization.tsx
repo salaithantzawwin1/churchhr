@@ -33,6 +33,11 @@ function scopeCond(scope: Scope) {
   return sql`hc.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
+/** True when a Regional Church's state is inside the signed-in user's scope. */
+function regionInScope(scope: Scope, regionId: number): boolean {
+  return scope.scopeAll || scope.stateIds.includes(regionId);
+}
+
 organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -531,13 +536,18 @@ async function orgRegions(db: DB, scope: Scope, lang: string): Promise<{ id: num
 
 type AdminHomeCell = { id: number; label: string; regionId: number; regionalChurchId: number | null; township: string | null };
 
-async function loadAdminHomeCells(db: DB): Promise<AdminHomeCell[]> {
+async function loadAdminHomeCells(db: DB, scope: Scope): Promise<AdminHomeCell[]> {
+  const conditions = [sql`hc.type = 'home_cell'`, sql`hc.active = 1`];
+  if (!scope.scopeAll) {
+    if (scope.stateIds.length === 0) conditions.push(sql`1=0`);
+    else conditions.push(sql`hc.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
   return db.all<AdminHomeCell>(sql`
     SELECT hc.id, hc.label, hc.region_id AS regionId, hc.regional_church_id AS regionalChurchId,
            t.label AS township
     FROM lookup_options hc
     LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
-    WHERE hc.type = 'home_cell' AND hc.active = 1
+    WHERE ${sql.join(conditions, sql` AND `)}
     ORDER BY hc.region_id, t.sort_order, t.label, hc.sort_order, hc.label`);
 }
 
@@ -546,7 +556,7 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
   const scope = scopeOf(c);
   const churches = await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const regions = await orgRegions(db, scope, c.get("lang"));
-  const homeCells = await loadAdminHomeCells(db);
+  const homeCells = await loadAdminHomeCells(db, scope);
   return c.html(
     <RegionalChurchesPage
       user={c.get("user")} perms={c.get("perms")}
@@ -559,11 +569,12 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
 
 organizationRoutes.get("/regional-churches/new", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
   return c.html(
     <RegionalChurchModal
-      regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
-      homeCells={await loadAdminHomeCells(db)}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db, scope)}
       lang={c.get("lang")}
     />,
   );
@@ -571,17 +582,18 @@ organizationRoutes.get("/regional-churches/new", requirePermission("options.mana
 
 organizationRoutes.get("/regional-churches/:id/edit", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   const church = id
-    ? (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] })).find((r) => r.id === id)
+    ? (await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds })).find((r) => r.id === id)
     : undefined;
   if (!church) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
   return c.html(
     <RegionalChurchModal
       church={church}
-      regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
-      homeCells={await loadAdminHomeCells(db)}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db, scope)}
       lang={c.get("lang")}
     />,
   );
@@ -595,6 +607,7 @@ async function regionalChurchNameTaken(db: DB, name: string, exceptId?: number):
 
 organizationRoutes.post("/regional-churches", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const body = await c.req.parseBody();
   const name = s(body.name).slice(0, 80);
   const nameEn = s(body.name_en).slice(0, 120);
@@ -608,8 +621,8 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
     if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
     return c.html(
       <RegionalChurchModal
-        regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
-        homeCells={await loadAdminHomeCells(db)}
+        regions={await orgRegions(db, scope, c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db, scope)}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
       />,
       422,
@@ -617,6 +630,8 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
   };
   if (!name) return await fail("regional-name-required");
   if (!regionId) return await fail("regional-state-required");
+  const allowedRegions = await orgRegions(db, scope, c.get("lang"));
+  if (!allowedRegions.some((r) => r.id === regionId)) return await fail("err-scope");
   if (await regionalChurchNameTaken(db, name)) return await fail("regional-name-taken");
   try {
     await db.run(sql`
@@ -631,12 +646,15 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
 
 organizationRoutes.post("/regional-churches/:id", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
   const current = (await db.all<Pick<RegionalChurchRow, "id" | "name" | "nameEn" | "regionId" | "active" | "sortOrder">>(sql`
     SELECT id, name, name_en AS nameEn, region_id AS regionId, active, sort_order AS sortOrder
     FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
-  if (!current) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  if (!current || !regionInScope(scope, current.regionId)) {
+    return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  }
   const body = await c.req.parseBody();
   const name = s(body.name).slice(0, 80);
   const nameEn = s(body.name_en).slice(0, 120);
@@ -647,20 +665,29 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   const modal = modalRequest(c);
   const fail = async (err: string) => {
     if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
-    const church = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] }))
+    const church = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds }))
       .find((r) => r.id === id);
     return c.html(
       <RegionalChurchModal
         church={church}
-        regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
-        homeCells={await loadAdminHomeCells(db)}
+        regions={await orgRegions(db, scope, c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db, scope)}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
       />,
       422,
     );
   };
   if (!name) return await fail("regional-name-required");
+  const allowedRegions = await orgRegions(db, scope, c.get("lang"));
+  if (!allowedRegions.some((r) => r.id === regionId)) return await fail("err-scope");
   if (await regionalChurchNameTaken(db, name, id)) return await fail("regional-name-taken");
+  if (regionId !== current.regionId) {
+    const attached = await db.all<{ n: number }>(sql`
+      SELECT
+        (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
+        (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+    if ((attached[0]?.n ?? 0) > 0) return await fail("regional-state-locked");
+  }
   if (current.active === 1 && active === 0) {
     const used = await db.all<{ n: number }>(sql`
       SELECT
@@ -679,11 +706,14 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
 
 organizationRoutes.post("/regional-churches/:id/cells", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
   const church = (await db.all<{ id: number; regionId: number }>(sql`
     SELECT id, region_id AS regionId FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
-  if (!church) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  if (!church || !regionInScope(scope, church.regionId)) {
+    return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  }
   // Checkboxes share one name, and parseBody keeps only the last value, so the
   // raw form data is read to keep every ticked Home Cell. Clearing the last
   // attachment arrives with no body at all, which leaves the list empty.
@@ -706,13 +736,13 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
     if ((valid[0]?.n ?? 0) !== ids.length) {
       if (!modal) return c.redirect("/organization/regional-churches?err=regional-cell-invalid", 303);
       // Keep the sheet open with the rejected picks still ticked.
-      const row = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] }))
+      const row = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds }))
         .find((r) => r.id === id);
       return c.html(
         <RegionalChurchModal
           church={row}
-          regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
-          homeCells={await loadAdminHomeCells(db)}
+          regions={await orgRegions(db, scope, c.get("lang"))}
+          homeCells={await loadAdminHomeCells(db, scope)}
           cellError={flashText("regional-cell-invalid", c.get("lang"))}
           selectedCellIds={ids}
           lang={c.get("lang")}
@@ -733,8 +763,14 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
 
 organizationRoutes.post("/regional-churches/:id/delete", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const church = (await db.all<{ regionId: number }>(sql`
+    SELECT region_id AS regionId FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
+  if (!church || !regionInScope(scope, church.regionId)) {
+    return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  }
   const used = await db.all<{ n: number }>(sql`
     SELECT
       (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +

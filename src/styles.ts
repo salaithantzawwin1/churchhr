@@ -1413,6 +1413,7 @@ td.empty-state .small { margin-top: 4px; }
 }
 .modal-body form.modal-danger > .actions {
   position: static; margin: 0; padding: 0; border: 0; background: none;
+  justify-content: flex-start;
 }
 
 .role-card-text { min-width: 0; }

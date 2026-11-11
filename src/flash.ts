@@ -32,6 +32,7 @@ const FLASH_KEYS: Record<string, string> = {
   "regional-updated": "flash.regionalUpdated",
   "regional-deleted": "flash.regionalDeleted",
   "regional-in-use": "flash.regionalInUse",
+  "regional-state-locked": "flash.regionalStateLocked",
   "regional-name-required": "flash.regionalNameRequired",
   "regional-name-taken": "flash.regionalNameTaken",
   "regional-state-required": "flash.regionalStateRequired",

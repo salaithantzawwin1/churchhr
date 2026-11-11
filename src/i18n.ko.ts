@@ -793,6 +793,7 @@ export const KO: Record<string, string> = {
   "flash.regionalUpdated": "지역 교회가 수정되었습니다.",
   "flash.regionalDeleted": "지역 교회가 삭제되었습니다.",
   "flash.regionalInUse": "홈셀이나 직책이 연결된 지역 교회는 삭제할 수 없습니다.",
+  "flash.regionalStateLocked": "주/지역을 변경하기 전에 홈셀과 직책 연결을 해제하세요.",
   "flash.regionalNameRequired": "지역 교회 이름을 입력하세요.",
   "flash.regionalNameTaken": "같은 이름의 지역 교회가 이미 있습니다.",
   "flash.regionalStateRequired": "주/지역을 선택하세요.",
