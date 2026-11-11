@@ -46,6 +46,8 @@ export type HeadCandidate = {
   id: number; member_code: string | null;
   name_myanmar: string | null; name_english: string | null;
   township?: string | null;
+  phone?: string | null;
+  address?: string | null;
   /** The member's current placement, offered as the new household's starting
    * values when this member is picked as head (see the head-picker JS). */
   region_id: number;
@@ -107,6 +109,8 @@ export function HouseholdFormFragment(props: Common & {
                           value={String(m.id)}
                           selected={v.head_member_id === String(m.id)}
                           data-name={nm ?? ""}
+                          data-phone={m.phone ?? ""}
+                          data-address={m.address ?? ""}
                           data-region={String(m.region_id)}
                           data-township={m.township ?? ""}
                           data-home-cell={m.home_cell_id ? String(m.home_cell_id) : ""}

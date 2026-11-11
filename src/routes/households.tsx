@@ -64,6 +64,7 @@ function scopeCondM(scope: Scope) {
 async function headCandidates(db: DB, scope: Scope, includeId: number | null) {
   return (await db.all(sql`
     SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.township,
+           m.phone, m.address,
            m.region_id, m.home_cell_id, m.group_id, m.family_group_id
     FROM members m
     WHERE ${scopeCondM(scope)}
@@ -71,7 +72,8 @@ async function headCandidates(db: DB, scope: Scope, includeId: number | null) {
     ORDER BY COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '')
     LIMIT 300`)) as {
       id: number; member_code: string | null; name_myanmar: string | null; name_english: string | null;
-      township: string | null; region_id: number; home_cell_id: number | null;
+      township: string | null; phone: string | null; address: string | null;
+      region_id: number; home_cell_id: number | null;
       group_id: number | null; family_group_id: number | null;
     }[];
 }

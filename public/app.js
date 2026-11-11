@@ -444,6 +444,15 @@
         pick("group_id", "data-group");
         pick("family_group_id", "data-family-group");
 
+        // Contact details travel with the picked head so the household form is
+        // complete before it is submitted.
+        function fill(name, attr) {
+          var el = form.querySelector('[name="' + name + '"]');
+          if (el) el.value = opt.getAttribute(attr) || "";
+        }
+        fill("phone", "data-phone");
+        fill("address", "data-address");
+
         var nameInput = form.querySelector('input[name="name"]');
         var headName = opt.getAttribute("data-name") || "";
         var prev = form.getAttribute("data-head-name") || "";
