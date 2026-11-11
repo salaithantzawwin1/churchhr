@@ -286,6 +286,14 @@ export function OrganizationPage(props: Common & {
     );
   };
 
+  const renderPersonNode = (role: string, leader: OrgLeader | null, size: "lg" | "md" | "sm", lead = false) => (
+    <div class={`org-node${lead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`}>
+      <LeaderAvatar leader={leader} size={size} />
+      <span class="org-node-role">{role}</span>
+      <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+    </div>
+  );
+
   const renderSupervisionGroup = (group: SupervisionGroup) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
@@ -294,59 +302,43 @@ export function OrganizationPage(props: Common & {
     const supervisor = defs[0] ?? null;
     const assistants = defs.slice(1);
     return (
-      <div class="org-supervision-group">
-        <div class="org-supervision-group-head">
+      <div class="org-flow-cluster">
+        <div class="org-flow-cluster-head">
           <div>
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
-            <h3>{group.name}</h3>
+            <h4>{group.name}</h4>
           </div>
           <span class="muted small">{group.cells.length} {t("org.cells")}</span>
         </div>
-        <div class="org-supervision-team">
-          {supervisor && (
-            <div class="org-supervision-person is-lead">
-              <LeaderAvatar leader={role(supervisor.code)} size="md" />
-              <div>
-                <span class="org-node-role">{positionDefLabel(supervisor, L)}</span>
-                <LeaderLink leader={role(supervisor.code)} empty={t("org.vacant")} />
-              </div>
-            </div>
-          )}
-          {assistants.map((def) => (
-            <div class="org-supervision-person">
-              <LeaderAvatar leader={role(def.code)} size="sm" />
-              <div>
-                <span class="org-node-role">{positionDefLabel(def, L)}</span>
-                <LeaderLink leader={role(def.code)} empty={t("org.vacant")} />
-              </div>
-            </div>
-          ))}
+        <div class="org-flow-cluster-team">
+          {supervisor && renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
+          {assistants.map((def) => renderPersonNode(positionDefLabel(def, L), role(def.code), "sm"))}
         </div>
-        <div class="org-supervision-cells">
+        <div class="org-flow-line" aria-hidden="true" />
+        <div class="org-flow-cells">
           {group.cells.map((cell) => (
-            <div class="org-supervision-cell">
-              <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
-              <div class="org-supervision-cell-main">
-                <a href={cellHref(cell.id)}>{cell.label}</a>
-                <span class="muted small">
-                  {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
-                </span>
-              </div>
-              <div class="org-supervision-cell-roles">
-                {cellRows.lead && (
-                  <span class="org-cell-leader">
-                    <span class="org-role-label">{positionDefLabel(cellRows.lead, L)}</span>
-                    <LeaderLink leader={homeRole(cell.id, cellRows.lead.code)} empty={t("org.noLeader")} />
+            <article class="org-flow-cell">
+              <div class="org-flow-cell-head">
+                <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
+                <div class="org-flow-cell-main">
+                  <a href={cellHref(cell.id)}>{cell.label}</a>
+                  <span class="muted small">
+                    {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
                   </span>
-                )}
-                {cellRows.all.slice(1).map((p) => (
-                  <span class="org-cell-leader">
+                </div>
+              </div>
+              <div class="org-flow-cell-roles">
+                {cellRows.all.map((p) => (
+                  <span class="org-flow-role">
                     <span class="org-role-label">{positionDefLabel(p, L)}</span>
-                    <LeaderLink leader={homeRole(cell.id, p.code)} empty={t("org.vacant")} />
+                    <LeaderLink
+                      leader={homeRole(cell.id, p.code)}
+                      empty={p.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
+                    />
                   </span>
                 ))}
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </div>
@@ -356,16 +348,16 @@ export function OrganizationPage(props: Common & {
   const renderStateHierarchy = (state: StateGroup) => {
     const stateMembers = state.cells.reduce((sum, cell) => sum + cell.member_count, 0);
     return (
-      <section class="card org-state org-state-hierarchy">
-        <div class="org-state-head">
-          <div>
-            <h2>{state.name}</h2>
-            <p class="muted small">
-              {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")}
-            </p>
-          </div>
+      <section class="org-flow-state">
+        <div class="org-flow-state-head">
+          <span class="org-flow-state-name">{state.name}</span>
+          <span class="muted small">
+            {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")}
+          </span>
         </div>
-        {state.groups.map(renderSupervisionGroup)}
+        <div class="org-flow-clusters">
+          {state.groups.map(renderSupervisionGroup)}
+        </div>
       </section>
     );
   };
@@ -692,7 +684,38 @@ export function OrganizationPage(props: Common & {
           {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
         </div>
       ) : (
-          <div class="org-state-list">{states.map(renderStateHierarchy)}</div>
+        <section class="card org-chart org-flow">
+          <div class="org-section-head">
+            <div>
+              <h2>{t("org.churchLeadership")}</h2>
+              <p class="muted small">{t("org.homeCellFlowHint")}</p>
+            </div>
+            {canManagePositions && (
+              <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
+            )}
+          </div>
+
+          <div class="org-flow-root">
+            {churchRows.lead && renderPersonNode(
+              positionDefLabel(churchRows.lead, L),
+              churchRole(churchRows.lead.code),
+              "lg",
+            )}
+          </div>
+          <div class="org-chart-connector" aria-hidden="true" />
+          {churchRows.rest.length > 0 && (
+            <div class="org-chart-level org-chart-level-team">
+              {churchRows.rest.map((p) => renderPersonNode(
+                positionDefLabel(p, L),
+                churchRole(p.code),
+                "md",
+              ))}
+            </div>
+          )}
+          <div class="org-flow-line" aria-hidden="true" />
+
+          {states.map(renderStateHierarchy)}
+        </section>
       )}
     </Layout>
   );

@@ -738,6 +738,7 @@ export const KO: Record<string, string> = {
   "org.savePosition": "직책 저장",
   "org.churchLeadership": "교회 리더십",
   "org.churchLeadershipHint": "회원 목록에서 지정하는 교회 전체 직책입니다.",
+  "org.homeCellFlowHint": "교회 리더십에서 감독자를 거쳐 각 홈셀까지 연결한 구조입니다.",
   "org.departments": "부서",
   "org.departmentsHint": "각 교회 부서의 리더십 직책입니다.",
   "org.department": "부서",

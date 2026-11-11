@@ -1557,6 +1557,50 @@ td.empty-state .small { margin-top: 4px; }
 .org-supervision-cell-main a { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .org-supervision-cell-main a:hover { text-decoration: underline; }
 .org-supervision-cell-roles { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-end; }
+/* Full leadership flow on Home Cell Structure: church-wide leaders flow down
+   into state/cluster supervisor teams and their Home Cell leader nodes. */
+.org-flow { padding-bottom: 18px; }
+.org-flow-root { display: flex; justify-content: center; }
+.org-flow-line { width: 2px; height: 22px; margin: 0 auto; background: var(--line); }
+.org-flow-state { margin-top: 6px; }
+.org-flow-state + .org-flow-state { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
+.org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
+.org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
+.org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+.org-flow-cluster { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--row-alt, rgba(15,23,42,.025)); }
+.org-flow-cluster-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.org-flow-cluster-head h4 { margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
+.org-flow-cluster-team { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 4px 8px; }
+.org-flow-cluster-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
+.org-flow-cluster-team .org-node-lead { width: 190px; }
+.org-flow-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; position: relative; padding-top: 14px; }
+.org-flow-cells::before { content: ""; position: absolute; top: 0; left: 6%; right: 6%; height: 2px; background: var(--line); }
+.org-flow-cell { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.org-flow-cell::before { content: ""; position: absolute; top: -14px; left: 50%; width: 2px; height: 14px; background: var(--line); }
+.org-flow-cell-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.org-flow-cell-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.org-flow-cell-main a { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-flow-cell-main a:hover { text-decoration: underline; }
+.org-flow-cell-roles { display: grid; gap: 4px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.org-flow-role { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; min-width: 0; }
+.org-flow-role .org-role-label { flex: none; }
+.org-flow-role a { text-align: right; color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-flow-role a:hover { color: var(--link); text-decoration: underline; }
+@media (max-width: 760px) {
+  .org-flow-clusters { grid-template-columns: 1fr; }
+  .org-flow-cluster-team .org-node { width: 190px; }
+  .org-flow-cluster-team .org-node-lead { width: 205px; }
+}
+@media (max-width: 520px) {
+  .org-flow-cluster-team { display: grid; grid-template-columns: 1fr; }
+  .org-flow-cluster-team .org-node,
+  .org-flow-cluster-team .org-node-lead { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
+  .org-flow-cluster-team .org-node .org-node-role { order: 1; }
+  .org-flow-cluster-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  .org-flow-cells { grid-template-columns: 1fr; }
+  .org-flow-cells::before,
+  .org-flow-cell::before { display: none; }
+}
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: 9px; background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }
 .position-subsection .form-grid { margin-top: 8px; }
