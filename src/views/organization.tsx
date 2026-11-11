@@ -372,7 +372,7 @@ export function OrganizationPage(props: Common & {
 
   return (
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
-      <div class="page-head">
+      <div class="page-head org-page-head">
         <div>
           <h1>{t("org.title")}<span class="count-pill">{cells.length} {t("org.cells")}</span></h1>
           <p class="page-sub">{t("org.intro")}</p>
@@ -692,69 +692,7 @@ export function OrganizationPage(props: Common & {
           {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
         </div>
       ) : (
-        <>
           <div class="org-state-list">{states.map(renderStateHierarchy)}</div>
-        <div class="org-grid">
-          {cells.map((cell) => {
-            const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
-            const church = regionalChurches.find((r) => r.id === cell.regional_church_id);
-            return (
-              <article class="card org-card org-cell-card">
-                <div class="org-cell-card-head">
-                  <LeaderAvatar leader={lead} size="lg" />
-                  <div>
-                    <h3><a href={cellHref(cell.id)}>{cell.label}</a></h3>
-                    <p class="muted small">
-                      {L !== "mm" && cell.state_name_en ? cell.state_name_en : cell.state_name}
-                      {cell.township ? ` · ${cell.township}` : ""}
-                    </p>
-                    <span class="org-member-count">
-                      {cell.member_count} {t("org.membersShort")}
-                    </span>
-                  </div>
-                </div>
-                {church && (
-                  <p class="org-cell-regional">
-                    <span class="org-role-label">{t("org.regionalChurch")}</span>{" "}
-                    {regionalChurchName(church, L)}
-                  </p>
-                )}
-                {cellRoles(cell, "card")}
-                {cell.township_id != null && (
-                  <div class="org-card-supervision">
-                    {(() => {
-                      const defs = defsForScope(positionDefs, "township");
-                      if (defs.length === 0) return null;
-                      return (
-                        <>
-                          <span class="org-supervision-title">{t("org.supervision")}</span>
-                          <div class="org-mini-list">
-                            {defs.map((def) => (
-                              <div class={`org-mini${townshipRole(cell.township_id, def.code) ? "" : " org-vacant"}`}>
-                                <LeaderAvatar leader={townshipRole(cell.township_id, def.code)} size="sm" />
-                                <div>
-                                  <span class="org-mini-role">{positionDefLabel(def, L)}</span>
-                                  <LeaderLink leader={townshipRole(cell.township_id, def.code)} empty={t("org.vacant")} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-                <div class="org-card-foot">
-                  <a class="org-cell-count" href={cellHref(cell.id)}>
-                    {cell.member_count} {t("org.membersShort")} →
-                  </a>
-                  {canEdit && <a class="small" href={cellHref(cell.id)}>{t("org.viewMembers")}</a>}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-        </>
       )}
     </Layout>
   );

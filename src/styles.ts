@@ -1562,6 +1562,13 @@ td.empty-state .small { margin-top: 4px; }
 .position-subsection .form-grid { margin-top: 8px; }
 .org-manage-links, .page-head-actions { align-items: stretch; }
 .org-manage-links .btn, .page-head-actions .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+.org-page-head { align-items: flex-start; }
+.org-page-head .page-head-actions { flex: 1 1 100%; width: 100%; justify-content: flex-start; gap: 6px; flex-wrap: nowrap; }
+.org-page-head .org-manage-links { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+.org-page-head .page-head-actions .btn { padding: 6px 9px; font-size: 12.5px; }
+@media (max-width: 700px) {
+  .org-page-head .page-head-actions, .org-page-head .org-manage-links { flex-wrap: wrap; }
+}
 @media (max-width: 640px) {
   .org-supervision-cell { grid-template-columns: auto minmax(0, 1fr); }
   .org-supervision-cell-roles { grid-column: 1 / -1; justify-content: flex-start; }
