@@ -687,32 +687,10 @@ export function OrganizationPage(props: Common & {
         <section class="card org-chart org-flow">
           <div class="org-section-head">
             <div>
-              <h2>{t("org.churchLeadership")}</h2>
+              <h2>{t("org.homeCellLeadership")}</h2>
               <p class="muted small">{t("org.homeCellFlowHint")}</p>
             </div>
-            {canManagePositions && (
-              <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
-            )}
           </div>
-
-          <div class="org-flow-root">
-            {churchRows.lead && renderPersonNode(
-              positionDefLabel(churchRows.lead, L),
-              churchRole(churchRows.lead.code),
-              "lg",
-            )}
-          </div>
-          <div class="org-chart-connector" aria-hidden="true" />
-          {churchRows.rest.length > 0 && (
-            <div class="org-chart-level org-chart-level-team">
-              {churchRows.rest.map((p) => renderPersonNode(
-                positionDefLabel(p, L),
-                churchRole(p.code),
-                "md",
-              ))}
-            </div>
-          )}
-          <div class="org-flow-line" aria-hidden="true" />
 
           {states.map(renderStateHierarchy)}
         </section>

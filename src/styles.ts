@@ -1560,7 +1560,6 @@ td.empty-state .small { margin-top: 4px; }
 /* Full leadership flow on Home Cell Structure: church-wide leaders flow down
    into state/cluster supervisor teams and their Home Cell leader nodes. */
 .org-flow { padding-bottom: 18px; }
-.org-flow-root { display: flex; justify-content: center; }
 .org-flow-line { width: 2px; height: 22px; margin: 0 auto; background: var(--line); }
 .org-flow-state { margin-top: 6px; }
 .org-flow-state + .org-flow-state { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
