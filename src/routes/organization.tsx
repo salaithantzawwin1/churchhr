@@ -18,12 +18,6 @@ import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
 
-function multi(v: unknown): string[] {
-  if (v === undefined || v === null) return [];
-  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
-  return typeof v === "string" ? [v] : [];
-}
-
 export const organizationRoutes = new Hono<AppEnv>();
 
 type Scope = { scopeAll: boolean; stateIds: number[] };
@@ -690,17 +684,42 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
   const church = (await db.all<{ id: number; regionId: number }>(sql`
     SELECT id, region_id AS regionId FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
   if (!church) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
-  const body = await c.req.parseBody();
-  const ids = multi(body.home_cell_ids)
-    .map((v) => Number(v))
-    .filter((n) => Number.isInteger(n) && n > 0);
+  // Checkboxes share one name, and parseBody keeps only the last value, so the
+  // raw form data is read to keep every ticked Home Cell. Clearing the last
+  // attachment arrives with no body at all, which leaves the list empty.
+  let ids: number[] = [];
+  try {
+    const form = await c.req.formData();
+    ids = form.getAll("home_cell_ids")
+      .map((v) => Number(String(v)))
+      .filter((n) => Number.isInteger(n) && n > 0);
+  } catch {
+    ids = [];
+  }
+  const modal = modalRequest(c);
   if (ids.length > 0) {
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${church.regionId}
         AND (regional_church_id IS NULL OR regional_church_id = ${id})
         AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
-    if ((valid[0]?.n ?? 0) !== ids.length) return c.redirect("/organization/regional-churches?err=regional-cell-invalid", 303);
+    if ((valid[0]?.n ?? 0) !== ids.length) {
+      if (!modal) return c.redirect("/organization/regional-churches?err=regional-cell-invalid", 303);
+      // Keep the sheet open with the rejected picks still ticked.
+      const row = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] }))
+        .find((r) => r.id === id);
+      return c.html(
+        <RegionalChurchModal
+          church={row}
+          regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
+          homeCells={await loadAdminHomeCells(db)}
+          cellError={flashText("regional-cell-invalid", c.get("lang"))}
+          selectedCellIds={ids}
+          lang={c.get("lang")}
+        />,
+        422,
+      );
+    }
   }
   await db.run(sql`UPDATE lookup_options SET regional_church_id = NULL WHERE regional_church_id = ${id}`);
   if (ids.length > 0) {
@@ -708,7 +727,8 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
       UPDATE lookup_options SET regional_church_id = ${id}
       WHERE id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
   }
-  return c.redirect("/organization/regional-churches?ok=regional-cells", 303);
+  const landing = "/organization/regional-churches?ok=regional-cells";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/regional-churches/:id/delete", requirePermission("options.manage"), async (c) => {

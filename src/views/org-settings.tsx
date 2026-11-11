@@ -309,9 +309,12 @@ export function RegionalChurchModal(props: {
   homeCells: HomeCellOption[];
   values?: RegionalValues;
   error?: string | null;
+  cellError?: string | null;
+  /** Rejected Home Cell picks, so a failed attach keeps what was chosen. */
+  selectedCellIds?: number[];
   lang?: Lang;
 }) {
-  const { church, regions, homeCells, error } = props;
+  const { church, regions, homeCells, error, cellError } = props;
   const L = props.lang ?? "en";
   const t = getDict(L);
   const values = props.values ?? regionalValues(church);
@@ -319,6 +322,8 @@ export function RegionalChurchModal(props: {
   const candidates = church
     ? homeCells.filter((c) => c.regionId === church.regionId && (c.regionalChurchId == null || c.regionalChurchId === church.id))
     : [];
+  const isPicked = (cell: HomeCellOption) =>
+    props.selectedCellIds ? props.selectedCellIds.includes(cell.id) : cell.regionalChurchId === church?.id;
 
   return (
     <>
@@ -332,11 +337,12 @@ export function RegionalChurchModal(props: {
 
       {church && (
         <>
-          <form method="post" action={`/organization/regional-churches/${church.id}/cells`} class="regional-cells-form" data-plain-submit>
+          <form method="post" action={`/organization/regional-churches/${church.id}/cells`} class="regional-cells-form" data-modal-ajax>
             <div class="regional-cells-head">
               <strong>{t("org.regionalCellAssignment")}</strong>
               <span class="muted small">{t("org.regionalCellHint")}</span>
             </div>
+            {cellError && <div class="modal-error" role="alert">{cellError}</div>}
             {candidates.length === 0 ? (
               <p class="muted small">{t("org.regionalNoCells")}</p>
             ) : (
@@ -348,7 +354,7 @@ export function RegionalChurchModal(props: {
                       {group.cells.map((cell) => (
                         <label class="check-chip">
                           <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
-                            checked={cell.regionalChurchId === church.id} />
+                            checked={isPicked(cell)} />
                           <span>{cell.label}</span>
                         </label>
                       ))}
