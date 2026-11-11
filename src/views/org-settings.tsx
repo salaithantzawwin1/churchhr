@@ -60,6 +60,9 @@ export function PositionsPage(props: Common & {
   const current = defs
     .filter((d) => d.scopeType === scope)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+  const counts = Object.fromEntries(
+    CONFIGURABLE_POSITION_SCOPES.map((s) => [s, defs.filter((d) => d.scopeType === s).length]),
+  ) as Record<ConfigurablePositionScope, number>;
 
   return (
     <Layout title={t("org.positionsTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -75,61 +78,77 @@ export function PositionsPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs">
+        <div class="tabs" role="tablist" aria-label={t("org.positionsTitle")}>
           {CONFIGURABLE_POSITION_SCOPES.map((s) => (
             <a class={`btn sm ${scope === s ? "" : "secondary"}`} href={`/organization/positions?scope=${s}`}
-              aria-current={scope === s ? "page" : undefined}>{t(SCOPE_KEYS[s])}</a>
+              aria-current={scope === s ? "page" : undefined}>
+              {t(SCOPE_KEYS[s])}
+              <span class="tab-count">{counts[s]}</span>
+            </a>
           ))}
         </div>
       </div>
 
-      <section class="card org-settings-add">
-        <div class="org-section-head">
-          <div>
-            <h2>{t("org.addPosition")}</h2>
-            <p class="muted small">{t("org.addPositionHint")}</p>
-          </div>
+      <details class="card settings-add" open={current.length === 0}>
+        <summary>
+          <span class="settings-add-title">+ {t("org.addPosition")}</span>
+          <span class="muted small">{t("org.addPositionHint")}</span>
+        </summary>
+        <div class="settings-add-body">
+          <form method="post" action="/organization/positions">
+            <input type="hidden" name="scope" value={scope} />
+            <PositionFields lang={L} editing={false} />
+            <div class="actions"><button class="btn" type="submit">{t("form.add")}</button></div>
+          </form>
         </div>
-        <form method="post" action="/organization/positions">
-          <input type="hidden" name="scope" value={scope} />
-          <PositionFields lang={L} editing={false} />
-          <div class="actions"><button class="btn" type="submit">{t("form.add")}</button></div>
-        </form>
-      </section>
+      </details>
 
       {current.length === 0 ? (
         <div class="card org-empty org-empty-small">
           <p class="muted">{t("org.noPositions")}</p>
         </div>
       ) : (
-        <div class="org-settings-list">
-          {current.map((def) => (
-            <div class={`card org-settings-row${def.active ? "" : " dept-inactive"}`}>
-              <div class="org-settings-head">
-                <div>
-                  <h3>{positionDefLabel(def, L)}</h3>
-                  <p class="muted small">
-                    <code>{def.code}</code>
-                    {" · "}{def.usageCount ?? 0} {t("org.positionUsage")}
-                  </p>
-                </div>
-                <span class={`badge ${def.active ? "active" : "inactive"}`}>
-                  {def.active ? t("dept.active") : t("dept.inactive")}
-                </span>
-              </div>
-              <form method="post" action={`/organization/positions/${def.id}`}>
-                <PositionFields def={def} lang={L} editing />
-                <div class="actions"><button class="btn sm" type="submit">{t("dept.save")}</button></div>
-              </form>
-              {(def.usageCount ?? 0) === 0 && (
-                <form method="post" action={`/organization/positions/${def.id}/delete`}
-                  data-confirm={t("org.deletePositionConfirm")} data-confirm-title={t("members.delete")}
-                  data-confirm-yes={t("members.delete")}>
-                  <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-                </form>
-              )}
-            </div>
-          ))}
+        <div class="role-list">
+          {current.map((def) => {
+            const inUse = (def.usageCount ?? 0) > 0;
+            return (
+              <article class={`card role-card${def.active ? "" : " is-inactive"}`}>
+                <header class="role-card-head">
+                  <div class="role-card-text">
+                    <h3>{positionDefLabel(def, L)}</h3>
+                    <p class="role-card-meta">
+                      <code>{def.code}</code>
+                      <span aria-hidden="true">·</span>
+                      <span>{def.usageCount ?? 0} {t("org.positionUsage")}</span>
+                    </p>
+                  </div>
+                  <span class={`badge ${def.active ? "active" : "inactive"}`}>
+                    {def.active ? t("dept.active") : t("dept.inactive")}
+                  </span>
+                </header>
+
+                <details class="settings-details">
+                  <summary>{t("org.editRole")}</summary>
+                  <form method="post" action={`/organization/positions/${def.id}`}>
+                    <PositionFields def={def} lang={L} editing />
+                    <div class="actions">
+                      <button class="btn sm" type="submit">{t("dept.save")}</button>
+                    </div>
+                  </form>
+
+                  {!inUse ? (
+                    <form method="post" action={`/organization/positions/${def.id}/delete`} class="role-danger"
+                      data-confirm={t("org.deletePositionConfirm")} data-confirm-title={t("members.delete")}
+                      data-confirm-yes={t("members.delete")}>
+                      <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+                    </form>
+                  ) : (
+                    <p class="muted small role-inuse">{t("org.deleteRoleHint")}</p>
+                  )}
+                </details>
+              </article>
+            );
+          })}
         </div>
       )}
     </Layout>
@@ -172,14 +191,33 @@ function RegionalFields(props: { row?: RegionalChurchRow; regions: { id: number;
   );
 }
 
+type HomeCellOption = { id: number; label: string; regionId: number; regionalChurchId: number | null; township: string | null };
+
+function groupCellsByTownship(cells: HomeCellOption[], noTownship: string): { name: string; cells: HomeCellOption[] }[] {
+  const groups = new Map<string, { name: string; cells: HomeCellOption[] }>();
+  for (const cell of cells) {
+    const name = cell.township || noTownship;
+    let group = groups.get(name);
+    if (!group) {
+      group = { name, cells: [] };
+      groups.set(name, group);
+    }
+    group.cells.push(cell);
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function RegionalChurchesPage(props: Common & {
   churches: RegionalChurchRow[];
   regions: { id: number; name: string }[];
-  homeCells: { id: number; label: string; regionId: number; regionalChurchId: number | null }[];
+  homeCells: HomeCellOption[];
 }) {
   const { user, perms, flash, lang, churches, regions, homeCells } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  const attachedCount = homeCells.filter((c) => c.regionalChurchId != null).length;
+  const unattachedCount = homeCells.length - attachedCount;
+
   return (
     <Layout title={t("org.regionalTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
@@ -190,75 +228,118 @@ export function RegionalChurchesPage(props: Common & {
         <a class="btn secondary" href="/organization?tab=regional">{t("dept.back")}</a>
       </div>
 
-      <section class="card org-settings-add">
-        <div class="org-section-head">
-          <div>
-            <h2>{t("org.addRegional")}</h2>
-            <p class="muted small">{t("org.addRegionalHint")}</p>
-          </div>
+      <div class="stat-grid org-stats">
+        <div class="stat"><div class="n">{churches.length}</div><div class="t">{t("org.regionalChurchesStat")}</div></div>
+        <div class="stat"><div class="n">{attachedCount}</div><div class="t">{t("org.attachedCells")}</div></div>
+        <div class="stat"><div class="n">{unattachedCount}</div><div class="t">{t("org.unattachedCells")}</div></div>
+      </div>
+
+      <details class="card settings-add" open={churches.length === 0}>
+        <summary>
+          <span class="settings-add-title">+ {t("org.addRegional")}</span>
+          <span class="muted small">{t("org.addRegionalHint")}</span>
+        </summary>
+        <div class="settings-add-body">
+          <form method="post" action="/organization/regional-churches">
+            <RegionalFields regions={regions} lang={L} />
+            <div class="actions"><button class="btn" type="submit">{t("form.add")}</button></div>
+          </form>
         </div>
-        <form method="post" action="/organization/regional-churches">
-          <RegionalFields regions={regions} lang={L} />
-          <div class="actions"><button class="btn" type="submit">{t("form.add")}</button></div>
-        </form>
-      </section>
+      </details>
 
       {churches.length === 0 ? (
-        <div class="card org-empty org-empty-small"><p class="muted">{t("org.noRegional")}</p></div>
+        <div class="card org-empty org-empty-small">
+          <p class="muted">{t("org.noRegional")}</p>
+        </div>
       ) : (
-        <div class="org-settings-list">
+        <div class="regional-list">
           {churches.map((church) => {
-            const cells = homeCells.filter((c) =>
+            const cells = homeCells.filter((c) => c.regionalChurchId === church.id);
+            const candidates = homeCells.filter((c) =>
               c.regionId === church.regionId && (c.regionalChurchId == null || c.regionalChurchId === church.id));
+            const attachedGroups = groupCellsByTownship(cells, t("org.townshipUnassigned"));
+            const candidateGroups = groupCellsByTownship(candidates, t("org.townshipUnassigned"));
+
             return (
-              <div class={`card org-settings-row${church.active ? "" : " dept-inactive"}`}>
-                <div class="org-settings-head">
+              <article class={`card regional-card${church.active ? "" : " is-inactive"}`}>
+                <header class="regional-card-head">
                   <div>
                     <h3>{L !== "mm" && church.nameEn ? church.nameEn : church.name}</h3>
                     <p class="muted small">
-                      {L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName}
-                      {" · "}{church.cellCount ?? 0} {t("org.cells")}
+                      {(L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName)}
+                      {" · "}{cells.length} {t("org.cells")}
                     </p>
                   </div>
                   <span class={`badge ${church.active ? "active" : "inactive"}`}>
                     {church.active ? t("dept.active") : t("dept.inactive")}
                   </span>
-                </div>
+                </header>
 
-                <form method="post" action={`/organization/regional-churches/${church.id}`}>
-                  <RegionalFields row={church} regions={regions} lang={L} />
-                  <div class="actions"><button class="btn sm" type="submit">{t("dept.save")}</button></div>
-                </form>
-
-                <form method="post" action={`/organization/regional-churches/${church.id}/cells`} class="regional-cells-form">
-                  <div class="regional-cells-head">
-                    <strong>{t("org.regionalCellAssignment")}</strong>
-                    <span class="muted small">{t("org.regionalCellHint")}</span>
+                {cells.length === 0 ? (
+                  <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
+                ) : (
+                  <div class="regional-attached">
+                    <span class="org-role-label">{t("org.attachedCells")}</span>
+                    {attachedGroups.map((group) => (
+                      <div class="regional-township-line">
+                        <span class="town">{group.name}</span>
+                        {group.cells.map((cell) => (
+                          <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
+                        ))}
+                      </div>
+                    ))}
                   </div>
-                  {cells.length === 0 ? (
-                    <p class="muted small">{t("org.regionalNoCells")}</p>
-                  ) : (
-                    <div class="check-grid">
-                      {cells.map((cell) => (
-                        <label class="check-chip">
-                          <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
-                            checked={cell.regionalChurchId === church.id} />
-                          <span>{cell.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  <div class="actions"><button class="btn sm secondary" type="submit">{t("org.saveCells")}</button></div>
-                </form>
-
-                {(church.cellCount ?? 0) === 0 && (
-                  <form method="post" action={`/organization/regional-churches/${church.id}/delete`}
-                    data-confirm={t("org.deleteRegionalConfirm")} data-confirm-title={t("members.delete")}
-                    data-confirm-yes={t("members.delete")}>
-                    <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-                  </form>
                 )}
-              </div>
+
+                <details class="settings-details">
+                  <summary>{t("org.editRegional")}</summary>
+
+                  <form method="post" action={`/organization/regional-churches/${church.id}`}>
+                    <RegionalFields row={church} regions={regions} lang={L} />
+                    <div class="actions">
+                      <button class="btn sm" type="submit">{t("dept.save")}</button>
+                    </div>
+                  </form>
+
+                  <form method="post" action={`/organization/regional-churches/${church.id}/cells`} class="regional-cells-form">
+                    <div class="regional-cells-head">
+                      <strong>{t("org.regionalCellAssignment")}</strong>
+                      <span class="muted small">{t("org.regionalCellHint")}</span>
+                    </div>
+                    {candidates.length === 0 ? (
+                      <p class="muted small">{t("org.regionalNoCells")}</p>
+                    ) : (
+                      <div class="regional-cell-groups">
+                        {candidateGroups.map((group) => (
+                          <div class="regional-candidate-group">
+                            <h4>{group.name}</h4>
+                            <div class="check-grid">
+                              {group.cells.map((cell) => (
+                                <label class="check-chip">
+                                  <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
+                                    checked={cell.regionalChurchId === church.id} />
+                                  <span>{cell.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div class="actions"><button class="btn sm secondary" type="submit">{t("org.saveCells")}</button></div>
+                  </form>
+
+                  {cells.length === 0 ? (
+                    <form method="post" action={`/organization/regional-churches/${church.id}/delete`} class="role-danger"
+                      data-confirm={t("org.deleteRegionalConfirm")} data-confirm-title={t("members.delete")}
+                      data-confirm-yes={t("members.delete")}>
+                      <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+                    </form>
+                  ) : (
+                    <p class="muted small role-inuse">{t("org.deleteRegionalHint")}</p>
+                  )}
+                </details>
+              </article>
             );
           })}
         </div>

@@ -482,12 +482,16 @@ async function orgRegions(db: DB, scope: Scope, lang: string): Promise<{ id: num
     FROM regions WHERE ${sql.join(conditions, sql` AND `)} ORDER BY id`);
 }
 
-async function loadAdminHomeCells(db: DB): Promise<{ id: number; label: string; regionId: number; regionalChurchId: number | null }[]> {
-  return db.all(sql`
-    SELECT id, label, region_id AS regionId, regional_church_id AS regionalChurchId
-    FROM lookup_options
-    WHERE type = 'home_cell' AND active = 1
-    ORDER BY region_id, sort_order, label`);
+type AdminHomeCell = { id: number; label: string; regionId: number; regionalChurchId: number | null; township: string | null };
+
+async function loadAdminHomeCells(db: DB): Promise<AdminHomeCell[]> {
+  return db.all<AdminHomeCell>(sql`
+    SELECT hc.id, hc.label, hc.region_id AS regionId, hc.regional_church_id AS regionalChurchId,
+           t.label AS township
+    FROM lookup_options hc
+    LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
+    WHERE hc.type = 'home_cell' AND hc.active = 1
+    ORDER BY hc.region_id, t.sort_order, t.label, hc.sort_order, hc.label`);
 }
 
 organizationRoutes.get("/regional-churches", requirePermission("options.manage"), async (c) => {

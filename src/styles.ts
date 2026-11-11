@@ -1373,6 +1373,67 @@ td.empty-state .small { margin-top: 4px; }
 .check-chip:has(input:checked) { border-color: var(--link); background: var(--chip-brand-bg); color: var(--link); }
 .check-chip input { width: auto; margin: 0; }
 
+/* ---------- position + regional settings screens ---------- */
+.tab-count { margin-left: 6px; font-size: 11.5px; opacity: .75; }
+.settings-add { padding: 0; overflow: hidden; }
+.settings-add > summary {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+  padding: 14px 18px; cursor: pointer; list-style: none;
+}
+.settings-add > summary::-webkit-details-marker { display: none; }
+.settings-add > summary::after {
+  content: "▾"; margin-left: auto; color: var(--muted); transition: transform .15s ease;
+}
+.settings-add[open] > summary::after { transform: rotate(180deg); }
+.settings-add > summary:hover { background: var(--field-bg); }
+.settings-add > summary:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+.settings-add-title { font-weight: 700; }
+.settings-add-body { padding: 14px 18px 18px; border-top: 1px solid var(--line); }
+
+.role-list, .regional-list { display: grid; gap: 12px; }
+.role-card, .regional-card { padding: 16px 18px; }
+.role-card.is-inactive, .regional-card.is-inactive { opacity: .72; }
+.role-card-head, .regional-card-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+}
+.role-card-text h3 { margin: 0 0 3px; font-size: 16px; overflow-wrap: anywhere; }
+.role-card-meta {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  margin: 0; font-size: 12.5px; color: var(--muted);
+}
+.role-card-meta code { font-size: 12px; }
+.regional-card-head h3 { margin: 0 0 3px; font-size: 17px; overflow-wrap: anywhere; }
+.regional-card-head p { margin: 0; }
+
+.settings-details { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.settings-details > summary {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+  padding: 6px 2px; cursor: pointer; list-style: none;
+  font-size: 13px; font-weight: 600; color: var(--link);
+}
+.settings-details > summary::-webkit-details-marker { display: none; }
+.settings-details > summary::after { content: "▾"; font-size: 11px; transition: transform .15s ease; }
+.settings-details[open] > summary::after { transform: rotate(180deg); }
+.settings-details[open] > summary { margin-bottom: 8px; }
+.settings-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.role-danger { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.role-inuse { margin: 10px 0 0; }
+
+.regional-attached { display: grid; gap: 6px; margin-top: 10px; }
+.regional-attached-empty { margin: 8px 0 0; }
+.regional-township-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 8px; font-size: 12.5px; }
+.regional-township-line .town { font-weight: 600; }
+.regional-cell-chip {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  background: var(--chip-bg); color: inherit; font-size: 12px; text-decoration: none;
+}
+.regional-cell-chip:hover { background: var(--chip-brand-bg); color: var(--link); }
+.regional-cell-groups { display: grid; gap: 12px; margin-top: 4px; }
+.regional-candidate-group h4 {
+  margin: 0 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+  text-transform: uppercase; color: var(--muted);
+}
+
 /* ---------- supervision + regional cards on the organization page ---------- */
 .org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: 9px; background: var(--field-bg); border: 1px dashed var(--line); }
 .org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
