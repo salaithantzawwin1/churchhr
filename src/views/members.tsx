@@ -665,12 +665,14 @@ type PositionFormProps = {
   positionDefs: PositionDefRow[];
   regionalChurches: RegionalChurchRow[];
   canManageDepartments: boolean;
+  canManagePositions: boolean;
+  canManageRegional: boolean;
   error?: string | null;
   lang?: Lang;
 };
 
 export function MemberPositionPage(props: Common & PositionFormProps) {
-  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, canManageDepartments } = props;
+  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, canManagePositions, canManageRegional } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -682,7 +684,8 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
         <MemberPositionForm
           member={member} assignments={assignments} departments={departments}
           positionDefs={positionDefs} regionalChurches={regionalChurches}
-          canManageDepartments={canManageDepartments} lang={lang}
+          canManageDepartments={canManageDepartments} canManagePositions={canManagePositions}
+          canManageRegional={canManageRegional} lang={lang}
         />
       </div>
     </Layout>
@@ -690,7 +693,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
 }
 
 export function MemberPositionForm(props: PositionFormProps) {
-  const { member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, error, lang } = props;
+  const { member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, canManagePositions, canManageRegional, error, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
@@ -719,7 +722,7 @@ export function MemberPositionForm(props: PositionFormProps) {
   ].filter((x) => x.available);
   const firstTab = tabs[0]?.key ?? "home";
 
-  const managePositions = (scope: string) => canManageDepartments && (
+  const managePositions = (scope: string) => canManagePositions && (
     <p class="hint">
       <a href={`/organization/positions?scope=${scope}`}>{t("org.managePositions")}</a>
     </p>
@@ -831,7 +834,7 @@ export function MemberPositionForm(props: PositionFormProps) {
               <>
                 <p class="hint">{regionalChurches.length === 0 ? t("org.noRegional") : t("org.noPositions")}</p>
                 {managePositions("regional_church")}
-                {canManageDepartments && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
+                {canManageRegional && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
               </>
             ) : (
               <div class="form-grid">

@@ -87,28 +87,28 @@ export function PositionModal(props: {
       <form method="post" action={def ? `/organization/positions/${def.id}` : "/organization/positions"} data-modal-ajax>
         {!def && <input type="hidden" name="scope" value={scope} />}
         <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} />
-        <div class="actions">
+        <div class={`actions${def && !inUse ? " modal-actions-split" : ""}`}>
+          {def && !inUse && (
+            <button class="btn sm outline-danger" type="submit" form={`delete-position-${def.id}`}>
+              {t("members.delete")}
+            </button>
+          )}
           <button class="btn" type="submit">{def ? t("dept.save") : t("form.add")}</button>
         </div>
       </form>
-      {def && (
-        inUse ? (
-          <p class="muted small modal-note">{t("org.deleteRoleHint")}</p>
-        ) : (
-          <form
-            method="post"
-            action={`/organization/positions/${def.id}/delete`}
-            class="modal-danger"
-            data-confirm={t("org.deletePositionConfirm")}
-            data-confirm-title={t("members.delete")}
-            data-confirm-yes={t("members.delete")}
-          >
-            <div class="actions">
-              <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-            </div>
-          </form>
-        )
+      {def && !inUse && (
+        <form
+          id={`delete-position-${def.id}`}
+          method="post"
+          action={`/organization/positions/${def.id}/delete`}
+          class="modal-danger"
+          data-confirm={t("org.deletePositionConfirm")}
+          data-confirm-title={t("members.delete")}
+          data-confirm-yes={t("members.delete")}
+          hidden
+        />
       )}
+      {def && inUse && <p class="muted small modal-note">{t("org.deleteRoleHint")}</p>}
     </>
   );
 }

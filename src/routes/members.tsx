@@ -1189,7 +1189,9 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
   const formProps = {
     member, assignments: state.assignments, departments: state.departments,
     positionDefs: state.defs, regionalChurches: state.regionalChurches,
-    canManageDepartments: c.get("perms").has("options.manage"), lang: c.get("lang"),
+    canManageDepartments: c.get("perms").has("options.manage") && scope.scopeAll,
+    canManagePositions: c.get("perms").has("options.manage") && scope.scopeAll,
+    canManageRegional: c.get("perms").has("options.manage"), lang: c.get("lang"),
   };
   if (c.req.query("modal") !== "1") {
     return c.html(
@@ -1248,7 +1250,9 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       member={memberState}
       assignments={state} departments={departments}
       positionDefs={defs} regionalChurches={regionalChurches}
-      canManageDepartments={c.get("perms").has("options.manage")}
+      canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
+      canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
+      canManageRegional={c.get("perms").has("options.manage")}
       error={message} lang={c.get("lang")}
     />,
     400,

@@ -139,11 +139,12 @@ export function OrganizationPage(props: Common & {
   positionDefs: PositionDefRow[];
   canManageDepartments: boolean;
   canManageStructure: boolean;
+  canManagePositions: boolean;
   unassignedMembers: number;
 }) {
   const {
     user, perms, flash, lang, tab, cells, departments, leaders,
-    regionalChurches, positionDefs, canManageDepartments, canManageStructure, unassignedMembers,
+    regionalChurches, positionDefs, canManageDepartments, canManageStructure, canManagePositions, unassignedMembers,
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
@@ -172,10 +173,14 @@ export function OrganizationPage(props: Common & {
   const regionalRole = (churchId: number, position: string) =>
     leaderFor(leaders, "regional_church", position, { regionalChurchId: churchId });
 
-  const manageLinks = canManageStructure && (
+  const manageLinks = (canManagePositions || canManageStructure) && (
     <div class="org-manage-links">
-      <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
-      <a class="btn secondary sm" href="/organization/regional-churches">{t("org.manageRegional")}</a>
+      {canManagePositions && (
+        <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
+      )}
+      {canManageStructure && (
+        <a class="btn secondary sm" href="/organization/regional-churches">{t("org.manageRegional")}</a>
+      )}
     </div>
   );
 
@@ -283,7 +288,7 @@ export function OrganizationPage(props: Common & {
                 <h2>{t("org.churchLeadership")}</h2>
                 <p class="muted small">{t("org.churchLeadershipHint")}</p>
               </div>
-              {canManageStructure && (
+              {canManagePositions && (
                 <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
               )}
             </div>

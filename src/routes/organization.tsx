@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
@@ -7,6 +8,7 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
+import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
@@ -19,6 +21,16 @@ import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
 
 export const organizationRoutes = new Hono<AppEnv>();
+
+/** Positions and departments are church-wide, so only an all-state options
+ *  administrator may change them. State-scoped managers keep their regional
+ *  church and Home Cell settings. */
+const requireAllStates = createMiddleware<AppEnv>(async (c, next) => {
+  if (!c.get("scopeAll")) {
+    return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
+  }
+  await next();
+});
 
 type Scope = { scopeAll: boolean; stateIds: number[] };
 
@@ -92,8 +104,9 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       lang={c.get("lang")} tab={tab} cells={cells}
       departments={departments} leaders={leaders}
       regionalChurches={regionalChurches} positionDefs={positionDefs}
-      canManageDepartments={c.get("perms").has("options.manage")}
+      canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageStructure={c.get("perms").has("options.manage")}
+      canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
   );
@@ -103,6 +116,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
 organizationRoutes.get("/departments/:id", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.notFound();
   const department = (await db.all<OrgDepartment>(sql`
@@ -125,7 +139,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} department={department} leaders={leaders}
-      canManage={c.get("perms").has("options.manage")}
+      canManage={c.get("perms").has("options.manage") && scope.scopeAll}
     />,
   );
 });
@@ -163,7 +177,7 @@ async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<Admin
     ORDER BY d.active DESC, d.sort_order, d.name`);
 }
 
-organizationRoutes.get("/departments", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/departments", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const departments = await loadAdminDepartments(db);
   return c.html(
@@ -187,7 +201,7 @@ function departmentNameError(name: string, nameEn: string): string | null {
   return null;
 }
 
-organizationRoutes.post("/departments", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/departments", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const body = await c.req.parseBody();
   const name = s(body.name);
@@ -208,7 +222,7 @@ organizationRoutes.post("/departments", requirePermission("options.manage"), asy
   return c.redirect("/organization/departments?ok=department-created", 303);
 });
 
-organizationRoutes.post("/departments/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/departments/:id", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/departments?err=err-notfound", 303);
@@ -288,7 +302,7 @@ function modalRequest(c: { req: { header: (name: string) => string | undefined }
   return c.req.header("X-Requested-With") === "modal";
 }
 
-organizationRoutes.get("/positions", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/positions", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const scope = positionScopeFrom(c.req.query("scope"));
   const defs = await adminPositionDefs(db);
@@ -302,13 +316,13 @@ organizationRoutes.get("/positions", requirePermission("options.manage"), async 
   );
 });
 
-organizationRoutes.get("/positions/new", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/positions/new", requirePermission("options.manage"), requireAllStates, async (c) => {
   const scope = positionScopeFrom(c.req.query("scope"));
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${scope}`, 303);
   return c.html(<PositionModal scope={scope} lang={c.get("lang")} />);
 });
 
-organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   const def = id ? (await adminPositionDefs(db)).find((d) => d.id === id) : undefined;
@@ -317,7 +331,7 @@ organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"
   return c.html(<PositionModal scope={def.scopeType} def={def} lang={c.get("lang")} />);
 });
 
-organizationRoutes.post("/positions", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/positions", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const body = await c.req.parseBody();
   const scope = positionScopeFrom(s(body.scope));
@@ -363,7 +377,7 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), async
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/positions/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/positions/:id", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
@@ -422,7 +436,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), a
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/positions/:id/delete", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/positions/:id/delete", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
@@ -446,7 +460,7 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
 
 // ---------- Position change history ----------
 
-organizationRoutes.get("/positions/history", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/positions/history", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const rawType = c.req.query("type");
   const filter = rawType === "def" || rawType === "assignment" ? rawType : "all";

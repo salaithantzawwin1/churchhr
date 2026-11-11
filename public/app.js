@@ -959,6 +959,9 @@
     // its place: replacing the body would detach it and submit() would do
     // nothing. Show the prompt under it with the form hidden instead.
     if (bodyEl.contains(f)) {
+      // A delete form can be hidden from the start (its Delete button lives in
+      // the main form footer); remember that so Cancel restores the right state.
+      f.setAttribute("data-confirm-was-hidden", f.hidden ? "1" : "0");
       f.hidden = true;
       var box = document.createElement("div");
       box.className = "modal-confirm";
@@ -1027,7 +1030,11 @@
     if (no) {
       var box = no.closest(".modal-confirm");
       if (box) box.remove();
-      if (pendingForm) { pendingForm.hidden = false; pendingForm = null; }
+      if (pendingForm) {
+        pendingForm.hidden = pendingForm.getAttribute("data-confirm-was-hidden") === "1";
+        pendingForm.removeAttribute("data-confirm-was-hidden");
+        pendingForm = null;
+      }
       return;
     }
     var b = el.closest("[data-confirm-yes]");

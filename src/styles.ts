@@ -451,6 +451,8 @@ th.bar-col { width: 42%; }
 }
 /* Cancel sits left of the primary action in the sticky bar. */
 .modal-body form > .actions:last-child .btn.secondary { order: -1; }
+/* Delete on the left, Save on the right, in one footer row. */
+.modal-body form > .actions.modal-actions-split { justify-content: space-between; }
 .form-section { margin: 0; padding: 0; border: 0; min-width: 0; }
 .form-section + .form-section { margin-top: 2px; }
 .form-section legend {
@@ -1411,6 +1413,9 @@ td.empty-state .small { margin-top: 4px; }
   flex: 0 0 auto; margin-top: 4px; padding-top: 14px;
   border-top: 1px dashed var(--line);
 }
+/* The delete form can be present only as a submit target for the footer
+   button; the modal form display rule must not reveal its empty border. */
+.modal-body form[hidden] { display: none; }
 .modal-body form.modal-danger > .actions {
   position: static; margin: 0; padding: 0; border: 0; background: none;
   justify-content: flex-start;
