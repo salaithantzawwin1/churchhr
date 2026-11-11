@@ -1457,6 +1457,65 @@ td.empty-state .small { margin-top: 4px; }
   text-transform: uppercase; color: var(--muted);
 }
 
+/* Supervision clusters use a compact row: the cluster, its pastor and the
+   actions share one line, while the attached cells sit on a quiet strip below.
+   This keeps a one-cluster list from turning into a mostly-empty wide card. */
+.cluster-list { display: grid; gap: 10px; }
+.cluster-card { padding: 0; overflow: hidden; }
+.cluster-card.is-inactive { opacity: .72; }
+.cluster-card-main {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(170px, 1fr) auto;
+  gap: 8px 20px; align-items: center; padding: 13px 18px;
+}
+.cluster-card-title { min-width: 0; }
+.cluster-card-title h3 { margin: 0 0 2px; font-size: 16.5px; overflow-wrap: anywhere; }
+.cluster-card-title p { margin: 0; }
+.cluster-card-pastor { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13.5px; }
+.cluster-kicker {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.cluster-card-actions { justify-content: flex-end; }
+.cluster-cell-strip {
+  display: grid; gap: 5px; padding: 9px 18px 10px;
+  border-top: 1px solid var(--line); background: var(--field-bg);
+}
+.cluster-township-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; font-size: 12.5px; }
+.cluster-township-line .town { font-weight: 600; }
+.cluster-empty-line { margin: 0; padding: 9px 18px 11px; border-top: 1px solid var(--line); }
+
+/* Cluster editor: two clear sections, with both saves kept in the flow rather
+   than two competing sticky footers. */
+.modal-body .cluster-main-form > .actions:last-child,
+.modal-body .cluster-cells-form > .actions:last-child {
+  position: static; margin: 0; padding: 0; border: 0; background: none;
+}
+/* Let the two cluster forms keep their natural height. Stretching them made a
+   short editor fill the whole sheet and pushed the cell save far from its
+   fields, which read as two unrelated buttons. Tighter gaps keep the whole
+   editor inside a laptop-height dialog instead of ending on a cut-off line. */
+.modal-body .cluster-main-form,
+.modal-body .cluster-cells-form { flex: 0 0 auto; }
+.modal-body .cluster-main-form { gap: 12px; }
+.modal-body .cluster-main-form .form-grid { gap: 10px 16px; }
+.cluster-cells-form { gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.cluster-section-head { display: grid; gap: 2px; }
+.cluster-section-title { display: flex; align-items: center; gap: 8px; }
+.cluster-section-title strong { font-size: 14px; }
+.cluster-section-head p { margin: 0; }
+.cluster-section-head .count-pill { font-size: 11px; }
+.cluster-modal-foot { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.modal-body .cluster-modal-foot form.modal-danger { margin: 0; padding: 0; border: 0; }
+.modal-body .cluster-modal-foot form.modal-danger > .actions { margin: 0; padding: 0; border: 0; }
+
+@media (max-width: 640px) {
+  .cluster-card-main { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 14px; }
+  .cluster-card-pastor { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 6px; }
+  .cluster-card-actions { align-self: start; }
+  .cluster-cell-strip { padding: 8px 14px 10px; }
+  .cluster-empty-line { padding: 8px 14px 10px; }
+}
+
 /* ---------- supervision + regional cards on the organization page ---------- */
 .org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: 9px; background: var(--field-bg); border: 1px dashed var(--line); }
 .org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }

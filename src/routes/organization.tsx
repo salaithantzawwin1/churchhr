@@ -10,7 +10,7 @@ import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } fr
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
-import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell } from "../views/clusters";
+import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
@@ -889,15 +889,31 @@ organizationRoutes.post("/clusters", requirePermission("options.manage"), async 
   const nameEn = s(body.name_en).slice(0, 120);
   const regionId = asInt(s(body.region_id));
   const sortOrder = departmentSortOrder(s(body.sort_order));
-  if (!name) return c.redirect("/organization/clusters?err=cluster-name-required", 303);
-  if (!regionId) return c.redirect("/organization/clusters?err=cluster-state-required", 303);
+  const values: ClusterValues = {
+    name, nameEn, regionId: regionId ?? "", sortOrder, active: true, pastorMemberId: "",
+  };
+  const modal = modalRequest(c);
+  const fail = async (err: string) => {
+    if (!modal) return c.redirect(`/organization/clusters?err=${err}`, 303);
+    return c.html(
+      <SupervisionClusterModal
+        regions={await orgRegions(db, scope, c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+      />,
+      422,
+    );
+  };
+  if (!name) return await fail("cluster-name-required");
+  if (!regionId) return await fail("cluster-state-required");
   const allowed = await orgRegions(db, scope, c.get("lang"));
-  if (!allowed.some((r) => r.id === regionId)) return c.redirect("/organization/clusters?err=err-scope", 303);
-  if (await clusterNameTaken(db, name, regionId)) return c.redirect("/organization/clusters?err=cluster-name-taken", 303);
+  if (!allowed.some((r) => r.id === regionId)) return await fail("err-scope");
+  if (await clusterNameTaken(db, name, regionId)) return await fail("cluster-name-taken");
   await db.run(sql`
     INSERT INTO supervision_clusters (name, name_en, region_id, active, sort_order)
     VALUES (${name}, ${nameEn || null}, ${regionId}, 1, ${sortOrder})`);
-  return c.redirect("/organization/clusters?ok=cluster-created", 303);
+  const landing = "/organization/clusters?ok=cluster-created";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), async (c) => {
@@ -918,15 +934,33 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   const pastorId = asInt(s(body.pastor_member_id));
-  if (!name) return c.redirect("/organization/clusters?err=cluster-name-required", 303);
+  const values: ClusterValues = {
+    name, nameEn, regionId, sortOrder, active: active === 1, pastorMemberId: pastorId ?? "",
+  };
+  const modal = modalRequest(c);
+  const fail = async (err: string) => {
+    if (!modal) return c.redirect(`/organization/clusters?err=${err}`, 303);
+    const cluster = (await adminClusters(db, scope)).find((r) => r.id === id);
+    return c.html(
+      <SupervisionClusterModal
+        cluster={cluster}
+        regions={await orgRegions(db, scope, c.get("lang"))}
+        homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+        pastorCandidates={await clusterPastorCandidates(db, regionId)}
+        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+      />,
+      422,
+    );
+  };
+  if (!name) return await fail("cluster-name-required");
   const allowed = await orgRegions(db, scope, c.get("lang"));
-  if (!allowed.some((r) => r.id === regionId)) return c.redirect("/organization/clusters?err=err-scope", 303);
-  if (await clusterNameTaken(db, name, regionId, id)) return c.redirect("/organization/clusters?err=cluster-name-taken", 303);
+  if (!allowed.some((r) => r.id === regionId)) return await fail("err-scope");
+  if (await clusterNameTaken(db, name, regionId, id)) return await fail("cluster-name-taken");
   if (pastorId) {
     const validPastor = await db.all<{ id: number }>(sql`
       SELECT id FROM members
       WHERE id = ${pastorId} AND status = 'active' AND region_id = ${regionId} LIMIT 1`);
-    if (validPastor.length === 0) return c.redirect("/organization/clusters?err=cluster-pastor-invalid", 303);
+    if (validPastor.length === 0) return await fail("cluster-pastor-invalid");
   }
   const attached = await db.all<{ n: number }>(sql`
     SELECT
@@ -934,8 +968,8 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
       (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) +
       (SELECT COUNT(*) FROM cluster_pastor_assignments WHERE cluster_id = ${id}) AS n`);
   const used = attached[0]?.n ?? 0;
-  if (regionId !== current.regionId && used > 0) return c.redirect("/organization/clusters?err=cluster-state-locked", 303);
-  if (current.active === 1 && active === 0 && used > 0) return c.redirect("/organization/clusters?err=cluster-in-use", 303);
+  if (regionId !== current.regionId && used > 0) return await fail("cluster-state-locked");
+  if (current.active === 1 && active === 0 && used > 0) return await fail("cluster-in-use");
   await db.run(sql`
     UPDATE supervision_clusters
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
@@ -950,7 +984,8 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   } else {
     await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
   }
-  return c.redirect("/organization/clusters?ok=cluster-updated", 303);
+  const landing = "/organization/clusters?ok=cluster-updated";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/clusters/:id/cells", requirePermission("options.manage"), async (c) => {
@@ -972,13 +1007,27 @@ organizationRoutes.post("/clusters/:id/cells", requirePermission("options.manage
   } catch {
     ids = [];
   }
+  const modal = modalRequest(c);
   if (ids.length > 0) {
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${cluster.regionId}
         AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
     if ((valid[0]?.n ?? 0) !== ids.length) {
-      return c.redirect("/organization/clusters?err=cluster-cell-invalid", 303);
+      if (!modal) return c.redirect("/organization/clusters?err=cluster-cell-invalid", 303);
+      const row = (await adminClusters(db, scope)).find((r) => r.id === id);
+      return c.html(
+        <SupervisionClusterModal
+          cluster={row}
+          regions={await orgRegions(db, scope, c.get("lang"))}
+          homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+          pastorCandidates={await clusterPastorCandidates(db, row?.regionId ?? cluster.regionId)}
+          cellError={flashText("cluster-cell-invalid", c.get("lang"))}
+          selectedCellIds={ids}
+          lang={c.get("lang")}
+        />,
+        422,
+      );
     }
   }
   await db.run(sql`UPDATE lookup_options SET supervision_cluster_id = NULL WHERE supervision_cluster_id = ${id}`);
@@ -987,7 +1036,8 @@ organizationRoutes.post("/clusters/:id/cells", requirePermission("options.manage
       UPDATE lookup_options SET supervision_cluster_id = ${id}
       WHERE id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
   }
-  return c.redirect("/organization/clusters?ok=cluster-cells", 303);
+  const landing = "/organization/clusters?ok=cluster-cells";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/clusters/:id/delete", requirePermission("options.manage"), async (c) => {

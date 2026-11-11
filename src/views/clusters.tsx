@@ -13,7 +13,7 @@ export type ClusterHomeCell = {
   supervisionClusterId: number | null;
 };
 
-type ClusterValues = {
+export type ClusterValues = {
   name: string;
   nameEn: string;
   regionId: number | "";
@@ -66,7 +66,7 @@ function ClusterFields(props: {
         <input name="sort_order" type="number" min="0" max="9999" value={String(values.sortOrder)} />
       </label>
       {editing && (
-        <label class="field">
+        <label class="field span-2">
           <span class="lbl">{t("org.clusterPastor")}</span>
           <select name="pastor_member_id">
             <option value="">{t("org.noPastor")}</option>
@@ -80,7 +80,7 @@ function ClusterFields(props: {
         </label>
       )}
       {editing && (
-        <label class="dept-active">
+        <label class="dept-active span-2">
           <input type="checkbox" name="active" value="1" checked={values.active} />
           <span>{t("dept.active")}</span>
         </label>
@@ -123,8 +123,11 @@ export function SupervisionClusterModal(props: {
   const cells = cluster
     ? homeCells.filter((c) => c.supervisionClusterId === cluster.id)
     : [];
-  const candidates = cluster
-    ? homeCells.filter((c) => c.regionId === cluster.regionId)
+  // When a failed save proposed a different state, show that state's cells
+  // so the corrected form can still be submitted without reopening it.
+  const selectedRegion = values.regionId === "" ? cluster?.regionId : values.regionId;
+  const candidates = cluster && selectedRegion != null
+    ? homeCells.filter((c) => c.regionId === selectedRegion)
     : [];
   const isPicked = (cell: ClusterHomeCell) =>
     props.selectedCellIds
@@ -134,7 +137,8 @@ export function SupervisionClusterModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" action={cluster ? `/organization/clusters/${cluster.id}` : "/organization/clusters"} data-plain-submit>
+      <form method="post" class="cluster-main-form"
+        action={cluster ? `/organization/clusters/${cluster.id}` : "/organization/clusters"} data-modal-ajax>
         <ClusterFields
           values={values}
           regions={regions}
@@ -149,10 +153,14 @@ export function SupervisionClusterModal(props: {
 
       {cluster && (
         <>
-          <form method="post" action={`/organization/clusters/${cluster.id}/cells`} class="regional-cells-form" data-plain-submit>
-            <div class="regional-cells-head">
-              <strong>{t("org.clusterCellAssignment")}</strong>
-              <span class="muted small">{t("org.clusterCellHint")}</span>
+          <form method="post" action={`/organization/clusters/${cluster.id}/cells`}
+            class="cluster-cells-form" data-modal-ajax>
+            <div class="cluster-section-head">
+              <div class="cluster-section-title">
+                <strong>{t("org.clusterCellAssignment")}</strong>
+                <span class="count-pill">{cells.length}</span>
+              </div>
+              <p class="muted small">{t("org.clusterCellHint")}</p>
             </div>
             {cellError && <div class="modal-error" role="alert">{cellError}</div>}
             {candidates.length === 0 ? (
@@ -180,22 +188,24 @@ export function SupervisionClusterModal(props: {
             </div>
           </form>
 
-          {cells.length === 0 ? (
-            <form
-              method="post"
-              action={`/organization/clusters/${cluster.id}/delete`}
-              class="modal-danger"
-              data-confirm={t("org.clusterDeleteConfirm")}
-              data-confirm-title={t("members.delete")}
-              data-confirm-yes={t("members.delete")}
-            >
-              <div class="actions">
-                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-              </div>
-            </form>
-          ) : (
-            <p class="muted small modal-note">{t("org.clusterDeleteHint")}</p>
-          )}
+          <div class="cluster-modal-foot">
+            {cells.length === 0 ? (
+              <form
+                method="post"
+                action={`/organization/clusters/${cluster.id}/delete`}
+                class="modal-danger"
+                data-confirm={t("org.clusterDeleteConfirm")}
+                data-confirm-title={t("members.delete")}
+                data-confirm-yes={t("members.delete")}
+              >
+                <div class="actions">
+                  <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+                </div>
+              </form>
+            ) : (
+              <p class="muted small modal-note">{t("org.clusterDeleteHint")}</p>
+            )}
+          </div>
         </>
       )}
     </>
@@ -266,25 +276,26 @@ export function SupervisionClustersPage(props: Common & {
           {filtered && <p class="small"><a href="/organization/clusters">{t("members.clearFilters")}</a></p>}
         </div>
       ) : (
-        <div class="regional-list">
+        <div class="cluster-list">
           {visible.map((cluster) => {
             const cells = homeCells.filter((c) => c.supervisionClusterId === cluster.id);
             return (
-              <article class={`card regional-card${cluster.active ? "" : " is-inactive"}`}>
-                <header class="regional-card-head">
-                  <div>
+              <article class={`card cluster-card${cluster.active ? "" : " is-inactive"}`}>
+                <div class="cluster-card-main">
+                  <div class="cluster-card-title">
                     <h3>{clusterName(cluster, L)}</h3>
                     <p class="muted small">
                       {L !== "mm" && cluster.stateNameEn ? cluster.stateNameEn : cluster.stateName}
                       {" · "}{cells.length} {t("org.cells")}
                     </p>
-                    {cluster.pastorName && (
-                      <p class="muted small org-cluster-pastor">
-                        {t("org.clusterPastor")}: <strong>{cluster.pastorName}</strong>
-                      </p>
-                    )}
                   </div>
-                  <div class="role-card-actions">
+                  <div class="cluster-card-pastor">
+                    <span class="cluster-kicker">{t("org.clusterPastor")}</span>
+                    <span class={cluster.pastorName ? "" : "muted"}>
+                      {cluster.pastorName || t("org.noPastor")}
+                    </span>
+                  </div>
+                  <div class="role-card-actions cluster-card-actions">
                     <span class={`badge ${cluster.active ? "active" : "inactive"}`}>
                       {cluster.active ? t("dept.active") : t("dept.inactive")}
                     </span>
@@ -293,14 +304,14 @@ export function SupervisionClustersPage(props: Common & {
                       {t("members.edit")}
                     </a>
                   </div>
-                </header>
+                </div>
 
                 {cells.length === 0 ? (
-                  <p class="muted small regional-attached-empty">{t("org.clusterNoCells")}</p>
+                  <p class="muted small cluster-empty-line">{t("org.clusterNoCells")}</p>
                 ) : (
-                  <div class="regional-attached">
+                  <div class="cluster-cell-strip">
                     {groupHomeCells(cells, t("org.townshipUnassigned")).map((group) => (
-                      <div class="regional-township-line">
+                      <div class="cluster-township-line">
                         <span class="town">{group.name}</span>
                         {group.cells.map((cell) => (
                           <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
