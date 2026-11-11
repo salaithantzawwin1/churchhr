@@ -1604,6 +1604,7 @@ const EN: Dict = {
   "vacancy.all": "All structures",
   "vacancy.scopeChurch": "Church",
   "vacancy.scopeRegional": "Regional Church",
+  "vacancy.scopeCluster": "Supervision cluster",
   "vacancy.scopeHomeCell": "Home Cell",
   "vacancy.scopeSupervision": "Supervision",
   "vacancy.scopeDepartment": "Department",
