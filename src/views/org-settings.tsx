@@ -68,7 +68,10 @@ export function PositionsPage(props: Common & {
           <h1>{t("org.positionsTitle")}<span class="count-pill">{current.length}</span></h1>
           <p class="page-sub">{t("org.positionsIntro")}</p>
         </div>
-        <a class="btn secondary" href="/organization">{t("dept.back")}</a>
+        <div class="page-head-actions">
+          <a class="btn secondary" href="/organization/positions/history">{t("history.link")}</a>
+          <a class="btn secondary" href="/organization">{t("dept.back")}</a>
+        </div>
       </div>
 
       <div class="page-toolbar">

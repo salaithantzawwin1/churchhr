@@ -1386,6 +1386,45 @@ td.empty-state .small { margin-top: 4px; }
 .org-regional-empty { margin: 10px 0 0; }
 .org-unassigned { margin-top: 4px; }
 
+/* townships inside a regional church card */
+.org-regional-groups { display: grid; gap: 12px; margin-top: 10px; }
+.org-regional-township { padding-top: 10px; border-top: 1px dashed var(--line); }
+.org-regional-township-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.org-regional-township-head .org-township-name { font-weight: 700; }
+.org-regional-township .org-supervision { margin: 8px 0 6px; }
+.org-regional-township .org-regional-cells { margin-top: 4px; }
+.org-regional-township .org-regional-cell:first-child { border-top: 0; }
+
+/* ---------- position change history ---------- */
+.badge.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.history-list { display: grid; gap: 10px; }
+.history-item { padding: 14px 16px; }
+.history-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12px; color: var(--muted); }
+.history-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: 6px; }
+.history-main strong { font-size: 15px; overflow-wrap: anywhere; }
+.history-main code { font-size: 12px; }
+.history-detail { margin: 6px 0 0; font-size: 13px; }
+.history-changes { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; }
+.history-changes li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.history-changes .org-role-label { min-width: 96px; }
+.history-old { color: var(--muted); text-decoration: line-through; }
+
+/* ---------- vacancy report ---------- */
+.vacancy-progress { padding: 14px 16px; margin-bottom: 16px; }
+.vacancy-progress-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.vacancy-bar { height: 8px; border-radius: 999px; background: var(--field-bg); overflow: hidden; }
+.vacancy-bar > span { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
+.vacancy-group { margin-bottom: 16px; }
+.vacancy-rows { display: grid; gap: 4px; }
+.vacancy-row { padding: 12px 0; border-top: 1px solid var(--line); }
+.vacancy-row:first-child { border-top: 0; padding-top: 4px; }
+.vacancy-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.vacancy-row-head h3 { margin: 0 0 2px; font-size: 15px; overflow-wrap: anywhere; }
+.vacancy-row-head p { margin: 0; }
+.vacancy-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.vacancy-chip { display: inline-block; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--warn-bg); color: var(--warn-ink); font-size: 12px; }
+.vacancy-foot { margin-top: 6px; }
+
 .dept-add { margin-bottom: 18px; padding: 18px 20px; }
 .dept-add h2 { margin: 0 0 2px; }
 .dept-list { display: grid; gap: 14px; }

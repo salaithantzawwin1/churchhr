@@ -9,10 +9,11 @@ import { flashFromQuery } from "../flash";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 import {
-  getMemberPositions, isPositionForScope, positionTaken, setHomeCellPosition, setMemberPositions,
+  getMemberPositions, isPositionForScope, positionLabel, positionTaken, setHomeCellPosition, setMemberPositions,
   type PositionAssignment,
 } from "../positions";
-import { isDefinedForScope, loadPositionDefs, type PositionDefRow } from "../position-catalog";
+import { isDefinedForScope, loadPositionDefs, positionDefLabel, type PositionDefRow } from "../position-catalog";
+import { recordPositionHistory } from "../position-history";
 import { loadRegionalChurches } from "../org-units";
 import { loadDepartments } from "../departments";
 
@@ -1312,6 +1313,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     assignments.push({ scopeType: "church", position: churchPosition });
   }
 
+  const previous = await getMemberPositions(db, id);
   try {
     await setMemberPositions(db, id, assignments, c.get("user").id);
   } catch {
@@ -1321,6 +1323,43 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     memberId: id, actorId: c.get("user").id, action: "position",
     snapshotJson: JSON.stringify({ assignments, home_cell_id: row.home_cell_id }),
   });
+
+  // Record who changed which roles, with the previous assignments for the audit trail.
+  const roleLabel = (code: string, scopeType: string) => {
+    const def = defs.find((d) => d.code === code && d.scopeType === scopeType);
+    return def ? positionDefLabel(def, c.get("lang")) : positionLabel(code, c.get("lang"));
+  };
+  const describe = (a: PositionAssignment) => {
+    switch (a.scopeType) {
+      case "home_cell": return `${roleLabel(a.position, "home_cell")} · ${row.home_cell ?? ""}`;
+      case "township": return `${roleLabel(a.position, "township")} · ${row.home_cell_township ?? ""}`;
+      case "regional_church": {
+        const church = regionalChurches.find((r) => r.id === a.regionalChurchId);
+        return `${roleLabel(a.position, "regional_church")} · ${church?.nameEn || church?.name || ""}`;
+      }
+      case "department": {
+        const department = departments.find((d) => d.id === a.departmentId);
+        return `${roleLabel(a.position, "department")} · ${department?.name ?? ""}`;
+      }
+      default: return roleLabel(a.position, "church");
+    }
+  };
+  const keyOf = (p: { scopeType: string; position: string }) => `${p.scopeType}:${p.position}`;
+  const beforeKeys = previous.map(keyOf).sort().join("|");
+  const afterKeys = assignments.map(keyOf).sort().join("|");
+  if (beforeKeys !== afterKeys) {
+    await recordPositionHistory(db, {
+      entity: "assignment", action: "assigned", actorId: c.get("user").id,
+      scopeType: assignments.length === 1 ? assignments[0]!.scopeType : null,
+      memberId: id,
+      summary: assignments.length > 0 ? assignments.map(describe).join("; ") : null,
+      changes: [{
+        field: "assignment",
+        from: previous.map((p) => p.position).join(", ") || null,
+        to: assignments.map((a) => a.position).join(", ") || null,
+      }],
+    });
+  }
   return back("/members?ok=member-position");
 });
 

@@ -15,7 +15,8 @@ export type HealthResult = {
  * the Worker, D1 and the schema this build expects (0014 added short_code,
  * 0015 members.photo, 0016 activity_reports, 0017 report_edits, 0018 families
  * placement, 0019 member_positions, 0021 church_departments, 0022 member
- * departments, 0023 position catalogue and regional churches). */
+ * departments, 0023 position catalogue and regional churches, 0024 position
+ * change history). */
 export async function checkHealth(env: Bindings): Promise<HealthResult> {
   const started = Date.now();
   let db: "ok" | "error" = "ok";
@@ -37,6 +38,7 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
     await env.DB.prepare("SELECT name, region_id FROM regional_churches LIMIT 1").all();
     await env.DB.prepare("SELECT regional_church_id FROM member_positions LIMIT 1").all();
     await env.DB.prepare("SELECT regional_church_id FROM lookup_options LIMIT 1").all();
+    await env.DB.prepare("SELECT entity, action, actor_id FROM position_history LIMIT 1").all();
   } catch (err) {
     console.error("health check failed:", err);
     db = "error";

@@ -8,9 +8,15 @@ import { flashFromQuery } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { RegionalChurchesPage, PositionsPage } from "../views/org-settings";
+import { PositionHistoryPage } from "../views/position-history";
+import { VacancyReportPage } from "../views/vacancies";
+import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
+import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
 import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { loadRegionalChurches, type RegionalChurchRow } from "../org-units";
-import { asInt, intParam, s } from "../util";
+import { buildCsv } from "../csv";
+import { getDict } from "../i18n";
+import { asInt, intParam, s, todayInYangon } from "../util";
 
 function multi(v: unknown): string[] {
   if (v === undefined || v === null) return [];
@@ -310,6 +316,13 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), async
   } catch {
     return c.redirect(`${back}&err=position-code-taken`, 303);
   }
+  const created = (await db.all<{ id: number }>(sql`
+    SELECT id FROM position_defs WHERE scope_type = ${scope} AND code = ${code} LIMIT 1`))[0];
+  await recordPositionHistory(db, {
+    entity: "def", action: "created", actorId: c.get("user").id,
+    scopeType: scope, code, positionDefId: created?.id ?? null,
+    summary: nameEn || nameMm,
+  });
   return c.redirect(`${back}&ok=position-created`, 303);
 });
 
@@ -337,12 +350,23 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), a
       WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
     if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
   }
+  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   await db.run(sql`
     UPDATE position_defs
        SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
-           active = ${active}, sort_order = ${departmentSortOrder(s(body.sort_order), current.sortOrder)},
+           active = ${active}, sort_order = ${sortOrder},
            updated_at = unixepoch()
      WHERE id = ${id}`);
+  const changes = diffPositionDefs(current, {
+    nameMyanmar: nameMm, nameEnglish: nameEn || null, nameKorean: nameKr || null, active, sortOrder,
+  });
+  if (changes.length > 0) {
+    await recordPositionHistory(db, {
+      entity: "def", action: "updated", actorId: c.get("user").id,
+      scopeType: current.scopeType, code: current.code, positionDefId: id,
+      summary: nameEn || nameMm, changes,
+    });
+  }
   return c.redirect(`${back}&ok=position-updated`, 303);
 });
 
@@ -350,8 +374,9 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
-  const current = (await db.all<{ scopeType: string; code: string }>(sql`
-    SELECT scope_type AS scopeType, code FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
+  const current = (await db.all<{ scopeType: string; code: string; nameMyanmar: string; nameEnglish: string | null }>(sql`
+    SELECT scope_type AS scopeType, code, name_myanmar AS nameMyanmar, name_english AS nameEnglish
+    FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
   if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
   const back = `/organization/positions?scope=${current.scopeType}`;
   const used = await db.all<{ n: number }>(sql`
@@ -359,7 +384,89 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
     WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
   await db.run(sql`DELETE FROM position_defs WHERE id = ${id}`);
+  await recordPositionHistory(db, {
+    entity: "def", action: "deleted", actorId: c.get("user").id,
+    scopeType: current.scopeType, code: current.code, positionDefId: id,
+    summary: current.nameEnglish || current.nameMyanmar,
+  });
   return c.redirect(`${back}&ok=position-deleted`, 303);
+});
+
+// ---------- Position change history ----------
+
+organizationRoutes.get("/positions/history", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const rawType = c.req.query("type");
+  const filter = rawType === "def" || rawType === "assignment" ? rawType : "all";
+  const rows = await loadPositionHistory(db, { entity: filter, limit: 300 });
+  return c.html(
+    <PositionHistoryPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} rows={rows} filter={filter}
+    />,
+  );
+});
+
+// ---------- Vacancy report ----------
+
+function vacancyScopeFrom(value: string | undefined): VacancyScope | null {
+  return value && (VACANCY_SCOPES as readonly string[]).includes(value) ? value as VacancyScope : null;
+}
+
+organizationRoutes.get("/vacancies", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const scopeFilter = vacancyScopeFrom(c.req.query("scope"));
+  const report = await loadVacancyReport(db, {
+    scopeAll: scope.scopeAll, stateIds: scope.stateIds,
+    lang: c.get("lang"), scope: scopeFilter ?? undefined,
+  });
+  return c.html(
+    <VacancyReportPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} report={report} scope={scopeFilter}
+    />,
+  );
+});
+
+organizationRoutes.get("/vacancies.csv", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const scopeFilter = vacancyScopeFrom(c.req.query("scope"));
+  const report = await loadVacancyReport(db, {
+    scopeAll: scope.scopeAll, stateIds: scope.stateIds, lang, scope: scopeFilter ?? undefined,
+  });
+  const scopeLabels: Record<VacancyScope, string> = {
+    church: t("vacancy.scopeChurch"),
+    regional_church: t("vacancy.scopeRegional"),
+    home_cell: t("vacancy.scopeHomeCell"),
+    township: t("vacancy.scopeSupervision"),
+    department: t("vacancy.scopeDepartment"),
+  };
+  const rows: string[][] = [[
+    t("vacancy.colScope"), t("vacancy.colStructure"), t("vacancy.colState"),
+    t("vacancy.colTownship"), t("vacancy.colRegional"), t("vacancy.colPosition"),
+    t("vacancy.colCode"), t("vacancy.colSlots"), t("vacancy.colFilled"), t("vacancy.colVacant"),
+  ]];
+  for (const structure of report.structures) {
+    for (const item of structure.vacancies) {
+      rows.push([
+        scopeLabels[structure.scope], structure.name, structure.stateName ?? "",
+        structure.townshipName ?? "", structure.regionalChurchName ?? "",
+        item.name, item.code, String(structure.slots), String(structure.filled),
+        String(structure.vacancies.length),
+      ]);
+    }
+  }
+  const csv = "\uFEFF" + buildCsv(rows);
+  return c.body(csv, 200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="position-vacancies-${todayInYangon()}.csv"`,
+  });
 });
 
 // ---------- Regional churches ----------

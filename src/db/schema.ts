@@ -363,6 +363,31 @@ export const memberHistory = sqliteTable(
   }),
 );
 
+/** Audit trail for position definitions and member assignments. Member and
+ * definition ids are plain integers so history survives their deletion, and
+ * `changes_json` keeps the before/after values for each edited field. */
+export const positionHistory = sqliteTable(
+  "position_history",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entity: text("entity").notNull(),
+    action: text("action").notNull(),
+    scopeType: text("scope_type"),
+    code: text("code"),
+    positionDefId: integer("position_def_id"),
+    memberId: integer("member_id"),
+    actorId: integer("actor_id").notNull().references(() => users.id),
+    summary: text("summary"),
+    changesJson: text("changes_json"),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    createdIdx: index("position_history_created_idx").on(t.createdAt),
+    entityIdx: index("position_history_entity_idx").on(t.entity, t.createdAt),
+    memberIdx: index("position_history_member_idx").on(t.memberId, t.createdAt),
+  }),
+);
+
 /** Daily activity reports: one row per author per day (unique index), with an
  * optional review pass by a leader who can see the author's state. */
 export const activityReports = sqliteTable("activity_reports", {

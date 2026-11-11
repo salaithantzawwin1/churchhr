@@ -43,6 +43,22 @@ type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lan
 type TownshipGroup = { id: number | null; name: string; cells: OrgCell[] };
 type StateGroup = { id: number; name: string; cells: OrgCell[]; townships: TownshipGroup[] };
 
+/** Group cells by township; cells without a township keep their own unnamed
+ * cluster so supervisors and their cells stay together inside a regional church. */
+function groupByTownship(cells: OrgCell[], fallbackName: string): TownshipGroup[] {
+  const groups = new Map<string, TownshipGroup>();
+  for (const cell of cells) {
+    const key = String(cell.township_id ?? "none");
+    let group = groups.get(key);
+    if (!group) {
+      group = { id: cell.township_id, name: cell.township || fallbackName, cells: [] };
+      groups.set(key, group);
+    }
+    group.cells.push(cell);
+  }
+  return [...groups.values()];
+}
+
 function groupCells(cells: OrgCell[], lang: Lang): StateGroup[] {
   const states = new Map<number, StateGroup>();
   for (const cell of cells) {
@@ -236,6 +252,7 @@ export function OrganizationPage(props: Common & {
         </div>
         <div class="page-head-actions">
           {manageLinks}
+          <a class="btn secondary" href="/organization/vacancies">{t("vacancy.link")}</a>
           <a class="btn secondary" href="/members">{t("org.membersLink")}</a>
         </div>
       </div>
@@ -475,16 +492,29 @@ export function OrganizationPage(props: Common & {
                       {churchCells.length === 0 ? (
                         <p class="muted small org-regional-empty">{t("org.regionalNoCells")}</p>
                       ) : (
-                        <div class="org-regional-cells">
-                          {churchCells.map((cell) => (
-                            <div class="org-regional-cell">
-                              <a href={cellHref(cell.id)}>{cell.label}</a>
-                              <span class="muted small">{cell.township || "—"}</span>
-                              {cellRows.lead && (
-                                <span class="org-regional-cell-lead">
-                                  <LeaderLink leader={homeRole(cell.id, cellRows.lead.code)} empty={t("org.noLeader")} />
-                                </span>
-                              )}
+                        <div class="org-regional-groups">
+                          {groupByTownship(churchCells, t("org.townshipUnassigned")).map((town) => (
+                            <div class="org-regional-township">
+                              <div class="org-regional-township-head">
+                                <span class="org-township-name">{town.name}</span>
+                                <span class="muted small">{town.cells.length} {t("org.cells")}</span>
+                              </div>
+                              {townshipSupervision(town)}
+                              <div class="org-regional-cells">
+                                {town.cells.map((cell) => (
+                                  <div class="org-regional-cell">
+                                    <a href={cellHref(cell.id)}>{cell.label}</a>
+                                    {cellRows.lead && (
+                                      <span class="org-regional-cell-lead">
+                                        <LeaderLink leader={homeRole(cell.id, cellRows.lead.code)} empty={t("org.noLeader")} />
+                                      </span>
+                                    )}
+                                    <span class="muted small">
+                                      {cell.member_count} {t("org.membersShort")}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           ))}
                         </div>
