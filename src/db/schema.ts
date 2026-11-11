@@ -113,6 +113,8 @@ export const lookupOptions = sqliteTable(
     regionId: integer("region_id").notNull().default(0),
     /** Optional parent option: Home Cell -> Township, Family Group -> Home Cell. */
     parentId: integer("parent_id"),
+    /** Optional Regional Church for Home Cell options. */
+    regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
     /** Short code (TWP-001, CEL-014, …) shown in dropdowns/export; unique per type+region. */
     code: text("code"),
     /** Township prefix for Family Group codes (INS -> INS_FG001); unique per type+region. */
@@ -273,6 +275,48 @@ export const churchDepartments = sqliteTable(
   (t) => ({ nameUq: uniqueIndex("church_departments_name_uq").on(t.name) }),
 );
 
+/** Editable position catalogue. `scope_type` is church, regional_church,
+ * home_cell, township (Home Cell supervision) or department. Codes are stable
+ * because member_positions stores the code, not the display label. */
+export const positionDefs = sqliteTable(
+  "position_defs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    scopeType: text("scope_type").notNull(),
+    code: text("code").notNull(),
+    nameMyanmar: text("name_myanmar").notNull(),
+    nameEnglish: text("name_english"),
+    nameKorean: text("name_korean"),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    scopeCodeUq: uniqueIndex("position_defs_scope_code_uq").on(t.scopeType, t.code),
+    scopeIdx: index("position_defs_scope_idx").on(t.scopeType, t.active, t.sortOrder),
+  }),
+);
+
+/** Optional organisational layer above Home Cells. A regional church belongs
+ * to one state/region and can own several Home Cells. */
+export const regionalChurches = sqliteTable(
+  "regional_churches",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    nameEn: text("name_en"),
+    regionId: integer("region_id").notNull().references(() => regions.id),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    nameUq: uniqueIndex("regional_churches_name_uq").on(t.name),
+    regionIdx: index("regional_churches_region_idx").on(t.regionId, t.active, t.sortOrder),
+  }),
+);
+
 /** Service position held by a member (Home Cell Leader, Department Head, …).
  * scope_type/scope_id/department_id are generic so church-level roles can
  * reuse the table without another schema change. */
@@ -287,6 +331,7 @@ export const memberPositions = sqliteTable(
     scopeType: text("scope_type").notNull().default("home_cell"),
     scopeId: integer("scope_id").references(() => lookupOptions.id),
     departmentId: integer("department_id").references(() => churchDepartments.id),
+    regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),

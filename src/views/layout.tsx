@@ -41,6 +41,8 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
     { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
+    { href: "/organization/positions", label: t("nav.positions"), perm: "options.manage" },
+    { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: "options.manage" },
   ];
   const allowed = (n: { perm: Permission }) => !perms || perms.has(n.perm);
   const primaryItems = PRIMARY_NAV.filter(allowed);

@@ -1,13 +1,22 @@
 import { Hono } from "hono";
 import { eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
-import { getDb } from "../db/client";
+import { getDb, type DB } from "../db/client";
 import { churchDepartments } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
+import { RegionalChurchesPage, PositionsPage } from "../views/org-settings";
+import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
+import { loadRegionalChurches, type RegionalChurchRow } from "../org-units";
 import { asInt, intParam, s } from "../util";
+
+function multi(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  return typeof v === "string" ? [v] : [];
+}
 
 export const organizationRoutes = new Hono<AppEnv>();
 
@@ -27,10 +36,13 @@ function scopeCond(scope: Scope) {
 organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
-  const tab = c.req.query("tab") === "home-cells" ? "home-cells" : "church";
+  const tabParam = c.req.query("tab");
+  const tab: "church" | "regional" | "home-cells" = tabParam === "home-cells" ? "home-cells" : tabParam === "regional" ? "regional" : "church";
 
   const cells = await db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,
+           hc.parent_id AS township_id,
+           hc.regional_church_id,
            r.name AS state_name, r.name_en AS state_name_en,
            t.label AS township,
            (SELECT COUNT(*) FROM members m
@@ -41,6 +53,9 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE hc.type = 'home_cell' AND hc.active = 1 AND ${scopeCond(scope)}
     ORDER BY r.id, t.sort_order, t.label, hc.sort_order, hc.label`);
 
+  const regionalChurches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const positionDefs = await loadPositionDefs(db);
+
   const departments = await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order,
       (SELECT COUNT(*) FROM members m
@@ -50,7 +65,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     ORDER BY d.sort_order, d.name`);
 
   const leaders = await db.all<OrgLeader>(sql`
-    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id,
+    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
            (m.photo IS NOT NULL) AS has_photo, m.updated_at
@@ -71,7 +86,9 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells}
       departments={departments} leaders={leaders}
+      regionalChurches={regionalChurches} positionDefs={positionDefs}
       canManageDepartments={c.get("perms").has("options.manage")}
+      canManageStructure={c.get("perms").has("options.manage")}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
   );
@@ -90,7 +107,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     FROM church_departments d WHERE d.id = ${id} LIMIT 1`))[0];
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
-    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id,
+    SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
            (m.photo IS NOT NULL) AS has_photo, m.updated_at
@@ -227,4 +244,252 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
     return c.redirect("/organization/departments?err=department-name-taken", 303);
   }
   return c.redirect("/organization/departments?ok=department-updated", 303);
+});
+
+// ---------- Editable position catalogue ----------
+
+async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
+  return db.all<PositionDefRow>(sql`
+    SELECT pd.id, pd.scope_type AS scopeType, pd.code,
+           pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
+           pd.name_korean AS nameKorean, pd.active, pd.sort_order AS sortOrder,
+           (SELECT COUNT(*) FROM member_positions mp
+             WHERE mp.position = pd.code AND mp.scope_type = pd.scope_type) AS usageCount
+    FROM position_defs pd
+    ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+}
+
+function positionScopeFrom(value: string | undefined): ConfigurablePositionScope {
+  return isConfigurableScope(value) ? value : "church";
+}
+
+function positionNameError(nameMm: string, nameEn: string): string | null {
+  if (!nameMm) return "position-name-mm";
+  if (nameMm.length > 100 || nameEn.length > 100) return "position-name-long";
+  return null;
+}
+
+organizationRoutes.get("/positions", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = positionScopeFrom(c.req.query("scope"));
+  const defs = await adminPositionDefs(db);
+  return c.html(
+    <PositionsPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} scope={scope} defs={defs}
+    />,
+  );
+});
+
+organizationRoutes.post("/positions", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const body = await c.req.parseBody();
+  const scope = positionScopeFrom(s(body.scope));
+  const back = `/organization/positions?scope=${scope}`;
+  const nameMm = s(body.name_myanmar).slice(0, 100);
+  const nameEn = s(body.name_english).slice(0, 100);
+  const nameKr = s(body.name_korean).slice(0, 100);
+  const invalid = positionNameError(nameMm, nameEn);
+  if (invalid) return c.redirect(`${back}&err=${invalid}`, 303);
+  if (!nameEn) return c.redirect(`${back}&err=position-name-en`, 303);
+  const sortOrder = departmentSortOrder(s(body.sort_order));
+
+  const base = codeFromEnglishName(scope, nameEn);
+  let code = base;
+  for (let n = 2; n < 50; n += 1) {
+    const existing = await db.all<{ id: number }>(sql`
+      SELECT id FROM position_defs WHERE scope_type = ${scope} AND code = ${code} LIMIT 1`);
+    if (existing.length === 0) break;
+    code = `${base}_${n}`;
+  }
+  try {
+    await db.run(sql`
+      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order)
+      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder})`);
+  } catch {
+    return c.redirect(`${back}&err=position-code-taken`, 303);
+  }
+  return c.redirect(`${back}&ok=position-created`, 303);
+});
+
+organizationRoutes.post("/positions/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
+  const current = (await db.all<PositionDefRow>(sql`
+    SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
+           name_english AS nameEnglish, name_korean AS nameKorean, active,
+           sort_order AS sortOrder
+    FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
+  if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
+  const back = `/organization/positions?scope=${current.scopeType}`;
+  const body = await c.req.parseBody();
+  const nameMm = s(body.name_myanmar).slice(0, 100);
+  const nameEn = s(body.name_english).slice(0, 100);
+  const nameKr = s(body.name_korean).slice(0, 100);
+  const invalid = positionNameError(nameMm, nameEn);
+  if (invalid) return c.redirect(`${back}&err=${invalid}`, 303);
+  const active = s(body.active) === "1" ? 1 : 0;
+  if (current.active === 1 && active === 0) {
+    const used = await db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM member_positions
+      WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
+    if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
+  }
+  await db.run(sql`
+    UPDATE position_defs
+       SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
+           active = ${active}, sort_order = ${departmentSortOrder(s(body.sort_order), current.sortOrder)},
+           updated_at = unixepoch()
+     WHERE id = ${id}`);
+  return c.redirect(`${back}&ok=position-updated`, 303);
+});
+
+organizationRoutes.post("/positions/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
+  const current = (await db.all<{ scopeType: string; code: string }>(sql`
+    SELECT scope_type AS scopeType, code FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
+  if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
+  const back = `/organization/positions?scope=${current.scopeType}`;
+  const used = await db.all<{ n: number }>(sql`
+    SELECT COUNT(*) AS n FROM member_positions
+    WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
+  if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
+  await db.run(sql`DELETE FROM position_defs WHERE id = ${id}`);
+  return c.redirect(`${back}&ok=position-deleted`, 303);
+});
+
+// ---------- Regional churches ----------
+
+async function orgRegions(db: DB, scope: Scope, lang: string): Promise<{ id: number; name: string }[]> {
+  const conditions = [sql`1=1`];
+  if (!scope.scopeAll) {
+    if (scope.stateIds.length === 0) conditions.push(sql`1=0`);
+    else conditions.push(sql`id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
+  return db.all<{ id: number; name: string }>(sql`
+    SELECT id, ${lang !== "mm" ? sql`COALESCE(name_en, name)` : sql`name`} AS name
+    FROM regions WHERE ${sql.join(conditions, sql` AND `)} ORDER BY id`);
+}
+
+async function loadAdminHomeCells(db: DB): Promise<{ id: number; label: string; regionId: number; regionalChurchId: number | null }[]> {
+  return db.all(sql`
+    SELECT id, label, region_id AS regionId, regional_church_id AS regionalChurchId
+    FROM lookup_options
+    WHERE type = 'home_cell' AND active = 1
+    ORDER BY region_id, sort_order, label`);
+}
+
+organizationRoutes.get("/regional-churches", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const churches = await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const regions = await orgRegions(db, scope, c.get("lang"));
+  const homeCells = await loadAdminHomeCells(db);
+  return c.html(
+    <RegionalChurchesPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} churches={churches} regions={regions} homeCells={homeCells}
+    />,
+  );
+});
+
+async function regionalChurchNameTaken(db: DB, name: string, exceptId?: number): Promise<boolean> {
+  const rows = await db.all<{ id: number }>(sql`
+    SELECT id FROM regional_churches WHERE lower(name) = lower(${name}) LIMIT 1`);
+  return rows.some((r) => r.id !== exceptId);
+}
+
+organizationRoutes.post("/regional-churches", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const body = await c.req.parseBody();
+  const name = s(body.name).slice(0, 80);
+  const nameEn = s(body.name_en).slice(0, 120);
+  const regionId = asInt(s(body.region_id));
+  if (!name) return c.redirect("/organization/regional-churches?err=regional-name-required", 303);
+  if (!regionId) return c.redirect("/organization/regional-churches?err=regional-state-required", 303);
+  if (await regionalChurchNameTaken(db, name)) return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
+  try {
+    await db.run(sql`
+      INSERT INTO regional_churches (name, name_en, region_id, active, sort_order)
+      VALUES (${name}, ${nameEn || null}, ${regionId}, 1, ${departmentSortOrder(s(body.sort_order))})`);
+  } catch {
+    return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
+  }
+  return c.redirect("/organization/regional-churches?ok=regional-created", 303);
+});
+
+organizationRoutes.post("/regional-churches/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const current = (await db.all<Pick<RegionalChurchRow, "id" | "name" | "nameEn" | "regionId" | "active" | "sortOrder">>(sql`
+    SELECT id, name, name_en AS nameEn, region_id AS regionId, active, sort_order AS sortOrder
+    FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
+  if (!current) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const body = await c.req.parseBody();
+  const name = s(body.name).slice(0, 80);
+  const nameEn = s(body.name_en).slice(0, 120);
+  const regionId = asInt(s(body.region_id)) ?? current.regionId;
+  if (!name) return c.redirect("/organization/regional-churches?err=regional-name-required", 303);
+  if (await regionalChurchNameTaken(db, name, id)) return c.redirect("/organization/regional-churches?err=regional-name-taken", 303);
+  const active = s(body.active) === "1" ? 1 : 0;
+  if (current.active === 1 && active === 0) {
+    const used = await db.all<{ n: number }>(sql`
+      SELECT
+        (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
+        (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+    if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/regional-churches?err=regional-in-use", 303);
+  }
+  await db.run(sql`
+    UPDATE regional_churches
+       SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
+           active = ${active}, sort_order = ${departmentSortOrder(s(body.sort_order), current.sortOrder)}
+     WHERE id = ${id}`);
+  return c.redirect("/organization/regional-churches?ok=regional-updated", 303);
+});
+
+organizationRoutes.post("/regional-churches/:id/cells", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const church = (await db.all<{ id: number; regionId: number }>(sql`
+    SELECT id, region_id AS regionId FROM regional_churches WHERE id = ${id} LIMIT 1`))[0];
+  if (!church) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const body = await c.req.parseBody();
+  const ids = multi(body.home_cell_ids)
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length > 0) {
+    const valid = await db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM lookup_options
+      WHERE type = 'home_cell' AND region_id = ${church.regionId}
+        AND (regional_church_id IS NULL OR regional_church_id = ${id})
+        AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== ids.length) return c.redirect("/organization/regional-churches?err=regional-cell-invalid", 303);
+  }
+  await db.run(sql`UPDATE lookup_options SET regional_church_id = NULL WHERE regional_church_id = ${id}`);
+  if (ids.length > 0) {
+    await db.run(sql`
+      UPDATE lookup_options SET regional_church_id = ${id}
+      WHERE id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
+  }
+  return c.redirect("/organization/regional-churches?ok=regional-cells", 303);
+});
+
+organizationRoutes.post("/regional-churches/:id/delete", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  const used = await db.all<{ n: number }>(sql`
+    SELECT
+      (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
+      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+  if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/regional-churches?err=regional-in-use", 303);
+  await db.run(sql`DELETE FROM regional_churches WHERE id = ${id}`);
+  return c.redirect("/organization/regional-churches?ok=regional-deleted", 303);
 });

@@ -5,7 +5,9 @@ import type { OptionRow } from "../lookup";
 import { ageFromDate, optionLabel, optionText, qs } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
-import { CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS, positionLabel, positionLabels } from "../positions";
+import { positionLabels } from "../positions";
+import { defsForScope, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
+import { regionalChurchName, type RegionalChurchRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
 
 export type MemberListItem = {
@@ -58,6 +60,7 @@ type ListProps = Common & {
   departments: DepartmentRow[];
   groups: OptionRow[];
   fellowships: OptionRow[];
+  positionDefs?: PositionDefRow[];
 };
 
 function filterQs(f: Filters, page?: number): string {
@@ -103,7 +106,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   // Korean uses the English data labels (region names etc.); only MM differs.
@@ -117,7 +120,9 @@ export function MembersListPage(props: ListProps) {
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
-  const roleBadges = (csv: string | null | undefined) => positionLabels(csv, L).map((label) => (
+  const roleLabels = (csv: string | null | undefined) =>
+    positionDefs ? positionLabelsForCsv(positionDefs, csv, L) : positionLabels(csv, L);
+  const roleBadges = (csv: string | null | undefined) => roleLabels(csv).map((label) => (
     <span class="badge position">{label}</span>
   ));
   const filtered = hasFilters(f);
@@ -635,22 +640,37 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
 
 export type PositionFormAssignments = {
   homeCell: string;
+  township: string;
+  regionalChurch: string;
+  regionalChurchId: number | null;
   department: string;
   departmentId: number | null;
   church: string;
 };
 
+export type PositionMember = {
+  id: number;
+  name: string;
+  homeCell: string | null;
+  homeCellId: number | null;
+  townshipId?: number | null;
+  townshipName?: string | null;
+  regionalChurchId?: number | null;
+};
+
 type PositionFormProps = {
-  member: { id: number; name: string; homeCell: string | null; homeCellId: number | null };
+  member: PositionMember;
   assignments: PositionFormAssignments;
   departments: DepartmentRow[];
+  positionDefs: PositionDefRow[];
+  regionalChurches: RegionalChurchRow[];
   canManageDepartments: boolean;
   error?: string | null;
   lang?: Lang;
 };
 
 export function MemberPositionPage(props: Common & PositionFormProps) {
-  const { user, perms, flash, lang, member, assignments, departments, canManageDepartments } = props;
+  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, canManageDepartments } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -661,6 +681,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
       <div class="card">
         <MemberPositionForm
           member={member} assignments={assignments} departments={departments}
+          positionDefs={positionDefs} regionalChurches={regionalChurches}
           canManageDepartments={canManageDepartments} lang={lang}
         />
       </div>
@@ -669,16 +690,50 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
 }
 
 export function MemberPositionForm(props: PositionFormProps) {
-  const { member, assignments, departments, canManageDepartments, error, lang } = props;
+  const { member, assignments, departments, positionDefs, regionalChurches, canManageDepartments, error, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
   const department = departments.find((d) => d.id === assignments.departmentId);
+  const homeDefs = defsForScope(positionDefs, "home_cell");
+  const townshipDefs = defsForScope(positionDefs, "township");
+  const regionalDefs = defsForScope(positionDefs, "regional_church");
+  const departmentDefs = defsForScope(positionDefs, "department");
+  const churchDefs = defsForScope(positionDefs, "church");
+  const label = (code: string) => positionLabelForCode(positionDefs, code, L);
+  const regionalId = assignments.regionalChurchId ?? member.regionalChurchId ?? null;
   const currentRoles = [
-    assignments.homeCell && positionLabel(assignments.homeCell, L),
-    assignments.department && department && positionLabel(assignments.department, L),
-    assignments.church && positionLabel(assignments.church, L),
+    assignments.homeCell && label(assignments.homeCell),
+    assignments.township && `${label(assignments.township)} · ${member.townshipName ?? t("org.supervision")}`,
+    assignments.regionalChurch && label(assignments.regionalChurch),
+    assignments.department && department && label(assignments.department),
+    assignments.church && label(assignments.church),
   ].filter(Boolean) as string[];
+
+  const tabs = [
+    { key: "home", label: t("org.tabHomeCell"), available: true },
+    { key: "supervision", label: t("org.tabSupervision"), available: Boolean(member.townshipId) },
+    { key: "regional", label: t("org.tabRegional"), available: regionalDefs.length > 0 || regionalChurches.length > 0 },
+    { key: "department", label: t("org.tabDepartment"), available: departmentDefs.length > 0 || departments.length > 0 },
+    { key: "church", label: t("org.tabChurch"), available: churchDefs.length > 0 },
+  ].filter((x) => x.available);
+  const firstTab = tabs[0]?.key ?? "home";
+
+  const managePositions = (scope: string) => canManageDepartments && (
+    <p class="hint">
+      <a href={`/organization/positions?scope=${scope}`}>{t("org.managePositions")}</a>
+    </p>
+  );
+
+  const positionOptions = (defs: PositionDefRow[], selected: string) => (
+    <>
+      <option value="">{t("org.noPosition")}</option>
+      {defs.map((p) => (
+        <option value={p.code} selected={selected === p.code}>{positionDefLabel(p, L)}</option>
+      ))}
+    </>
+  );
+
   return (
     <div class="position-form">
       <div class="position-hero">
@@ -702,89 +757,154 @@ export function MemberPositionForm(props: PositionFormProps) {
       <p class="hint position-intro">{t("org.positionIntro")}</p>
       {error && <div class="flash err">{error}</div>}
       <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
-        <section class="position-section">
-          <div class="position-section-head">
-            <span class="position-step" aria-hidden="true">1</span>
-            <div>
-              <h3>{t("org.homeCellSection")}</h3>
-              {member.homeCellId && <p class="hint">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>}
-            </div>
-          </div>
-          {!member.homeCellId ? (
-            <div class="position-notice">
-              <p>{t("org.noHomeCell")}</p>
-              <a class="btn sm secondary" href={`/members/${member.id}/edit`}>{t("org.changeHomeCell")}</a>
-            </div>
-          ) : (
-            <label class="field">
-              <span class="lbl">{t("org.position")}</span>
-              <select name="home_cell_position">
-                <option value="">{t("org.noPosition")}</option>
-                {HOME_CELL_POSITIONS.map((p) => (
-                  <option value={p.value} selected={assignments.homeCell === p.value}>
-                    {positionLabel(p.value, L)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </section>
+        <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
+          {tabs.map((tab) => (
+            <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
+              data-tab-target={tab.key} aria-selected={tab.key === firstTab ? "true" : "false"}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-        <section class="position-section">
-          <div class="position-section-head">
-            <span class="position-step" aria-hidden="true">2</span>
-            <div><h3>{t("org.departmentSection")}</h3></div>
-          </div>
-          {departments.length === 0 ? (
-            <p class="hint">
-              {t("org.noDepartments")}
-              {canManageDepartments && <> <a href="/organization/departments">{t("org.manageDepartments")}</a></>}
-            </p>
-          ) : (
-            <div class="form-grid" data-dept-position>
+        <div class="position-panes" data-tabs-body>
+          <section class="position-section" data-tab-pane="home" role="tabpanel">
+            <div class="position-section-head">
+              <span class="position-step" aria-hidden="true">1</span>
+              <div>
+                <h3>{t("org.homeCellSection")}</h3>
+                {member.homeCellId && <p class="hint">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>}
+              </div>
+            </div>
+            {!member.homeCellId ? (
+              <div class="position-notice">
+                <p>{t("org.noHomeCell")}</p>
+                <a class="btn sm secondary" href={`/members/${member.id}/edit`}>{t("org.changeHomeCell")}</a>
+              </div>
+            ) : homeDefs.length === 0 ? (
+              managePositions("home_cell")
+            ) : (
               <label class="field">
-                <span class="lbl">{t("org.department")}</span>
-                <select name="department_id">
-                  <option value="">{t("org.noDepartment")}</option>
-                  {departments.map((d) => (
-                    <option value={String(d.id)} selected={assignments.departmentId === d.id}>
-                      {departmentName(d, L)}
-                    </option>
-                  ))}
+                <span class="lbl">{t("org.position")}</span>
+                <select name="home_cell_position">
+                  {positionOptions(homeDefs, assignments.homeCell)}
                 </select>
               </label>
+            )}
+          </section>
+
+          <section class="position-section" data-tab-pane="supervision" role="tabpanel">
+            <div class="position-section-head">
+              <span class="position-step" aria-hidden="true">2</span>
+              <div>
+                <h3>{t("org.supervisionSection")}</h3>
+                <p class="hint">{t("org.supervisionSectionHint")}</p>
+              </div>
+            </div>
+            {!member.townshipId ? (
+              <div class="position-notice">
+                <p>{t("org.noSupervision")}</p>
+                <a class="btn sm secondary" href={`/members/${member.id}/edit`}>{t("org.changeHomeCell")}</a>
+              </div>
+            ) : townshipDefs.length === 0 ? (
+              managePositions("township")
+            ) : (
+              <>
+                <p class="position-scope">
+                  {t("org.supervision")}: <strong>{member.townshipName ?? `#${member.townshipId}`}</strong>
+                </p>
+                <label class="field">
+                  <span class="lbl">{t("org.position")}</span>
+                  <select name="township_position">
+                    {positionOptions(townshipDefs, assignments.township)}
+                  </select>
+                </label>
+              </>
+            )}
+          </section>
+
+          <section class="position-section" data-tab-pane="regional" role="tabpanel">
+            <div class="position-section-head">
+              <span class="position-step" aria-hidden="true">3</span>
+              <div><h3>{t("org.regionalSection")}</h3></div>
+            </div>
+            {regionalDefs.length === 0 || regionalChurches.length === 0 ? (
+              <>
+                <p class="hint">{regionalChurches.length === 0 ? t("org.noRegional") : t("org.noPositions")}</p>
+                {managePositions("regional_church")}
+                {canManageDepartments && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
+              </>
+            ) : (
+              <div class="form-grid">
+                <label class="field">
+                  <span class="lbl">{t("org.regionalChurch")}</span>
+                  <select name="regional_church_id">
+                    <option value="">{t("org.noRegionalChurch")}</option>
+                    {regionalChurches.map((r) => (
+                      <option value={String(r.id)} selected={regionalId === r.id}>
+                        {regionalChurchName(r, L)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="lbl">{t("org.position")}</span>
+                  <select name="regional_church_position">
+                    {positionOptions(regionalDefs, assignments.regionalChurch)}
+                  </select>
+                </label>
+              </div>
+            )}
+          </section>
+
+          <section class="position-section" data-tab-pane="department" role="tabpanel">
+            <div class="position-section-head">
+              <span class="position-step" aria-hidden="true">4</span>
+              <div><h3>{t("org.departmentSection")}</h3></div>
+            </div>
+            {departments.length === 0 ? (
+              <p class="hint">
+                {t("org.noDepartments")}
+                {canManageDepartments && <> <a href="/organization/departments">{t("org.manageDepartments")}</a></>}
+              </p>
+            ) : (
+              <div class="form-grid" data-dept-position>
+                <label class="field">
+                  <span class="lbl">{t("org.department")}</span>
+                  <select name="department_id">
+                    <option value="">{t("org.noDepartment")}</option>
+                    {departments.map((d) => (
+                      <option value={String(d.id)} selected={assignments.departmentId === d.id}>
+                        {departmentName(d, L)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="lbl">{t("org.departmentPosition")}</span>
+                  <select name="department_position" disabled={!assignments.departmentId}>
+                    {positionOptions(departmentDefs, assignments.department)}
+                  </select>
+                </label>
+              </div>
+            )}
+            {departmentDefs.length === 0 && managePositions("department")}
+          </section>
+
+          <section class="position-section" data-tab-pane="church" role="tabpanel">
+            <div class="position-section-head">
+              <span class="position-step" aria-hidden="true">5</span>
+              <div><h3>{t("org.churchSection")}</h3></div>
+            </div>
+            {churchDefs.length === 0 ? managePositions("church") : (
               <label class="field">
-                <span class="lbl">{t("org.departmentPosition")}</span>
-                <select name="department_position" disabled={!assignments.departmentId}>
-                  <option value="">{t("org.noPosition")}</option>
-                  {DEPARTMENT_POSITIONS.map((p) => (
-                    <option value={p.value} selected={assignments.department === p.value}>
-                      {positionLabel(p.value, L)}
-                    </option>
-                  ))}
+                <span class="lbl">{t("org.churchLeadership")}</span>
+                <select name="church_position">
+                  {positionOptions(churchDefs, assignments.church)}
                 </select>
               </label>
-            </div>
-          )}
-        </section>
-
-        <section class="position-section">
-          <div class="position-section-head">
-            <span class="position-step" aria-hidden="true">3</span>
-            <div><h3>{t("org.churchSection")}</h3></div>
-          </div>
-          <label class="field">
-            <span class="lbl">{t("org.churchLeadership")}</span>
-            <select name="church_position">
-              <option value="">{t("org.noPosition")}</option>
-              {CHURCH_POSITIONS.map((p) => (
-                <option value={p.value} selected={assignments.church === p.value}>
-                  {positionLabel(p.value, L)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </section>
+            )}
+          </section>
+        </div>
 
         <div class="actions">
           <button class="btn" type="submit">{t("org.savePosition")}</button>
@@ -836,6 +956,9 @@ export type MemberDetail = {
   sector_id: number | null;
   group_id: number | null;
   home_cell_id: number | null;
+  home_cell_township_id?: number | null;
+  home_cell_township?: string | null;
+  home_cell_regional_church_id?: number | null;
   department_id?: number | null;
   department?: string | null;
   positions?: string | null;
@@ -852,8 +975,8 @@ export type MemberHistoryRow = {
   created_at: number;
 };
 
-export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[] }) {
-  const { user, perms, flash, m, lang, history = [] } = props;
+export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[] }) {
+  const { user, perms, flash, m, lang, history = [], positionDefs } = props;
   const t = getDict(lang ?? "en");
   const ACTION_LABELS: Record<string, { mm: string; en: string; ko: string; cls: string }> = {
     create: { mm: "ထည့်သွင်း", en: "Created", ko: "생성", cls: "active" },
@@ -920,7 +1043,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
         [t("form.group"), m.group_label ?? ""],
         [t("form.homeCell"), m.home_cell ?? ""],
         [t("form.department"), m.department ?? ""],
-        [t("org.position"), positionLabels(m.positions, L).join(" · ")],
+        [t("org.position"), (positionDefs ? positionLabelsForCsv(positionDefs, m.positions, L) : positionLabels(m.positions, L)).join(" · ")],
         [t("detail.status"), S[m.status] ?? m.status],
         [t("detail.notes"), m.notes ?? ""],
       ],

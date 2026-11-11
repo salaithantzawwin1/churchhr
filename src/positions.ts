@@ -2,7 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { memberPositions } from "./db/schema";
 
-export type PositionScope = "home_cell" | "department" | "church";
+export type PositionScope = "home_cell" | "department" | "church" | "regional_church" | "township";
 
 export type PositionDef = {
   value: string;
@@ -70,6 +70,7 @@ export type MemberPositionRow = {
   scopeType: string;
   scopeId: number | null;
   departmentId: number | null;
+  regionalChurchId: number | null;
 };
 
 /** All positions for a member (at most one per scope, enforced by schema). */
@@ -82,6 +83,7 @@ export async function getMemberPositions(db: DB, memberId: number): Promise<Memb
       scopeType: memberPositions.scopeType,
       scopeId: memberPositions.scopeId,
       departmentId: memberPositions.departmentId,
+      regionalChurchId: memberPositions.regionalChurchId,
     })
     .from(memberPositions)
     .where(eq(memberPositions.memberId, memberId))) as MemberPositionRow[];
@@ -95,10 +97,12 @@ export async function getHomeCellPosition(db: DB, memberId: number): Promise<Mem
 export type PositionAssignment = {
   scopeType: PositionScope;
   position: string;
-  /** Home Cell id (scope_id). */
+  /** Home Cell or township id (scope_id). */
   homeCellId?: number | null;
   /** Department id. */
   departmentId?: number | null;
+  /** Regional Church id. */
+  regionalChurchId?: number | null;
 };
 
 /** Replace every position for a member with the supplied valid assignments.
@@ -111,14 +115,15 @@ export async function setMemberPositions(
 ): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   await db.delete(memberPositions).where(eq(memberPositions.memberId, memberId));
-  const rows = assignments.filter((a) => a.position && isPositionForScope(a.position, a.scopeType));
+  const rows = assignments.filter((a) => a.position);
   if (rows.length === 0) return;
   await db.insert(memberPositions).values(rows.map((a) => ({
     memberId,
     position: a.position,
     scopeType: a.scopeType,
-    scopeId: a.scopeType === "home_cell" ? a.homeCellId ?? null : null,
+    scopeId: a.scopeType === "home_cell" || a.scopeType === "township" ? a.homeCellId ?? null : null,
     departmentId: a.scopeType === "department" ? a.departmentId ?? null : null,
+    regionalChurchId: a.scopeType === "regional_church" ? a.regionalChurchId ?? null : null,
     createdBy: actorId,
     createdAt: now,
     updatedAt: now,
@@ -155,20 +160,29 @@ export async function positionTaken(
   db: DB,
   scopeType: PositionScope,
   position: string,
-  opts: { homeCellId?: number | null; departmentId?: number | null; exceptMemberId: number },
+  opts: {
+    homeCellId?: number | null;
+    departmentId?: number | null;
+    regionalChurchId?: number | null;
+    exceptMemberId: number;
+  },
 ): Promise<boolean> {
   const conditions = [
     eq(memberPositions.scopeType, scopeType),
     eq(memberPositions.position, position),
     ne(memberPositions.memberId, opts.exceptMemberId),
   ];
-  if (scopeType === "home_cell") {
+  if (scopeType === "home_cell" || scopeType === "township") {
     if (!opts.homeCellId) return false;
     conditions.push(eq(memberPositions.scopeId, opts.homeCellId));
   }
   if (scopeType === "department") {
     if (!opts.departmentId) return false;
     conditions.push(eq(memberPositions.departmentId, opts.departmentId));
+  }
+  if (scopeType === "regional_church") {
+    if (!opts.regionalChurchId) return false;
+    conditions.push(eq(memberPositions.regionalChurchId, opts.regionalChurchId));
   }
   const rows = await db
     .select({ memberId: memberPositions.memberId })

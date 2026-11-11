@@ -863,6 +863,42 @@
   }
   initDepartmentPosition(document);
 
+  // Tabbed forms (e.g. Assign position). Without JS every pane stays visible
+  // and usable; this only hides the panes that are not selected.
+  function initTabs(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-tabs]"), function (bar) {
+      if (bar.getAttribute("data-tabs-bound")) return;
+      bar.setAttribute("data-tabs-bound", "1");
+      var wrap = bar.parentNode;
+      var buttons = bar.querySelectorAll("[data-tab-target]");
+      var panes = wrap.querySelectorAll("[data-tab-pane]");
+      if (!buttons.length) return;
+      function show(key) {
+        Array.prototype.forEach.call(buttons, function (b) {
+          var on = b.getAttribute("data-tab-target") === key;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+          b.setAttribute("tabindex", on ? "0" : "-1");
+        });
+        Array.prototype.forEach.call(panes, function (p) {
+          p.hidden = p.getAttribute("data-tab-pane") !== key;
+        });
+      }
+      Array.prototype.forEach.call(buttons, function (b, i) {
+        b.addEventListener("click", function () { show(b.getAttribute("data-tab-target")); });
+        b.addEventListener("keydown", function (e) {
+          if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+          e.preventDefault();
+          var next = buttons[(i + (e.key === "ArrowRight" ? 1 : buttons.length - 1)) % buttons.length];
+          next.focus();
+          show(next.getAttribute("data-tab-target"));
+        });
+      });
+      show(buttons[0].getAttribute("data-tab-target"));
+    });
+  }
+  initTabs(document);
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
@@ -936,6 +972,7 @@
     initRegionCascade(bodyEl);
     initHeadPicker(bodyEl);
     initDepartmentPosition(bodyEl);
+    initTabs(bodyEl);
     initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);
   }

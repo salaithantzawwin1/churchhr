@@ -9,10 +9,11 @@ import { flashFromQuery } from "../flash";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 import {
-  CHURCH_POSITIONS, DEPARTMENT_POSITIONS, HOME_CELL_POSITIONS,
   getMemberPositions, isPositionForScope, positionTaken, setHomeCellPosition, setMemberPositions,
   type PositionAssignment,
 } from "../positions";
+import { isDefinedForScope, loadPositionDefs, type PositionDefRow } from "../position-catalog";
+import { loadRegionalChurches } from "../org-units";
 import { loadDepartments } from "../departments";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
@@ -224,6 +225,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   const allRegions = await loadRegions(db);
   const allOptions = await loadAllOptions(db);
   const departments = await loadDepartments(db, true);
+  const positionDefs = await loadPositionDefs(db);
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -235,6 +237,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
       departments={departments}
       groups={optionsOfType(allOptions, "group")}
       fellowships={optionsOfType(allOptions, "fellowship_category")}
+      positionDefs={positionDefs}
       lang={c.get("lang")}
     />,
   );
@@ -901,6 +904,9 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,
       fg.code AS family_group_code,
       fc.label AS fellowship, sec.label AS sector, gr.label AS group_label, hc.label AS home_cell,
+      hc.parent_id AS home_cell_township_id,
+      hc.regional_church_id AS home_cell_regional_church_id,
+      ht.label AS home_cell_township,
       cd.name AS department, m.department_id,
       (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions,
       fam.name AS household_name
@@ -914,6 +920,7 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
     LEFT JOIN lookup_options sec ON sec.id = m.sector_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN lookup_options ht ON ht.id = hc.parent_id AND ht.type = 'township'
     LEFT JOIN church_departments cd ON cd.id = m.department_id
     WHERE m.id = ${id}`);
   return rows[0] as any;
@@ -1117,32 +1124,55 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   return c.html(
     <MemberDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
-      history={historyRows as any} lang={c.get("lang")}
+      history={historyRows as any} positionDefs={await loadPositionDefs(db)} lang={c.get("lang")}
     />,
   );
 });
 
 // ---------- Service position assignment (list modal) ----------
 
-async function positionFormState(db: DB, memberId: number, row: { home_cell: string | null; home_cell_id: number | null }) {
+type PositionMemberState = {
+  id: number;
+  name: string;
+  homeCell: string | null;
+  homeCellId: number | null;
+  townshipId: number | null;
+  townshipName: string | null;
+  regionalChurchId: number | null;
+};
+
+async function positionFormState(db: DB, memberId: number, row: MemberDetail & { region_id: number }) {
   const current = await getMemberPositions(db, memberId);
   const home = current.find((p) => p.scopeType === "home_cell");
   const department = current.find((p) => p.scopeType === "department");
   const church = current.find((p) => p.scopeType === "church");
+  const regional = current.find((p) => p.scopeType === "regional_church");
+  const township = current.find((p) => p.scopeType === "township");
+  const townshipId = row.home_cell_township_id ?? null;
   return {
     member: {
       id: memberId,
       name: "",
       homeCell: row.home_cell,
       homeCellId: row.home_cell_id,
-    },
+      townshipId,
+      townshipName: row.home_cell_township ?? null,
+      regionalChurchId: row.home_cell_regional_church_id ?? null,
+    } as PositionMemberState,
     assignments: {
       homeCell: home?.position ?? "",
       department: department?.position ?? "",
       departmentId: department?.departmentId ?? null,
       church: church?.position ?? "",
+      regionalChurch: regional?.position ?? "",
+      regionalChurchId: regional?.regionalChurchId ?? null,
+      township: township?.position ?? "",
     },
     departments: await loadDepartments(db),
+    defs: await loadPositionDefs(db),
+    regionalChurches: await loadRegionalChurches(db, {
+      regionId: row.region_id, activeOnly: true,
+    }),
   };
 }
 
@@ -1155,21 +1185,20 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
   if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
   const state = await positionFormState(db, id, row);
   const member = { ...state.member, name: row.name_myanmar || row.name_english || `#${id}` };
+  const formProps = {
+    member, assignments: state.assignments, departments: state.departments,
+    positionDefs: state.defs, regionalChurches: state.regionalChurches,
+    canManageDepartments: c.get("perms").has("options.manage"), lang: c.get("lang"),
+  };
   if (c.req.query("modal") !== "1") {
     return c.html(
       <MemberPositionPage
-        user={c.get("user")} perms={c.get("perms")} lang={c.get("lang")}
-        member={member} assignments={state.assignments} departments={state.departments}
-        canManageDepartments={c.get("perms").has("options.manage")}
+        user={c.get("user")} perms={c.get("perms")}
+        {...formProps}
       />,
     );
   }
-  return c.html(
-    <MemberPositionForm
-      member={member} assignments={state.assignments} departments={state.departments}
-      canManageDepartments={c.get("perms").has("options.manage")} lang={c.get("lang")}
-    />,
-  );
+  return c.html(<MemberPositionForm {...formProps} />);
 });
 
 membersRoutes.post("/:id/position", requirePermission("members.update"), async (c) => {
@@ -1186,38 +1215,68 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const body = await c.req.parseBody();
   const t = getDict(c.get("lang"));
   const departments = await loadDepartments(db);
+  const defs = await loadPositionDefs(db);
+  const regionalChurches = await loadRegionalChurches(db, { regionId: row.region_id, activeOnly: true });
   const homePosition = s(body.home_cell_position) || s(body.position);
+  const townshipPosition = s(body.township_position);
+  const regionalPosition = s(body.regional_church_position);
+  const regionalRaw = s(body.regional_church_id);
+  const regionalChurchId = regionalRaw && /^\d+$/.test(regionalRaw) ? Number(regionalRaw) : null;
   const departmentPosition = s(body.department_position);
   const churchPosition = s(body.church_position);
   const departmentRaw = s(body.department_id);
   const departmentId = departmentRaw && /^\d+$/.test(departmentRaw) ? Number(departmentRaw) : null;
   const state = {
     homeCell: homePosition,
+    township: townshipPosition,
+    regionalChurch: regionalPosition,
+    regionalChurchId: regionalChurchId ?? row.home_cell_regional_church_id ?? null,
     department: departmentPosition,
     departmentId: departmentId ?? departments[0]?.id ?? null,
     church: churchPosition,
   };
+  const memberState = {
+    id, name: row.name_myanmar || row.name_english || `#${id}`,
+    homeCell: row.home_cell, homeCellId: row.home_cell_id,
+    townshipId: row.home_cell_township_id ?? null,
+    townshipName: row.home_cell_township ?? null,
+    regionalChurchId: row.home_cell_regional_church_id ?? null,
+  };
   const renderError = (message: string) => c.html(
     <MemberPositionForm
-      member={{ id, name: row.name_myanmar || row.name_english || `#${id}`, homeCell: row.home_cell, homeCellId: row.home_cell_id }}
+      member={memberState}
       assignments={state} departments={departments}
+      positionDefs={defs} regionalChurches={regionalChurches}
       canManageDepartments={c.get("perms").has("options.manage")}
       error={message} lang={c.get("lang")}
     />,
     400,
   );
 
-  if (homePosition && !isPositionForScope(homePosition, "home_cell")) {
+  const validFor = (code: string, scope: Parameters<typeof isDefinedForScope>[2]) =>
+    isDefinedForScope(defs, code, scope) || isPositionForScope(code, scope as any);
+
+  if (homePosition && !validFor(homePosition, "home_cell")) {
     return renderError(t("flash.positionInvalid"));
   }
   if (homePosition && !row.home_cell_id) return renderError(t("flash.positionNoHomeCell"));
-  if (departmentPosition && !isPositionForScope(departmentPosition, "department")) {
+  if (townshipPosition) {
+    if (!validFor(townshipPosition, "township")) return renderError(t("flash.positionInvalid"));
+    if (!row.home_cell_township_id) return renderError(t("flash.positionNoHomeCell"));
+  }
+  if (regionalPosition) {
+    if (!validFor(regionalPosition, "regional_church")) return renderError(t("flash.positionInvalid"));
+    if (!regionalChurchId || !regionalChurches.some((r) => r.id === regionalChurchId)) {
+      return renderError(t("flash.positionRegionalRequired"));
+    }
+  }
+  if (departmentPosition && !validFor(departmentPosition, "department")) {
     return renderError(t("flash.positionInvalid"));
   }
   if (departmentPosition && (!departmentId || !departments.some((d) => d.id === departmentId))) {
     return renderError(t("flash.departmentRequired"));
   }
-  if (churchPosition && !isPositionForScope(churchPosition, "church")) {
+  if (churchPosition && !validFor(churchPosition, "church")) {
     return renderError(t("flash.positionInvalid"));
   }
 
@@ -1227,6 +1286,18 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       return renderError(t("flash.positionTaken"));
     }
     assignments.push({ scopeType: "home_cell", position: homePosition, homeCellId: row.home_cell_id });
+  }
+  if (townshipPosition && row.home_cell_township_id) {
+    if (await positionTaken(db, "township", townshipPosition, { homeCellId: row.home_cell_township_id, exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "township", position: townshipPosition, homeCellId: row.home_cell_township_id });
+  }
+  if (regionalPosition && regionalChurchId) {
+    if (await positionTaken(db, "regional_church", regionalPosition, { regionalChurchId, exceptMemberId: id })) {
+      return renderError(t("flash.positionTaken"));
+    }
+    assignments.push({ scopeType: "regional_church", position: regionalPosition, regionalChurchId });
   }
   if (departmentPosition && departmentId) {
     if (await positionTaken(db, "department", departmentPosition, { departmentId, exceptMemberId: id })) {

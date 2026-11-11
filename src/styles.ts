@@ -1328,6 +1328,64 @@ td.empty-state .small { margin-top: 4px; }
 }
 .position-notice p { margin: 0 0 8px; }
 .position-notice .btn { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.position-scope { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+.position-scope strong { color: var(--ink); }
+
+/* Tabbed assignment form: one swipeable row on phones, wrapping on desktop. */
+.position-tabs {
+  display: flex; gap: 4px; margin: 0 0 12px; padding: 4px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--field-bg);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.position-tabs::-webkit-scrollbar { display: none; }
+.position-tab {
+  flex: 1 1 auto; min-width: max-content; padding: 8px 10px;
+  border: 0; border-radius: 7px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+}
+.position-tab:hover { color: var(--ink); background: var(--chip-bg); }
+.position-tab.active { background: var(--card); color: var(--link); box-shadow: 0 1px 3px rgba(2, 8, 23, .12); }
+.position-tab:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.position-panes [data-tab-pane][hidden] { display: none; }
+@media (min-width: 720px) { .position-tab { flex: 1 1 0; } }
+
+/* ---------- organization settings (positions / regional churches) ---------- */
+.page-head-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.org-manage-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.org-settings-add { padding: 16px 18px; }
+.org-settings-add h2 { margin: 0 0 2px; }
+.org-settings-add form { margin-top: 12px; }
+.org-settings-list { display: grid; gap: 14px; }
+.org-settings-row { padding: 16px 18px; }
+.org-settings-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.org-settings-head h3 { margin: 0 0 2px; font-size: 16px; overflow-wrap: anywhere; }
+.org-settings-head p { margin: 0; }
+.org-settings-row form + form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.org-settings-row .actions { margin-top: 12px; }
+.regional-cells-form .regional-cells-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-bottom: 8px; }
+.check-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.check-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  font-size: 12.5px; cursor: pointer;
+}
+.check-chip:has(input:checked) { border-color: var(--link); background: var(--chip-brand-bg); color: var(--link); }
+.check-chip input { width: auto; margin: 0; }
+
+/* ---------- supervision + regional cards on the organization page ---------- */
+.org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: 9px; background: var(--field-bg); border: 1px dashed var(--line); }
+.org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+.org-supervision .org-mini-list { margin: 0; }
+.org-card-supervision { margin-top: 10px; }
+.org-cell-regional { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+.org-regional-card .org-regional-cells { display: grid; gap: 4px; margin-top: 10px; }
+.org-regional-cell { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 13px; }
+.org-regional-cell a { font-weight: 600; overflow-wrap: anywhere; }
+.org-regional-cell-lead { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.org-regional-empty { margin: 10px 0 0; }
+.org-unassigned { margin-top: 4px; }
+
 .dept-add { margin-bottom: 18px; padding: 18px 20px; }
 .dept-add h2 { margin: 0 0 2px; }
 .dept-list { display: grid; gap: 14px; }
