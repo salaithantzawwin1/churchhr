@@ -23,6 +23,8 @@ export type SupervisionClusterRow = {
   active: number;
   sortOrder: number;
   cellCount?: number;
+  pastorId?: number | null;
+  pastorName?: string | null;
 };
 
 export type TownshipRow = {
@@ -82,7 +84,13 @@ export async function loadSupervisionClusters(db: DB, opts: LoadRegionalOptions 
            sc.active, sc.sort_order AS sortOrder,
            (SELECT COUNT(*) FROM lookup_options hc
              WHERE hc.supervision_cluster_id = sc.id
-               AND hc.type = 'home_cell' AND hc.active = 1) AS cellCount
+               AND hc.type = 'home_cell' AND hc.active = 1) AS cellCount,
+           (SELECT cp.member_id FROM cluster_pastor_assignments cp
+             WHERE cp.cluster_id = sc.id) AS pastorId,
+           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
+              FROM cluster_pastor_assignments cp
+              JOIN members m ON m.id = cp.member_id
+             WHERE cp.cluster_id = sc.id AND m.status = 'active' LIMIT 1) AS pastorName
     FROM supervision_clusters sc
     JOIN regions r ON r.id = sc.region_id
     WHERE ${sql.join(conditions, sql` AND `)}

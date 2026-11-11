@@ -339,6 +339,28 @@ export const supervisionClusters = sqliteTable(
   }),
 );
 
+/** Pastoral oversight for a supervision cluster. Kept separate from
+ * member_positions because one pastor may cover several clusters. */
+export const clusterPastorAssignments = sqliteTable(
+  "cluster_pastor_assignments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clusterId: integer("cluster_id")
+      .notNull()
+      .unique()
+      .references(() => supervisionClusters.id, { onDelete: "cascade" }),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    createdBy: integer("created_by").references(() => users.id),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    memberIdx: index("cluster_pastor_assignments_member_idx").on(t.memberId),
+  }),
+);
+
 /** Service position held by a member (Home Cell Leader, Department Head, …).
  * scope_type/scope_id/department_id are generic so church-level roles can
  * reuse the table without another schema change. */

@@ -189,6 +189,7 @@ export function OrganizationPage(props: Common & {
   const L = lang ?? "en";
   const t = getDict(L);
   const states = groupCells(cells, clusters, L);
+  const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -301,28 +302,37 @@ export function OrganizationPage(props: Common & {
     </div>
   );
 
-  const renderSupervisionGroup = (group: SupervisionGroup) => {
+  const renderSupervisionGroup = (group: SupervisionGroup, index: number) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
       ? clusterRole(group.id, position)
       : townshipRole(group.id, position);
+    const pastor = group.kind === "cluster" ? clusterRole(group.id, "cluster_pastor") : null;
     const supervisor = defs[0] ?? null;
     const assistants = defs.slice(1);
     return (
-      <div class="org-flow-cluster">
-        <div class="org-flow-cluster-head">
-          <div>
+      <details class="org-flow-cluster" open={index === 0}>
+        <summary class="org-flow-cluster-head">
+          <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
-            <h4>{group.name}</h4>
+            <span class="org-flow-cluster-name">{group.name}</span>
+          </span>
+          <span class="org-flow-cluster-meta">
+            <span class="muted small">{group.cells.length} {t("org.cells")}</span>
+            <span class="org-flow-chev" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <div class="org-flow-cluster-body">
+          <div class="org-flow-pastor">
+            {renderPersonNode(t("org.clusterPastor"), pastor, "md", true)}
           </div>
-          <span class="muted small">{group.cells.length} {t("org.cells")}</span>
-        </div>
-        <div class="org-flow-cluster-team">
-          {supervisor && renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
-          {assistants.map((def) => renderPersonNode(positionDefLabel(def, L), role(def.code), "sm"))}
-        </div>
-        <div class="org-flow-line" aria-hidden="true" />
-        <div class="org-flow-cells">
+          <div class="org-flow-line" aria-hidden="true" />
+          <div class="org-flow-cluster-team">
+            {supervisor && renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
+            {assistants.map((def) => renderPersonNode(positionDefLabel(def, L), role(def.code), "sm"))}
+          </div>
+          <div class="org-flow-line" aria-hidden="true" />
+          <div class="org-flow-cells">
           {group.cells.map((cell) => (
             <article class="org-flow-cell">
               <div class="org-flow-cell-head">
@@ -348,8 +358,9 @@ export function OrganizationPage(props: Common & {
               </div>
             </article>
           ))}
+          </div>
         </div>
-      </div>
+      </details>
     );
   };
 
@@ -698,6 +709,12 @@ export function OrganizationPage(props: Common & {
               <h2>{t("org.homeCellLeadership")}</h2>
               <p class="muted small">{t("org.homeCellFlowHint")}</p>
             </div>
+            {clusterCount > 1 && (
+              <div class="org-flow-actions">
+                <button class="btn secondary sm" type="button" data-cluster-toggle="open">{t("org.expandAll")}</button>
+                <button class="btn secondary sm" type="button" data-cluster-toggle="close">{t("org.collapseAll")}</button>
+              </div>
+            )}
           </div>
 
           {states.map(renderStateHierarchy)}

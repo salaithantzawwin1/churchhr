@@ -1567,8 +1567,18 @@ td.empty-state .small { margin-top: 4px; }
 .org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
 .org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
 .org-flow-cluster { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--row-alt, rgba(15,23,42,.025)); }
-.org-flow-cluster-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
-.org-flow-cluster-head h4 { margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
+.org-flow-cluster > summary { list-style: none; cursor: pointer; }
+.org-flow-cluster > summary::-webkit-details-marker { display: none; }
+.org-flow-cluster-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 0; }
+.org-flow-cluster-head:hover .org-flow-cluster-name { color: var(--link); }
+.org-flow-cluster-title { display: flex; flex-direction: column; min-width: 0; }
+.org-flow-cluster-name { margin: 2px 0 0; font-size: 15px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.org-flow-cluster-meta { display: flex; align-items: center; gap: 8px; flex: none; }
+.org-flow-chev { color: var(--muted); font-size: 12px; line-height: 1; transition: transform .15s ease; }
+.org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
+.org-flow-cluster-body { padding-top: 6px; }
+.org-flow-pastor { display: flex; justify-content: center; }
+.org-flow-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .org-flow-cluster-team { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 4px 8px; }
 .org-flow-cluster-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
 .org-flow-cluster-team .org-node-lead { width: 190px; }

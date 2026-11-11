@@ -19,6 +19,7 @@ type ClusterValues = {
   regionId: number | "";
   sortOrder: number;
   active: boolean;
+  pastorMemberId: number | "";
 };
 
 function clusterValues(cluster?: SupervisionClusterRow): ClusterValues {
@@ -28,16 +29,18 @@ function clusterValues(cluster?: SupervisionClusterRow): ClusterValues {
     regionId: cluster?.regionId ?? "",
     sortOrder: cluster?.sortOrder ?? 0,
     active: cluster ? cluster.active === 1 : true,
+    pastorMemberId: cluster?.pastorId ?? "",
   };
 }
 
 function ClusterFields(props: {
   values: ClusterValues;
   regions: { id: number; name: string }[];
+  pastorCandidates: { id: number; name: string }[];
   lang: Lang;
   editing: boolean;
 }) {
-  const { values, regions, lang, editing } = props;
+  const { values, regions, pastorCandidates, lang, editing } = props;
   const t = getDict(lang);
   return (
     <div class="form-grid">
@@ -62,6 +65,20 @@ function ClusterFields(props: {
         <span class="lbl">{t("org.positionSort")}</span>
         <input name="sort_order" type="number" min="0" max="9999" value={String(values.sortOrder)} />
       </label>
+      {editing && (
+        <label class="field">
+          <span class="lbl">{t("org.clusterPastor")}</span>
+          <select name="pastor_member_id">
+            <option value="">{t("org.noPastor")}</option>
+            {pastorCandidates.map((member) => (
+              <option value={String(member.id)} selected={values.pastorMemberId === member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+          <span class="hint">{t("org.clusterPastorHint")}</span>
+        </label>
+      )}
       {editing && (
         <label class="dept-active">
           <input type="checkbox" name="active" value="1" checked={values.active} />
@@ -92,6 +109,7 @@ export function SupervisionClusterModal(props: {
   cluster?: SupervisionClusterRow;
   regions: { id: number; name: string }[];
   homeCells: ClusterHomeCell[];
+  pastorCandidates?: { id: number; name: string }[];
   values?: ClusterValues;
   error?: string | null;
   cellError?: string | null;
@@ -117,7 +135,13 @@ export function SupervisionClusterModal(props: {
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
       <form method="post" action={cluster ? `/organization/clusters/${cluster.id}` : "/organization/clusters"} data-plain-submit>
-        <ClusterFields values={values} regions={regions} lang={L} editing={Boolean(cluster)} />
+        <ClusterFields
+          values={values}
+          regions={regions}
+          pastorCandidates={props.pastorCandidates ?? []}
+          lang={L}
+          editing={Boolean(cluster)}
+        />
         <div class="actions">
           <button class="btn" type="submit">{cluster ? t("dept.save") : t("form.add")}</button>
         </div>
@@ -254,6 +278,11 @@ export function SupervisionClustersPage(props: Common & {
                       {L !== "mm" && cluster.stateNameEn ? cluster.stateNameEn : cluster.stateName}
                       {" · "}{cells.length} {t("org.cells")}
                     </p>
+                    {cluster.pastorName && (
+                      <p class="muted small org-cluster-pastor">
+                        {t("org.clusterPastor")}: <strong>{cluster.pastorName}</strong>
+                      </p>
+                    )}
                   </div>
                   <div class="role-card-actions">
                     <span class={`badge ${cluster.active ? "active" : "inactive"}`}>

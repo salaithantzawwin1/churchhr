@@ -93,7 +93,17 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     FROM member_positions mp
     JOIN members m ON m.id = mp.member_id
     WHERE m.status = 'active'
-    ORDER BY mp.position`);
+    UNION ALL
+    SELECT 'cluster_pastor' AS position, 'cluster' AS scope_type, NULL AS scope_id,
+           NULL AS department_id, NULL AS regional_church_id,
+           cp.cluster_id AS supervision_cluster_id,
+           m.id AS member_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
+           (m.photo IS NOT NULL) AS has_photo, m.updated_at
+    FROM cluster_pastor_assignments cp
+    JOIN members m ON m.id = cp.member_id
+    WHERE m.status = 'active'
+    ORDER BY position`);
 
   const unassignedRows = await db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM members m
@@ -817,6 +827,14 @@ async function clusterNameTaken(db: DB, name: string, regionId: number, exceptId
   return rows.some((r) => r.id !== exceptId);
 }
 
+async function clusterPastorCandidates(db: DB, regionId: number): Promise<{ id: number; name: string }[]> {
+  return db.all<{ id: number; name: string }>(sql`
+    SELECT id, COALESCE(NULLIF(name_myanmar, ''), name_english) AS name
+    FROM members
+    WHERE status = 'active' AND region_id = ${regionId}
+    ORDER BY name`);
+}
+
 organizationRoutes.get("/clusters", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -857,6 +875,7 @@ organizationRoutes.get("/clusters/:id/edit", requirePermission("options.manage")
       cluster={cluster}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
+      pastorCandidates={await clusterPastorCandidates(db, cluster.regionId)}
       lang={c.get("lang")}
     />,
   );
@@ -898,14 +917,22 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   const regionId = asInt(s(body.region_id)) ?? current.regionId;
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const pastorId = asInt(s(body.pastor_member_id));
   if (!name) return c.redirect("/organization/clusters?err=cluster-name-required", 303);
   const allowed = await orgRegions(db, scope, c.get("lang"));
   if (!allowed.some((r) => r.id === regionId)) return c.redirect("/organization/clusters?err=err-scope", 303);
   if (await clusterNameTaken(db, name, regionId, id)) return c.redirect("/organization/clusters?err=cluster-name-taken", 303);
+  if (pastorId) {
+    const validPastor = await db.all<{ id: number }>(sql`
+      SELECT id FROM members
+      WHERE id = ${pastorId} AND status = 'active' AND region_id = ${regionId} LIMIT 1`);
+    if (validPastor.length === 0) return c.redirect("/organization/clusters?err=cluster-pastor-invalid", 303);
+  }
   const attached = await db.all<{ n: number }>(sql`
     SELECT
       (SELECT COUNT(*) FROM lookup_options WHERE supervision_cluster_id = ${id}) +
-      (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) AS n`);
+      (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) +
+      (SELECT COUNT(*) FROM cluster_pastor_assignments WHERE cluster_id = ${id}) AS n`);
   const used = attached[0]?.n ?? 0;
   if (regionId !== current.regionId && used > 0) return c.redirect("/organization/clusters?err=cluster-state-locked", 303);
   if (current.active === 1 && active === 0 && used > 0) return c.redirect("/organization/clusters?err=cluster-in-use", 303);
@@ -914,6 +941,15 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
            active = ${active}, sort_order = ${sortOrder}
      WHERE id = ${id}`);
+  if (pastorId) {
+    await db.run(sql`
+      INSERT INTO cluster_pastor_assignments (cluster_id, member_id, created_by)
+      VALUES (${id}, ${pastorId}, ${c.get("user").id})
+      ON CONFLICT(cluster_id) DO UPDATE SET
+        member_id = excluded.member_id, updated_at = unixepoch()`);
+  } else {
+    await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
+  }
   return c.redirect("/organization/clusters?ok=cluster-updated", 303);
 });
 
@@ -969,6 +1005,7 @@ organizationRoutes.post("/clusters/:id/delete", requirePermission("options.manag
       (SELECT COUNT(*) FROM lookup_options WHERE supervision_cluster_id = ${id}) +
       (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) AS n`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/clusters?err=cluster-in-use", 303);
+  await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
   await db.run(sql`DELETE FROM supervision_clusters WHERE id = ${id}`);
   return c.redirect("/organization/clusters?ok=cluster-deleted", 303);
 });

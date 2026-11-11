@@ -1285,4 +1285,16 @@
       strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2;
     }
   })();
+
+  // Home Cell structure: expand or collapse every cluster branch at once.
+  (function initClusterToggles() {
+    document.addEventListener("click", function (e) {
+      var toggle = e.target && e.target.closest ? e.target.closest("[data-cluster-toggle]") : null;
+      if (!toggle) return;
+      var open = toggle.getAttribute("data-cluster-toggle") === "open";
+      Array.prototype.forEach.call(document.querySelectorAll("details.org-flow-cluster"), function (cluster) {
+        cluster.open = open;
+      });
+    });
+  })();
 })();

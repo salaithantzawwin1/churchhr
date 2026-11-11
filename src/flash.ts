@@ -37,6 +37,7 @@ const FLASH_KEYS: Record<string, string> = {
   "regional-name-taken": "flash.regionalNameTaken",
   "regional-state-required": "flash.regionalStateRequired",
   "regional-cell-invalid": "flash.regionalCellInvalid",
+  "cluster-pastor-invalid": "cluster-pastor-invalid",
   "user-created": "flash.userCreated",
   "user-updated": "flash.userUpdated",
   "role-created": "flash.roleCreated",
