@@ -953,11 +953,31 @@
     if (!f || !f.getAttribute || !f.getAttribute("data-confirm")) return;
     e.preventDefault();
     pendingForm = f;
+    var text = f.getAttribute("data-confirm");
+    var yesLabel = f.getAttribute("data-confirm-yes") || modal.getAttribute("data-yes") || "OK";
+    // A form inside the modal (e.g. deleting the record being edited) keeps
+    // its place: replacing the body would detach it and submit() would do
+    // nothing. Show the prompt under it with the form hidden instead.
+    if (bodyEl.contains(f)) {
+      f.hidden = true;
+      var box = document.createElement("div");
+      box.className = "modal-confirm";
+      box.innerHTML =
+        '<p style="margin:0 0 4px">' + text + "</p>" +
+        '<div class="actions" style="margin-top:14px">' +
+        '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
+        '<button type="button" class="btn secondary" data-confirm-no="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
+        "</div>";
+      bodyEl.appendChild(box);
+      var inlineYes = box.querySelector("[data-confirm-yes]");
+      if (inlineYes) inlineYes.focus();
+      return;
+    }
     openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", "sm");
     bodyEl.innerHTML =
-      '<p style="margin:0 0 4px">' + f.getAttribute("data-confirm") + "</p>" +
+      '<p style="margin:0 0 4px">' + text + "</p>" +
       '<div class="actions" style="margin-top:14px">' +
-      '<button type="button" class="btn danger" data-confirm-yes="1">' + (f.getAttribute("data-confirm-yes") || modal.getAttribute("data-yes") || "OK") + "</button>" +
+      '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
       '<button type="button" class="btn secondary" data-close="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
       "</div>";
     var yes = bodyEl.querySelector("[data-confirm-yes]");
@@ -999,9 +1019,18 @@
       .catch(function () { location.href = href; });
   });
 
-  // Confirm button inside the delete modal
+  // Confirm / cancel buttons of the delete prompt
   bodyEl.addEventListener("click", function (e) {
-    var b = e.target && e.target.closest ? e.target.closest("[data-confirm-yes]") : null;
+    var el = e.target;
+    if (!el || !el.closest) return;
+    var no = el.closest("[data-confirm-no]");
+    if (no) {
+      var box = no.closest(".modal-confirm");
+      if (box) box.remove();
+      if (pendingForm) { pendingForm.hidden = false; pendingForm = null; }
+      return;
+    }
+    var b = el.closest("[data-confirm-yes]");
     if (!b || !pendingForm) return;
     var f = pendingForm;
     pendingForm = null;
@@ -1012,6 +1041,9 @@
   bodyEl.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form || form.tagName !== "FORM") return;
+    // Settings forms submit natively so the server redirect (and its ok/err
+    // flash) replaces the page; confirm-marked forms are handled below.
+    if (form.hasAttribute("data-plain-submit") || form.hasAttribute("data-confirm")) return;
     e.preventDefault();
     var btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;

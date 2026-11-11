@@ -7,7 +7,7 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
-import { RegionalChurchesPage, PositionsPage } from "../views/org-settings";
+import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal } from "../views/org-settings";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
@@ -275,6 +275,12 @@ function positionNameError(nameMm: string, nameEn: string): string | null {
   return null;
 }
 
+/** The settings modals fetch a bare form with this header; a direct visit
+ *  falls back to the list page instead of rendering a form without a shell. */
+function modalRequest(c: { req: { header: (name: string) => string | undefined } }): boolean {
+  return c.req.header("X-Requested-With") === "modal";
+}
+
 organizationRoutes.get("/positions", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = positionScopeFrom(c.req.query("scope"));
@@ -286,6 +292,21 @@ organizationRoutes.get("/positions", requirePermission("options.manage"), async 
       lang={c.get("lang")} scope={scope} defs={defs}
     />,
   );
+});
+
+organizationRoutes.get("/positions/new", requirePermission("options.manage"), async (c) => {
+  const scope = positionScopeFrom(c.req.query("scope"));
+  if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${scope}`, 303);
+  return c.html(<PositionModal scope={scope} lang={c.get("lang")} />);
+});
+
+organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  const def = id ? (await adminPositionDefs(db)).find((d) => d.id === id) : undefined;
+  if (!def) return c.redirect("/organization/positions?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${def.scopeType}`, 303);
+  return c.html(<PositionModal scope={def.scopeType} def={def} lang={c.get("lang")} />);
 });
 
 organizationRoutes.post("/positions", requirePermission("options.manage"), async (c) => {
@@ -505,6 +526,36 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} churches={churches} regions={regions} homeCells={homeCells}
+    />,
+  );
+});
+
+organizationRoutes.get("/regional-churches/new", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
+  return c.html(
+    <RegionalChurchModal
+      regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db)}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/regional-churches/:id/edit", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  const church = id
+    ? (await loadRegionalChurches(db, { activeOnly: false, scopeAll: true, stateIds: [] })).find((r) => r.id === id)
+    : undefined;
+  if (!church) return c.redirect("/organization/regional-churches?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
+  return c.html(
+    <RegionalChurchModal
+      church={church}
+      regions={await orgRegions(db, scopeOf(c), c.get("lang"))}
+      homeCells={await loadAdminHomeCells(db)}
+      lang={c.get("lang")}
     />,
   );
 });

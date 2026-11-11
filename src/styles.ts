@@ -545,8 +545,10 @@ th.bar-col { width: 42%; }
   .stat .n { font-size: 22px; }
   .stat .ico { width: 26px; height: 26px; }
   .stat .ico svg { width: 14px; height: 14px; }
-  .modal { padding: 10px; align-items: stretch; }
-  .modal-card { width: 100%; max-height: none; height: calc(100dvh - 20px); border-radius: 12px; }
+  .modal { padding: 10px; align-items: center; }
+  /* Content-sized sheets on phones: a short form no longer leaves a mostly
+     empty full-height panel, and tall ones still scroll inside the viewport. */
+  .modal-card { width: 100%; height: auto; max-height: calc(100dvh - 20px); border-radius: 12px; }
   .modal-head { position: sticky; top: 0; background: var(--card); z-index: 2; }
   /* Keep the sheet inside the viewport even when the underlying scrollbar removal
      relayouts the page (iOS Safari body-lock quirk). */
@@ -1375,21 +1377,6 @@ td.empty-state .small { margin-top: 4px; }
 
 /* ---------- position + regional settings screens ---------- */
 .tab-count { margin-left: 6px; font-size: 11.5px; opacity: .75; }
-.settings-add { padding: 0; overflow: hidden; }
-.settings-add > summary {
-  display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
-  padding: 14px 18px; cursor: pointer; list-style: none;
-}
-.settings-add > summary::-webkit-details-marker { display: none; }
-.settings-add > summary::after {
-  content: "▾"; margin-left: auto; color: var(--muted); transition: transform .15s ease;
-}
-.settings-add[open] > summary::after { transform: rotate(180deg); }
-.settings-add > summary:hover { background: var(--field-bg); }
-.settings-add > summary:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
-.settings-add-title { font-weight: 700; }
-.settings-add-body { padding: 14px 18px 18px; border-top: 1px solid var(--line); }
-
 .role-list, .regional-list { display: grid; gap: 12px; }
 .role-card, .regional-card { padding: 16px 18px; }
 .role-card.is-inactive, .regional-card.is-inactive { opacity: .72; }
@@ -1405,19 +1392,36 @@ td.empty-state .small { margin-top: 4px; }
 .regional-card-head h3 { margin: 0 0 3px; font-size: 17px; overflow-wrap: anywhere; }
 .regional-card-head p { margin: 0; }
 
-.settings-details { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line); }
-.settings-details > summary {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
-  padding: 6px 2px; cursor: pointer; list-style: none;
-  font-size: 13px; font-weight: 600; color: var(--link);
+.role-card-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.role-card-actions .btn { white-space: nowrap; }
+
+/* Modal sheets for the settings screens: body copy between forms, a quiet
+   danger section that is not a sticky action bar, and inline error text. */
+.modal-note { margin: 2px 0 0; }
+.modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.modal-error {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 9px;
+  background: var(--err-bg, #fdecec); color: var(--err-ink); font-size: 13px;
 }
-.settings-details > summary::-webkit-details-marker { display: none; }
-.settings-details > summary::after { content: "▾"; font-size: 11px; transition: transform .15s ease; }
-.settings-details[open] > summary::after { transform: rotate(180deg); }
-.settings-details[open] > summary { margin-bottom: 8px; }
-.settings-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.role-danger { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
-.role-inuse { margin: 10px 0 0; }
+.modal-body .regional-cells-form {
+  padding-top: 14px; border-top: 1px dashed var(--line);
+}
+.modal-body .regional-cells-form .regional-cells-head { margin-bottom: 4px; }
+.modal-body form.modal-danger {
+  flex: 0 0 auto; margin-top: 4px; padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+.modal-body form.modal-danger > .actions {
+  position: static; margin: 0; padding: 0; border: 0; background: none;
+}
+
+.role-card-text { min-width: 0; }
+.role-card-actions { flex-wrap: nowrap; }
+
+@media (max-width: 640px) {
+  .role-card, .regional-card { padding: 14px 16px; }
+  .role-card-actions .btn { min-height: 36px; padding: 5px 12px; }
+}
 
 .regional-attached { display: grid; gap: 6px; margin-top: 10px; }
 .regional-attached-empty { margin: 8px 0 0; }
