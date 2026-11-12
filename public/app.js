@@ -1178,6 +1178,28 @@
     return u.toString();
   }
 
+  // Double-submit guard: once a form is on its way, the button that sent it
+  // stops accepting clicks so a slow response cannot create the record twice.
+  // Uses a class (never `disabled`) so the button's value still posts, and it
+  // re-arms itself in case the navigation never happens.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form || form.tagName !== "FORM") return;
+    if (String(form.method || "get").toLowerCase() !== "post") return;
+    var event = e;
+    window.setTimeout(function () {
+      if (event.defaultPrevented) return;
+      var btn = event.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+      if (!btn || btn.classList.contains("is-submitting")) return;
+      btn.classList.add("is-submitting");
+      btn.setAttribute("aria-busy", "true");
+      window.setTimeout(function () {
+        btn.classList.remove("is-submitting");
+        btn.removeAttribute("aria-busy");
+      }, 8000);
+    }, 0);
+  }, false);
+
   // Delete confirm modal (replaces window.confirm for data-confirm forms)
   document.addEventListener("submit", function (e) {
     var f = e.target;

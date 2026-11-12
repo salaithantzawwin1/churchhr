@@ -224,6 +224,8 @@ tbody tr:hover { background: var(--row-hover); }
   line-height: 1.35; min-height: 40px;
 }
 .btn:hover { filter: brightness(1.08); }
+/* Sent forms lock their button until the response arrives (app.js). */
+.btn.is-submitting { pointer-events: none; opacity: .65; }
 .btn.secondary { background: var(--btn2-bg); color: var(--ink); border: 1px solid var(--line); }
 .btn.secondary:hover { filter: none; background: var(--btn2-hover); }
 .btn.danger { background: #b42318; }
