@@ -23,6 +23,9 @@ export type PastorRow = {
   stateNameEn: string | null;
   churchName: string | null;
   churchNameEn: string | null;
+  spousePastorId: number | null;
+  spouseName: string | null;
+  spouseNameEn: string | null;
   hasPhoto: number | boolean;
 };
 
@@ -53,10 +56,13 @@ export async function loadPastors(db: DB, opts: PastorFilter = {}): Promise<Past
            p.notes, p.active, p.sort_order AS sortOrder,
            r.name AS stateName, r.name_en AS stateNameEn,
            rc.name AS churchName, rc.name_en AS churchNameEn,
+           p.spouse_pastor_id AS spousePastorId,
+           sp.name AS spouseName, sp.name_en AS spouseNameEn,
            (p.photo IS NOT NULL) AS hasPhoto
     FROM pastors p
     JOIN regions r ON r.id = p.region_id
     LEFT JOIN regional_churches rc ON rc.id = p.regional_church_id
+    LEFT JOIN pastors sp ON sp.id = p.spouse_pastor_id
     WHERE ${sql.join(conditions, sql` AND `)}
     ORDER BY p.active DESC, p.sort_order, p.name`);
 }

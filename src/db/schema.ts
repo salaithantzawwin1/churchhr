@@ -367,6 +367,8 @@ export const pastors = sqliteTable(
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
     sourceMemberId: integer("source_member_id"),
+    /** Mutual spouse link to another pastor (0032). */
+    spousePastorId: integer("spouse_pastor_id"),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },

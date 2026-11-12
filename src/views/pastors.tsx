@@ -6,6 +6,7 @@ import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 type ChurchOption = { id: number; name: string; regionId: number };
+export type SpouseOption = { id: number; name: string; nameEn: string | null; title: string | null };
 
 export type PastorValues = {
   name: string;
@@ -24,6 +25,7 @@ export type PastorValues = {
   notes: string;
   sortOrder: number;
   active: boolean;
+  spouseId: number | "";
 };
 
 function pastorValues(pastor?: PastorRow): PastorValues {
@@ -44,7 +46,13 @@ function pastorValues(pastor?: PastorRow): PastorValues {
     notes: pastor?.notes ?? "",
     sortOrder: pastor?.sortOrder ?? 0,
     active: pastor ? pastor.active === 1 : true,
+    spouseId: pastor?.spousePastorId ?? "",
   };
+}
+
+function spouseLabel(spouse: SpouseOption, L: Lang): string {
+  const name = L !== "mm" && spouse.nameEn ? spouse.nameEn : spouse.name;
+  return spouse.title ? `${spouse.title} ${name}` : name;
 }
 
 export function pastorPhotoUrl(pastor: Pick<PastorRow, "id" | "hasPhoto">): string | undefined {
@@ -59,11 +67,13 @@ function PastorFields(props: {
   values: PastorValues;
   regions: { id: number; name: string }[];
   churches: ChurchOption[];
+  spouses: SpouseOption[];
+  selfId?: number;
   lang: Lang;
   editing: boolean;
   photoUrl?: string;
 }) {
-  const { values, regions, churches, lang, editing, photoUrl } = props;
+  const { values, regions, churches, spouses, selfId, lang, editing, photoUrl } = props;
   const t = getDict(lang);
   const initial = Array.from((values.name || values.nameEn || "Ps").trim())[0] ?? "Ps";
   return (
@@ -138,6 +148,18 @@ function PastorFields(props: {
           <label class="field">
             <span class="lbl">{t("form.dob")}</span>
             <input type="date" name="date_of_birth" value={values.dateOfBirth} />
+          </label>
+          <label class="field span-2">
+            <span class="lbl">{t("org.pastorSpouse")}</span>
+            <select name="spouse_pastor_id">
+              <option value="">{t("org.pastorNoSpouse")}</option>
+              {spouses.filter((s) => s.id !== selfId).map((spouse) => (
+                <option value={String(spouse.id)} selected={values.spouseId === spouse.id}>
+                  {spouseLabel(spouse, lang)}
+                </option>
+              ))}
+            </select>
+            <span class="hint">{t("org.pastorSpouseHint")}</span>
           </label>
         </div>
       </fieldset>
@@ -221,11 +243,13 @@ export function PastorModal(props: {
   pastor?: PastorRow;
   regions: { id: number; name: string }[];
   churches: ChurchOption[];
+  spouses?: SpouseOption[];
   values?: PastorValues;
   error?: string | null;
   lang?: Lang;
 }) {
   const { pastor, regions, churches, error } = props;
+  const spouses = props.spouses ?? [];
   const L = props.lang ?? "en";
   const t = getDict(L);
   return (
@@ -236,7 +260,8 @@ export function PastorModal(props: {
         data-modal-ajax>
         <PastorFields
           values={props.values ?? pastorValues(pastor)}
-          regions={regions} churches={churches} lang={L} editing={Boolean(pastor)}
+          regions={regions} churches={churches} spouses={spouses} selfId={pastor?.id}
+          lang={L} editing={Boolean(pastor)}
           photoUrl={pastor ? pastorPhotoUrl(pastor) : undefined}
         />
         <div class="actions">
@@ -276,7 +301,7 @@ export function PastorsPage(props: Common & {
     (status === "all" || (status === "active" ? p.active === 1 : p.active === 0)) &&
     (region == null || p.regionId === region) &&
     matchesQuery(q, [p.name, p.nameEn, p.title, p.position, p.stateName, p.stateNameEn,
-      p.churchName, p.churchNameEn, p.phone, p.email]));
+      p.churchName, p.churchNameEn, p.spouseName, p.spouseNameEn, p.phone, p.email]));
   const activeCount = pastors.filter((p) => p.active === 1).length;
   const churchCount = new Set(pastors.map((p) => p.regionalChurchId).filter((id): id is number => id != null)).size;
   const filtered = q.trim().length > 0 || status !== "all" || region != null;
@@ -365,6 +390,16 @@ export function PastorsPage(props: Common & {
                     <span class="hh-fact-label">{t("detail.phone")}</span>
                     <span class="hh-fact-value">{pastor.phone || pastor.email || "—"}</span>
                   </div>
+                  {pastor.spousePastorId != null && (
+                    <div class="hh-fact wide">
+                      <span class="hh-fact-label">{t("org.pastorSpouse")}</span>
+                      <span class="hh-fact-value">
+                        <a href={`/organization/pastors/${pastor.spousePastorId}`}>
+                          {(L !== "mm" && pastor.spouseNameEn) ? pastor.spouseNameEn : pastor.spouseName || "—"}
+                        </a>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div class="hh-card-actions">
@@ -459,6 +494,18 @@ export function PastorDetailPage(props: Common & { pastor: PastorRow }) {
               <span class={`v${value ? "" : " empty"}`}>{value || "—"}</span>
             </div>
           ))}
+          <div class="detail-item">
+            <span class="k">{t("org.pastorSpouse")}</span>
+            {pastor.spousePastorId != null ? (
+              <span class="v">
+                <a href={`/organization/pastors/${pastor.spousePastorId}`}>
+                  {(L !== "mm" && pastor.spouseNameEn) ? pastor.spouseNameEn : pastor.spouseName || "—"}
+                </a>
+              </span>
+            ) : (
+              <span class="v empty">—</span>
+            )}
+          </div>
         </div>
       </div>
     </Layout>

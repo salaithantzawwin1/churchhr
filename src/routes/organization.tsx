@@ -19,7 +19,7 @@ import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "..
 import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
-import { PastorsPage, PastorModal, PastorDetailPage, type PastorValues } from "../views/pastors";
+import { PastorsPage, PastorModal, PastorDetailPage, type PastorValues, type SpouseOption } from "../views/pastors";
 import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
@@ -1211,6 +1211,25 @@ async function validPastorChurch(db: DB, churchId: number | null, regionId: numb
   return rows.length > 0;
 }
 
+/** Pastors selectable as a spouse: the directory scoped to the signed-in user. */
+async function pastorSpouseOptions(db: DB, scope: Scope): Promise<SpouseOption[]> {
+  const rows = await loadPastors(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  return rows.map((p) => ({ id: p.id, name: p.name, nameEn: p.nameEn, title: p.title }));
+}
+
+/** Keep the spouse link mutual: setting or clearing one side updates the other. */
+async function linkPastorSpouse(db: DB, id: number, spouseId: number | null): Promise<void> {
+  await db.run(sql`
+    UPDATE pastors SET spouse_pastor_id = NULL, updated_at = unixepoch()
+     WHERE spouse_pastor_id = ${id} OR id = ${id}`);
+  if (spouseId == null || spouseId === id) return;
+  await db.run(sql`
+    UPDATE pastors SET spouse_pastor_id = NULL, updated_at = unixepoch()
+     WHERE spouse_pastor_id = ${spouseId} OR id = ${spouseId}`);
+  await db.run(sql`UPDATE pastors SET spouse_pastor_id = ${spouseId}, updated_at = unixepoch() WHERE id = ${id}`);
+  await db.run(sql`UPDATE pastors SET spouse_pastor_id = ${id}, updated_at = unixepoch() WHERE id = ${spouseId}`);
+}
+
 /** Same 500×500 WebP data URL contract the member photo pipeline produces. */
 const MAX_PASTOR_PHOTO_BYTES = 400 * 1024;
 type PastorPhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
@@ -1257,6 +1276,7 @@ function pastorFormFields(body: Record<string, unknown>) {
     address: s(body.address).slice(0, 300),
     ordinationDate: s(body.ordination_date).slice(0, 10),
     notes: s(body.notes).slice(0, 1000),
+    spouseId: asInt(s(body.spouse_pastor_id)),
   };
 }
 
@@ -1284,6 +1304,7 @@ organizationRoutes.get("/pastors/new", requirePermission("options.manage"), asyn
     <PastorModal
       regions={await orgRegions(db, scope, c.get("lang"))}
       churches={await pastorChurches(db, scope, c.get("lang"))}
+      spouses={await pastorSpouseOptions(db, scope)}
       lang={c.get("lang")}
     />,
   );
@@ -1343,6 +1364,7 @@ organizationRoutes.get("/pastors/:id/edit", requirePermission("options.manage"),
       pastor={pastor}
       regions={await orgRegions(db, scope, c.get("lang"))}
       churches={await pastorChurches(db, scope, c.get("lang"))}
+      spouses={await pastorSpouseOptions(db, scope)}
       lang={c.get("lang")}
     />,
   );
@@ -1372,6 +1394,7 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
     notes: f.notes,
     sortOrder,
     active: true,
+    spouseId: f.spouseId ?? "",
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -1380,6 +1403,7 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
       <PastorModal
         regions={await orgRegions(db, scope, c.get("lang"))}
         churches={await pastorChurches(db, scope, c.get("lang"))}
+        spouses={await pastorSpouseOptions(db, scope)}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
       />,
       422,
@@ -1392,6 +1416,9 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
   if (!allowed.some((r) => r.id === f.regionId)) return await fail("err-scope");
   if (!await validPastorChurch(db, f.churchId, f.regionId)) return await fail("pastor-church-invalid");
   if (await pastorNameTaken(db, f.name, f.regionId, f.churchId)) return await fail("pastor-name-taken");
+  if (f.spouseId != null && !(await pastorSpouseOptions(db, scope)).some((p) => p.id === f.spouseId)) {
+    return await fail("pastor-spouse-invalid");
+  }
   await db.run(sql`
     INSERT INTO pastors (name, name_en, title, position, gender, marital_status, date_of_birth,
                          region_id, regional_church_id, phone, email, address, ordination_date, notes, active, sort_order)
@@ -1399,11 +1426,13 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
             ${f.gender}, ${f.maritalStatus}, ${f.dateOfBirth || null}, ${f.regionId}, ${f.churchId},
             ${f.phone || null}, ${f.email || null}, ${f.address || null}, ${f.ordinationDate || null},
             ${f.notes || null}, 1, ${sortOrder})`);
-  if (photo.touched) {
-    const created = await db.all<{ id: number }>(sql`
-      SELECT id FROM pastors WHERE name = ${f.name} AND region_id = ${f.regionId}
-        AND COALESCE(regional_church_id, 0) = ${f.churchId ?? 0} ORDER BY id DESC LIMIT 1`);
-    if (created[0]) await savePastorPhoto(db, created[0].id, photo.bytes);
+  const created = await db.all<{ id: number }>(sql`
+    SELECT id FROM pastors WHERE name = ${f.name} AND region_id = ${f.regionId}
+      AND COALESCE(regional_church_id, 0) = ${f.churchId ?? 0} ORDER BY id DESC LIMIT 1`);
+  const newId = created[0]?.id;
+  if (newId != null) {
+    if (photo.touched) await savePastorPhoto(db, newId, photo.bytes);
+    if (f.spouseId != null) await linkPastorSpouse(db, newId, f.spouseId);
   }
   const landing = "/organization/pastors?ok=pastor-created";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
@@ -1440,6 +1469,7 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
     notes: f.notes,
     sortOrder,
     active: active === 1,
+    spouseId: f.spouseId ?? "",
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -1449,6 +1479,7 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
         pastor={current}
         regions={await orgRegions(db, scope, c.get("lang"))}
         churches={await pastorChurches(db, scope, c.get("lang"))}
+        spouses={await pastorSpouseOptions(db, scope)}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
       />,
       422,
@@ -1460,6 +1491,10 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
   if (!allowed.some((r) => r.id === regionId)) return await fail("err-scope");
   if (!await validPastorChurch(db, f.churchId, regionId)) return await fail("pastor-church-invalid");
   if (await pastorNameTaken(db, f.name, regionId, f.churchId, id)) return await fail("pastor-name-taken");
+  if (f.spouseId != null &&
+    (f.spouseId === id || !(await pastorSpouseOptions(db, scope)).some((p) => p.id === f.spouseId))) {
+    return await fail("pastor-spouse-invalid");
+  }
   await db.run(sql`
     UPDATE pastors
        SET name = ${f.name}, name_en = ${f.nameEn || null}, title = ${f.title || null},
@@ -1471,6 +1506,7 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
            updated_at = unixepoch()
      WHERE id = ${id}`);
   if (photo.touched) await savePastorPhoto(db, id, photo.bytes);
+  await linkPastorSpouse(db, id, f.spouseId);
   const landing = "/organization/pastors?ok=pastor-updated";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
@@ -1486,6 +1522,7 @@ organizationRoutes.post("/pastors/:id/delete", requirePermission("options.manage
   const used = await db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM cluster_pastor_assignments WHERE pastor_id = ${id}`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/pastors?err=pastor-in-use", 303);
+  await db.run(sql`UPDATE pastors SET spouse_pastor_id = NULL WHERE spouse_pastor_id = ${id}`);
   await db.run(sql`DELETE FROM pastors WHERE id = ${id}`);
   return c.redirect("/organization/pastors?ok=pastor-deleted", 303);
 });

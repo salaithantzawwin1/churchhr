@@ -59,6 +59,7 @@ const FLASH_KEYS: Record<string, string> = {
   "pastor-state-required": "pastor-state-required",
   "pastor-church-invalid": "pastor-church-invalid",
   "pastor-name-taken": "pastor-name-taken",
+  "pastor-spouse-invalid": "pastor-spouse-invalid",
   "pastor-in-use": "pastor-in-use",
   "user-created": "flash.userCreated",
   "user-updated": "flash.userUpdated",
