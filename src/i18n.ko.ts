@@ -487,6 +487,8 @@ export const KO: Record<string, string> = {
   "val.marital": "잘못된 혼인 상태입니다.",
   "val.blood": "잘못된 혈액형입니다.",
   "val.dob": "생년월일 형식이 잘못되었습니다 (YYYY-MM-DD).",
+  "val.dobFuture": "생년월일은 미래일 수 없습니다.",
+  "val.salvationFuture": "구원일은 미래일 수 없습니다.",
   "val.salvation": "구원일 형식이 잘못되었습니다 (YYYY-MM-DD).",
   "val.income": "소득은 숫자만 입력해야 합니다.",
   "val.option": "잘못된 드롭다운 값입니다.",

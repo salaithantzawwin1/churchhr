@@ -6,7 +6,7 @@ import { families, lookupOptions, memberHistory, members, regions } from "../db/
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
-import { asInt, intParam, normKey, s } from "../util";
+import { asInt, intParam, isFutureDate, normKey, parseDateFlexible, s } from "../util";
 import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
@@ -596,10 +596,25 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   values.township = values.township || family.township || "";
   values.region_id = values.region_id || String(family.region_id);
   const errors: string[] = [];
-  if (!values.name_myanmar && !values.name_english) errors.push(getDict(lang)("val.name"));
+  const td = getDict(lang);
+  if (!values.name_myanmar && !values.name_english) errors.push(td("val.name"));
   const regionId = asInt(values.region_id);
   if (regionId === null || (!scope.scopeAll && !scope.stateIds.includes(regionId))) {
-    errors.push(getDict(lang)("val.state"));
+    errors.push(td("val.state"));
+  }
+  // Same date rules as the full member form: normalise the input and refuse
+  // impossible or future dates instead of storing them verbatim.
+  let dateOfBirth: string | null = null;
+  if (values.date_of_birth) {
+    dateOfBirth = parseDateFlexible(values.date_of_birth);
+    if (!dateOfBirth) errors.push(td("val.dob"));
+    else if (isFutureDate(dateOfBirth)) errors.push(td("val.dobFuture"));
+  }
+  let salvationDate: string | null = null;
+  if (values.salvation_date) {
+    salvationDate = parseDateFlexible(values.salvation_date);
+    if (!salvationDate) errors.push(td("val.salvation"));
+    else if (isFutureDate(salvationDate)) errors.push(td("val.salvationFuture"));
   }
   if (errors.length > 0) {
     const allOptions = await loadAllOptions(db);
@@ -644,7 +659,7 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
       nameEnglish: values.name_english || null,
       gender: values.gender ?? "",
       maritalStatus: values.marital_status ?? "",
-      dateOfBirth: values.date_of_birth || null,
+      dateOfBirth,
       bloodType: values.blood_type ?? "",
       phone: values.phone || null,
       nrcNumber: values.nrc_number || null,
@@ -658,7 +673,7 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
       job: values.job || null,
       workSkills: values.work_skills || null,
       income: values.income ? Number(values.income.replace(/[,\s]/g, "")) || null : null,
-      salvationDate: values.salvation_date || null,
+      salvationDate,
       notes: values.notes || null,
       status: values.status === "inactive" ? "inactive" : "active",
       regionId: regionId!,
@@ -673,6 +688,11 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   await db.update(members).set({ memberCode: `CH-${String(memberId).padStart(5, "0")}` }).where(eq(members.id, memberId));
 
   if (isHead) {
+    // One head per household: a newly added head replaces the previous one,
+    // which becomes a plain member (matching the attach path below).
+    await db.update(members).set({ relationship: "other" }).where(and(
+      eq(members.householdId, id), eq(members.relationship, "head"), sql`${members.id} <> ${memberId}`,
+    ));
     await db.update(families).set({ headMemberId: memberId }).where(eq(families.id, id));
   }
   await db.insert(memberHistory).values({

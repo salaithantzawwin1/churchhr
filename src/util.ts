@@ -80,6 +80,11 @@ export function todayInYangon(): string {
   return new Date(Date.now() + 6.5 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+/** True when an ISO date (YYYY-MM-DD) lands after today in Myanmar time. */
+export function isFutureDate(iso: string): boolean {
+  return iso > todayInYangon();
+}
+
 /** YYYY-MM-DD plus/minus whole days (calendar dates only, UTC arithmetic). */
 export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split("-").map(Number);

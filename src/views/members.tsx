@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
-import { ageFromDate, optionLabel, optionText, qs } from "../util";
+import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
 import { positionLabels } from "../positions";
@@ -557,7 +557,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             <label class="field"><span class="lbl">{t("form.marital")}</span>{select("marital_status", M, v.marital_status ?? "", t("form.choose"))}</label>
             <label class="field">
               <span class="lbl">{t("form.dob")}</span>
-              <input type="date" name="date_of_birth" value={dob} />
+              <input type="date" name="date_of_birth" value={dob} max={todayInYangon()} />
               {dob && <span class="hint">{t("form.age")}: {ageFromDate(dob) ?? "—"}</span>}
             </label>
             <label class="field">
@@ -642,7 +642,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"), undefined, true)}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.sector")}</span><select name="sector_id">{opts(options.sector ?? [], v.sector_id ?? "", t("form.choose"))}</select></label>
-            <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} /></label>
+            <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} max={todayInYangon()} /></label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>{select("status", S, v.status || "active", "")}</label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
           </div>

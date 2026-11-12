@@ -28,7 +28,7 @@ function ints(vals: string[]): number[] {
 }
 import {
   asInt, ageFromDate, b64decode, b64encode, intParam, normKey,
-  parseDateFlexible, s,
+  isFutureDate, parseDateFlexible, s,
 } from "../util";
 import { BLOOD_TYPES, GENDERS, MARITAL_STATUSES, STATUSES, normEnum } from "../enums";
 import { getDict, type Lang } from "../i18n";
@@ -320,11 +320,13 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
   if (v.date_of_birth) {
     dob = parseDateFlexible(v.date_of_birth);
     if (dob === null) errors.push(msg("val.dob"));
+    else if (isFutureDate(dob)) errors.push(msg("val.dobFuture"));
   }
   let salvation: string | null = "";
   if (v.salvation_date) {
     salvation = parseDateFlexible(v.salvation_date);
     if (salvation === null) errors.push(msg("val.salvation"));
+    else if (isFutureDate(salvation)) errors.push(msg("val.salvationFuture"));
   }
 
   let income: number | null = null;
@@ -631,12 +633,14 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
     if (dobRaw) {
       dob = parseDateFlexible(dobRaw);
       if (dob === null) rowErrors.push(`${msg("imp.badDob")}: ${dobRaw}`);
+      else if (isFutureDate(dob)) rowErrors.push(`${msg("val.dobFuture")}: ${dobRaw}`);
     }
     const salRaw = rec("salvation");
     let salvation: string | null = null;
     if (salRaw) {
       salvation = parseDateFlexible(salRaw);
       if (salvation === null) rowErrors.push(`${msg("imp.badSalvation")}: ${salRaw}`);
+      else if (isFutureDate(salvation)) rowErrors.push(`${msg("val.salvationFuture")}: ${salRaw}`);
     }
 
     const incomeRaw = rec("income").replace(/[,\s]/g, "");
