@@ -64,10 +64,10 @@ function PastorFields(props: {
 }) {
   const { values, regions, churches, lang, editing, photoUrl } = props;
   const t = getDict(lang);
-  const initial = Array.from((values.name || values.nameEn || "?").trim())[0] ?? "?";
+  const initial = Array.from((values.name || values.nameEn || "Ps").trim())[0] ?? "Ps";
   return (
     <>
-      <div class="photo-field" data-photo-field data-initial={initial}
+      <div class="photo-field pastor-photo-field" data-photo-field data-initial={initial}
         data-processing={t("form.photoProcessing")} data-ready={t("form.photoReady")}
         data-error={t("form.photoError")}>
         <div class="photo-preview">
@@ -94,96 +94,124 @@ function PastorFields(props: {
         </div>
       </div>
 
-      <div class="form-grid">
-        <label class="field">
-          <span class="lbl">{t("org.pastorName")}</span>
-          <input type="text" name="name" value={values.name} maxlength={100} required />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.pastorNameEn")}</span>
-          <input type="text" name="name_en" value={values.nameEn} maxlength={100} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.pastorTitle")}</span>
-          <input type="text" name="title" value={values.title} maxlength={40} placeholder="Rev / Ps" />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.pastorPosition")}</span>
-          <input type="text" name="position" value={values.position} maxlength={80}
-            placeholder={t("org.pastorPositionHint")} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.gender")}</span>
-          <select name="gender">
-            {option("", t("form.choose"), values.gender)}
-            {option("male", t("org.male"), values.gender)}
-            {option("female", t("org.female"), values.gender)}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.marital")}</span>
-          <select name="marital_status">
-            {option("", t("form.choose"), values.maritalStatus)}
-            {option("single", t("org.single"), values.maritalStatus)}
-            {option("married", t("org.married"), values.maritalStatus)}
-            {option("widowed", t("org.widowed"), values.maritalStatus)}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.dob")}</span>
-          <input type="date" name="date_of_birth" value={values.dateOfBirth} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.ordinationDate")}</span>
-          <input type="date" name="ordination_date" value={values.ordinationDate} />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.clusterState")}</span>
-          <select name="region_id" required data-region-select>
-            <option value="">{t("form.choose")}</option>
-            {regions.map((r) => (
-              <option value={String(r.id)} selected={values.regionId === r.id}>{r.name}</option>
-            ))}
-          </select>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.pastorChurch")}</span>
-          <select name="regional_church_id" data-region-filter="1">
-            <option value="" data-region="">{t("org.noPastorChurch")}</option>
-            {churches.map((church) => (
-              <option value={String(church.id)} selected={values.regionalChurchId === church.id}
-                data-region={String(church.regionId)}>{church.name}</option>
-            ))}
-          </select>
-          <span class="hint">{t("org.pastorChurchHint")}</span>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.phone")}</span>
-          <input type="text" name="phone" value={values.phone} maxlength={40} inputmode="tel" />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("form.email")}</span>
-          <input type="email" name="email" value={values.email} maxlength={120} />
-        </label>
-        <label class="field span-2">
-          <span class="lbl">{t("form.address")}</span>
-          <textarea name="address" rows={2} maxlength={300}>{values.address}</textarea>
-        </label>
-        <label class="field span-2">
-          <span class="lbl">{t("form.notes")}</span>
-          <textarea name="notes" rows={3} maxlength={1000}>{values.notes}</textarea>
-        </label>
-        <label class="field">
-          <span class="lbl">{t("org.positionSort")}</span>
-          <input name="sort_order" type="number" min="0" max="9999" value={String(values.sortOrder)} />
-        </label>
-        {editing && (
-          <label class="dept-active span-2">
-            <input type="checkbox" name="active" value="1" checked={values.active} />
-            <span>{t("dept.active")}</span>
+      <fieldset class="form-section pastor-section">
+        <legend>{t("form.basic")}</legend>
+        <div class="form-grid">
+          <label class="field">
+            <span class="lbl">{t("org.pastorName")} <span class="req">*</span></span>
+            <input type="text" name="name" value={values.name} maxlength={100} required
+              autocomplete="name" />
           </label>
-        )}
-      </div>
+          <label class="field">
+            <span class="lbl">{t("org.pastorNameEn")}</span>
+            <input type="text" name="name_en" value={values.nameEn} maxlength={100}
+              placeholder="e.g. John Doe" autocomplete="name" />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.pastorTitle")}</span>
+            <input type="text" name="title" value={values.title} maxlength={40}
+              placeholder="Rev / Ps / Dr" />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.pastorPosition")}</span>
+            <input type="text" name="position" value={values.position} maxlength={80}
+              placeholder={t("org.pastorPositionHint")} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("form.gender")}</span>
+            <select name="gender">
+              {option("", t("form.choose"), values.gender)}
+              {option("male", t("org.male"), values.gender)}
+              {option("female", t("org.female"), values.gender)}
+            </select>
+          </label>
+          <label class="field">
+            <span class="lbl">{t("form.marital")}</span>
+            <select name="marital_status">
+              {option("", t("form.choose"), values.maritalStatus)}
+              {option("single", t("org.single"), values.maritalStatus)}
+              {option("married", t("org.married"), values.maritalStatus)}
+              {option("widowed", t("org.widowed"), values.maritalStatus)}
+            </select>
+          </label>
+          <label class="field">
+            <span class="lbl">{t("form.dob")}</span>
+            <input type="date" name="date_of_birth" value={values.dateOfBirth} />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-section pastor-section">
+        <legend>{t("form.church")}</legend>
+        <div class="form-grid">
+          <label class="field">
+            <span class="lbl">{t("org.clusterState")} <span class="req">*</span></span>
+            <select name="region_id" required data-region-select>
+              <option value="">{t("form.choose")}</option>
+              {regions.map((r) => (
+                <option value={String(r.id)} selected={values.regionId === r.id}>{r.name}</option>
+              ))}
+            </select>
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.pastorChurch")}</span>
+            <select name="regional_church_id" data-region-filter="1">
+              <option value="" data-region="">{t("org.noPastorChurch")}</option>
+              {churches.map((church) => (
+                <option value={String(church.id)} selected={values.regionalChurchId === church.id}
+                  data-region={String(church.regionId)}>{church.name}</option>
+              ))}
+            </select>
+            <span class="hint">{t("org.pastorChurchHint")}</span>
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.ordinationDate")}</span>
+            <input type="date" name="ordination_date" value={values.ordinationDate} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.positionSort")}</span>
+            <input name="sort_order" type="number" min="0" max="9999" value={String(values.sortOrder)} />
+            <span class="hint">{t("org.positionSortHint")}</span>
+          </label>
+          {editing && (
+            <label class="dept-active span-2">
+              <input type="checkbox" name="active" value="1" checked={values.active} />
+              <span>{t("dept.active")}</span>
+            </label>
+          )}
+        </div>
+      </fieldset>
+
+      <fieldset class="form-section pastor-section">
+        <legend>{t("form.contact")}</legend>
+        <div class="form-grid">
+          <label class="field">
+            <span class="lbl">{t("form.phone")}</span>
+            <input type="text" name="phone" value={values.phone} maxlength={40} inputmode="tel"
+              placeholder="09..." autocomplete="tel" />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("form.email")}</span>
+            <input type="email" name="email" value={values.email} maxlength={120}
+              placeholder="name@example.com" autocomplete="email" />
+          </label>
+          <label class="field span-2">
+            <span class="lbl">{t("form.address")}</span>
+            <textarea name="address" rows={2} maxlength={300} placeholder={t("form.address")}
+              autocomplete="street-address">{values.address}</textarea>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-section pastor-section">
+        <legend>{t("form.notes")}</legend>
+        <div class="form-grid">
+          <label class="field span-2">
+            <textarea name="notes" rows={3} maxlength={1000}
+              placeholder={t("org.pastorNotesHint")}>{values.notes}</textarea>
+          </label>
+        </div>
+      </fieldset>
     </>
   );
 }
@@ -212,6 +240,7 @@ export function PastorModal(props: {
         />
         <div class="actions">
           <button class="btn" type="submit">{pastor ? t("dept.save") : t("form.add")}</button>
+          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
         </div>
       </form>
     </>
@@ -258,7 +287,7 @@ export function PastorsPage(props: Common & {
         <div class="page-head-actions">
           {canUpdate && (
             <a class="btn js-add-modal" href="/organization/pastors/new"
-              data-modal-title={t("org.addPastor")} data-modal-size="md">
+              data-modal-title={t("org.addPastor")}>
               + {t("org.addPastor")}
             </a>
           )}
@@ -319,7 +348,7 @@ export function PastorsPage(props: Common & {
                     <a class="btn sm secondary" href={`/organization/pastors/${pastor.id}`}>{t("org.viewPastor")}</a>
                     {canUpdate && (
                       <a class="btn sm secondary js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-                        data-modal-title={t("org.editPastor")} data-modal-size="md">
+                        data-modal-title={t("org.editPastor")}>
                         {t("members.edit")}
                       </a>
                     )}
@@ -385,7 +414,7 @@ export function PastorDetailPage(props: Common & { pastor: PastorRow }) {
         <div class="page-head-actions">
           {canUpdate && (
             <a class="btn js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-              data-modal-title={t("org.editPastor")} data-modal-size="md">
+              data-modal-title={t("org.editPastor")}>
               {t("members.edit")}
             </a>
           )}

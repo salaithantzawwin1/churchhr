@@ -253,6 +253,7 @@ label.field .hint { font-weight: 400; color: var(--muted); }
 .field { display: block; font-size: 13.5px; color: var(--muted); }
 .field > label.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=email], input[type=tel], input[type=url],
 input[type=number], input[type=file], select, textarea {
   width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
   font: inherit; background: var(--field-bg); color: var(--ink);
@@ -262,6 +263,7 @@ input[type=number], input[type=file], select, textarea {
    intrinsic height, so fields in one .form-grid row end up uneven. A fixed
    height with vertical centering keeps inputs, selects and date pickers equal. */
 input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=email], input[type=tel], input[type=url],
 input[type=number], select {
   height: 40px; padding: 0 10px; box-sizing: border-box; vertical-align: middle;
 }
@@ -462,6 +464,22 @@ th.bar-col { width: 42%; }
   padding: 0; margin-bottom: 8px; font-size: 13.5px;
   font-weight: 600; color: var(--ink);
 }
+/* Pastor profile editor: a compact portrait strip above grouped fieldsets, so
+   the long profile reads as three short sections instead of one flat column. */
+.pastor-photo-field { padding-bottom: 14px; margin-bottom: 0; }
+.pastor-photo-field .photo-preview { width: 80px; height: 80px; font-size: 26px; }
+.pastor-photo-field .hint { max-width: 52ch; font-size: 12.5px; }
+.pastor-section { padding-top: 14px; border-top: 1px dashed var(--line); }
+.pastor-section:first-of-type { padding-top: 0; border-top: 0; }
+.pastor-section legend {
+  display: flex; align-items: center; width: 100%; padding: 0;
+  margin-bottom: 10px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.pastor-section legend::after {
+  content: ""; flex: 1; height: 1px; margin-left: 10px; background: var(--line);
+}
+.req { color: var(--err-ink); }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 8px; }
 .check-chip {
   display: flex; align-items: center; gap: 8px; min-width: 0;
