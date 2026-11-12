@@ -5,7 +5,8 @@ import { getDb, type DB } from "../db/client";
 import { activityReports, regions, reportEdits } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
+import { buildCsv } from "../csv";
+import { addDays, intParam, parseDateFlexible, s, todayInYangon } from "../util";
 import { getDict, type Lang } from "../i18n";
 import { ForbiddenPage } from "../views/errors";
 import {
@@ -139,6 +140,7 @@ function readForm(
   body: Record<string, unknown>,
   allowedRegions: { id: number; name: string }[],
   lang: Lang,
+  opts: { draft?: boolean } = {},
 ): { values: ReportFormValues; errors: string[]; data: ReportData | null } {
   const values: ReportFormValues = {
     report_date: s(body.report_date),
@@ -166,11 +168,13 @@ function readForm(
     errors.push(t("rep.errState"));
   }
 
+  // A draft only needs the date and the state: the narrative can be written
+  // across several sessions on a phone, then submitted when it is complete.
   const title = (values.title ?? "").trim();
-  if (!title || title.length > MAX_TITLE) errors.push(t("rep.errTitle"));
+  if ((!title && !opts.draft) || title.length > MAX_TITLE) errors.push(t("rep.errTitle"));
 
   const text = (values.body ?? "").trim();
-  if (!text || text.length > MAX_BODY) errors.push(t("rep.errBody"));
+  if ((!text && !opts.draft) || text.length > MAX_BODY) errors.push(t("rep.errBody"));
 
   if ((values.township ?? "").trim().length > MAX_TOWNSHIP) errors.push(t("rep.errTownship"));
 
@@ -217,12 +221,14 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
   const status = statusFromQuery(q);
   const where = team ? scopeCond(scope) : sql`ar.author_id = ${user.id}`;
   const statusCond = status ? sql`ar.status = ${status}` : sql`1=1`;
+  // Reviewers can narrow the team view to one author.
+  const authorId = team ? intParam(q.author) : null;
+  const authorCond = authorId ? sql`ar.author_id = ${authorId}` : sql`1=1`;
+  const cond = sql`ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
+      AND ${where} AND ${statusCond} AND ${authorCond}`;
 
   const countRows = await db.all<{ n: number }>(sql`
-    SELECT COUNT(*) AS n
-    FROM activity_reports ar
-    WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
-      AND ${where} AND ${statusCond}`);
+    SELECT COUNT(*) AS n FROM activity_reports ar WHERE ${cond}`);
   const total = countRows[0]?.n ?? 0;
 
   const rows = await db.all<ReportListRow>(sql`
@@ -233,10 +239,27 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
     FROM activity_reports ar
     JOIN regions r ON r.id = ar.region_id
     JOIN users u ON u.id = ar.author_id
-    WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
-      AND ${where} AND ${statusCond}
+    WHERE ${cond}
     ORDER BY ar.report_date DESC, ar.id DESC
     LIMIT ${LIST_LIMIT}`);
+
+  // The pile a leader actually acts on: submitted reports nobody has reviewed
+  // yet, regardless of the status filter currently applied.
+  const awaitingRows = canReview
+    ? await db.all<{ n: number }>(sql`
+        SELECT COUNT(*) AS n FROM activity_reports ar
+        WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
+          AND ${where} AND ${authorCond} AND ar.status = 'submitted'`)
+    : [];
+  const awaiting = awaitingRows[0]?.n ?? 0;
+
+  const authorRows = team
+    ? await db.all<{ id: number; username: string }>(sql`
+        SELECT DISTINCT u.id, u.username
+        FROM activity_reports ar JOIN users u ON u.id = ar.author_id
+        WHERE ${scopeCond(scope)}
+        ORDER BY u.username`)
+    : [];
 
   return c.html(
     <ReportsListPage
@@ -244,8 +267,97 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
       rows={rows} total={total} range={range} team={team} status={status}
       quickRanges={quickRanges(todayInYangon(), getDict(lang))}
       canCreate={perms.has("reports.create")} canReview={canReview}
+      awaiting={awaiting} authors={authorRows} authorId={authorId}
     />,
   );
+});
+
+// ---------- GET /reports/export: the same list as CSV ----------
+// Registered before "/:id" so "export" is not read as a report id.
+
+reportsRoutes.get("/export", requirePermission("reports.view"), async (c) => {
+  const db = getDb(c.env);
+  const user = c.get("user");
+  const perms = c.get("perms");
+  const scope = scopeOf(c);
+  const lang = c.get("lang");
+  const q = c.req.query();
+  const range = rangeFromQuery(q);
+  const team = perms.has("reports.review") && q.scope === "team";
+  const status = statusFromQuery(q);
+  const authorId = team ? intParam(q.author) : null;
+  const where = team ? scopeCond(scope) : sql`ar.author_id = ${user.id}`;
+  const statusCond = status ? sql`ar.status = ${status}` : sql`1=1`;
+  const authorCond = authorId ? sql`ar.author_id = ${authorId}` : sql`1=1`;
+
+  const rows = await db.all<ReportListRow>(sql`
+    SELECT ar.id, ar.report_date, ar.title, ar.status, ar.township,
+           ar.author_id, ar.region_id, ar.attendance, ar.new_contacts, ar.follow_ups,
+           r.name AS state_name, r.name_en AS state_name_en,
+           u.username AS author_name
+    FROM activity_reports ar
+    JOIN regions r ON r.id = ar.region_id
+    JOIN users u ON u.id = ar.author_id
+    WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
+      AND ${where} AND ${statusCond} AND ${authorCond}
+    ORDER BY ar.report_date DESC, ar.id DESC
+    LIMIT 5000`);
+
+  const t = getDict(lang);
+  const label = (value: string) => {
+    if (value === "reviewed") return t("rep.statusReviewed");
+    if (value === "draft") return t("rep.statusDraft");
+    return t("rep.statusSubmitted");
+  };
+  const csv = "\uFEFF" + buildCsv([
+    ["Date", "Title", "State", "Township", "Author", "Status", "Attendance", "New contacts", "Follow-ups"],
+    ...rows.map((r) => [
+      r.report_date,
+      r.title,
+      lang !== "mm" && r.state_name_en ? r.state_name_en : r.state_name,
+      r.township ?? "",
+      r.author_name,
+      label(r.status),
+      r.attendance,
+      r.new_contacts,
+      r.follow_ups,
+    ]),
+  ]);
+  return c.body(csv, 200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="reports-${range.from}_${range.to}.csv"`,
+    "Cache-Control": "no-store",
+  });
+});
+
+// ---------- POST /reports/:id/submit: send a draft for review ----------
+
+reportsRoutes.post("/:id/submit", requirePermission("reports.create"), async (c) => {
+  const db = getDb(c.env);
+  const user = c.get("user");
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) {
+    return c.redirect(`/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`, 302);
+  }
+  const report = await loadReport(db, id);
+  if (!report) return c.redirect(`/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`, 302);
+  if (report.author_id !== user.id) {
+    return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
+  }
+  if (report.status === "reviewed") {
+    return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
+  }
+  if (!report.title.trim() || !report.body.trim()) {
+    return c.redirect(`/reports/${id}/edit?err=${encodeURIComponent(t("rep.errBody"))}`, 302);
+  }
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .update(activityReports)
+    .set({ status: "submitted", reviewerId: null, reviewNote: null, reviewedAt: null, updatedAt: now })
+    .where(and(eq(activityReports.id, id), eq(activityReports.authorId, user.id)));
+  return c.redirect(`/reports/${id}?ok=report-submitted`, 302);
 });
 
 // ---------- GET /reports/new ----------
@@ -279,8 +391,9 @@ reportsRoutes.post("/", requirePermission("reports.create"), async (c) => {
   const lang = c.get("lang");
   const t = getDict(lang);
   const body = await c.req.parseBody();
+  const draft = s(body.intent) === "draft";
   const regionList = await scopedRegions(db, scope, lang);
-  const { values, errors, data } = readForm(body as Record<string, unknown>, regionList, lang);
+  const { values, errors, data } = readForm(body as Record<string, unknown>, regionList, lang, { draft });
 
   const rerender = (list: string[]) =>
     c.html(
@@ -318,10 +431,10 @@ reportsRoutes.post("/", requirePermission("reports.create"), async (c) => {
         challenges: data.challenges,
         prayerRequests: data.prayer_requests,
         nextSteps: data.next_steps,
-        status: "submitted",
+        status: draft ? "draft" : "submitted",
       })
       .returning({ id: activityReports.id });
-    return c.redirect(`/reports/${inserted[0]!.id}?ok=report-created`, 302);
+    return c.redirect(`/reports/${inserted[0]!.id}?ok=${draft ? "report-draft" : "report-created"}`, 302);
   } catch (err) {
     // The unique (author, date) index catches a double submit racing the check above.
     const again = await db
@@ -444,8 +557,9 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
   }
 
   const body = await c.req.parseBody();
+  const draft = s(body.intent) === "draft";
   const regionList = await scopedRegions(db, scope, lang);
-  const { values, errors, data } = readForm(body as Record<string, unknown>, regionList, lang);
+  const { values, errors, data } = readForm(body as Record<string, unknown>, regionList, lang, { draft });
   const rerender = (list: string[]) =>
     c.html(
       <ReportFormPage
@@ -490,7 +604,7 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
         challenges: data.challenges,
         prayerRequests: data.prayer_requests,
         nextSteps: data.next_steps,
-        status: "submitted",
+        status: draft ? "draft" : "submitted",
         updatedAt: now,
       })
       .where(and(
@@ -508,7 +622,7 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
       editedAt: now,
       changes: JSON.stringify(changes),
     });
-    return c.redirect(`/reports/${id}?ok=report-updated`, 302);
+    return c.redirect(`/reports/${id}?ok=${draft ? "report-draft" : "report-updated"}`, 302);
   } catch (err) {
     // The unique (author, date) index catches a date change racing the check above.
     const again = await db

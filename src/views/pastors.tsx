@@ -2,6 +2,7 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { pastorName, type PastorRow } from "../pastors";
+import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -420,8 +421,12 @@ export function PastorsPage(props: Common & {
   );
 }
 
-export function PastorDetailPage(props: Common & { pastor: PastorRow }) {
-  const { user, perms, flash, lang, pastor } = props;
+export function PastorDetailPage(props: Common & {
+  pastor: PastorRow;
+  history?: PastorHistoryRow[];
+  historyRegions?: { id: number; name: string }[];
+}) {
+  const { user, perms, flash, lang, pastor, history = [], historyRegions = [] } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const photo = pastorPhotoUrl(pastor);
@@ -508,6 +513,154 @@ export function PastorDetailPage(props: Common & { pastor: PastorRow }) {
           </div>
         </div>
       </div>
+
+      <PastorHistoryCard
+        pastorId={pastor.id}
+        rows={history}
+        canManage={canUpdate}
+        regions={historyRegions}
+        lang={L}
+      />
     </Layout>
+  );
+}
+
+/** Service history card on the pastor page: one line per posting, newest first,
+ * with back-dated years so records can be entered from old appointment books. */
+export function PastorHistoryCard(props: {
+  pastorId: number;
+  rows: PastorHistoryRow[];
+  canManage: boolean;
+  regions: { id: number; name: string }[];
+  lang: Lang;
+}) {
+  const { pastorId, rows, canManage, regions, lang } = props;
+  const t = getDict(lang);
+  const regionName = (id: number | null) => {
+    if (id == null) return "";
+    const found = regions.find((r) => r.id === id);
+    return found?.name ?? "";
+  };
+  return (
+    <div class="card detail-card">
+      <div class="history-head">
+        <h2>{t("org.history")}</h2>
+        {canManage && (
+          <a class="btn sm secondary js-add-modal" href={`/organization/pastors/${pastorId}/history/new`}
+            data-modal-title={t("org.historyAdd")}>
+            {t("org.historyAdd")}
+          </a>
+        )}
+      </div>
+      <p class="muted small">{t("org.historyIntro")}</p>
+      {rows.length === 0 ? (
+        <p class="muted">{t("org.historyEmpty")}</p>
+      ) : (
+        <ol class="timeline">
+          {rows.map((h) => (
+            <li class={`timeline-item${h.endYear == null ? " is-current" : ""}`}>
+              <div class="timeline-years">
+                {h.startYear} – {h.endYear == null ? t("org.historyPresent") : h.endYear}
+              </div>
+              <div class="timeline-body">
+                <div class="timeline-role">
+                  {h.position || t("org.historyPosition")}
+                  {h.churchName ? <span class="timeline-church"> · {h.churchName}</span> : null}
+                </div>
+                {(h.township || h.regionId != null) && (
+                  <div class="timeline-meta">
+                    {[h.township, regionName(h.regionId)].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                {h.notes && <p class="timeline-notes">{h.notes}</p>}
+                {canManage && (
+                  <div class="timeline-actions">
+                    <a class="btn sm secondary js-edit-modal"
+                      href={`/organization/pastors/${pastorId}/history/${h.id}/edit`}
+                      data-modal-title={t("org.history")}>{t("members.edit")}</a>
+                    <form method="post" action={`/organization/pastors/${pastorId}/history/${h.id}/delete`}
+                      data-confirm={t("org.historyDeleteConfirm")}>
+                      <button class="btn sm secondary" type="submit">{t("members.delete")}</button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+export function PastorHistoryModal(props: {
+  pastorId: number;
+  historyId?: number;
+  values: PastorHistoryValues;
+  regions: { id: number; name: string }[];
+  errors?: string[];
+  lang: Lang;
+}) {
+  const { pastorId, historyId, values: v, regions, errors = [], lang } = props;
+  const t = getDict(lang);
+  const thisYear = new Date().getUTCFullYear();
+  const editing = historyId != null;
+  const editId = historyId;
+  return (
+    <>
+      {errors.length > 0 && (
+        <div class="modal-error" role="alert">
+          <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul>
+        </div>
+      )}
+      <form method="post" class="pastor-form"
+        action={editing
+          ? `/organization/pastors/${pastorId}/history/${editId}/edit`
+          : `/organization/pastors/${pastorId}/history`}
+        data-modal-ajax>
+        <div class="form-grid">
+          <label class="field">
+            <span class="lbl">{t("org.historyStart")} <span class="req">*</span></span>
+            <input type="number" name="start_year" inputmode="numeric" min={1900} max={thisYear}
+              value={v.startYear} required />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.historyEnd")}</span>
+            <input type="number" name="end_year" inputmode="numeric" min={1900} max={thisYear + 1}
+              value={v.endYear} placeholder={t("org.historyPresent")} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.historyPosition")}</span>
+            <input type="text" name="position" maxlength={80} value={v.position}
+              placeholder={t("org.pastorPositionHint")} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.historyChurch")}</span>
+            <input type="text" name="church_name" maxlength={120} value={v.churchName} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.clusterState")}</span>
+            <select name="region_id">
+              <option value="">{t("form.choose")}</option>
+              {regions.map((r) => (
+                <option value={String(r.id)} selected={v.regionId === String(r.id)}>{r.name}</option>
+              ))}
+            </select>
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.historyTownship")}</span>
+            <input type="text" name="township" maxlength={80} value={v.township} />
+          </label>
+          <label class="field span-2">
+            <span class="lbl">{t("org.historyNotes")}</span>
+            <textarea name="notes" rows={3} maxlength={500}>{v.notes}</textarea>
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn" type="submit">{t("org.historySave")}</button>
+          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+        </div>
+      </form>
+    </>
   );
 }

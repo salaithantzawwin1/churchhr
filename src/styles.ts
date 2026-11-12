@@ -227,6 +227,9 @@ tbody tr:hover { background: var(--row-hover); }
 /* Easy date entry (app.js): day / month / year selects in front of the native
    input, which stays in the form as the submitted value. */
 .dp { display: inline-flex; gap: 6px; width: 100%; min-width: 0; }
+/* A date field in a filter row needs room for three parts; the shared
+   "flex: 1 1 170px" would squeeze the month down to an arrow. */
+.filters label.field:has(.dp) { flex: 1 1 250px; min-width: 214px; max-width: 320px; }
 .dp .dp-part { flex: 0 0 auto; width: auto; padding: 0 4px 0 8px; }
 .dp .dp-part:first-child { width: 58px; } /* day */
 .dp .dp-part:nth-child(2) { flex: 1 1 0; min-width: 66px; } /* month name */
@@ -2609,8 +2612,109 @@ th { font-size: 13px; }
   .members-tbl input[type="checkbox"],
   .bulk-check-all { width: 18px; height: 18px; }
 }
+@media (max-width: 380px) {
+  /* The account block (language pills, username, Sign out) must still fit on a
+     320px screen; the taller touch targets pushed it 8px past the edge. */
+  .topbar .langswitch a { padding: 2px 7px; min-height: 30px; }
+  .topbar .who { gap: 4px; }
+  .topbar .who-link { max-width: 72px; padding: 4px 4px; }
+  .topbar .who form .btn { padding: 5px 8px; }
+}
 @media (max-width: 400px) {
   .members-tbl .list-avatar { display: none; }
   .members-tbl td[data-col="age"], .members-tbl th[data-col="age"] { padding-left: 4px; padding-right: 4px; }
 }
+/* ---------- audit log ----------
+   One row per change: when, who, what, device/IP, and the raw request behind
+   it. On a phone each row becomes a labelled card. */
+.audit-tbl td { vertical-align: top; }
+.audit-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }
+.audit-user { font-weight: 600; white-space: nowrap; }
+.audit-action { font-weight: 600; }
+.audit-action.is-warn { color: var(--err-ink); }
+.audit-entity {
+  margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--muted); font-size: 11.5px;
+}
+.audit-summary { display: block; margin-top: 2px; }
+.audit-device { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.audit-ip { display: block; font-size: 11.5px; }
+.audit-detail details > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.audit-detail details > summary:hover { color: var(--ink); }
+.audit-ua { margin-top: 6px; font-size: 11.5px; line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .audit-wrap { overflow: visible; border: 0; background: transparent; }
+  /* Beats the shared "table.list-tbl { min-width: 760px }" phone rule. */
+  table.list-tbl.audit-tbl { display: block; min-width: 0; border: 0; background: transparent; }
+  .audit-tbl thead { display: none; }
+  .audit-tbl tbody { display: grid; gap: 10px; }
+  .audit-tbl tr {
+    display: block; padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .audit-tbl td {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+    padding: 3px 0; border: 0; text-align: right; white-space: normal; font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .audit-tbl td::before {
+    content: attr(data-label); flex: none; text-align: left;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+  }
+  .audit-tbl td.audit-action-cell, .audit-tbl td.audit-detail { display: block; text-align: left; }
+  .audit-tbl td.audit-action-cell::before, .audit-tbl td.audit-detail::before { display: none; }
+  .audit-tbl td.audit-when { justify-content: flex-start; }
+}
+
+/* ---------- pastor ministry history (timeline) ---------- */
+.history-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.history-head h2 { margin: 0; }
+.timeline { list-style: none; margin: 14px 0 0; padding: 0; }
+.timeline-item {
+  position: relative; display: grid; grid-template-columns: 132px minmax(0, 1fr);
+  gap: 6px 16px; padding: 0 0 16px 18px; border-left: 2px solid var(--line);
+}
+.timeline-item:last-child { padding-bottom: 2px; }
+.timeline-item::before {
+  content: ""; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--card); border: 2px solid var(--line-strong);
+}
+.timeline-item.is-current::before { border-color: var(--link); background: var(--link); }
+.timeline-years {
+  font-weight: 700; font-size: 13.5px; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.timeline-role { font-weight: 600; overflow-wrap: anywhere; }
+.timeline-church { font-weight: 500; color: var(--muted); }
+.timeline-meta { margin-top: 2px; color: var(--muted); font-size: 12.5px; }
+.timeline-notes { margin: 6px 0 0; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .timeline-item { grid-template-columns: minmax(0, 1fr); }
+  .timeline-item { padding-left: 16px; }
+}
+
+/* ---------- reports: review flag, drafts ---------- */
+.review-flag {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px;
+  padding: 8px 14px; border-radius: 999px;
+  background: var(--warn-bg); color: var(--warn-ink);
+  font-size: 13px; text-decoration: none; border: 1px solid transparent;
+}
+.review-flag:hover { border-color: var(--warn-ink); }
+.review-flag.is-on { background: var(--card); border-color: var(--warn-ink); }
+.draft-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+}
+.draft-banner p { margin: 3px 0 0; }
+.report-draft-hint { margin-top: 8px; }
+@media (max-width: 640px) {
+  .report-form-actions { flex-wrap: wrap; }
+  .report-form-actions .btn { flex: 1 1 44%; }
+}
+
 `; // end of stylesheet

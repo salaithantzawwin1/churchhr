@@ -110,8 +110,15 @@ export function ReportsListPage(props: Common & {
   quickRanges: { key: string; label: string; from: string; to: string }[];
   canCreate: boolean;
   canReview: boolean;
+  /** Submitted reports not reviewed yet in this range (leaders only). */
+  awaiting?: number;
+  authors?: { id: number; username: string }[];
+  authorId?: number | null;
 }) {
-  const { user, perms, flash, lang, rows, total, range, team, status, quickRanges, canCreate, canReview } = props;
+  const {
+    user, perms, flash, lang, rows, total, range, team, status, quickRanges,
+    canCreate, canReview, awaiting = 0, authors = [], authorId = null,
+  } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const columns = 5 + (team ? 1 : 0);
@@ -119,7 +126,12 @@ export function ReportsListPage(props: Common & {
   const rangeText = allTime ? t("rep.allTime") : `${range.from} → ${range.to}`;
   const linkQs = (from: string, to: string, withTeam = team) => qs({
     from, to, scope: withTeam ? "team" : null, status: status || null,
+    author: withTeam && authorId ? String(authorId) : null,
   });
+  const needsReviewHref = `/reports${qs({
+    from: range.from, to: range.to, scope: team ? "team" : null, status: "submitted",
+    author: team && authorId ? String(authorId) : null,
+  })}`;
   return (
     <Layout title={t("rep.title")} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
       <div class="page-head">
@@ -127,7 +139,12 @@ export function ReportsListPage(props: Common & {
           {t("rep.title")}
           <span class="count-pill">{total} {t("rep.count")}</span>
         </h1>
-        {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
+        <div class="actions" style="margin:0">
+          <a class="btn secondary" href={`/reports/export${linkQs(range.from, range.to)}`}>
+            {t("rep.exportCsv")}
+          </a>
+          {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
+        </div>
       </div>
 
       {canReview && (
@@ -153,6 +170,12 @@ export function ReportsListPage(props: Common & {
         ))}
       </div>
 
+      {canReview && awaiting > 0 && (
+        <a class={`review-flag${status === "submitted" ? " is-on" : ""}`} href={needsReviewHref}>
+          <strong>{awaiting}</strong> {t("rep.awaiting")} <span aria-hidden="true">→</span>
+        </a>
+      )}
+
       <details class="filter-box reports-filter-box" open>
         <summary>
           <span>{t("rep.filter")} <span class="range">{rangeText}</span>{status && <span class="range"> · {statusLabel(t, status)}</span>}</span>
@@ -168,6 +191,17 @@ export function ReportsListPage(props: Common & {
             <span class="lbl">{t("rep.to")}</span>
             <input type="date" name="to" value={range.to} />
           </label>
+          {team && authors.length > 0 && (
+            <label class="field">
+              <span class="lbl">{t("rep.author")}</span>
+              <select name="author">
+                <option value="">{t("rep.allAuthors")}</option>
+                {authors.map((a) => (
+                  <option value={String(a.id)} selected={authorId === a.id}>{a.username}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label class="field">
             <span class="lbl">{t("rep.status")}</span>
             <select name="status">
@@ -331,9 +365,15 @@ export function ReportFormPage(props: Common & {
         </div>
 
         <div class="actions report-form-actions">
-          <button class="btn" type="submit">{editing ? t("rep.update") : t("rep.submit")}</button>
+          <button class="btn" type="submit" name="intent" value="submit">
+            {editing ? t("rep.update") : t("rep.submit")}
+          </button>
+          <button class="btn secondary" type="submit" name="intent" value="draft" formnovalidate>
+            {t("rep.draftSave")}
+          </button>
           <a class="btn secondary" href="/reports">{t("rep.cancel")}</a>
         </div>
+        <p class="muted small report-draft-hint">{t("rep.draftHint")}</p>
       </form>
     </Layout>
   );
@@ -382,6 +422,18 @@ export function ReportDetailPage(props: Common & {
           {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
         </div>
       </div>
+
+      {r.status === "draft" && canEdit && (
+        <div class="flash warn draft-banner">
+          <div>
+            <strong>{t("rep.statusDraft")}</strong>
+            <p class="small">{t("rep.draftBanner")}</p>
+          </div>
+          <form method="post" action={`/reports/${r.id}/submit`}>
+            <button class="btn" type="submit">{t("rep.submitForReview")}</button>
+          </form>
+        </div>
+      )}
 
       <div class="card detail-card">
         <h2>{t("rep.details")}</h2>

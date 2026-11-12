@@ -19,6 +19,7 @@ import { RegionsPage } from "./views/regions";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
 import { checkHealth } from "./health";
+import { auditMutations } from "./audit";
 
 const app = new Hono<AppEnv>();
 
@@ -131,6 +132,9 @@ app.get("/healthz", async (c) => {
 // Public routes first so requireAuth (below) never intercepts them.
 app.route("/", publicAuthRoutes);
 app.use("*", requireAuth);
+// Every successful state-changing request is recorded for the audit trail; it
+// runs after requireAuth so the entry can name the signed-in user.
+app.use("*", auditMutations());
 app.route("/", profileRoutes);
 
 app.get("/", requirePermission("dashboard.view"), async (c) => {

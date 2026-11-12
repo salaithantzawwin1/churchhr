@@ -15,6 +15,7 @@ export const PERMISSIONS = [
   "options.manage",
   "pastors.view",
   "pastors.manage",
+  "audit.view",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -35,6 +36,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "options.manage": "Dropdown စာရင်း စီမံခွင့်",
   "pastors.view": "သင်းအုပ်ဆရာ စာရင်း ကြည့်ခွင့်",
   "pastors.manage": "သင်းအုပ်ဆရာ စာရင်း စီမံခွင့်",
+  "audit.view": "မှတ်တမ်း (Audit Log) ကြည့်ခွင့်",
 };
 
 export const PERMISSION_LABELS_KR: Record<Permission, string> = {
@@ -53,6 +55,7 @@ export const PERMISSION_LABELS_KR: Record<Permission, string> = {
   "options.manage": "드롭다운 옵션 관리",
   "pastors.view": "목회자 목록 보기",
   "pastors.manage": "목회자 목록 관리",
+  "audit.view": "감사 로그 보기",
 };
 
 export const PERMISSION_LABELS_EN: Record<Permission, string> = {
@@ -71,6 +74,7 @@ export const PERMISSION_LABELS_EN: Record<Permission, string> = {
   "options.manage": "Manage dropdown options",
   "pastors.view": "View pastor list",
   "pastors.manage": "Manage pastor list",
+  "audit.view": "View audit log",
 };
 
 /** Special region_id row meaning "every state". Kept out of FK constraints on purpose. */

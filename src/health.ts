@@ -43,6 +43,9 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
     await env.DB.prepare("SELECT supervision_cluster_id FROM lookup_options LIMIT 1").all();
     await env.DB.prepare("SELECT supervision_cluster_id FROM member_positions LIMIT 1").all();
     await env.DB.prepare("SELECT spouse_pastor_id FROM pastors LIMIT 1").all();
+    // 0035 audit trail, 0036 pastor service history.
+    await env.DB.prepare("SELECT action, device FROM audit_log LIMIT 1").all();
+    await env.DB.prepare("SELECT start_year, end_year FROM pastor_history LIMIT 1").all();
   } catch (err) {
     console.error("health check failed:", err);
     db = "error";

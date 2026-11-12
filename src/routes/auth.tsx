@@ -6,6 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { users, loginAttempts } from "../db/schema";
 import { hashPassword, parseIterations, verifyPassword } from "../auth";
 import { checkPasswordPolicy } from "../password";
+import { logAudit } from "../audit";
 import { isHttpsRequest } from "../util";
 import {
   getSessionUser,
@@ -113,6 +114,13 @@ publicAuthRoutes.post("/login", async (c) => {
       .update(users)
       .set({ failedAttempts: attempts, lockedUntil })
       .where(eq(users.id, user.id));
+    await logAudit(db, {
+      action: lockedUntil > now ? "login.locked" : "login.failed",
+      entity: "session", entityId: null,
+      userId: user.id, username: user.username,
+      ip, userAgent: c.req.header("user-agent") ?? "",
+      method: "POST", path: new URL(c.req.url).pathname, status: 401,
+    });
     return fail(t("login.error"));
   }
 
@@ -135,6 +143,14 @@ publicAuthRoutes.post("/login", async (c) => {
     secure: isHttpsRequest(c),
   });
   await purgeExpiredSessions(db);
+  await logAudit(db, {
+    action: "login.success",
+    entity: "session", entityId: null,
+    userId: user.id, username: user.username,
+    summary: remember ? "remember" : null,
+    ip, userAgent: c.req.header("user-agent") ?? "",
+    method: "POST", path: new URL(c.req.url).pathname, status: 302,
+  });
   return c.redirect(user.mustChangePassword === 1 ? "/profile?msg=change" : "/", 302);
 });
 

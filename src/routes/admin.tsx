@@ -15,7 +15,7 @@ import { checkPasswordPolicy } from "../password";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
-import { s } from "../util";
+import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
 import { Layout } from "../views/layout";
 import {
   AddAgeGroupForm, AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
@@ -23,6 +23,7 @@ import {
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
+import { AuditLogPage, type AuditRow } from "../views/audit";
 import { loadRegionalChurches, regionalChurchName } from "../org-units";
 
 export const adminRoutes = new Hono<AppEnv>();
@@ -1324,4 +1325,70 @@ adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), asy
   }
   await db.delete(regions).where(eq(regions.id, id));
   return c.redirect(`${back}&ok=region-deleted`, 302);
+});
+
+// ---------- GET /admin/audit: the audit trail ----------
+// Written by the request middleware (src/audit.ts). This page is a read-only
+// view with filters, so "who changed what, when, and from which device" can be
+// answered months later without database access.
+
+adminRoutes.get("/audit", requirePermission("audit.view"), async (c) => {
+  const db = getDb(c.env);
+  const lang = c.get("lang");
+  const q = c.req.query();
+  const perPage = 40;
+
+  const search = (q.q ?? "").trim().slice(0, 80);
+  const who = (q.user ?? "").trim().slice(0, 60);
+  const group = /^[a-z_]{1,30}$/.test(q.action ?? "") ? q.action! : "";
+  // Default to the last 30 days: an unfiltered log is both slow to scan and
+  // leaves the date fields empty on first visit.
+  const today = todayInYangon();
+  const from = parseDateFlexible(q.from ?? "") ?? addDays(today, -29);
+  const to = parseDateFlexible(q.to ?? "") ?? today;
+  // Day boundaries in Myanmar time (UTC+6:30), matching what the page displays.
+  const fromTs = from ? Math.floor(Date.parse(`${from}T00:00:00+06:30`) / 1000) : 0;
+  const toTs = to ? Math.floor(Date.parse(`${to}T23:59:59+06:30`) / 1000) : 0;
+
+  const where = [sql`1=1`];
+  if (who) where.push(sql`username = ${who}`);
+  if (group) where.push(sql`action LIKE ${group + ".%"}`);
+  if (search) {
+    const like = `%${search}%`;
+    where.push(sql`(username LIKE ${like} OR action LIKE ${like} OR path LIKE ${like}
+      OR summary LIKE ${like} OR entity_id LIKE ${like} OR device LIKE ${like} OR ip LIKE ${like})`);
+  }
+  if (fromTs) where.push(sql`at >= ${fromTs}`);
+  if (toTs) where.push(sql`at <= ${toTs}`);
+  const cond = sql.join(where, sql` AND `);
+
+  const countRows = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM audit_log WHERE ${cond}`);
+  const total = countRows[0]?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const page = Math.min(Math.max(1, Number(q.page) || 1), pages);
+
+  const rows = await db.all<AuditRow>(sql`
+    SELECT id, at, user_id, username, action, entity, entity_id, summary,
+           ip, user_agent, device, method, path, status
+    FROM audit_log
+    WHERE ${cond}
+    ORDER BY at DESC, id DESC
+    LIMIT ${perPage} OFFSET ${(page - 1) * perPage}`);
+
+  const userRows = await db.all<{ username: string }>(sql`
+    SELECT DISTINCT username FROM audit_log
+    WHERE username IS NOT NULL ORDER BY username LIMIT 200`);
+  const groupRows = await db.all<{ g: string }>(sql`
+    SELECT DISTINCT substr(action, 1, instr(action, '.') - 1) AS g
+    FROM audit_log WHERE instr(action, '.') > 0 ORDER BY g`);
+
+  return c.html(
+    <AuditLogPage
+      user={c.get("user")} perms={c.get("perms")} lang={lang} flash={null}
+      rows={rows} total={total} page={page} pages={pages}
+      users={userRows.map((r) => r.username)}
+      actionGroups={groupRows.map((r) => r.g).filter(Boolean)}
+      filters={{ q: search, user: who, action: group, from, to }}
+    />,
+  );
 });

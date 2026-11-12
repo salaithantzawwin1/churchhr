@@ -19,7 +19,8 @@ import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "..
 import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
-import { PastorsPage, PastorModal, PastorDetailPage, type PastorValues, type SpouseOption } from "../views/pastors";
+import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
+import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues } from "../pastor-history";
 import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
@@ -1386,6 +1387,8 @@ organizationRoutes.get("/pastors/:id", requireAnyPermission("pastors.view", "pas
   return c.html(
     <PastorDetailPage
       pastor={pastor}
+      history={await loadPastorHistory(db, id)}
+      historyRegions={await orgRegions(db, scope, c.get("lang"))}
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")}
@@ -1789,4 +1792,121 @@ organizationRoutes.post("/clusters/:id/delete", requirePermission("options.manag
   await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
   await db.run(sql`DELETE FROM supervision_clusters WHERE id = ${id}`);
   return c.redirect("/organization/clusters?ok=cluster-deleted", 303);
+});
+
+// ---------- pastor service history ----------
+// Back-dated records: "1998–2004 · Pastor · Kalay church · Chin State". The
+// years are validated (1900 … this year, end after start) but any past year is
+// accepted, so old appointment books can be entered as they are.
+
+async function historyPastor(c: any, id: number) {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const pastor = await loadPastor(db, id, {
+    activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds,
+  });
+  return { db, scope, pastor };
+}
+
+organizationRoutes.get("/pastors/:id/history/new", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, scope, pastor } = await historyPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/pastors/${id}`, 303);
+  return c.html(
+    <PastorHistoryModal
+      pastorId={id}
+      values={historyValues()}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/pastors/:id/history/:hid/edit", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const hid = intParam(c.req.param("hid"));
+  if (!id || !hid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, scope, pastor } = await historyPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const row = await loadPastorHistoryRow(db, id, hid);
+  if (!row) return c.redirect(`/organization/pastors/${id}?err=err-notfound`, 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/pastors/${id}`, 303);
+  return c.html(
+    <PastorHistoryModal
+      pastorId={id} historyId={hid}
+      values={historyValues(row)}
+      regions={await orgRegions(db, scope, c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.post("/pastors/:id/history", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, scope, pastor } = await historyPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const regions = await orgRegions(db, scope, lang);
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readHistoryForm(body as Record<string, unknown>, regions.map((r) => r.id), t);
+  const modal = modalRequest(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+    return c.html(
+      <PastorHistoryModal pastorId={id} values={values} regions={regions} errors={errors} lang={lang} />,
+      422,
+    );
+  }
+  await db.run(sql`
+    INSERT INTO pastor_history (pastor_id, start_year, end_year, region_id, township, church_name,
+                                position, notes, created_by, updated_at)
+    VALUES (${id}, ${data.startYear}, ${data.endYear}, ${data.regionId}, ${data.township},
+            ${data.churchName}, ${data.position}, ${data.notes}, ${c.get("user").id}, unixepoch())`);
+  const landing = `/organization/pastors/${id}?ok=pastor-history-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+organizationRoutes.post("/pastors/:id/history/:hid/edit", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const hid = intParam(c.req.param("hid"));
+  if (!id || !hid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, scope, pastor } = await historyPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const row = await loadPastorHistoryRow(db, id, hid);
+  if (!row) return c.redirect(`/organization/pastors/${id}?err=err-notfound`, 303);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const regions = await orgRegions(db, scope, lang);
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readHistoryForm(body as Record<string, unknown>, regions.map((r) => r.id), t);
+  const modal = modalRequest(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+    return c.html(
+      <PastorHistoryModal pastorId={id} historyId={hid} values={values} regions={regions} errors={errors} lang={lang} />,
+      422,
+    );
+  }
+  await db.run(sql`
+    UPDATE pastor_history
+       SET start_year = ${data.startYear}, end_year = ${data.endYear}, region_id = ${data.regionId},
+           township = ${data.township}, church_name = ${data.churchName}, position = ${data.position},
+           notes = ${data.notes}, updated_at = unixepoch()
+     WHERE id = ${hid} AND pastor_id = ${id}`);
+  const landing = `/organization/pastors/${id}?ok=pastor-history-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+organizationRoutes.post("/pastors/:id/history/:hid/delete", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const hid = intParam(c.req.param("hid"));
+  if (!id || !hid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await historyPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  await db.run(sql`DELETE FROM pastor_history WHERE id = ${hid} AND pastor_id = ${id}`);
+  return c.redirect(`/organization/pastors/${id}?ok=pastor-history-deleted`, 303);
 });

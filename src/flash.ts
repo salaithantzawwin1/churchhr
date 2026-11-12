@@ -5,6 +5,8 @@ import { getDict, normalizeLang, type Lang } from "./i18n";
 const FLASH_KEYS: Record<string, string> = {
   "member-created": "flash.memberCreated",
   "report-created": "flash.reportCreated",
+  "report-draft": "flash.reportDraftSaved",
+  "report-submitted": "flash.reportSubmitted",
   "report-reviewed": "flash.reportReviewed",
   "report-updated": "flash.reportUpdated",
   "report-unchanged": "flash.reportUnchanged",
@@ -56,6 +58,8 @@ const FLASH_KEYS: Record<string, string> = {
   "pastor-created": "flash.pastorCreated",
   "pastor-updated": "flash.pastorUpdated",
   "pastor-deleted": "flash.pastorDeleted",
+  "pastor-history-saved": "flash.pastorHistorySaved",
+  "pastor-history-deleted": "flash.pastorHistoryDeleted",
   "pastor-name-required": "pastor-name-required",
   "pastor-state-required": "pastor-state-required",
   "pastor-church-invalid": "pastor-church-invalid",
