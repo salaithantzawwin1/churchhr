@@ -21,14 +21,26 @@ export function AssignLeaderModal(props: {
   churchName: string;
   def: PositionDefRow;
   candidates: AssignCandidate[];
+  /** Form field the radio list posts: members, unless this is a pastoral post. */
+  personField?: "member_id" | "pastor_id";
+  /** Pastoral posts list the pastor directory instead of this church's members. */
+  pastorDirectory?: boolean;
+  /** Current holder when they appear in this list, so their row starts checked. */
   currentId: number | null;
+  /** The slot is filled, even when the holder is not in this list. */
+  hasHolder?: boolean;
   /** Name of the current holder (shown even when they are not a candidate here). */
   currentName?: string | null;
+  /** Profile page of the current holder, when one exists and the user may open it. */
+  currentHref?: string | null;
   /** code → localized label for church positions a candidate may already hold. */
   labels: Record<string, string>;
   error?: string | null;
 }) {
-  const { lang, tab, churchId, churchName, def, candidates, currentId, currentName, labels, error } = props;
+  const {
+    lang, tab, churchId, churchName, def, candidates,
+    personField = "member_id", pastorDirectory, currentId, hasHolder, currentName, currentHref, labels, error,
+  } = props;
   const t = getDict(lang);
   const label = positionDefLabel(def, lang);
 
@@ -56,8 +68,8 @@ export function AssignLeaderModal(props: {
           {currentName && (
             <div class="position-hero-home">
               {t("org.assignCurrently")}{" "}
-              {currentId ? (
-                <a href={`/members/${currentId}`} class="position-hero-profile" title={t("org.viewProfile")}>
+              {currentHref ? (
+                <a href={currentHref} class="position-hero-profile" title={t("org.viewProfile")}>
                   {currentName}
                 </a>
               ) : (
@@ -69,9 +81,12 @@ export function AssignLeaderModal(props: {
       </div>
 
       <label class="field assign-search">
-        <span class="lbl">{t("org.assignSearch")}</span>
-        <input type="search" data-filter-list=".assign-list" placeholder={t("org.assignSearch")} autocomplete="off" />
+        <span class="lbl">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
+        <input type="search" data-filter-list=".assign-list"
+          placeholder={pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")} autocomplete="off" />
       </label>
+
+      {pastorDirectory && <p class="assign-hint">{t("org.assignPastorHint")}</p>}
 
       {candidates.length === 0 ? (
         <p class="assign-empty">{t("org.assignEmpty")}</p>
@@ -81,7 +96,7 @@ export function AssignLeaderModal(props: {
             const warning = replaceWarning(m);
             return (
               <label class={`assign-row${m.id === currentId ? " is-current" : ""}`} data-name={`${m.name} ${m.home_cell ?? ""}`}>
-                <input type="radio" name="member_id" value={String(m.id)} checked={m.id === currentId}
+                <input type="radio" name={personField} value={String(m.id)} checked={m.id === currentId}
                   data-warn={warning || undefined} />
                 <span class="assign-text">
                   <span class="assign-name">{m.name}</span>
@@ -91,12 +106,17 @@ export function AssignLeaderModal(props: {
               </label>
             );
           })}
-          {currentId != null && (
-            <label class="assign-row">
-              <input type="radio" name="member_id" value="" />
-              <span class="assign-name muted">{t("org.assignClear")}</span>
-            </label>
-          )}
+        </div>
+      )}
+
+      {/* Shown even when the holder is not in this list, so any filled slot can
+          be cleared from the same dialog. */}
+      {(hasHolder ?? currentId != null) && (
+        <div class="assign-list assign-list-clear">
+          <label class="assign-row">
+            <input type="radio" name={personField} value="" />
+            <span class="assign-name muted">{t("org.assignClear")}</span>
+          </label>
         </div>
       )}
 

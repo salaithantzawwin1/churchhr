@@ -406,8 +406,10 @@ export const memberPositions = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     memberId: integer("member_id")
-      .notNull()
       .references(() => members.id, { onDelete: "cascade" }),
+    /** Pastoral posts belong to the pastor directory instead of a member row. */
+    pastorId: integer("pastor_id")
+      .references(() => pastors.id, { onDelete: "cascade" }),
     position: text("position").notNull(),
     scopeType: text("scope_type").notNull().default("home_cell"),
     scopeId: integer("scope_id").references(() => lookupOptions.id),
@@ -420,6 +422,7 @@ export const memberPositions = sqliteTable(
   },
   (t) => ({
     memberIdx: index("member_positions_member_idx").on(t.memberId),
+    pastorIdx: index("member_positions_pastor_idx").on(t.pastorId),
     scopeIdx: index("member_positions_scope_idx").on(t.scopeType, t.scopeId),
     supervisionClusterIdx: index("member_positions_supervision_cluster_idx").on(t.supervisionClusterId),
     memberScopeUq: uniqueIndex("member_positions_member_scope_uq").on(t.memberId, t.scopeType),

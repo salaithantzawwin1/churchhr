@@ -121,8 +121,10 @@ export async function loadVacancyReport(
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
            mp.supervision_cluster_id
     FROM member_positions mp
-    JOIN members m ON m.id = mp.member_id
-    WHERE m.status = 'active'`);
+    LEFT JOIN members m ON m.id = mp.member_id
+    LEFT JOIN pastors p ON p.id = mp.pastor_id
+    WHERE (mp.member_id IS NOT NULL AND m.status = 'active')
+       OR (mp.pastor_id IS NOT NULL AND p.active = 1)`);
   for (const row of heldRows) held.add(positionKey(row));
 
   const regionalRows = await db.all<StructureRow>(sql`

@@ -2377,6 +2377,8 @@ th { font-size: 13px; }
 .assign-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
+.assign-hint { margin: 0 0 var(--space-2); color: var(--muted); font-size: 12px; }
+.assign-list-clear { margin-top: var(--space-2); }
 /* Replace notice: shown in the row that owns the conflict and repeated under the
    list once that member is selected, so the consequence is visible at Save time. */
 .assign-row-note { color: var(--warn-ink); font-size: 12px; line-height: 1.5; }

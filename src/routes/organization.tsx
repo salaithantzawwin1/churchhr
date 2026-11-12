@@ -99,11 +99,15 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
            mp.supervision_cluster_id,
            m.id AS member_id,
-           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
-           (m.photo IS NOT NULL) AS has_photo, m.updated_at
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english,
+                    NULLIF(p.name, ''), p.name_en) AS member_name,
+           (COALESCE(m.photo, p.photo) IS NOT NULL) AS has_photo,
+           COALESCE(m.updated_at, p.updated_at) AS updated_at
     FROM member_positions mp
-    JOIN members m ON m.id = mp.member_id
-    WHERE m.status = 'active'
+    LEFT JOIN members m ON m.id = mp.member_id
+    LEFT JOIN pastors p ON p.id = mp.pastor_id
+    WHERE (mp.member_id IS NOT NULL AND m.status = 'active')
+       OR (mp.pastor_id IS NOT NULL AND p.active = 1)
     UNION ALL
     SELECT 'cluster_pastor' AS position, 'cluster' AS scope_type, NULL AS scope_id,
            NULL AS department_id, NULL AS regional_church_id,
@@ -166,6 +170,37 @@ async function assignCandidates(db: DB, churchId: number, q: string) {
     ORDER BY name LIMIT 300`);
 }
 
+/** Pastoral posts are filled from the pastor directory, not the member list. */
+function isPastorSlot(def: PositionDefRow): boolean {
+  return def.scopeType === "church" && /pastor/i.test(def.code);
+}
+
+/** Pastors of this church's state, offered for a pastoral post. Pastors already
+ *  serving this church come first, and each row carries the church slot they
+ *  hold so the dialog can warn before a save moves that role. */
+async function pastorCandidates(db: DB, church: { id: number; regionId: number }, q: string) {
+  const like = `%${q}%`;
+  return db.all<{
+    id: number; name: string; home_cell: string | null;
+    church_position: string | null; church_id: number | null; church_name: string | null;
+  }>(sql`
+    SELECT p.id,
+           COALESCE(NULLIF(p.name, ''), p.name_en, '#') AS name,
+           rc.name AS home_cell,
+           mp.position AS church_position,
+           mp.regional_church_id AS church_id,
+           mrc.name AS church_name
+    FROM pastors p
+    LEFT JOIN regional_churches rc ON rc.id = p.regional_church_id
+    LEFT JOIN member_positions mp ON mp.pastor_id = p.id AND mp.scope_type = 'church'
+    LEFT JOIN regional_churches mrc ON mrc.id = mp.regional_church_id
+    WHERE p.active = 1 AND p.region_id = ${church.regionId}
+      AND (p.regional_church_id IS NULL OR p.regional_church_id = ${church.id})
+      ${q ? sql`AND (p.name LIKE ${like} OR p.name_en LIKE ${like})` : sql``}
+    ORDER BY (mp.regional_church_id = ${church.id} OR p.regional_church_id = ${church.id}) DESC,
+             p.sort_order, name LIMIT 300`);
+}
+
 /** code → localized church position label, for labels on a member's current slot. */
 function churchPositionLabels(defs: PositionDefRow[], lang: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -204,13 +239,32 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const def = (await loadPositionDefs(db)).find((d) => d.scopeType === "church" && d.code === code) ?? null;
   if (!church || !def) return c.html(<p class="muted">Not found</p>, 404);
 
-  // The holder may live in another church's Home Cell, so their name is resolved
-  // here and shown even when they are not among this church's candidates.
-  const current = await db.all<{ member_id: number; name: string | null }>(sql`
-    SELECT mp.member_id, COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name
+  // A member holder may live in another church's Home Cell and a pastor has no
+  // member row at all, so the current name is resolved here for both cases.
+  const pastorSlot = isPastorSlot(def);
+  // A pastor post may still be held by an older member assignment, so both kinds
+  // of holder are resolved; either one can be cleared from this dialog.
+  const holders = await db.all<{ person_type: string; person_id: number; name: string | null }>(sql`
+    SELECT 'pastor' AS person_type, mp.pastor_id AS person_id,
+           COALESCE(NULLIF(p.name, ''), p.name_en) AS name
+    FROM member_positions mp JOIN pastors p ON p.id = mp.pastor_id
+    WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
+      AND mp.regional_church_id = ${church.id} AND mp.pastor_id IS NOT NULL
+    UNION ALL
+    SELECT 'member' AS person_type, mp.member_id AS person_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name
     FROM member_positions mp JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
-      AND mp.regional_church_id = ${church.id} LIMIT 1`);
+      AND mp.regional_church_id = ${church.id} AND mp.member_id IS NOT NULL
+    LIMIT 1`);
+  const holder = holders[0] ?? null;
+  const holderIsPastor = holder?.person_type === "pastor";
+  const canSeePastorProfile = c.get("perms").has("options.manage");
+  const currentHref = holder
+    ? holderIsPastor
+      ? (canSeePastorProfile ? `/organization/pastors/${holder.person_id}` : null)
+      : `/members/${holder.person_id}`
+    : null;
 
   return c.html(
     <AssignLeaderModal
@@ -219,9 +273,15 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
       churchId={church.id}
       churchName={regionalChurchName(church, c.get("lang"))}
       def={def}
-      candidates={await assignCandidates(db, church.id, q)}
-      currentId={current[0]?.member_id ?? null}
-      currentName={current[0]?.name ?? null}
+      personField={pastorSlot ? "pastor_id" : "member_id"}
+      pastorDirectory={pastorSlot}
+      candidates={pastorSlot
+        ? await pastorCandidates(db, church, q)
+        : await assignCandidates(db, church.id, q)}
+      currentId={holder && holderIsPastor === pastorSlot ? holder.person_id : null}
+      hasHolder={Boolean(holder)}
+      currentName={holder?.name ?? null}
+      currentHref={currentHref}
       labels={churchPositionLabels(await loadPositionDefs(db), c.get("lang"))}
     />,
   );
@@ -236,9 +296,10 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
   const churchId = intParam(s(body.church));
   const code = s(body.position);
   const memberId = intParam(s(body.member_id));
+  const pastorId = intParam(s(body.pastor_id));
   const tab = assignTab(body.tab);
   const landing = assignLanding(tab, churchId);
-  const done = assignLanding(tab, churchId, memberId ? "church-leader-saved" : "church-leader-cleared");
+  const done = assignLanding(tab, churchId, memberId || pastorId ? "church-leader-saved" : "church-leader-cleared");
 
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
@@ -248,31 +309,61 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
     return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
   }
 
-  let target: { id: number } | null = null;
-  if (memberId) {
+  const pastorSlot = isPastorSlot(def);
+  const personId = pastorSlot ? pastorId : memberId;
+  let memberTarget: { id: number } | null = null;
+  let pastorTarget: { id: number } | null = null;
+  if (personId && pastorSlot) {
+    const rows = await db.all<{ id: number }>(sql`
+      SELECT id FROM pastors
+      WHERE id = ${personId} AND active = 1 AND region_id = ${church.regionId}
+        AND (regional_church_id IS NULL OR regional_church_id = ${church.id}) LIMIT 1`);
+    if (!rows[0]) {
+      return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
+    }
+    pastorTarget = { id: rows[0].id };
+  } else if (personId) {
     const rows = await db.all<{ id: number; region_id: number }>(sql`
       SELECT m.id, m.region_id FROM members m
-      WHERE m.id = ${memberId} AND m.status = 'active' LIMIT 1`);
+      WHERE m.id = ${personId} AND m.status = 'active' LIMIT 1`);
     if (!rows[0] || !regionInScope(scope, rows[0].region_id)) {
       return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
     }
-    target = { id: rows[0].id };
+    memberTarget = { id: rows[0].id };
   }
 
   const now = Math.floor(Date.now() / 1000);
-  // One holder per slot, and at most one church position per member.
+  // One holder per slot, and at most one church position per person.
   await db.delete(memberPositions).where(and(
     eq(memberPositions.scopeType, "church"),
     eq(memberPositions.position, def.code),
     eq(memberPositions.regionalChurchId, church.id),
   ));
-  if (target) {
+  if (pastorTarget) {
     await db.delete(memberPositions).where(and(
       eq(memberPositions.scopeType, "church"),
-      eq(memberPositions.memberId, target.id),
+      eq(memberPositions.pastorId, pastorTarget.id),
     ));
     await db.insert(memberPositions).values({
-      memberId: target.id,
+      memberId: null,
+      pastorId: pastorTarget.id,
+      position: def.code,
+      scopeType: "church",
+      scopeId: null,
+      departmentId: null,
+      regionalChurchId: church.id,
+      supervisionClusterId: null,
+      createdBy: c.get("user").id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } else if (memberTarget) {
+    await db.delete(memberPositions).where(and(
+      eq(memberPositions.scopeType, "church"),
+      eq(memberPositions.memberId, memberTarget.id),
+    ));
+    await db.insert(memberPositions).values({
+      memberId: memberTarget.id,
       position: def.code,
       scopeType: "church",
       scopeId: null,

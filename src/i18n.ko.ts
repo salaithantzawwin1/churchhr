@@ -615,6 +615,8 @@ export const KO: Record<string, string> = {
   "org.assignEmpty": "이 교회에서 성도를 찾지 못했습니다.",
   "org.assignClear": "이 지정 해제",
   "org.assignCurrently": "현재 지정",
+  "org.assignPastorHint": "목사 직분은 목사 명부에서 선택합니다.",
+  "org.assignSearchPastors": "목사 검색",
   "org.viewProfile": "프로필 보기",
   "org.assignCurrentAt": "현재",
   "org.assignWillReplace": "저장하면 기존 지정이 대체됩니다",
