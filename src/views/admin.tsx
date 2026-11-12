@@ -431,6 +431,8 @@ export type OptionUsage = {
   state?: string | null;
   /** Parent option label (Home Cell -> Township, Family Group -> Home Cell). */
   parent?: string | null;
+  /** Church a Home Cell is bound to. */
+  church?: string | null;
 };
 
 type OptionsProps = Common & {
@@ -448,6 +450,8 @@ type OptionsProps = Common & {
   allowAllStates?: boolean;
   /** Parent options for chained types (Home Cell -> Township, Family Group -> Home Cell). */
   parentOptions?: { id: number; label: string; regionId: number }[];
+  /** Regional Churches a Home Cell can be bound to. */
+  churches?: { id: number; name: string; regionId: number }[];
   addErrors: string[];
   editError: string | null;
   showAddForm?: boolean;
@@ -471,7 +475,7 @@ function optionStateField(
     <label class="field">
       <span class="lbl">{t("adm.optionState")}</span>
       {lockRegion && <input type="hidden" name="region_id" value={selected || String(regions[0]!.id)} />}
-      <select name="region_id" disabled={lockRegion ? true : undefined}>
+      <select name="region_id" data-region-select disabled={lockRegion ? true : undefined}>
         {!lockRegion && allowAllStates && <option value="">{t("adm.allStates")}</option>}
         {regions.map((r) => (
           <option value={String(r.id)} selected={lockRegion || selected === String(r.id)}>{r.name}</option>
@@ -506,6 +510,30 @@ function optionParentField(
   );
 }
 
+/** Church picker for Home Cells — the missing link between the Home Cell list
+ * and the Regional Church it belongs to (e.g. Yangon Church (Main)). */
+function optionChurchField(
+  churches: { id: number; name: string; regionId: number }[] | undefined,
+  type: string,
+  selected: string,
+  t: (k: string) => string,
+) {
+  if (type !== "home_cell") return null;
+  return (
+    <label class="field span-2">
+      <span class="lbl">{t("form.church")}</span>
+      <select name="regional_church_id" data-region-filter="1">
+        <option value="" data-region="">{t("adm.churchNone")}</option>
+        {(churches ?? []).map((c) => (
+          <option value={String(c.id)} selected={selected === String(c.id)}
+            data-region={String(c.regionId)}>{c.name}</option>
+        ))}
+      </select>
+      <span class="field-hint">{t("adm.churchHint")}</span>
+    </label>
+  );
+}
+
 /** Township short-code input: the prefix of its Family Group codes (INS_FG001…). */
 function optionShortCodeField(type: string, value: string | undefined, t: (k: string) => string) {
   if (type !== "township") return null;
@@ -525,6 +553,7 @@ export function AddOptionForm(props: {
   regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
+  churches?: { id: number; name: string; regionId: number }[]; churchId?: string;
   shortCode?: string;
 }) {
   const t = getDict(props.lang ?? "en");
@@ -546,6 +575,7 @@ export function AddOptionForm(props: {
       <div class="form-grid">
         {optionStateField(props.regions, props.type, props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
         {optionParentField(props.parentOptions, props.type, props.parentId ?? "", t)}
+        {optionChurchField(props.churches, props.type, props.churchId ?? "", t)}
         {optionShortCodeField(props.type, props.shortCode, t)}
       </div>
       <div class="actions">
@@ -667,6 +697,7 @@ export function EditOptionForm(props: {
   type?: string; regions?: { id: number; name: string }[]; regionId?: string; lockRegion?: boolean;
   allowAllStates?: boolean;
   parentOptions?: { id: number; label: string; regionId: number }[]; parentId?: string;
+  churches?: { id: number; name: string; regionId: number }[]; churchId?: string;
   code?: string; shortCode?: string;
 }) {
   const t = getDict(props.lang ?? "en");
@@ -693,6 +724,7 @@ export function EditOptionForm(props: {
         </label>
         {optionStateField(props.regions, props.type ?? "", props.regionId ?? "", t, props.lockRegion, props.allowAllStates ?? true)}
         {optionParentField(props.parentOptions, props.type ?? "", props.parentId ?? "", t)}
+        {optionChurchField(props.churches, props.type ?? "", props.churchId ?? "", t)}
         {optionShortCodeField(props.type ?? "", props.shortCode, t)}
       </div>
       <div class="actions">
@@ -752,7 +784,7 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
 }
 
 export function AdminOptionsPage(props: OptionsProps) {
-  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, addErrors, editError, lang, showAddForm, lockRegion, allowAllStates } = props;
+  const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, churches, addErrors, editError, lang, showAddForm, lockRegion, allowAllStates } = props;
   const t = getDict(lang ?? "en");
   const TL = (lang ?? "en") === "mm" ? OPTION_TYPE_LABELS
     : (lang ?? "en") === "kr" ? OPTION_TYPE_LABELS_KR : OPTION_TYPE_LABELS_EN;
@@ -804,7 +836,7 @@ export function AdminOptionsPage(props: OptionsProps) {
             ? <AddRegionForm lang={lang} />
             : type === "age_group"
               ? <AddAgeGroupForm lang={lang} />
-              : <AddOptionForm type={type} lang={lang} regions={regions} lockRegion={lockRegion} allowAllStates={allowAllStates} parentOptions={parentOptions} />}
+              : <AddOptionForm type={type} lang={lang} regions={regions} lockRegion={lockRegion} allowAllStates={allowAllStates} parentOptions={parentOptions} churches={churches} />}
         </div>
       )}
 
@@ -868,14 +900,15 @@ export function AdminOptionsPage(props: OptionsProps) {
       {scrollHint}
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>ID</th><th>{t("adm.codeCol")}</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}{type === "home_cell" && <th>{t("form.township")}</th>}{type === "family_group" && <th>{t("form.homeCell")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>{t("adm.codeCol")}</th><th>{t("adm.labelCol")}</th>{scoped && <th>{t("adm.stateCol")}</th>}{type === "home_cell" && <th>{t("form.church")}</th>}{type === "home_cell" && <th>{t("form.township")}</th>}{type === "family_group" && <th>{t("form.homeCell")}</th>}<th class="num">{t("adm.usage")}</th><th>{t("members.status")}</th><th></th></tr></thead>
           <tbody>
-            {options.length === 0 ? emptyStateRow(5 + (scoped ? 1 : 0) + (type === "home_cell" || type === "family_group" ? 1 : 0) + 1, t) : options.map((o) => (
+            {options.length === 0 ? emptyStateRow(5 + (scoped ? 1 : 0) + (type === "home_cell" ? 2 : type === "family_group" ? 1 : 0) + 1, t) : options.map((o) => (
               <tr>
                 <td class="muted">{o.id}</td>
                 <td><code>{o.code || "—"}</code></td>
                 <td>{o.label}</td>
                 {scoped && <td>{o.state || <span class="muted small">{t("adm.allStates")}</span>}</td>}
+                {type === "home_cell" && <td>{o.church || <span class="muted small">{t("adm.churchNone")}</span>}</td>}
                 {(type === "home_cell" || type === "family_group") && <td>{o.parent || <span class="muted">—</span>}</td>}
                 <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used} {t("members.count")}</td>
                 <td>

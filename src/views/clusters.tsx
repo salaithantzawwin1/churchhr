@@ -19,7 +19,7 @@ export type ClusterValues = {
   regionId: number | "";
   sortOrder: number;
   active: boolean;
-  pastorMemberId: number | "";
+  pastorId: number | "";
 };
 
 function clusterValues(cluster?: SupervisionClusterRow): ClusterValues {
@@ -29,7 +29,7 @@ function clusterValues(cluster?: SupervisionClusterRow): ClusterValues {
     regionId: cluster?.regionId ?? "",
     sortOrder: cluster?.sortOrder ?? 0,
     active: cluster ? cluster.active === 1 : true,
-    pastorMemberId: cluster?.pastorId ?? "",
+    pastorId: cluster?.pastorId ?? "",
   };
 }
 
@@ -68,11 +68,11 @@ function ClusterFields(props: {
       {editing && (
         <label class="field span-2">
           <span class="lbl">{t("org.clusterPastor")}</span>
-          <select name="pastor_member_id">
+          <select name="pastor_id">
             <option value="">{t("org.noPastor")}</option>
-            {pastorCandidates.map((member) => (
-              <option value={String(member.id)} selected={values.pastorMemberId === member.id}>
-                {member.name}
+            {pastorCandidates.map((pastor) => (
+              <option value={String(pastor.id)} selected={values.pastorId === pastor.id}>
+                {pastor.name}
               </option>
             ))}
           </select>

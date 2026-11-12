@@ -15,6 +15,8 @@ export type OptionRow = {
   regionId: number;
   /** Optional parent option id (Home Cell -> Township, Family Group -> Home Cell). */
   parentId: number | null;
+  /** Regional Church this option is bound to (Home Cell -> Church), optional. */
+  regionalChurchId: number | null;
   /** Short code (TWP-001…), null until assigned. */
   code: string | null;
   /** Township short code used as the prefix of its Family Group codes (INS_FG001…). */
@@ -27,6 +29,7 @@ export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
       id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label,
       active: lookupOptions.active, sortOrder: lookupOptions.sortOrder,
       regionId: lookupOptions.regionId, parentId: lookupOptions.parentId,
+      regionalChurchId: lookupOptions.regionalChurchId,
       code: lookupOptions.code, shortCode: lookupOptions.shortCode,
     })
     .from(lookupOptions)

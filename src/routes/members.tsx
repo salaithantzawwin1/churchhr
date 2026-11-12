@@ -749,7 +749,7 @@ async function ensureOption(
     const rows = await db
       .insert(lookupOptions)
       .values({ type, label, regionId, parentId: opts.parentId ?? null, code, shortCode })
-      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId, code: lookupOptions.code, shortCode: lookupOptions.shortCode });
+      .returning({ id: lookupOptions.id, type: lookupOptions.type, label: lookupOptions.label, active: lookupOptions.active, sortOrder: lookupOptions.sortOrder, regionId: lookupOptions.regionId, parentId: lookupOptions.parentId, regionalChurchId: lookupOptions.regionalChurchId, code: lookupOptions.code, shortCode: lookupOptions.shortCode });
     cache.push(rows[0]!);
     return rows[0]!.id;
   } catch {

@@ -34,7 +34,7 @@ export type OrgLeader = {
   department_id: number | null;
   regional_church_id: number | null;
   supervision_cluster_id: number | null;
-  member_id: number;
+  member_id: number | null;
   member_name: string | null;
   has_photo: number | boolean;
   updated_at: number;
@@ -128,7 +128,7 @@ function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm
   if (!leader) return <span class={`org-avatar ${size} vacant`} aria-hidden="true">?</span>;
   return (
     <span class={`org-avatar ${size}`} aria-hidden="true">
-      {leader.has_photo
+      {leader.has_photo && leader.member_id
         ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" />
         : initialOf(leader.member_name)}
     </span>
@@ -138,9 +138,11 @@ function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm
 function LeaderLink(props: { leader: OrgLeader | null; empty: string; photoPreview?: boolean }) {
   const { leader, empty, photoPreview } = props;
   if (!leader) return <span class="muted">{empty}</span>;
-  const previewUrl = photoPreview && leader.has_photo
+  const previewUrl = photoPreview && leader.has_photo && leader.member_id
     ? `/members/${leader.member_id}/photo?v=${leader.updated_at}`
     : undefined;
+  // A pastor from the separate directory has no member record to open.
+  if (!leader.member_id) return <span>{leader.member_name || "—"}</span>;
   return (
     <a href={`/members/${leader.member_id}`} data-photo-preview={previewUrl}>
       {leader.member_name || "—"}
@@ -226,6 +228,9 @@ export function OrganizationPage(props: Common & {
       )}
       {canManageClusters && (
         <a class="btn secondary sm" href="/organization/clusters">{t("org.manageClusters")}</a>
+      )}
+      {canManageClusters && (
+        <a class="btn secondary sm" href="/organization/pastors">{t("org.managePastors")}</a>
       )}
     </div>
   );

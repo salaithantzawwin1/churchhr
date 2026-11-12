@@ -85,12 +85,12 @@ export async function loadSupervisionClusters(db: DB, opts: LoadRegionalOptions 
            (SELECT COUNT(*) FROM lookup_options hc
              WHERE hc.supervision_cluster_id = sc.id
                AND hc.type = 'home_cell' AND hc.active = 1) AS cellCount,
-           (SELECT cp.member_id FROM cluster_pastor_assignments cp
+           (SELECT cp.pastor_id FROM cluster_pastor_assignments cp
              WHERE cp.cluster_id = sc.id) AS pastorId,
-           (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
+           (SELECT COALESCE(NULLIF(p.name, ''), p.name_en)
               FROM cluster_pastor_assignments cp
-              JOIN members m ON m.id = cp.member_id
-             WHERE cp.cluster_id = sc.id AND m.status = 'active' LIMIT 1) AS pastorName
+              JOIN pastors p ON p.id = cp.pastor_id
+             WHERE cp.cluster_id = sc.id AND p.active = 1 LIMIT 1) AS pastorName
     FROM supervision_clusters sc
     JOIN regions r ON r.id = sc.region_id
     WHERE ${sql.join(conditions, sql` AND `)}

@@ -44,7 +44,7 @@ function DepartmentFields(props: { department?: AdminDepartmentRow; lang: Lang }
 
 export type DepartmentDetailLeader = {
   position: string;
-  member_id: number;
+  member_id: number | null;
   member_name: string | null;
   has_photo: number | boolean;
   updated_at: number;
@@ -96,12 +96,12 @@ export function DepartmentDetailPage(props: Common & {
               <div class={`org-lead dept-leader${leader ? "" : " org-vacant"}`}>
                 <span class="org-avatar md" aria-hidden="true">
                   {leader?.has_photo
-                    ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" />
+                    ? (leader.member_id ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" /> : initial(leader.member_name))
                     : initial(leader?.member_name)}
                 </span>
                 <span class="org-lead-role">{positionLabel(p.value, L)}</span>
                 {leader
-                  ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a>
+                  ? (leader.member_id ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a> : <span>{leader.member_name || "—"}</span>)
                   : <span class="muted">{t("org.vacant")}</span>}
               </div>
             );

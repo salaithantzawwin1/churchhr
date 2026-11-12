@@ -1460,6 +1460,18 @@ td.empty-state .small { margin-top: 4px; }
 /* Supervision clusters use a compact row: the cluster, its pastor and the
    actions share one line, while the attached cells sit on a quiet strip below.
    This keeps a one-cluster list from turning into a mostly-empty wide card. */
+.pastor-list { display: grid; gap: 10px; }
+.pastor-card { padding: 0; overflow: hidden; }
+.pastor-card.is-inactive { opacity: .72; }
+.pastor-main {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(130px, .7fr) auto;
+  align-items: center; gap: 8px 20px; padding: 13px 18px;
+}
+.pastor-title { min-width: 0; }
+.pastor-title h3 { margin: 0 0 2px; font-size: 16.5px; overflow-wrap: anywhere; }
+.pastor-title p { margin: 0; }
+.pastor-phone { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13.5px; }
+.pastor-actions { justify-content: flex-end; }
 .cluster-list { display: grid; gap: 10px; }
 .cluster-card { padding: 0; overflow: hidden; }
 .cluster-card.is-inactive { opacity: .72; }
@@ -1520,6 +1532,9 @@ td.empty-state .small { margin-top: 4px; }
 .modal-body .cluster-modal-foot form.modal-danger > .actions { margin: 0; padding: 0; border: 0; }
 
 @media (max-width: 640px) {
+  .pastor-main { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 14px; }
+  .pastor-phone { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 6px; }
+  .pastor-actions { align-self: start; }
   .cluster-card-main { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 14px; }
   .cluster-card-pastor { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 6px; }
   .cluster-card-actions { align-self: start; }

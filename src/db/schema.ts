@@ -339,6 +339,30 @@ export const supervisionClusters = sqliteTable(
   }),
 );
 
+/** Separate pastor directory. A pastor belongs to one State/Region and can
+ * optionally be tied to one of its Regional Churches, without creating a
+ * member record. */
+export const pastors = sqliteTable(
+  "pastors",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    nameEn: text("name_en"),
+    regionId: integer("region_id").notNull().references(() => regions.id),
+    regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
+    phone: text("phone"),
+    active: integer("active").notNull().default(1),
+    sortOrder: integer("sort_order").notNull().default(0),
+    sourceMemberId: integer("source_member_id"),
+    createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    regionIdx: index("pastors_region_idx").on(t.regionId, t.active, t.sortOrder),
+    churchIdx: index("pastors_church_idx").on(t.regionalChurchId, t.active, t.sortOrder),
+  }),
+);
+
 /** Pastoral oversight for a supervision cluster. Kept separate from
  * member_positions because one pastor may cover several clusters. */
 export const clusterPastorAssignments = sqliteTable(
@@ -349,15 +373,15 @@ export const clusterPastorAssignments = sqliteTable(
       .notNull()
       .unique()
       .references(() => supervisionClusters.id, { onDelete: "cascade" }),
-    memberId: integer("member_id")
+    pastorId: integer("pastor_id")
       .notNull()
-      .references(() => members.id, { onDelete: "cascade" }),
+      .references(() => pastors.id, { onDelete: "cascade" }),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },
   (t) => ({
-    memberIdx: index("cluster_pastor_assignments_member_idx").on(t.memberId),
+    pastorIdx: index("cluster_pastor_assignments_pastor_idx").on(t.pastorId),
   }),
 );
 

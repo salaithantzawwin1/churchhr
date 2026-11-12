@@ -22,6 +22,7 @@ import {
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
+import { loadRegionalChurches, regionalChurchName } from "../org-units";
 
 export const adminRoutes = new Hono<AppEnv>();
 
@@ -483,12 +484,16 @@ async function optionsPage(c: any, type: string, opts: {
   const stateListAll = await loadRegionsLite(db, lang);
   // State managers pick only among their own states; no "all states" choice.
   const stateList = admin ? stateListAll : stateListAll.filter((r) => scope.stateIds.includes(r.id));
+  // Home Cells may be bound to a Regional Church in the same State/Region.
+  const churches = (await loadRegionalChurches(db, {
+    activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
+  })).map((church) => ({ id: church.id, name: regionalChurchName(church, lang), regionId: church.regionId }));
   if (opts.modal) {
     const all = await loadAllOptions(db);
     const parentType = PARENT_TYPE[type];
     return c.html(
       <AddOptionForm type={type} lang={lang} regions={stateList} modal lockRegion={!admin && stateList.length === 1}
-        allowAllStates={admin}
+        allowAllStates={admin} churches={churches}
         parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId === 0 ? 0 : o.regionId)) : []} />,
     );
   }
@@ -524,6 +529,7 @@ async function optionsPage(c: any, type: string, opts: {
   const stateName = (id: number | null) =>
     id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;
   const labelById = new Map(all.map((o) => [o.id, o.label] as const));
+  const churchById = new Map(churches.map((church) => [church.id, church] as const));
   const options: OptionUsage[] = list.map((o) => ({
     id: o.id, label: o.label, active: o.active,
     code: o.code ?? null,
@@ -533,6 +539,7 @@ async function optionsPage(c: any, type: string, opts: {
     ),
     state: stateName(o.regionId ?? null),
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
+    church: o.regionalChurchId ? churchById.get(o.regionalChurchId)?.name ?? null : null,
   }));
   const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
   const types = admin
@@ -545,7 +552,7 @@ async function optionsPage(c: any, type: string, opts: {
     <AdminOptionsPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       type={type} typeLabel={typeLabel(lang, type as OptionType)} types={types}
-      options={options} regions={stateList}
+      options={options} regions={stateList} churches={churches}
       lockRegion={!admin && stateList.length === 1}
       allowAllStates={admin}
       parentOptions={PARENT_TYPE[type]
@@ -652,11 +659,15 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
   const allRegions = await loadRegionsLite(db, c.get("lang"));
   // State managers pick only among their own states.
   const stateList = isOptionsAdmin(scope) ? allRegions : allRegions.filter((r) => scope.stateIds.includes(r.id));
+  const churches = (await loadRegionalChurches(db, {
+    activeOnly: true, scopeAll: isOptionsAdmin(scope), stateIds: scope.stateIds,
+  })).map((church) => ({ id: church.id, name: regionalChurchName(church, c.get("lang")), regionId: church.regionId }));
   const fail = (msg: string) =>
     fromModal
       ? c.html(
           <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
             regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)}
+            churches={churches} churchId={s(body.regional_church_id)}
             shortCode={s(body.short_code)}
             lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} allowAllStates={isOptionsAdmin(scope)} modal />,
           400,
@@ -704,7 +715,19 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
     );
     if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
   }
-  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId, code, shortCode });
+  let regionalChurchId: number | null = null;
+  if (type === "home_cell") {
+    const rawChurch = s(body.regional_church_id);
+    if (rawChurch) {
+      const n = Number(rawChurch);
+      if (!Number.isInteger(n) || n < 1 ||
+          !churches.some((church) => church.id === n && church.regionId === anchorRegion)) {
+        return fail(t("adm.errChurchBad"));
+      }
+      regionalChurchId = n;
+    }
+  }
+  await db.insert(lookupOptions).values({ type, label, regionId: anchorRegion, parentId, code, shortCode, regionalChurchId });
   return c.redirect(`${back}${back.includes("?") ? "&" : "?"}ok=option-added`, 302);
 });
 
@@ -821,6 +844,10 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
     shortCode: current.shortCode ?? "",
     regionId: current.regionId === 0 ? "" : String(current.regionId),
     parentId: current.parentId == null ? "" : String(current.parentId),
+    churches: (await loadRegionalChurches(db, {
+      activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
+    })).map((church) => ({ id: church.id, name: regionalChurchName(church, lang), regionId: church.regionId })),
+    churchId: current.regionalChurchId == null ? "" : String(current.regionalChurchId),
     parentOptions: parentType
       ? allOpts.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId))
       : [],
@@ -873,15 +900,19 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   const parentOptions = parentType
     ? allOpts.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId))
     : [];
+  const churches = (await loadRegionalChurches(db, {
+    activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
+  })).map((church) => ({ id: church.id, name: regionalChurchName(church, c.get("lang")), regionId: church.regionId }));
   const fail = (msg: string) => {
     const fp = {
-      id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions,
+      id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions, churches,
       lockRegion: !admin && stateList.length === 1,
       allowAllStates: admin,
       code: s(body.code),
       shortCode: s(body.short_code),
       regionId: regionId === false ? s(body.region_id) : regionId === 0 ? "" : String(regionId),
       parentId: parentId === false ? s(body.parent_id) : parentId == null ? "" : String(parentId),
+      churchId: s(body.regional_church_id),
     };
     return fromModal
       ? c.html(<EditOptionForm {...fp} errors={[msg]} modal />, 400)
@@ -920,8 +951,21 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
     );
     if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
   }
+  let regionalChurchId: number | null = current.regionalChurchId ?? null;
+  if (current.type === "home_cell") {
+    regionalChurchId = null;
+    const rawChurch = s(body.regional_church_id);
+    if (rawChurch) {
+      const n = Number(rawChurch);
+      if (!Number.isInteger(n) || n < 1 ||
+          !churches.some((church) => church.id === n && church.regionId === anchorRegion)) {
+        return fail(t("adm.errChurchBad"));
+      }
+      regionalChurchId = n;
+    }
+  }
   await db.update(lookupOptions)
-    .set({ label, regionId: anchorRegion, parentId, code: rawCode || null, shortCode })
+    .set({ label, regionId: anchorRegion, parentId, code: rawCode || null, shortCode, regionalChurchId })
     .where(eq(lookupOptions.id, id));
   // Changing a township's short code renumbers the Family Groups under it so the
   // INS_FG001 sequence stays correct (only when the prefix actually changed).
