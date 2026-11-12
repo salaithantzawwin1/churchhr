@@ -245,6 +245,13 @@ export function OrganizationPage(props: Common & {
   const cellHref = (id: number) => `/members?home_cell=${id}`;
 
   const churchRows = positionRows(positionDefs, "church", L);
+  const selectedChurchCellCount = selectedChurch
+    ? cells.filter((c) => c.regional_church_id === selectedChurch.id).length
+    : 0;
+  const selectedChurchFilled = selectedChurch
+    ? churchRows.all.filter((p) =>
+      leaderFor(leaders, "church", p.code, { regionalChurchId: selectedChurch.id })).length
+    : 0;
   const cellRows = positionRows(positionDefs, "home_cell", L);
   const regionalRows = positionRows(positionDefs, "regional_church", L);
   const deptRows = positionRows(positionDefs, "department", L);
@@ -485,21 +492,37 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
-            {orderedChurches.length > 0 && (
-              <form class="filters settings-filters org-church-picker" method="get" action="/organization" data-auto-submit="1">
-                <input type="hidden" name="tab" value="church" />
-                <label class="field">
-                  <span class="lbl">{t("org.selectChurch")}</span>
-                  <select name="church">
-                    {orderedChurches.map((church) => (
-                      <option value={String(church.id)} selected={selectedChurch?.id === church.id}>
-                        {regionalChurchName(church, L)}{church.isMain === 1 ? ` · ${t("org.mainChurchBadge")}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div class="actions"><button class="btn sm secondary" type="submit">{t("members.search")}</button></div>
-              </form>
+            {orderedChurches.length > 0 && selectedChurch && (
+              <div class="org-church-switcher">
+                <form method="get" action="/organization" data-auto-submit="1">
+                  <input type="hidden" name="tab" value="church" />
+                  <label class="org-church-control">
+                    <span class="org-church-kicker">{t("org.selectChurch")}</span>
+                    <select name="church" aria-label={t("org.selectChurch")}>
+                      {regionalStates.map((state) => (
+                        <optgroup label={state.name}>
+                          {state.churches.map((church) => (
+                            <option value={String(church.id)} selected={selectedChurch.id === church.id}>
+                              {regionalChurchName(church, L)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                </form>
+                <div class="org-church-facts">
+                  <span class="org-church-fact org-church-state">
+                    {L !== "mm" && selectedChurch.stateNameEn ? selectedChurch.stateNameEn : selectedChurch.stateName}
+                  </span>
+                  <span class="org-church-fact"><b>{selectedChurchCellCount}</b> {t("org.cells")}</span>
+                  {churchRows.all.length > 0 && (
+                    <span class="org-church-fact">
+                      <b>{selectedChurchFilled}</b> / {churchRows.all.length} {t("dept.rolesFilled")}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
 
             {!selectedChurch ? (

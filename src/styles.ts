@@ -1527,12 +1527,35 @@ td.empty-state .small { margin-top: 4px; }
 .settings-filters select { flex: 0 1 180px; }
 .settings-filters .actions { margin-left: 0; }
 .settings-filters .btn { min-height: 40px; }
-/* Church selector on the organization page stays a compact inline control
-   instead of stretching across the whole leadership card. */
-.org-church-picker { max-width: 520px; margin: 0 0 18px; }
-.org-church-picker label.field { flex: 1 1 300px; max-width: none; }
-.org-church-picker .actions { margin-left: 0; }
-.org-church-picker .actions .btn { min-height: 40px; }
+/* Church switcher: the selected church, its state and leadership progress live
+   in one compact strip above the chart. Selecting a church applies immediately. */
+.org-church-switcher {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  margin: 0 0 18px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--chip-bg);
+}
+.org-church-switcher form { margin: 0; flex: 0 1 340px; min-width: 220px; }
+.org-church-control { display: block; min-width: 0; }
+.org-church-kicker {
+  display: block; margin: 0 0 4px; color: var(--muted);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.org-church-control select {
+  height: 44px; font-size: 15px; font-weight: 600; background: var(--field-bg);
+}
+.org-church-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.org-church-fact {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); font-size: 12.5px; white-space: nowrap;
+}
+.org-church-fact b { color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.org-church-state { border-color: transparent; background: var(--chip-brand-bg); color: var(--link); font-weight: 600; }
+@media (max-width: 640px) {
+  .org-church-switcher form { flex-basis: 100%; }
+  .org-church-facts { margin-left: 0; }
+}
 /* Position rows are short records; keep the list dense and easy to scan. */
 .role-list { gap: 8px; }
 .role-card { padding: 12px 16px; transition: border-color .12s ease, box-shadow .12s ease; }
