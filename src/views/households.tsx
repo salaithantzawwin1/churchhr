@@ -6,6 +6,7 @@ import { CardViewToggle } from "./view-toggle";
 import { regionCascadeSelects } from "./hh-cascade";
 import { optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
+import { EditIcon, RemoveUserIcon, TrashIcon } from "./action-icons";
 
 /** Household relationships: stored key -> label per UI language. */
 const RELATIONSHIPS: Record<string, { mm: string; en: string; ko: string }> = {
@@ -265,15 +266,21 @@ export function HouseholdsListPage(props: Common & {
                 </div>
                 <div class="hh-card-actions">
                   <a class="btn sm secondary" href={`/admin/households/${f.id}`}>{t("members.open")}</a>
-                  {perms.has("members.update") && (
-                    <a class="btn sm secondary js-edit-modal" href={`/admin/households/${f.id}/edit`} data-modal-title={t("hh.editTitle")}>{t("members.edit")}</a>
-                  )}
-                  {perms.has("members.delete") && (
-                    <form method="post" action={`/admin/households/${f.id}/delete`}
-                      data-confirm={t("hh.deleteConfirm")} data-confirm-title={t("hh.deleteTitle")}
-                      data-confirm-yes={t("hh.delete")} style="display:inline">
-                      <button class="btn sm outline-danger" type="submit">{t("hh.deleteShort")}</button>
-                    </form>
+                  {(perms.has("members.update") || perms.has("members.delete")) && (
+                    <div class="row-icon-actions">
+                      {perms.has("members.update") && (
+                        <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/households/${f.id}/edit`}
+                          data-modal-title={t("hh.editTitle")} title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                      )}
+                      {perms.has("members.delete") && (
+                        <form method="post" action={`/admin/households/${f.id}/delete`}
+                          data-confirm={t("hh.deleteConfirm")} data-confirm-title={t("hh.deleteTitle")}
+                          data-confirm-yes={t("hh.delete")}>
+                          <button class="btn sm outline-danger icon-btn" type="submit"
+                            title={t("hh.deleteShort")} aria-label={t("hh.deleteShort")}><TrashIcon /></button>
+                        </form>
+                      )}
+                    </div>
                   )}
                 </div>
               </article>
@@ -405,13 +412,15 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
                   <span class="hh-rel">{RELATIONSHIPS[m.relationship]?.[L === "kr" ? "ko" : L] ?? m.relationship}</span>
                   {perms.has("members.update") && (
                     <div class="hh-member-actions">
-                      <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
+                      <a class="btn sm secondary icon-btn js-edit-modal" href={`/members/${m.id}/edit`}
+                        data-modal-title={t("form.editTitle")} title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
                       <form method="post" action={`/admin/households/${family.id}/detach`}
                         data-confirm={t("hh.removeConfirm")}
                         data-confirm-title={t("hh.removeTitle")}
                         data-confirm-yes={t("hh.removeMember")}>
                         <input type="hidden" name="member_id" value={String(m.id)} />
-                        <button class="btn sm outline-danger" type="submit" aria-label={`${t("hh.removeMember")}: ${nm}`}>{t("hh.removeMember")}</button>
+                        <button class="btn sm outline-danger icon-btn" type="submit"
+                          title={t("hh.removeMember")} aria-label={`${t("hh.removeMember")}: ${nm}`}><RemoveUserIcon /></button>
                       </form>
                     </div>
                   )}

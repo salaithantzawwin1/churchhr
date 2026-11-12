@@ -9,6 +9,7 @@ import { positionLabels } from "../positions";
 import { defsForScope, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
+import { EditIcon, TrashIcon } from "./action-icons";
 
 export type MemberListItem = {
   id: number;
@@ -104,25 +105,6 @@ const LIST_COLS = (t: (k: string) => string) => [
   { key: "sector", label: t("form.sector") },
   { key: "status", label: t("members.status") },
 ];
-
-function EditIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5" />
-    </svg>
-  );
-}
 
 export function MembersListPage(props: ListProps) {
   const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs } = props;

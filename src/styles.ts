@@ -2195,6 +2195,15 @@ body { background: var(--bg); }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .btn.icon-btn svg { width: 16px; height: 16px; display: block; }
+.hh-card-actions .row-icon-actions { flex: 0 0 auto; }
+.hh-card-actions .row-icon-actions .btn.icon-btn { flex: 0 0 36px; }
+.hh-card-actions .row-icon-actions form { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .btn.icon-btn { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .row-icon-actions { gap: 8px; }
+  .hh-card-actions .row-icon-actions .btn.icon-btn { flex: 0 0 44px; }
+  .hh-member-actions .btn.icon-btn { flex: 0 0 44px; width: 44px; }
+}
 .btn:not(.secondary):not(.danger):not(.outline-danger) {
   background: linear-gradient(180deg, #3478f6, var(--brand));
   box-shadow: 0 2px 7px rgba(37,99,235,.28);

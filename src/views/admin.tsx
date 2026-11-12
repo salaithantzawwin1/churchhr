@@ -6,6 +6,7 @@ import { getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
 import { qs } from "../util";
+import { EditIcon, TrashIcon } from "./action-icons";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -191,11 +192,14 @@ export function AdminUsersPage(props: UsersProps) {
                     : <span class="badge inactive">{t("adm.off")}</span>}
                   {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
                 </td>
-                <td class="row-actions">
-                  {u.id !== user.id
-                    ? <a class="btn sm secondary js-edit-modal" href={`/admin/users/${u.id}/edit`}
-                         data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md">{t("members.edit")}</a>
-                    : <span class="muted" title={t("adm.selfEdit")}>—</span>}
+                <td class="row-actions-cell">
+                  <div class="row-icon-actions">
+                    {u.id !== user.id
+                      ? <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
+                           data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
+                           title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                      : <span class="muted" title={t("adm.selfEdit")}>—</span>}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -400,14 +404,17 @@ export function AdminRolesPage(props: RolesProps) {
                     ? <span class="badge active">system</span>
                     : <span class="badge inactive">—</span>}
                 </td>
-                <td class="row-actions">
-                  <a class="btn sm secondary js-edit-modal" href={`/admin/roles/${r.id}/edit`}
-                     data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md">{t("members.edit")}</a>{" "}
-                  {r.is_system !== 1 && (
-                    <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")} style="display:inline">
-                      <button class="btn sm danger" type="submit">{t("members.delete")}</button>
-                    </form>
-                  )}
+                <td class="row-actions-cell">
+                  <div class="row-icon-actions">
+                    <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/roles/${r.id}/edit`}
+                       data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md"
+                       title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                    {r.is_system !== 1 && (
+                      <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}>
+                        <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+                      </form>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -852,12 +859,15 @@ export function AdminOptionsPage(props: OptionsProps) {
                   <td class="muted">{g.id}</td>
                   <td>{g.name}</td>
                   <td class="num">{g.min_age} – {g.max_age}</td>
-                  <td style="white-space:nowrap">
-                    <a class="btn sm secondary js-edit-modal" href={`/admin/age-groups/${g.id}/edit`}
-                       data-modal-title={`${t("adm.ageTab")}: ${g.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
-                    <form method="post" action={`/admin/age-groups/${g.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
-                      <button class="btn sm danger" type="submit">{t("members.delete")}</button>
-                    </form>
+                  <td class="row-actions-cell">
+                    <div class="row-icon-actions">
+                      <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/age-groups/${g.id}/edit`}
+                         data-modal-title={`${t("adm.ageTab")}: ${g.name}`} data-modal-size="sm"
+                         title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                      <form method="post" action={`/admin/age-groups/${g.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                        <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -881,13 +891,17 @@ export function AdminOptionsPage(props: OptionsProps) {
                     <td>{r.name}</td>
                     <td>{r.name_en || "—"}</td>
                     <td class={`num${r.used === 0 ? " muted" : ""}`}>{r.used} {t("members.count")}</td>
-                    <td style="white-space:nowrap">
-                      <a class="btn sm secondary js-edit-modal" href={`/admin/regions/${r.id}/edit`}
-                         data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm">{t("members.edit")}</a>{" "}
-                      <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline">
-                        <button class="btn sm danger" type="submit" disabled={r.used > 0}
-                         title={r.used > 0 ? t("flash.errRegionUsed") : undefined}>{t("members.delete")}</button>
-                      </form>
+                    <td class="row-actions-cell">
+                      <div class="row-icon-actions">
+                        <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/regions/${r.id}/edit`}
+                           data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm"
+                           title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                        <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                          <button class="btn sm danger icon-btn" type="submit" disabled={r.used > 0}
+                           title={r.used > 0 ? t("flash.errRegionUsed") : t("members.delete")}
+                           aria-label={t("members.delete")}><TrashIcon /></button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -916,18 +930,20 @@ export function AdminOptionsPage(props: OptionsProps) {
                     ? <span class="badge active">{t("adm.active")}</span>
                     : <span class="badge inactive">{t("adm.off")}</span>}
                 </td>
-                <td style="white-space:nowrap">
-                  <a class="btn sm secondary js-edit-modal" href={`/admin/options/${o.id}/edit`}
-                     data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="md">{t("members.edit")}</a>{" "}
-                  <form method="post" action={`/admin/options/${o.id}`} style="display:inline">
-                    <input type="hidden" name="toggle" value="1" />
-                    <input type="hidden" name="label" value={o.label} />
-                    <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
-                  </form>{" "}
-                  <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
-                   >
-                    <button class="btn sm danger" type="submit">{t("members.delete")}</button>
-                  </form>
+                <td class="row-actions-cell">
+                  <div class="row-icon-actions">
+                    <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
+                       data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="md"
+                       title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                    <form method="post" action={`/admin/options/${o.id}`}>
+                      <input type="hidden" name="toggle" value="1" />
+                      <input type="hidden" name="label" value={o.label} />
+                      <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
+                    </form>
+                    <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                      <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+                    </form>
+                  </div>
                 </td>
               </tr>
             ))}
