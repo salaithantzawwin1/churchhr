@@ -1604,6 +1604,14 @@ td.empty-state .small { margin-top: 4px; }
 }
 /* Position rows are short records; keep the list dense and easy to scan. */
 .role-list { gap: 8px; }
+/* Card view tiles the roles, list view keeps the dense row. Both render the same
+   markup; app.js only flips the is-list class on [data-view-grid]. */
+.role-list[data-view-grid] { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+.role-list.is-list { grid-template-columns: 1fr; gap: 8px; }
+.role-list:not(.is-list) .role-card { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.role-list:not(.is-list) .role-card-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+.role-list:not(.is-list) .role-card-text h3 { font-size: 16px; }
+.role-list:not(.is-list) .role-card-actions { justify-content: flex-start; width: 100%; }
 .role-card { padding: 12px 16px; transition: border-color .12s ease, box-shadow .12s ease; }
 .role-card:hover { border-color: var(--line-strong); box-shadow: 0 3px 10px rgba(2, 8, 23, .06); }
 .role-card-head { align-items: center; }

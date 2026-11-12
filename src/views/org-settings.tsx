@@ -204,6 +204,7 @@ export function PositionsPage(props: Common & {
           <p class="page-sub">{t("org.positionsIntro")}</p>
         </div>
         <div class="page-head-actions">
+          <CardViewToggle lang={lang} viewKey="positions" />
           <a
             class="btn js-add-modal"
             href={`/organization/positions/new?scope=${scope}`}
@@ -249,7 +250,7 @@ export function PositionsPage(props: Common & {
           )}
         </div>
       ) : (
-        <div class="role-list">
+        <div class="role-list" data-view-grid>
           {visible.map((def) => (
             <article class={`card role-card${def.active ? "" : " is-inactive"}`}>
               <header class="role-card-head">

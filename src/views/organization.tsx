@@ -467,6 +467,10 @@ export function OrganizationPage(props: Common & {
   const renderChurchChart = (church: RegionalChurchRow, tab: "church" | "main") => {
     const role = (position: string) =>
       leaderFor(leaders, "church", position, { regionalChurchId: church.id });
+    // Each chart needs the roles of the church it draws: the Main Church tab has
+    // no selected regional church, and a position filed under one church must not
+    // surface (or vanish) because another church happens to be selected.
+    const rows = positionRows(defsForChurch(positionDefs, church.id), "church", L);
     const assignHref = (position: string) => {
       const params = new URLSearchParams({ tab, church: String(church.id), position });
       return `/organization/assign?${params.toString()}`;
@@ -498,10 +502,10 @@ export function OrganizationPage(props: Common & {
     };
 
     // Positions nest by parent_code; a position with no parent sits under the lead.
-    const forest = nestRoles(churchRows.all, churchRows.lead);
+    const forest = nestRoles(rows.all, rows.lead);
     const branch = (def: PositionDefRow) => {
       const children = forest.kids.get(def.code) ?? [];
-      const isLead = def.code === churchRows.lead?.code;
+      const isLead = def.code === rows.lead?.code;
       return (
         <div class="org-branch">
           {node(def, role(def.code), isLead ? "lg" : "md", isLead)}
@@ -512,9 +516,9 @@ export function OrganizationPage(props: Common & {
       );
     };
 
-    const filled = churchRows.all.filter((p) => role(p.code)).length;
+    const filled = rows.all.filter((p) => role(p.code)).length;
     // Nothing assigned: four empty cards say less than one prompt with the action.
-    if (churchRows.all.length > 0 && filled === 0) {
+    if (rows.all.length > 0 && filled === 0) {
       return (
         <div class="org-vacant-state">
           <div>
@@ -522,16 +526,16 @@ export function OrganizationPage(props: Common & {
             <p class="muted small">{t("org.allVacantHint")}</p>
             {/* Keep the slots themselves visible so the hierarchy still reads as a structure. */}
             <ul class="org-vacant-roles">
-              {churchRows.all.map((p) => (
+              {rows.all.map((p) => (
                 <li>{positionDefLabel(p, L)}</li>
               ))}
             </ul>
           </div>
           <div class="org-section-actions">
-            <span class="org-vacant-count">{churchRows.all.length} {t("org.positionsVacant")}</span>
-            {canEdit && churchRows.lead ? (
-              <a class="btn sm js-edit-modal" href={assignHref(churchRows.lead.code)}
-                data-modal-title={assignTitle(churchRows.lead, null)} data-modal-size="md">
+            <span class="org-vacant-count">{rows.all.length} {t("org.positionsVacant")}</span>
+            {canEdit && rows.lead ? (
+              <a class="btn sm js-edit-modal" href={assignHref(rows.lead.code)}
+                data-modal-title={assignTitle(rows.lead, null)} data-modal-size="md">
                 {t("org.assignLeader")}
               </a>
             ) : canManagePositions ? (
