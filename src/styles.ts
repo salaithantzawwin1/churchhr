@@ -211,8 +211,12 @@ tbody tr:hover { background: var(--row-hover); }
 .photo-status.bad { color: var(--err-ink); }
 .head-picker { position: relative; }
 .head-picker [data-head-search], .head-picker .head-clear { display: none; }
-.head-picker.is-ready [data-head-search] { display: block; padding-right: 34px; }
-.head-picker.is-ready select[data-head-select] { display: none; }
+.head-picker [data-search-input], .head-picker [data-search-clear] { display: none; }
+.head-picker.is-ready [data-head-search],
+.head-picker.is-ready [data-search-input] { display: block; padding-right: 34px; }
+.head-picker.is-ready select[data-head-select],
+.head-picker.is-ready select[data-search-select] { display: none; }
+.head-picker.is-ready [data-search-clear]:not([hidden]) { display: grid; }
 .head-picker .head-clear {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
@@ -1374,6 +1378,14 @@ td.empty-state .small { margin-top: 4px; }
 .position-tab:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .position-panes [data-tab-pane][hidden] { display: none; }
 @media (min-width: 720px) { .position-tab { flex: 1 1 0; } }
+/* Settings editors use the same tab bar at the top of a modal sheet. */
+.modal-form-tabs { margin: 0 0 16px; }
+.modal-form-panes { min-width: 0; }
+.modal-form-pane[hidden] { display: none; }
+.modal-form-pane .cluster-section-head { margin-bottom: 10px; }
+.modal-form-pane .cluster-cell-groups { margin-top: 0; }
+.pastor-picker { margin-top: 0; }
+.pastor-picker [data-search-input] { background: var(--card); }
 
 /* ---------- organization settings (positions / regional churches) ---------- */
 .page-head-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1449,6 +1461,23 @@ td.empty-state .small { margin-top: 4px; }
 .settings-filters input[type="search"] { flex: 1 1 240px; min-width: 0; max-width: 360px; }
 .settings-filters select { flex: 0 1 180px; }
 .settings-filters .actions { margin-left: 0; }
+.settings-filters .btn { min-height: 40px; }
+/* Church selector on the organization page stays a compact inline control
+   instead of stretching across the whole leadership card. */
+.org-church-picker { max-width: 520px; margin: 0 0 18px; }
+.org-church-picker label.field { flex: 1 1 300px; max-width: none; }
+.org-church-picker .actions { margin-left: 0; }
+.org-church-picker .actions .btn { min-height: 40px; }
+/* Position rows are short records; keep the list dense and easy to scan. */
+.role-list { gap: 8px; }
+.role-card { padding: 12px 16px; transition: border-color .12s ease, box-shadow .12s ease; }
+.role-card:hover { border-color: var(--line-strong); box-shadow: 0 3px 10px rgba(2, 8, 23, .06); }
+.role-card-head { align-items: center; }
+.role-card-text h3 { font-size: 15.5px; }
+.role-card-meta code {
+  padding: 1px 6px; border-radius: 5px;
+  background: var(--field-bg); color: var(--ink);
+}
 
 @media (max-width: 640px) {
   .role-card, .regional-card { padding: 14px 16px; }

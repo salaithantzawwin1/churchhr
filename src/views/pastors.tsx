@@ -309,7 +309,7 @@ export function PastorsPage(props: Common & {
           <option value="active" selected={status === "active"}>{t("dept.active")}</option>
           <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
         </select>
-        <div class="actions"><button class="btn sm" type="submit">{t("members.search")}</button></div>
+        <div class="actions"><button class="btn sm secondary" type="submit">{t("members.search")}</button></div>
       </form>
 
       {visible.length === 0 ? (

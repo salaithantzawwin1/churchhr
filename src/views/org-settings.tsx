@@ -190,7 +190,7 @@ export function PositionsPage(props: Common & {
           <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
         </select>
         <div class="actions">
-          <button class="btn sm" type="submit">{t("members.search")}</button>
+          <button class="btn sm secondary" type="submit">{t("members.search")}</button>
         </div>
       </form>
 
@@ -332,43 +332,57 @@ export function RegionalChurchModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
+      {cellError && <div class="modal-error" role="alert">{cellError}</div>}
       {/* One form and one Save, matching the cluster editor: details and Home
           Cell attachment are written together instead of two separate saves. */}
       <form method="post" class="cluster-main-form"
         action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
-        <RegionalFields values={values} regions={regions} lang={L} editing={Boolean(church)} />
-
-        {church && (
-          <section class="cluster-cells-section" aria-labelledby="church-cells-title">
-            <input type="hidden" name="cells_present" value="1" />
-            <div class="cluster-section-head">
-              <div class="cluster-section-title">
-                <strong id="church-cells-title">{t("org.regionalCellAssignment")}</strong>
-              </div>
-              <p class="muted small">{t("org.regionalCellHint")}</p>
+        {church ? (
+          <>
+            <div class="position-tabs modal-form-tabs" data-tabs role="tablist"
+              aria-label={t("org.editRegional")}>
+              <button type="button" role="tab" class={`position-tab${cellError ? "" : " active"}`}
+                data-tab-target="details" aria-selected={cellError ? "false" : "true"}>{t("org.detailsTab")}</button>
+              <button type="button" role="tab" class={`position-tab${cellError ? " active" : ""}`}
+                data-tab-target="cells" aria-selected={cellError ? "true" : "false"}>
+                {t("org.regionalCellAssignment")}
+                <span class="tab-count">{cells.length}</span>
+              </button>
             </div>
-            {cellError && <div class="modal-error" role="alert">{cellError}</div>}
-            {candidates.length === 0 ? (
-              <p class="muted small">{t("org.regionalNoCells")}</p>
-            ) : (
-              <div class="cluster-cell-groups">
-                {groupCellsByTownship(candidates, t("org.townshipUnassigned")).map((group) => (
-                  <div class="cluster-cell-group">
-                    <h4>{group.name}</h4>
-                    <div class="check-grid">
-                      {group.cells.map((cell) => (
-                        <label class="check-chip">
-                          <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
-                            checked={isPicked(cell)} />
-                          <span>{cell.label}</span>
-                        </label>
-                      ))}
-                    </div>
+            <div class="modal-form-panes" data-tabs-body>
+              <section class="modal-form-pane" data-tab-pane="details" role="tabpanel">
+                <RegionalFields values={values} regions={regions} lang={L} editing />
+              </section>
+              <section class="modal-form-pane" data-tab-pane="cells" role="tabpanel">
+                <input type="hidden" name="cells_present" value="1" />
+                <div class="cluster-section-head">
+                  <p class="muted small">{t("org.regionalCellHint")}</p>
+                </div>
+                {candidates.length === 0 ? (
+                  <p class="muted small">{t("org.regionalNoCells")}</p>
+                ) : (
+                  <div class="cluster-cell-groups">
+                    {groupCellsByTownship(candidates, t("org.townshipUnassigned")).map((group) => (
+                      <div class="cluster-cell-group">
+                        <h4>{group.name}</h4>
+                        <div class="check-grid">
+                          {group.cells.map((cell) => (
+                            <label class="check-chip">
+                              <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
+                                checked={isPicked(cell)} />
+                              <span>{cell.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                )}
+              </section>
+            </div>
+          </>
+        ) : (
+          <RegionalFields values={values} regions={regions} lang={L} editing={false} />
         )}
 
         <div class="actions">
@@ -445,7 +459,6 @@ export function RegionalChurchesPage(props: Common & {
               class="btn sm secondary js-edit-modal"
               href={`/organization/regional-churches/${church.id}/edit`}
               data-modal-title={t("org.editRegional")}
-              data-modal-size="md"
             >{t("members.edit")}</a>
           </div>
         </header>
@@ -480,7 +493,6 @@ export function RegionalChurchesPage(props: Common & {
             class="btn js-add-modal"
             href="/organization/regional-churches/new"
             data-modal-title={t("org.addRegional")}
-            data-modal-size="md"
           >+ {t("org.addRegional")}</a>
           <a class="btn secondary" href="/organization?tab=regional">{t("dept.back")}</a>
         </div>
@@ -502,7 +514,7 @@ export function RegionalChurchesPage(props: Common & {
           <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
         </select>
         <div class="actions">
-          <button class="btn sm" type="submit">{t("members.search")}</button>
+          <button class="btn sm secondary" type="submit">{t("members.search")}</button>
         </div>
       </form>
 

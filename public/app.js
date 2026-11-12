@@ -472,7 +472,17 @@
         if (clear) clear.hidden = !search.value;
         open();
       });
-      search.addEventListener("blur", function () { setTimeout(close, 120); });
+      search.addEventListener("blur", function () {
+        setTimeout(function () {
+          close();
+          // Typing without picking an option must not leave a value-looking
+          // search string next to an empty native select.
+          if (!sel.value && search.value.trim()) {
+            search.value = "";
+            if (clear) clear.hidden = true;
+          }
+        }, 120);
+      });
       search.addEventListener("keydown", function (e) {
         if (e.key === "Escape") { close(); return; }
         if (e.key === "Enter") {
@@ -507,6 +517,143 @@
     });
   }
   initHeadPicker(document);
+
+  // Generic type-to-search select. Unlike the household head picker it only
+  // writes the native select value; it never copies placement or contact data
+  // into sibling fields.
+  function initSearchPicker(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-search-picker]"), function (picker) {
+      if (picker.getAttribute("data-search-bound")) return;
+      picker.setAttribute("data-search-bound", "1");
+      var sel = picker.querySelector("select[data-search-select]");
+      var search = picker.querySelector("input[data-search-input]");
+      var clear = picker.querySelector("[data-search-clear]");
+      if (!sel || !search) return;
+
+      var list = document.createElement("div");
+      list.className = "head-list";
+      list.setAttribute("role", "listbox");
+      list.hidden = true;
+      list.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      var noMatch = document.createElement("div");
+      noMatch.className = "head-empty";
+      noMatch.textContent = picker.getAttribute("data-no-match") || "No matching option";
+      noMatch.hidden = true;
+
+      var items = [];
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        if (!opt.value) return;
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "head-option";
+        item.setAttribute("role", "option");
+        item.textContent = opt.textContent;
+        item._opt = opt;
+        item.addEventListener("click", function () { choose(opt); });
+        list.appendChild(item);
+        items.push(item);
+      });
+      list.appendChild(noMatch);
+      picker.appendChild(list);
+      picker.classList.add("is-ready");
+
+      function labelOf(opt) { return (opt && opt.textContent || "").trim(); }
+      function open() { filter(); list.hidden = false; search.setAttribute("aria-expanded", "true"); }
+      function close() {
+        list.hidden = true;
+        search.setAttribute("aria-expanded", "false");
+        items.forEach(function (b) { b.classList.remove("active"); });
+      }
+      function filter() {
+        var q = search.value.trim().toLowerCase();
+        var shown = 0;
+        items.forEach(function (b) {
+          var available = !b._opt.hidden;
+          var match = available && (!q || b.textContent.toLowerCase().indexOf(q) > -1);
+          var visible = match && shown < 80;
+          b.hidden = !visible;
+          if (visible) shown++;
+          b.classList.toggle("selected", b._opt.value === sel.value);
+        });
+        noMatch.hidden = shown > 0;
+      }
+      function syncText() {
+        var opt = sel.options[sel.selectedIndex];
+        search.value = opt && opt.value ? labelOf(opt) : "";
+        if (clear) clear.hidden = !search.value;
+      }
+      function choose(opt) {
+        sel.value = opt.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        syncText();
+        close();
+      }
+      function clearSelection() {
+        sel.value = "";
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        search.value = "";
+        if (clear) clear.hidden = true;
+      }
+
+      search.addEventListener("focus", open);
+      search.addEventListener("input", function () {
+        var current = sel.options[sel.selectedIndex];
+        if (sel.value && (!current || search.value.trim() !== labelOf(current))) {
+          sel.value = "";
+        }
+        if (clear) clear.hidden = !search.value;
+        open();
+      });
+      search.addEventListener("blur", function () {
+        setTimeout(function () {
+          close();
+          // Typing without picking an option must not leave a value-looking
+          // search string next to an empty native select.
+          if (!sel.value && search.value.trim()) {
+            search.value = "";
+            if (clear) clear.hidden = true;
+          }
+        }, 120);
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") { close(); return; }
+        if (e.key === "Enter") {
+          var active = list.querySelector(".head-option.active");
+          if (active) { e.preventDefault(); active.click(); }
+          return;
+        }
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        e.preventDefault();
+        var visible = items.filter(function (b) { return !b.hidden; });
+        if (!visible.length) return;
+        var current = visible.indexOf(list.querySelector(".head-option.active"));
+        var next = e.key === "ArrowDown" ? Math.min(current + 1, visible.length - 1) : Math.max(current - 1, 0);
+        items.forEach(function (b) { b.classList.remove("active"); });
+        visible[next].classList.add("active");
+        visible[next].scrollIntoView({ block: "nearest" });
+      });
+      if (clear) clear.addEventListener("click", function () {
+        clearSelection();
+        close();
+        search.focus();
+      });
+      sel.addEventListener("change", function () {
+        var opt = sel.options[sel.selectedIndex];
+        search.value = opt && opt.value ? labelOf(opt) : search.value;
+        if (clear) clear.hidden = !sel.value;
+      });
+      // The region cascade may clear this select when the state changes; keep
+      // the visible search text in step with the real value.
+      var form = sel.form;
+      var region = form && form.querySelector("select[data-region-select]");
+      if (region) region.addEventListener("change", function () { setTimeout(syncText, 0); });
+
+      var initial = sel.options[sel.selectedIndex];
+      if (initial && initial.value) syncText();
+      else if (clear) clear.hidden = true;
+    });
+  }
+  initSearchPicker(document);
 
   // Type-ahead for the household "Add existing member" page. The server already
   // renders the full result list for ?q=, so typing just fetches that page and
@@ -903,7 +1050,8 @@
           show(next.getAttribute("data-tab-target"));
         });
       });
-      show(buttons[0].getAttribute("data-tab-target"));
+      var initial = bar.querySelector("[data-tab-target].active") || buttons[0];
+      show(initial.getAttribute("data-tab-target"));
     });
   }
   initTabs(document);
@@ -1003,6 +1151,7 @@
     });
     initRegionCascade(bodyEl);
     initHeadPicker(bodyEl);
+    initSearchPicker(bodyEl);
     initDepartmentPosition(bodyEl);
     initTabs(bodyEl);
     initPhotoInputs(bodyEl);

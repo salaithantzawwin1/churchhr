@@ -72,11 +72,11 @@ export async function loadPastor(db: DB, id: number, opts: PastorFilter = {}): P
 export async function loadPastorOptions(
   db: DB,
   opts: { regionId: number; churchId?: number | null },
-): Promise<{ id: number; name: string }[]> {
+): Promise<{ id: number; name: string; regionId: number }[]> {
   const conditions = [sql`p.active = 1`, sql`p.region_id = ${opts.regionId}`];
   if (opts.churchId) conditions.push(sql`(p.regional_church_id IS NULL OR p.regional_church_id = ${opts.churchId})`);
-  return db.all<{ id: number; name: string }>(sql`
-    SELECT p.id, COALESCE(NULLIF(p.name, ''), p.name_en) AS name
+  return db.all<{ id: number; name: string; regionId: number }>(sql`
+    SELECT p.id, COALESCE(NULLIF(p.name, ''), p.name_en) AS name, p.region_id AS regionId
     FROM pastors p
     WHERE ${sql.join(conditions, sql` AND `)}
     ORDER BY p.sort_order, p.name`);

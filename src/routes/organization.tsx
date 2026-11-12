@@ -1164,7 +1164,7 @@ async function clusterNameTaken(db: DB, name: string, regionId: number, exceptId
   return rows.some((r) => r.id !== exceptId);
 }
 
-async function clusterPastorCandidates(db: DB, regionId: number): Promise<{ id: number; name: string }[]> {
+async function clusterPastorCandidates(db: DB, regionId: number): Promise<{ id: number; name: string; regionId: number }[]> {
   return loadPastorOptions(db, { regionId });
 }
 

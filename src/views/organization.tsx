@@ -452,7 +452,7 @@ export function OrganizationPage(props: Common & {
                     ))}
                   </select>
                 </label>
-                <div class="actions"><button class="btn sm" type="submit">{t("members.search")}</button></div>
+                <div class="actions"><button class="btn sm secondary" type="submit">{t("members.search")}</button></div>
               </form>
             )}
 

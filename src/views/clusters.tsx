@@ -36,12 +36,13 @@ function clusterValues(cluster?: SupervisionClusterRow): ClusterValues {
 function ClusterFields(props: {
   values: ClusterValues;
   regions: { id: number; name: string }[];
-  pastorCandidates: { id: number; name: string }[];
+  pastorCandidates: { id: number; name: string; regionId: number }[];
   lang: Lang;
   editing: boolean;
 }) {
   const { values, regions, pastorCandidates, lang, editing } = props;
   const t = getDict(lang);
+  const selectedPastor = pastorCandidates.find((p) => p.id === values.pastorId);
   return (
     <div class="form-grid">
       <label class="field">
@@ -68,14 +69,23 @@ function ClusterFields(props: {
       {editing && (
         <label class="field span-2">
           <span class="lbl">{t("org.clusterPastor")}</span>
-          <select name="pastor_id">
-            <option value="">{t("org.noPastor")}</option>
-            {pastorCandidates.map((pastor) => (
-              <option value={String(pastor.id)} selected={values.pastorId === pastor.id}>
-                {pastor.name}
-              </option>
-            ))}
-          </select>
+          <div class="head-picker pastor-picker" data-search-picker
+            data-no-match={t("org.pastorNoMatch")}>
+            <input type="search" data-search-input value={selectedPastor?.name ?? ""}
+              placeholder={t("org.pastorSearch")} aria-label={t("org.pastorSearch")}
+              autocomplete="off" role="combobox" aria-expanded="false" />
+            <button type="button" class="head-clear" data-search-clear
+              aria-label={t("org.pastorClear")} hidden={!values.pastorId}>×</button>
+            <select name="pastor_id" data-search-select data-region-filter="1">
+              <option value="">{t("org.noPastor")}</option>
+              {pastorCandidates.map((pastor) => (
+                <option value={String(pastor.id)} selected={values.pastorId === pastor.id}
+                  data-region={String(pastor.regionId)}>
+                  {pastor.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <span class="hint">{t("org.clusterPastorHint")}</span>
         </label>
       )}
@@ -109,7 +119,7 @@ export function SupervisionClusterModal(props: {
   cluster?: SupervisionClusterRow;
   regions: { id: number; name: string }[];
   homeCells: ClusterHomeCell[];
-  pastorCandidates?: { id: number; name: string }[];
+  pastorCandidates?: { id: number; name: string; regionId: number }[];
   values?: ClusterValues;
   error?: string | null;
   cellError?: string | null;
@@ -137,47 +147,67 @@ export function SupervisionClusterModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
+      {cellError && <div class="modal-error" role="alert">{cellError}</div>}
       <form method="post" class="cluster-main-form"
         action={cluster ? `/organization/clusters/${cluster.id}` : "/organization/clusters"} data-modal-ajax>
-        <ClusterFields
-          values={values}
-          regions={regions}
-          pastorCandidates={props.pastorCandidates ?? []}
-          lang={L}
-          editing={Boolean(cluster)}
-        />
-
-        {cluster && (
-          <section class="cluster-cells-section" aria-labelledby="cluster-cells-title">
-            <input type="hidden" name="cells_present" value="1" />
-            <div class="cluster-section-head">
-              <div class="cluster-section-title">
-                <strong id="cluster-cells-title">{t("org.clusterCellAssignment")}</strong>
-              </div>
-              <p class="muted small">{t("org.clusterCellHint")}</p>
+        {cluster ? (
+          <>
+            <div class="position-tabs modal-form-tabs" data-tabs role="tablist"
+              aria-label={t("org.editCluster")}>
+              <button type="button" role="tab" class={`position-tab${cellError ? "" : " active"}`}
+                data-tab-target="details" aria-selected={cellError ? "false" : "true"}>{t("org.detailsTab")}</button>
+              <button type="button" role="tab" class={`position-tab${cellError ? " active" : ""}`}
+                data-tab-target="cells" aria-selected={cellError ? "true" : "false"}>
+                {t("org.clusterCellAssignment")}
+                <span class="tab-count">{cells.length}</span>
+              </button>
             </div>
-            {cellError && <div class="modal-error" role="alert">{cellError}</div>}
-            {candidates.length === 0 ? (
-              <p class="muted small">{t("org.clusterCandidatesEmpty")}</p>
-            ) : (
-              <div class="cluster-cell-groups">
-                {groupHomeCells(candidates, t("org.townshipUnassigned")).map((group) => (
-                  <div class="cluster-cell-group">
-                    <h4>{group.name}</h4>
-                    <div class="check-grid">
-                      {group.cells.map((cell) => (
-                        <label class="check-chip">
-                          <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
-                            checked={isPicked(cell)} />
-                          <span>{cell.label}</span>
-                        </label>
-                      ))}
-                    </div>
+            <div class="modal-form-panes" data-tabs-body>
+              <section class="modal-form-pane" data-tab-pane="details" role="tabpanel">
+                <ClusterFields
+                  values={values}
+                  regions={regions}
+                  pastorCandidates={props.pastorCandidates ?? []}
+                  lang={L}
+                  editing
+                />
+              </section>
+              <section class="modal-form-pane" data-tab-pane="cells" role="tabpanel">
+                <input type="hidden" name="cells_present" value="1" />
+                <div class="cluster-section-head">
+                  <p class="muted small">{t("org.clusterCellHint")}</p>
+                </div>
+                {candidates.length === 0 ? (
+                  <p class="muted small">{t("org.clusterCandidatesEmpty")}</p>
+                ) : (
+                  <div class="cluster-cell-groups">
+                    {groupHomeCells(candidates, t("org.townshipUnassigned")).map((group) => (
+                      <div class="cluster-cell-group">
+                        <h4>{group.name}</h4>
+                        <div class="check-grid">
+                          {group.cells.map((cell) => (
+                            <label class="check-chip">
+                              <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
+                                checked={isPicked(cell)} />
+                              <span>{cell.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                )}
+              </section>
+            </div>
+          </>
+        ) : (
+          <ClusterFields
+            values={values}
+            regions={regions}
+            pastorCandidates={props.pastorCandidates ?? []}
+            lang={L}
+            editing={false}
+          />
         )}
 
         <div class="actions">
@@ -243,7 +273,7 @@ export function SupervisionClustersPage(props: Common & {
         </div>
         <div class="page-head-actions">
           <a class="btn js-add-modal" href="/organization/clusters/new"
-            data-modal-title={t("org.addCluster")} data-modal-size="md">
+            data-modal-title={t("org.addCluster")}>
             + {t("org.addCluster")}
           </a>
           <a class="btn secondary" href="/organization?tab=home-cells">{t("dept.back")}</a>
@@ -264,7 +294,7 @@ export function SupervisionClustersPage(props: Common & {
           <option value="active" selected={status === "active"}>{t("dept.active")}</option>
           <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
         </select>
-        <div class="actions"><button class="btn sm" type="submit">{t("members.search")}</button></div>
+        <div class="actions"><button class="btn sm secondary" type="submit">{t("members.search")}</button></div>
       </form>
 
       {visible.length === 0 ? (
@@ -297,7 +327,7 @@ export function SupervisionClustersPage(props: Common & {
                       {cluster.active ? t("dept.active") : t("dept.inactive")}
                     </span>
                     <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
-                      data-modal-title={t("org.editCluster")} data-modal-size="md">
+                      data-modal-title={t("org.editCluster")}>
                       {t("members.edit")}
                     </a>
                   </div>
