@@ -7,7 +7,7 @@ import { churchDepartments, memberPositions } from "../db/schema";
 import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
-import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
+import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
 import { AssignLeaderModal } from "../views/org-assign";
@@ -430,6 +430,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} department={department} leaders={leaders}
+      positionDefs={await loadPositionDefs(db)}
       canManage={c.get("perms").has("options.manage") && scope.scopeAll}
     />,
   );
@@ -440,32 +441,25 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
 async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<AdminDepartmentRow[]> {
   return db.all<AdminDepartmentRow>(sql`
     SELECT d.id, d.name, d.name_en AS nameEn, d.active, d.sort_order AS sortOrder,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_head' AND m.status = 'active'
-        LIMIT 1) AS head_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_assistant' AND m.status = 'active'
-        LIMIT 1) AS assistant_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_secretary' AND m.status = 'active'
-        LIMIT 1) AS secretary_name,
-      (SELECT COALESCE(NULLIF(m.name_myanmar, ''), m.name_english)
-         FROM members m JOIN member_positions mp ON mp.member_id = m.id
-        WHERE mp.scope_type = 'department' AND mp.department_id = d.id
-          AND mp.position = 'department_treasurer' AND m.status = 'active'
-        LIMIT 1) AS treasurer_name,
       (SELECT COUNT(*) FROM member_positions mp
         WHERE mp.scope_type = 'department' AND mp.department_id = d.id) AS role_count,
       (SELECT COUNT(*) FROM members m
         WHERE m.department_id = d.id AND m.status = 'active') AS member_count
     FROM church_departments d
     ORDER BY d.active DESC, d.sort_order, d.name`);
+}
+
+/** Active holders of department roles; the card list names a slot's holder from
+ *  this list, so a role added to the catalogue needs no new SQL column. */
+async function loadDepartmentLeaders(db: DB): Promise<DepartmentLeaderRow[]> {
+  return db.all<DepartmentLeaderRow>(sql`
+    SELECT mp.department_id AS departmentId, mp.position,
+           m.id AS memberId,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS memberName
+    FROM member_positions mp
+    JOIN members m ON m.id = mp.member_id
+    WHERE mp.scope_type = 'department' AND m.status = 'active'
+    ORDER BY mp.department_id, mp.position`);
 }
 
 organizationRoutes.get("/departments", requirePermission("options.manage"), requireAllStates, async (c) => {
@@ -476,6 +470,7 @@ organizationRoutes.get("/departments", requirePermission("options.manage"), requ
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} departments={departments}
+      positionDefs={await loadPositionDefs(db)} leaders={await loadDepartmentLeaders(db)}
     />,
   );
 });
@@ -583,10 +578,28 @@ async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
            pd.regional_church_id AS regionalChurchId,
            rc.name AS churchName, rc.name_en AS churchNameEn,
            (SELECT COUNT(*) FROM member_positions mp
-             WHERE mp.position = pd.code AND mp.scope_type = pd.scope_type) AS usageCount
+             LEFT JOIN members m ON m.id = mp.member_id
+             LEFT JOIN pastors p ON p.id = mp.pastor_id
+             WHERE mp.position = pd.code AND mp.scope_type = pd.scope_type
+               AND ((mp.member_id IS NOT NULL AND m.status = 'active')
+                 OR (mp.pastor_id IS NOT NULL AND p.active = 1))) AS usageCount
     FROM position_defs pd
     LEFT JOIN regional_churches rc ON rc.id = pd.regional_church_id
     ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+}
+
+/** How many live people hold a catalogue role. A row left behind by a
+ *  deactivated member or pastor is shown as vacant everywhere, so it must not
+ *  keep the role from being edited, deactivated or deleted. */
+async function activeHolderCount(db: DB, code: string, scopeType: string): Promise<number> {
+  const rows = await db.all<{ n: number }>(sql`
+    SELECT COUNT(*) AS n FROM member_positions mp
+    LEFT JOIN members m ON m.id = mp.member_id
+    LEFT JOIN pastors p ON p.id = mp.pastor_id
+    WHERE mp.position = ${code} AND mp.scope_type = ${scopeType}
+      AND ((mp.member_id IS NOT NULL AND m.status = 'active')
+        OR (mp.pastor_id IS NOT NULL AND p.active = 1))`);
+  return rows[0]?.n ?? 0;
 }
 
 /** Church choices for the position form (this admin sees every state). */
@@ -790,10 +803,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
     }
   }
   if (current.active === 1 && active === 0) {
-    const used = await db.all<{ n: number }>(sql`
-      SELECT COUNT(*) AS n FROM member_positions
-      WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
-    if ((used[0]?.n ?? 0) > 0) return await fail("position-in-use");
+    if ((await activeHolderCount(db, current.code, current.scopeType)) > 0) return await fail("position-in-use");
   }
   await db.run(sql`
     UPDATE position_defs
@@ -824,10 +834,9 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
     FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
   if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
   const back = `/organization/positions?scope=${current.scopeType}`;
-  const used = await db.all<{ n: number }>(sql`
-    SELECT COUNT(*) AS n FROM member_positions
-    WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
-  if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
+  if ((await activeHolderCount(db, current.code, current.scopeType)) > 0) {
+    return c.redirect(`${back}&err=position-in-use`, 303);
+  }
   await db.run(sql`DELETE FROM position_defs WHERE id = ${id}`);
   // Children of a removed position become top level instead of vanishing.
   await db.run(sql`

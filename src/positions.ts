@@ -1,6 +1,6 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "./db/client";
-import { memberPositions } from "./db/schema";
+import { memberPositions, members, pastors } from "./db/schema";
 
 export type PositionScope = "home_cell" | "department" | "church" | "regional_church" | "township" | "cluster";
 
@@ -198,9 +198,15 @@ export async function positionTaken(
     if (!opts.supervisionClusterId) return false;
     conditions.push(eq(memberPositions.supervisionClusterId, opts.supervisionClusterId));
   }
+  // Only a live holder keeps a slot: a role left behind by a deactivated member
+  // or pastor shows as vacant on every chart, so it must be assignable again.
+  conditions.push(sql`((member_positions.member_id IS NOT NULL AND members.status = 'active')
+                     OR (member_positions.pastor_id IS NOT NULL AND pastors.active = 1))`);
   const rows = await db
     .select({ memberId: memberPositions.memberId })
     .from(memberPositions)
+    .leftJoin(members, eq(members.id, memberPositions.memberId))
+    .leftJoin(pastors, eq(pastors.id, memberPositions.pastorId))
     .where(and(...conditions))
     .limit(1);
   return rows.length > 0;

@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { DB } from "./db/client";
 import type { Lang } from "./i18n";
-import { defsForScope, loadPositionDefs, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "./position-catalog";
+import { defsForChurch, defsForScope, loadPositionDefs, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "./position-catalog";
 
 export type VacancyScope = ConfigurablePositionScope;
 
@@ -49,6 +49,8 @@ type StructureRow = {
   townshipName: string | null;
   regionalName: string | null;
   regionalNameEn: string | null;
+  /** Church a Home Cell belongs to; null for structures that are not church-bound. */
+  regionalChurchId?: number | null;
 };
 
 function stateFilter(scope: Scope, column: string) {
@@ -140,7 +142,8 @@ export async function loadVacancyReport(
     SELECT hc.id, hc.label AS name, NULL AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            t.label AS townshipName,
-           rc.name AS regionalName, rc.name_en AS regionalNameEn
+           rc.name AS regionalName, rc.name_en AS regionalNameEn,
+           hc.regional_church_id AS regionalChurchId
     FROM lookup_options hc
     JOIN regions r ON r.id = hc.region_id
     LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
@@ -178,9 +181,20 @@ export async function loadVacancyReport(
   const stateOf = (row: StructureRow) =>
     lang !== "mm" && row.stateNameEn ? row.stateNameEn : row.stateName || null;
 
+  /** Roles that apply to one structure. A role filed under a single church
+   *  exists only there, so it must not be reported as a slot of its siblings. */
+  const defsForStructure = (
+    scopeType: VacancyScope, id: number | null, row: StructureRow | null,
+  ): PositionDefRow[] => {
+    const all = defsByScope[scopeType];
+    if (scopeType === "church" || scopeType === "regional_church") return defsForChurch(all, id);
+    if (scopeType === "home_cell") return defsForChurch(all, row?.regionalChurchId ?? null);
+    return all;
+  };
+
   const structures: VacancyStructure[] = [];
   const push = (scopeType: VacancyScope, id: number | null, row: StructureRow | null, displayName: string) => {
-    const roleDefs = defsByScope[scopeType];
+    const roleDefs = defsForStructure(scopeType, id, row);
     if (roleDefs.length === 0) return;
     const filledDefs = roleDefs.filter((def) => held.has(assignedKey(scopeType, def.code, id)));
     const vacancies = roleDefs

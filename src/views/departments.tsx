@@ -1,18 +1,23 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
-import { DEPARTMENT_POSITIONS, positionLabel } from "../positions";
+import { defsForScope, positionDefLabel, type PositionDefRow } from "../position-catalog";
 import { departmentName, type DepartmentRow } from "../departments";
+import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
 export type AdminDepartmentRow = DepartmentRow & {
   role_count: number;
   member_count: number;
-  head_name: string | null;
-  assistant_name: string | null;
-  secretary_name: string | null;
-  treasurer_name: string | null;
+};
+
+/** One active holder of a department role, listed on the department card. */
+export type DepartmentLeaderRow = {
+  departmentId: number;
+  position: string;
+  memberId: number | null;
+  memberName: string | null;
 };
 
 type DepartmentFormValues = { name: string; nameEn: string; sortOrder: number; active: boolean };
@@ -107,9 +112,11 @@ export type DepartmentDetailData = {
 export function DepartmentDetailPage(props: Common & {
   department: DepartmentDetailData;
   leaders: DepartmentDetailLeader[];
+  /** Department roles come from the editable catalogue, not a fixed list. */
+  positionDefs: PositionDefRow[];
   canManage: boolean;
 }) {
-  const { user, perms, flash, lang, department, leaders, canManage } = props;
+  const { user, perms, flash, lang, department, leaders, positionDefs, canManage } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const leaderFor = (position: string) => leaders.find((l) => l.position === position) ?? null;
@@ -137,8 +144,8 @@ export function DepartmentDetailPage(props: Common & {
           </div>
         </div>
         <div class="org-lead-grid">
-          {DEPARTMENT_POSITIONS.map((p) => {
-            const leader = leaderFor(p.value);
+          {defsForScope(positionDefs, "department").map((def) => {
+            const leader = leaderFor(def.code);
             return (
               <div class={`org-lead dept-leader${leader ? "" : " org-vacant"}`}>
                 <span class="org-avatar md" aria-hidden="true">
@@ -146,7 +153,7 @@ export function DepartmentDetailPage(props: Common & {
                     ? (leader.member_id ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" /> : initial(leader.member_name))
                     : initial(leader?.member_name)}
                 </span>
-                <span class="org-lead-role">{positionLabel(p.value, L)}</span>
+                <span class="org-lead-role">{positionDefLabel(def, L)}</span>
                 {leader
                   ? (leader.member_id ? <a href={`/members/${leader.member_id}`}>{leader.member_name || "—"}</a> : <span>{leader.member_name || "—"}</span>)
                   : <span class="muted">{t("org.vacant")}</span>}
@@ -173,10 +180,19 @@ export function DepartmentDetailPage(props: Common & {
 
 export function DepartmentsPage(props: Common & {
   departments: AdminDepartmentRow[];
+  positionDefs: PositionDefRow[];
+  leaders: DepartmentLeaderRow[];
 }) {
-  const { user, perms, flash, lang, departments } = props;
+  const { user, perms, flash, lang, departments, positionDefs, leaders } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  // Roles and their holders come from the editable catalogue so a role added on
+  // the Positions screen shows up here too.
+  const roleDefs = defsForScope(positionDefs, "department");
+  const departmentLeader = (departmentId: number, code: string) =>
+    leaders.find((l) => l.departmentId === departmentId && l.position === code) ?? null;
+  const filledRoles = (departmentId: number) =>
+    roleDefs.filter((def) => departmentLeader(departmentId, def.code)).length;
 
   return (
     <Layout title={t("dept.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -186,6 +202,7 @@ export function DepartmentsPage(props: Common & {
           <p class="page-sub">{t("dept.intro")}</p>
         </div>
         <div class="page-head-actions">
+          <CardViewToggle lang={lang} viewKey="departments" />
           <a class="btn js-add-modal" href="/organization/departments/new"
             data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
@@ -200,7 +217,7 @@ export function DepartmentsPage(props: Common & {
             data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
         </div>
       ) : (
-        <div class="hh-grid">
+        <div class="hh-grid" data-view-grid>
           {departments.map((d) => (
             <article class={`hh-card dept-card-v2${d.active ? "" : " is-inactive"}`}>
               <div class="hh-card-head">
@@ -211,7 +228,7 @@ export function DepartmentsPage(props: Common & {
                   </span>
                   <span class="hh-card-meta">
                     <span class="hh-count"><b>{d.member_count}</b> {t("org.membersShort")}</span>
-                    <span class="muted small">{d.role_count} / {DEPARTMENT_POSITIONS.length} {t("dept.rolesFilled")}</span>
+                    <span class="muted small">{filledRoles(d.id)} / {roleDefs.length} {t("dept.rolesFilled")}</span>
                   </span>
                 </div>
               </div>
@@ -232,16 +249,10 @@ export function DepartmentsPage(props: Common & {
               </div>
 
               <dl class="dept-roles">
-                {DEPARTMENT_POSITIONS.map((p) => (
+                {roleDefs.map((def) => (
                   <div>
-                    <dt>{positionLabel(p.value, L)}</dt>
-                    <dd>
-                      {(p.value === "department_head" && d.head_name) ? d.head_name
-                        : (p.value === "department_assistant" && d.assistant_name) ? d.assistant_name
-                        : (p.value === "department_secretary" && d.secretary_name) ? d.secretary_name
-                        : (p.value === "department_treasurer" && d.treasurer_name) ? d.treasurer_name
-                        : t("dept.vacant")}
-                    </dd>
+                    <dt>{positionDefLabel(def, L)}</dt>
+                    <dd>{departmentLeader(d.id, def.code)?.memberName || t("dept.vacant")}</dd>
                   </div>
                 ))}
               </dl>
