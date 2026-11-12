@@ -26,7 +26,13 @@ function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string;
   );
 }
 
-export function LoginPage({ error, username, lang, flash }: { error?: string | null; username?: string; lang?: Lang; flash?: Flash }) {
+export function LoginPage({ error, username, lang, flash, remember }: {
+  error?: string | null;
+  username?: string;
+  lang?: Lang;
+  flash?: Flash;
+  remember?: boolean;
+}) {
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("login.title")} lang={lang} flash={null} bodyClass="auth-page" footerNote={t("login.systemNote")}>
@@ -67,6 +73,11 @@ export function LoginPage({ error, username, lang, flash }: { error?: string | n
                 </span>
                 <CapsHint label={t("pw.capsLock")} />
               </div>
+              <label class="check-chip auth-remember">
+                <input type="checkbox" name="remember" value="1" checked={remember} />
+                <span>{t("login.savePassword")}</span>
+              </label>
+              <p class="hint auth-remember-note">{t("login.savePasswordHint")}</p>
               <div class="actions">
                 <button class="btn full" type="submit">{t("login.submit")}</button>
               </div>

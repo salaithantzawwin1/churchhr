@@ -580,10 +580,27 @@ async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
            pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
            pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
            pd.active, pd.sort_order AS sortOrder,
+           pd.regional_church_id AS regionalChurchId,
+           rc.name AS churchName, rc.name_en AS churchNameEn,
            (SELECT COUNT(*) FROM member_positions mp
              WHERE mp.position = pd.code AND mp.scope_type = pd.scope_type) AS usageCount
     FROM position_defs pd
+    LEFT JOIN regional_churches rc ON rc.id = pd.regional_church_id
     ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+}
+
+/** Church choices for the position form (this admin sees every state). */
+async function positionChurchOptions(db: DB, lang: string): Promise<{ id: number; name: string }[]> {
+  const rows = await loadRegionalChurches(db, { activeOnly: true, scopeAll: true });
+  return rows.map((r) => ({ id: r.id, name: regionalChurchName(r, lang) }));
+}
+
+/** The church a position is filed under, or null for every church. */
+async function validPositionChurch(db: DB, churchId: number | null): Promise<boolean> {
+  if (churchId == null) return true;
+  const rows = await db.all<{ id: number }>(sql`
+    SELECT id FROM regional_churches WHERE id = ${churchId} LIMIT 1`);
+  return rows.length > 0;
 }
 
 /** Parent choices for the position form: same scope, never the position itself. */
@@ -639,6 +656,7 @@ organizationRoutes.get("/positions", requirePermission("options.manage"), requir
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} scope={scope} defs={defs}
+      churches={await positionChurchOptions(db, c.get("lang"))}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
     />,
   );
@@ -650,6 +668,7 @@ organizationRoutes.get("/positions/new", requirePermission("options.manage"), re
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${scope}`, 303);
   return c.html(
     <PositionModal scope={scope} lang={c.get("lang")}
+      churches={await positionChurchOptions(db, c.get("lang"))}
       parents={parentOptions(await adminPositionDefs(db), scope, c.get("lang"))} />,
   );
 });
@@ -663,6 +682,7 @@ organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${def.scopeType}`, 303);
   return c.html(
     <PositionModal scope={def.scopeType} def={def} lang={c.get("lang")}
+      churches={await positionChurchOptions(db, c.get("lang"))}
       parents={parentOptions(defs, def.scopeType, c.get("lang"), def.code)} />,
   );
 });
@@ -677,16 +697,21 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   const nameKr = s(body.name_korean).slice(0, 100);
   const sortOrder = departmentSortOrder(s(body.sort_order));
   const parentCode = s(body.parent_code) || null;
-  const values = { nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true, parentCode };
+  const churchId = asInt(s(body.regional_church_id));
+  const values = {
+    nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true, parentCode,
+    regionalChurchId: churchId ?? "" as const,
+  };
   // A modal submit gets the form back with the error instead of a redirect, so
   // the dialog stays open and keeps what was typed.
   const modal = modalRequest(c);
   const fail = (err: string) => modal
-    ? c.html(<PositionModal scope={scope} values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")} />, 422)
+    ? c.html(<PositionModal scope={scope} values={values} churches={[]} error={flashText(err, c.get("lang"))} lang={c.get("lang")} />, 422)
     : c.redirect(`${back}&err=${err}`, 303);
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return fail(invalid);
   if (!nameEn) return fail("position-name-en");
+  if (!await validPositionChurch(db, churchId)) return fail("position-church-invalid");
   if (parentCode) {
     const exists = (await adminPositionDefs(db)).some((d) => d.scopeType === scope && d.code === parentCode);
     if (!exists) return fail("position-parent-invalid");
@@ -702,8 +727,8 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   }
   try {
     await db.run(sql`
-      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order, parent_code)
-      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder}, ${parentCode})`);
+      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order, parent_code, regional_church_id)
+      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder}, ${parentCode}, ${churchId})`);
   } catch {
     return fail("position-code-taken");
   }
@@ -725,7 +750,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   const current = (await db.all<PositionDefRow>(sql`
     SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
            name_english AS nameEnglish, name_korean AS nameKorean, active,
-           sort_order AS sortOrder
+           sort_order AS sortOrder, regional_church_id AS regionalChurchId
     FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
   if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
   const back = `/organization/positions?scope=${current.scopeType}`;
@@ -736,9 +761,10 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   const parentCode = s(body.parent_code) || null;
+  const churchId = asInt(s(body.regional_church_id));
   const values = {
     nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr,
-    sortOrder, active: active === 1, parentCode,
+    sortOrder, active: active === 1, parentCode, regionalChurchId: churchId ?? "" as const,
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -746,12 +772,14 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
     const def = (await adminPositionDefs(db)).find((d) => d.id === id);
     return c.html(
       <PositionModal scope={current.scopeType} def={def} values={values}
+        churches={await positionChurchOptions(db, c.get("lang"))}
         error={flashText(err, c.get("lang"))} lang={c.get("lang")} />,
       422,
     );
   };
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return await fail(invalid);
+  if (!await validPositionChurch(db, churchId)) return await fail("position-church-invalid");
   if (parentCode) {
     const defs = await adminPositionDefs(db);
     if (!defs.some((d) => d.scopeType === current.scopeType && d.code === parentCode)) {
@@ -771,7 +799,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
     UPDATE position_defs
        SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
            active = ${active}, sort_order = ${sortOrder}, parent_code = ${parentCode},
-           updated_at = unixepoch()
+           regional_church_id = ${churchId}, updated_at = unixepoch()
      WHERE id = ${id}`);
   const changes = diffPositionDefs(current, {
     nameMyanmar: nameMm, nameEnglish: nameEn || null, nameKorean: nameKr || null, active, sortOrder,

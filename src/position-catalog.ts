@@ -26,6 +26,10 @@ export type PositionDefRow = {
   active: number;
   sortOrder: number;
   usageCount?: number;
+  /** Set when the position exists only in this church (0034); null = all churches. */
+  regionalChurchId?: number | null;
+  churchName?: string | null;
+  churchNameEn?: string | null;
 };
 
 const SCOPE_LABEL_FALLBACK: Record<ConfigurablePositionScope, string> = {
@@ -94,9 +98,19 @@ export async function loadPositionDefs(db: DB): Promise<PositionDefRow[]> {
   return db.all<PositionDefRow>(sql`
     SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
            name_english AS nameEnglish, name_korean AS nameKorean,
-           parent_code AS parentCode, active, sort_order AS sortOrder
+           parent_code AS parentCode, active, sort_order AS sortOrder,
+           regional_church_id AS regionalChurchId
     FROM position_defs
     ORDER BY scope_type, sort_order, id`);
+}
+
+/** Positions usable in a church: state-wide ones plus that church's own. */
+export function defsForChurch<T extends { regionalChurchId?: number | null }>(
+  defs: T[],
+  churchId: number | null | undefined,
+): T[] {
+  if (churchId == null) return defs;
+  return defs.filter((d) => d.regionalChurchId == null || d.regionalChurchId === churchId);
 }
 
 /** Human scope title for admin tabs (English fallback; views translate it). */

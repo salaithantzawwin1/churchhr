@@ -23,6 +23,9 @@ const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_SECONDS = 600;
 const LAST_USER_COOKIE = "last_user";
 const LAST_USER_MAX_AGE = 60 * 60 * 24 * 365;
+/** "Save password" keeps the session on this device; otherwise the cookie dies
+ * with the browser so reopening it requires signing in again. */
+const REMEMBER_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 // Per-IP sliding window: at most 10 attempts inside 10 minutes, else 15-min wait.
 const IP_WINDOW_SECONDS = 600;
@@ -78,8 +81,9 @@ publicAuthRoutes.post("/login", async (c) => {
   const now = nowSeconds();
   const t = getDict(c.get("lang"));
 
+  const remember = String(body.remember ?? "") === "1";
   const fail = (msg: string, status: 401 | 429 = 401) =>
-    c.html(<LoginPage error={msg} username={username} lang={c.get("lang")} />, status);
+    c.html(<LoginPage error={msg} username={username} remember={remember} lang={c.get("lang")} />, status);
 
   // ---- per-IP sliding-window rate limit (independent of the account checks,
   // so it stops brute-forcing different usernames from one address) ----
@@ -109,12 +113,14 @@ publicAuthRoutes.post("/login", async (c) => {
   }
 
   await db.update(users).set({ failedAttempts: 0, lockedUntil: 0 }).where(eq(users.id, user.id));
-  const token = await createSession(db, user.id);
+  const token = await createSession(db, user.id, remember ? REMEMBER_TTL_SECONDS : SESSION_TTL_SECONDS);
   setCookie(c, "session", token, {
     path: "/",
     httpOnly: true,
     sameSite: "Lax",
-    maxAge: SESSION_TTL_SECONDS,
+    // No maxAge unless the user asked to save it: a browser-session cookie
+    // stops the app from silently signing in when the browser is reopened.
+    ...(remember ? { maxAge: REMEMBER_TTL_SECONDS } : {}),
     secure: isHttpsRequest(c),
   });
   setCookie(c, LAST_USER_COOKIE, encodeURIComponent(user.username), {

@@ -408,7 +408,9 @@ html[lang="my"] .auth-points li { line-height: 1.9; }
   background: var(--warn-bg); color: var(--warn-ink); font-size: 12px; font-weight: 600;
 }
 .caps-hint[hidden] { display: none; }
-.auth-secure { display: flex; align-items: center; gap: 6px; margin: 18px 0 0; font-size: 12px; color: var(--muted); }
+.auth-secure { display: flex; align-items: center; justify-content: center; text-align: center; gap: 6px; margin: 18px 0 0; font-size: 12px; color: var(--muted); }
+.auth-remember { margin: 14px 0 0; }
+.auth-remember-note { margin: 6px 0 0; }
 .auth-secure svg { width: 13px; height: 13px; flex: none; }
 .auth-card + * { margin-top: 18px; }
 @media (max-width: 820px) {

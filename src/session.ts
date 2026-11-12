@@ -40,13 +40,13 @@ export function nowSeconds(): number {
 }
 
 /** Creates a server-side session; returns the raw cookie token (never stored). */
-export async function createSession(db: DB, userId: number): Promise<string> {
+export async function createSession(db: DB, userId: number, ttlSeconds = SESSION_TTL_SECONDS): Promise<string> {
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
   await db.insert(sessions).values({
     tokenHash,
     userId,
-    expiresAt: nowSeconds() + SESSION_TTL_SECONDS,
+    expiresAt: nowSeconds() + ttlSeconds,
   });
   return token;
 }

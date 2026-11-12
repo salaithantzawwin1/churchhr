@@ -38,6 +38,8 @@ type PositionValues = {
   active: boolean;
   /** Code of the position this one reports to ("" = top level). */
   parentCode: string | null;
+  /** Church this position belongs to ("" = every church in its state). */
+  regionalChurchId: number | "";
 };
 
 function positionValues(def?: PositionDefRow): PositionValues {
@@ -48,6 +50,7 @@ function positionValues(def?: PositionDefRow): PositionValues {
     sortOrder: def?.sortOrder ?? 0,
     active: def ? def.active === 1 : true,
     parentCode: def?.parentCode ?? null,
+    regionalChurchId: def?.regionalChurchId ?? "",
   };
 }
 
@@ -57,8 +60,10 @@ function PositionFields(props: {
   editing: boolean;
   /** Same-scope positions this one can report to. */
   parents: { code: string; label: string }[];
+  /** Churches this position can be limited to. */
+  churches?: { id: number; name: string }[];
 }) {
-  const { values, lang, editing, parents } = props;
+  const { values, lang, editing, parents, churches = [] } = props;
   const t = getDict(lang);
   return (
     <div class="form-grid">
@@ -88,6 +93,16 @@ function PositionFields(props: {
         </select>
         <span class="field-hint">{t("org.positionParentHint")}</span>
       </label>
+      <label class="field">
+        <span class="lbl">{t("org.positionChurch")}</span>
+        <select name="regional_church_id">
+          <option value="" selected={values.regionalChurchId === ""}>{t("org.positionChurchAll")}</option>
+          {churches.map((church) => (
+            <option value={String(church.id)} selected={values.regionalChurchId === church.id}>{church.name}</option>
+          ))}
+        </select>
+        <span class="field-hint">{t("org.positionChurchHint")}</span>
+      </label>
       {editing && (
         <label class="dept-active">
           <input type="checkbox" name="active" value="1" checked={values.active} />
@@ -105,10 +120,11 @@ export function PositionModal(props: {
   def?: PositionDefRow;
   values?: PositionValues;
   parents?: { code: string; label: string }[];
+  churches?: { id: number; name: string }[];
   error?: string | null;
   lang?: Lang;
 }) {
-  const { scope, def, error, parents = [] } = props;
+  const { scope, def, error, parents = [], churches = [] } = props;
   const L = props.lang ?? "en";
   const t = getDict(L);
   const inUse = (def?.usageCount ?? 0) > 0;
@@ -117,7 +133,7 @@ export function PositionModal(props: {
       {error && <div class="modal-error" role="alert">{error}</div>}
       <form method="post" action={def ? `/organization/positions/${def.id}` : "/organization/positions"} data-modal-ajax>
         {!def && <input type="hidden" name="scope" value={scope} />}
-        <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} parents={parents} />
+        <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} parents={parents} churches={churches} />
         <div class={`actions${def && !inUse ? " modal-actions-split" : ""}`}>
           {def && !inUse && (
             <button class="btn sm outline-danger" type="submit" form={`delete-position-${def.id}`}>
@@ -160,6 +176,7 @@ function statusMatches(status: ListStatus, active: boolean): boolean {
 export function PositionsPage(props: Common & {
   scope: ConfigurablePositionScope;
   defs: PositionDefRow[];
+  churches?: { id: number; name: string }[];
   q?: string;
   status?: ListStatus;
 }) {
@@ -242,6 +259,14 @@ export function PositionsPage(props: Common & {
                     <code>{def.code}</code>
                     <span aria-hidden="true">·</span>
                     <span>{def.usageCount ?? 0} {t("org.positionUsage")}</span>
+                    {def.regionalChurchId != null && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span class="badge">
+                          {L !== "mm" && def.churchNameEn ? def.churchNameEn : def.churchName}
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
                 <div class="role-card-actions">

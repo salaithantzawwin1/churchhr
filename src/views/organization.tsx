@@ -1,7 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
-import { positionDefLabel, defsForScope, leadDef, type PositionDefRow } from "../position-catalog";
+import { positionDefLabel, defsForScope, defsForChurch, leadDef, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName } from "../departments";
 
@@ -290,7 +290,9 @@ export function OrganizationPage(props: Common & {
   const canManageOptions = perms.has("options.manage");
   const cellHref = (id: number) => `/members?home_cell=${id}`;
 
-  const churchRows = positionRows(positionDefs, "church", L);
+  // A church only sees state-wide positions plus the ones filed under it.
+  const churchDefs = defsForChurch(positionDefs, selectedChurch?.id);
+  const churchRows = positionRows(churchDefs, "church", L);
   const selectedChurchCellCount = selectedChurch
     ? cells.filter((c) => c.regional_church_id === selectedChurch.id).length
     : 0;
@@ -298,7 +300,7 @@ export function OrganizationPage(props: Common & {
     ? churchRows.all.filter((p) =>
       leaderFor(leaders, "church", p.code, { regionalChurchId: selectedChurch.id })).length
     : 0;
-  const cellRows = positionRows(positionDefs, "home_cell", L);
+  const cellRows = positionRows(churchDefs, "home_cell", L);
   const regionalRows = positionRows(positionDefs, "regional_church", L);
   const deptRows = positionRows(positionDefs, "department", L);
 
