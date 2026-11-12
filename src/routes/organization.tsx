@@ -986,6 +986,7 @@ organizationRoutes.get("/regional-churches/new", requirePermission("options.mana
     <RegionalChurchModal
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope)}
+      churches={await positionChurchOptions(db, c.get("lang"))}
       lang={c.get("lang")}
     />,
   );
@@ -1005,6 +1006,7 @@ organizationRoutes.get("/regional-churches/:id/edit", requirePermission("options
       church={church}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope)}
+      churches={await positionChurchOptions(db, c.get("lang"))}
       lang={c.get("lang")}
     />,
   );
@@ -1034,6 +1036,7 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
       <RegionalChurchModal
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope)}
+        churches={await positionChurchOptions(db, c.get("lang"))}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
       />,
       422,
@@ -1091,6 +1094,7 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
         church={church}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope)}
+        churches={await positionChurchOptions(db, c.get("lang"))}
         values={values}
         error={err ? flashText(err, c.get("lang")) : null}
         cellError={cellErr ? flashText(cellErr, c.get("lang")) : null}
@@ -1111,11 +1115,12 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   const used = attached[0]?.n ?? 0;
   if (regionId !== current.regionId && used > 0) return await fail("regional-state-locked");
   if (current.active === 1 && active === 0 && used > 0) return await fail("regional-in-use");
+  // Any Home Cell of this state may be picked: one that still sits under a
+  // sibling church is moved here by the save below, not rejected.
   if (cellsPresent && selectedCellIds.length > 0) {
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${regionId}
-        AND (regional_church_id IS NULL OR regional_church_id = ${id})
         AND id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
     if ((valid[0]?.n ?? 0) !== selectedCellIds.length) {
       return await fail(null, "regional-cell-invalid");
@@ -1162,10 +1167,11 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
   }
   const modal = modalRequest(c);
   if (ids.length > 0) {
+    // Same rule as the full editor: a Home Cell of this state can be moved here
+    // even while another church still owns it.
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${church.regionId}
-        AND (regional_church_id IS NULL OR regional_church_id = ${id})
         AND id IN (${sql.join(ids.map((v) => sql`${v}`), sql`, `)})`);
     if ((valid[0]?.n ?? 0) !== ids.length) {
       if (!modal) return c.redirect("/organization/regional-churches?err=regional-cell-invalid", 303);
@@ -1177,6 +1183,7 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
           church={row}
           regions={await orgRegions(db, scope, c.get("lang"))}
           homeCells={await loadAdminHomeCells(db, scope)}
+          churches={await positionChurchOptions(db, c.get("lang"))}
           cellError={flashText("regional-cell-invalid", c.get("lang"))}
           selectedCellIds={ids}
           lang={c.get("lang")}

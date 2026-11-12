@@ -1312,6 +1312,11 @@ td.empty-state .small { margin-top: 4px; }
 }
 /* ---------- organization structure ---------- */
 .org-stats { margin: 0 0 18px; }
+/* The structure page counts four small numbers, so they read better as one tight
+   strip than as tall dashboard tiles: same card, less air and a smaller figure. */
+.org-stats .stat { min-height: 0; padding: 13px 16px; gap: 3px; }
+.org-stats .stat .n { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+.org-stats .stat .t { font-size: 12.5px; line-height: 1.35; }
 .org-church { display: grid; gap: 14px; }
 .org-state { padding: 18px 20px; }
 .org-state-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -1520,6 +1525,13 @@ td.empty-state .small { margin-top: 4px; }
 }
 .check-chip:has(input:checked) { border-color: var(--link); background: var(--chip-brand-bg); color: var(--link); }
 .check-chip input { width: auto; margin: 0; }
+/* A Home Cell that still belongs to a sibling church: naming the church makes
+   the move obvious before the sheet is saved. */
+.check-chip-owner { display: block; color: var(--muted); font-size: 10.5px; font-style: italic; line-height: 1.35; }
+/* Administration option lists (Home Cell, Home Cell supervision) as cards. */
+.opt-card-v2.is-inactive { opacity: .72; }
+.opt-card-v2 .hh-card-actions .btn { min-height: 32px; }
+.opt-card-v2 .hh-card-actions form .btn { min-height: 32px; }
 
 /* ---------- position + regional settings screens ---------- */
 .tab-count { margin-left: 6px; font-size: 11.5px; opacity: .75; }

@@ -7,6 +7,7 @@ import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isReg
 import { PARENT_TYPE } from "../lookup";
 import { qs } from "../util";
 import { EditIcon, TrashIcon } from "./action-icons";
+import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -811,6 +812,110 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
   );
 }
 
+function HomeCellGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-5h-6v5H5a1 1 0 0 1-1-1z" />
+    </svg>
+  );
+}
+
+function TownshipGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 21s6.5-6.2 6.5-11a6.5 6.5 0 1 0-13 0C5.5 14.8 12 21 12 21z" />
+      <circle cx="12" cy="10" r="2.4" />
+    </svg>
+  );
+}
+
+/** Home Cell and Home Cell supervision entries as cards, sharing the collection
+ *  shell used by households and departments; app.js flips the list view. */
+function OptionCollection(props: { type: string; typeLabel: string; options: OptionUsage[]; lang?: Lang }) {
+  const { type, typeLabel, options } = props;
+  const L = props.lang ?? "en";
+  const t = getDict(L);
+  const isCell = type === "home_cell";
+  const Glyph = isCell ? HomeCellGlyph : TownshipGlyph;
+
+  if (options.length === 0) {
+    return (
+      <div class="card hh-empty">
+        <span class="hh-avatar lg" aria-hidden="true"><Glyph /></span>
+        <h2>{t("dash.none")}</h2>
+        <p class="muted small">{t("adm.addHint")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div class="hh-grid" data-view-grid>
+      {options.map((o) => (
+        <article class={`hh-card opt-card-v2${o.active === 1 ? "" : " is-inactive"}`}>
+          <div class="hh-card-head">
+            <span class="hh-avatar" aria-hidden="true"><Glyph /></span>
+            <div class="hh-card-title">
+              <span class="hh-card-name" title={o.label}>{o.label}</span>
+              <span class="hh-card-meta">
+                {o.code && <span class="muted small">{o.code}</span>}
+                <span class="hh-count"><b>{o.used}</b> {t("adm.usage")}</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="hh-facts">
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("detail.state")}</span>
+              <span class="hh-fact-value">{o.state || t("adm.allStates")}</span>
+            </div>
+            {isCell && (
+              <>
+                <div class="hh-fact">
+                  <span class="hh-fact-label">{t("form.church")}</span>
+                  <span class={`hh-fact-value${o.church ? "" : " muted"}`}>
+                    {o.church || t("adm.churchNone")}
+                  </span>
+                </div>
+                <div class="hh-fact">
+                  <span class="hh-fact-label">{t("form.township")}</span>
+                  <span class={`hh-fact-value${o.parent ? "" : " muted"}`}>{o.parent || "—"}</span>
+                </div>
+              </>
+            )}
+            <div class="hh-fact">
+              <span class="hh-fact-label">{t("members.status")}</span>
+              <span class="hh-fact-value">
+                <span class={`badge ${o.active === 1 ? "active" : "inactive"}`}>
+                  {o.active === 1 ? t("adm.active") : t("adm.off")}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div class="hh-card-actions">
+            <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
+              data-modal-title={`${typeLabel}: ${o.label}`}
+              data-modal-size="md" title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+            <form method="post" action={`/admin/options/${o.id}`}>
+              <input type="hidden" name="toggle" value="1" />
+              <input type="hidden" name="label" value={o.label} />
+              <button class="btn sm secondary" type="submit">
+                {o.active === 1 ? t("adm.disable") : t("adm.enable")}
+              </button>
+            </form>
+            <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+              <button class="btn sm outline-danger icon-btn" type="submit"
+                title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+            </form>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export function AdminOptionsPage(props: OptionsProps) {
   const { user, perms, flash, type, typeLabel, types, options = [], regionRows = [], ageGroupRows = [], regions, parentOptions, churches, addErrors, editError, lang, showAddForm, lockRegion, allowAllStates } = props;
   const t = getDict(lang ?? "en");
@@ -829,6 +934,9 @@ export function AdminOptionsPage(props: OptionsProps) {
       <div class="page-head">
         <h1>{t("adm.optionsHeading")}</h1>
         <div class="page-actions">
+          {(type === "home_cell" || type === "township") && (
+            <CardViewToggle lang={lang} viewKey={`options-${type}`} />
+          )}
           <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
           {type === "township" && (
             <a class="btn secondary" href="/admin/options/township-codes">{t("adm.shortCodesButton")}</a>
@@ -930,6 +1038,8 @@ export function AdminOptionsPage(props: OptionsProps) {
             </table>
           </div>
         </>
+      ) : type === "home_cell" || type === "township" ? (
+        <OptionCollection type={type} typeLabel={typeLabel} options={options} lang={lang} />
       ) : (
         <>
       {scrollHint}

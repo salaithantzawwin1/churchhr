@@ -364,6 +364,8 @@ export function RegionalChurchModal(props: {
   church?: RegionalChurchRow;
   regions: { id: number; name: string }[];
   homeCells: HomeCellOption[];
+  /** Churches the Home Cells can be moved between, for the owner labels. */
+  churches?: { id: number; name: string }[];
   values?: RegionalValues;
   error?: string | null;
   cellError?: string | null;
@@ -372,13 +374,17 @@ export function RegionalChurchModal(props: {
   lang?: Lang;
 }) {
   const { church, regions, homeCells, error, cellError } = props;
+  const churchNames = new Map((props.churches ?? []).map((c) => [c.id, c.name]));
   const L = props.lang ?? "en";
   const t = getDict(L);
   const values = props.values ?? regionalValues(church);
   const cells = church ? homeCells.filter((c) => c.regionalChurchId === church.id) : [];
   const selectedRegion = values.regionId === "" ? church?.regionId : values.regionId;
+  // Every Home Cell of the state is offered, including ones filed under a
+  // sibling church: ticking one moves it here when the sheet is saved, and the
+  // chip names the church it is leaving so the move is visible before saving.
   const candidates = church && selectedRegion != null
-    ? homeCells.filter((c) => c.regionId === selectedRegion && (c.regionalChurchId == null || c.regionalChurchId === church.id))
+    ? homeCells.filter((c) => c.regionId === selectedRegion)
     : [];
   const isPicked = (cell: HomeCellOption) =>
     props.selectedCellIds ? props.selectedCellIds.includes(cell.id) : cell.regionalChurchId === church?.id;
@@ -424,7 +430,14 @@ export function RegionalChurchModal(props: {
                             <label class="check-chip">
                               <input type="checkbox" name="home_cell_ids" value={String(cell.id)}
                                 checked={isPicked(cell)} />
-                              <span>{cell.label}</span>
+                              <span>
+                                {cell.label}
+                                {cell.regionalChurchId != null && cell.regionalChurchId !== church?.id && (
+                                  <span class="check-chip-owner">
+                                    {churchNames.get(cell.regionalChurchId) ?? ""}
+                                  </span>
+                                )}
+                              </span>
                             </label>
                           ))}
                         </div>
