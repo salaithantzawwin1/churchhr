@@ -256,6 +256,10 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   const allOptions = await loadAllOptions(db);
   const departments = await loadDepartments(db, true);
   const positionDefs = await loadPositionDefs(db);
+  // Every active age group, so the filter can be picked or switched here too.
+  const ageGroups = await db.all<{ id: number; name: string; min_age: number; max_age: number }>(
+    sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
+  );
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -268,6 +272,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
       groups={optionsOfType(allOptions, "group")}
       fellowships={optionsOfType(allOptions, "fellowship_category")}
       positionDefs={positionDefs}
+      ageGroups={ageGroups}
       lang={c.get("lang")}
     />,
   );

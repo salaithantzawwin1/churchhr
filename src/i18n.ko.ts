@@ -142,6 +142,7 @@ export const KO: Record<string, string> = {
   "members.township": "타운십",
   "members.all": "전체",
   "members.allStatuses": "모든 상태",
+  "members.allAges": "모든 연령대",
   "members.allGroups": "모든 그룹",
   "members.allFellowships": "모든 친교",
   "members.searchBtn": "검색",

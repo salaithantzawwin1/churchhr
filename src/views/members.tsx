@@ -66,6 +66,8 @@ type ListProps = Common & {
   positionDefs?: PositionDefRow[];
   /** Resolved Age Group behind the age_group filter, for the chip label. */
   ageGroup?: { name: string; min_age: number; max_age: number } | null;
+  /** Age groups offered in the filter toolbar. */
+  ageGroups?: { id: number; name: string; min_age: number; max_age: number }[];
 };
 
 function filterQs(f: Filters, page?: number): string {
@@ -112,7 +114,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs, ageGroups } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   // Korean uses the English data labels (region names etc.); only MM differs.
@@ -208,6 +210,14 @@ export function MembersListPage(props: ListProps) {
             <option value={k} selected={f.status === k}>{v}</option>
           ))}
         </select>
+        <select name="age_group" aria-label={t("dash.ageGroups")}>
+          <option value="">{t("members.allAges")}</option>
+          {(ageGroups ?? []).map((g) => (
+            <option value={String(g.id)} selected={f.ageGroup === g.id}>
+              {g.name} ({g.min_age}–{g.max_age})
+            </option>
+          ))}
+        </select>
         <select name="home_cell" data-region-filter="1" aria-label={t("members.thHomeCell")}>
           <option value="">{t("dash.allCells")}</option>
           {homeCells.map((o) => (
@@ -234,7 +244,6 @@ export function MembersListPage(props: ListProps) {
             <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
           ))}
         </select>
-        {f.ageGroup && <input type="hidden" name="age_group" value={String(f.ageGroup)} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
         {filtered && <a class="filter-clear" href="/members">{t("members.clear")}</a>}
