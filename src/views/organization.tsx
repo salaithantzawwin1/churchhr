@@ -1,7 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
-import { positionDefLabel, defsForScope, type PositionDefRow } from "../position-catalog";
+import { positionDefLabel, defsForScope, leadDef, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName } from "../departments";
 
@@ -173,7 +173,7 @@ function leaderFor(
  */
 function positionRows(defs: PositionDefRow[], scope: Parameters<typeof defsForScope>[1], lang: Lang) {
   const rows = defsForScope(defs, scope);
-  const lead = rows.find((r) => !r.parentCode) ?? rows[0] ?? null;
+  const lead = leadDef(rows);
   return { lead, rest: rows.filter((r) => r !== lead), all: rows };
 }
 
@@ -352,8 +352,8 @@ export function OrganizationPage(props: Common & {
       ? clusterRole(group.id, position)
       : townshipRole(group.id, position);
     const pastor = group.kind === "cluster" ? clusterRole(group.id, "cluster_pastor") : null;
-    const supervisor = defs[0] ?? null;
-    const assistants = defs.slice(1);
+    const supervisor = leadDef(defs);
+    const assistants = defs.filter((d) => d !== supervisor);
     return (
       <details class="org-flow-cluster">
         <summary class="org-flow-cluster-head">

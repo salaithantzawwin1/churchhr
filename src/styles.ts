@@ -1428,6 +1428,8 @@ td.empty-state .small { margin-top: 4px; }
 .position-hero-title h4 { margin: 0; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
 .position-hero-home { color: var(--muted); font-size: 12px; }
 .position-hero-home strong { color: var(--ink); font-weight: 600; }
+.position-hero-profile { color: var(--link); font-size: 12px; font-weight: 600; text-decoration: none; }
+.position-hero-profile:hover { text-decoration: underline; }
 .position-role-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .position-role-chips .badge { font-size: 11.5px; }
 .position-intro { margin: 0 0 12px; }

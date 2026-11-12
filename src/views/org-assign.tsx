@@ -54,7 +54,16 @@ export function AssignLeaderModal(props: {
           <div class="position-hero-title"><h4>{label}</h4></div>
           <div class="position-hero-home">{t("org.assignFor")} <strong>{churchName}</strong></div>
           {currentName && (
-            <div class="position-hero-home">{t("org.assignCurrently")} <strong>{currentName}</strong></div>
+            <div class="position-hero-home">
+              {t("org.assignCurrently")}{" "}
+              {currentId ? (
+                <a href={`/members/${currentId}`} class="position-hero-profile" title={t("org.viewProfile")}>
+                  {currentName}
+                </a>
+              ) : (
+                <strong>{currentName}</strong>
+              )}
+            </div>
           )}
         </div>
       </div>

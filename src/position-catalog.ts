@@ -73,6 +73,15 @@ export function defsForScope(defs: PositionDefRow[], scope: ConfigurablePosition
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
 }
 
+/**
+ * The lead position of an ordered scope list: the first role that is not nested
+ * under another one. A sub-role (e.g. an assistant secretary) therefore never
+ * takes the lead slot just because it sorts early.
+ */
+export function leadDef(rows: PositionDefRow[]): PositionDefRow | null {
+  return rows.find((r) => !r.parentCode) ?? rows[0] ?? null;
+}
+
 export function isDefinedForScope(
   defs: PositionDefRow[],
   code: string,
