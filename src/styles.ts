@@ -112,6 +112,11 @@ a { color: var(--link); }
 .topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: 7px; font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
 .topbar nav .nav-menu a.active { background: var(--chip-brand-bg); color: var(--link); font-weight: 600; }
+.nav-menu-label {
+  padding: 9px 10px 3px; border-top: 1px solid var(--line); margin-top: 4px;
+  color: var(--muted); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+}
 .topbar .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .topbar .who form { margin: 0; }
 .container { max-width: 1100px; margin: 22px auto; padding: 0 16px; }

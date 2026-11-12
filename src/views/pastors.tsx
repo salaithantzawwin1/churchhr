@@ -261,21 +261,25 @@ function displayName(pastor: PastorRow, L: Lang): string {
 
 export function PastorsPage(props: Common & {
   pastors: PastorRow[];
+  regions: { id: number; name: string }[];
   q?: string;
   status?: "all" | "active" | "inactive";
+  region?: number | null;
 }) {
-  const { user, perms, flash, lang, pastors } = props;
+  const { user, perms, flash, lang, pastors, regions } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const q = props.q ?? "";
   const status = props.status ?? "all";
+  const region = props.region ?? null;
   const visible = pastors.filter((p) =>
     (status === "all" || (status === "active" ? p.active === 1 : p.active === 0)) &&
+    (region == null || p.regionId === region) &&
     matchesQuery(q, [p.name, p.nameEn, p.title, p.position, p.stateName, p.stateNameEn,
       p.churchName, p.churchNameEn, p.phone, p.email]));
   const activeCount = pastors.filter((p) => p.active === 1).length;
   const churchCount = new Set(pastors.map((p) => p.regionalChurchId).filter((id): id is number => id != null)).size;
-  const filtered = q.trim().length > 0 || status !== "all";
+  const filtered = q.trim().length > 0 || status !== "all" || region != null;
   const canUpdate = perms.has("options.manage");
 
   return (
@@ -310,6 +314,12 @@ export function PastorsPage(props: Common & {
           <option value="" selected={status === "all"}>{t("members.allStatuses")}</option>
           <option value="active" selected={status === "active"}>{t("dept.active")}</option>
           <option value="inactive" selected={status === "inactive"}>{t("dept.inactive")}</option>
+        </select>
+        <select name="region" aria-label={t("detail.state")}>
+          <option value="">{t("org.allStates")}</option>
+          {regions.map((r) => (
+            <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+          ))}
         </select>
         <div class="actions"><button class="btn sm secondary" type="submit">{t("members.search")}</button></div>
       </form>

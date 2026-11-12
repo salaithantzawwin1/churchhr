@@ -240,26 +240,6 @@ export function OrganizationPage(props: Common & {
   const regionalRole = (churchId: number, position: string) =>
     leaderFor(leaders, "regional_church", position, { regionalChurchId: churchId });
 
-  const manageLinks = (canManagePositions || canManageStructure || canManageDepartments) && (
-    <div class="org-manage-links">
-      {canManagePositions && (
-        <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
-      )}
-      {canManageDepartments && (
-        <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
-      )}
-      {canManageStructure && (
-        <a class="btn secondary sm" href="/organization/regional-churches">{t("org.manageRegional")}</a>
-      )}
-      {canManageClusters && (
-        <a class="btn secondary sm" href="/organization/clusters">{t("org.manageClusters")}</a>
-      )}
-      {canManageClusters && (
-        <a class="btn secondary sm" href="/organization/pastors">{t("org.managePastors")}</a>
-      )}
-    </div>
-  );
-
   const cellRoles = (cell: OrgCell, variant: "card" | "row") => {
     const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
     if (variant === "row") {
@@ -450,10 +430,6 @@ export function OrganizationPage(props: Common & {
           <h1>{t("org.title")}<span class="count-pill">{cells.length} {t("org.cells")}</span></h1>
           <p class="page-sub">{t("org.intro")}</p>
         </div>
-        <div class="page-head-actions">
-          <a class="btn secondary sm" href="/organization/vacancies">{t("vacancy.link")}</a>
-          <a class="btn secondary sm" href="/members">{t("org.membersLink")}</a>
-        </div>
       </div>
 
       <div class="page-toolbar">
@@ -468,13 +444,6 @@ export function OrganizationPage(props: Common & {
             aria-current={tab === "home-cells" ? "page" : undefined}>{t("org.cellsTab")}</a>
         </div>
       </div>
-
-      {manageLinks && (
-        <div class="org-structure-bar">
-          <span class="muted small">{t("org.structureActions")}</span>
-          {manageLinks}
-        </div>
-      )}
 
       <div class="stat-grid org-stats">
         <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>

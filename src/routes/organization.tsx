@@ -936,7 +936,9 @@ organizationRoutes.get("/pastors", requirePermission("options.manage"), async (c
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")}
       pastors={await loadPastors(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds })}
+      regions={await orgRegions(db, scope, c.get("lang"))}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
+      region={intParam(c.req.query("region"))}
     />,
   );
 });

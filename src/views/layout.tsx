@@ -36,13 +36,17 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
     { href: "/reports", label: t("nav.reports"), perm: "reports.view" },
   ];
-  const ADMIN_NAV: { href: string; label: string; perm: Permission }[] = [
+  const ADMIN_NAV: { href: string; label: string; perm: Permission; section?: string }[] = [
     { href: "/members/import", label: t("nav.import"), perm: "members.import" },
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
     { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
-    { href: "/organization/positions", label: t("nav.positions"), perm: "options.manage" },
-    { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: "options.manage" },
+    { href: "/organization/positions", label: t("nav.positions"), perm: "options.manage", section: "structure" },
+    { href: "/organization/departments", label: t("nav.departments"), perm: "options.manage", section: "structure" },
+    { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: "options.manage", section: "structure" },
+    { href: "/organization/clusters", label: t("nav.clusters"), perm: "options.manage", section: "structure" },
+    { href: "/organization/pastors", label: t("nav.pastors"), perm: "options.manage", section: "structure" },
+    { href: "/organization/vacancies", label: t("vacancy.link"), perm: "members.view", section: "structure" },
   ];
   const allowed = (n: { perm: Permission }) => !perms || perms.has(n.perm);
   const primaryItems = PRIMARY_NAV.filter(allowed);
@@ -94,14 +98,19 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
                       {t("nav.admin")} <span class="chev" aria-hidden="true">▾</span>
                     </summary>
                     <div class="nav-menu">
-                      {adminItems.map((n) => (
-                        <a
-                          href={n.href}
-                          class={active === n.href ? "active" : ""}
-                          aria-current={active === n.href ? "page" : undefined}
-                        >
-                          {n.label}
-                        </a>
+                      {adminItems.map((n, i) => (
+                        <>
+                          {n.section === "structure" && adminItems[i - 1]?.section !== "structure" && (
+                            <span class="nav-menu-label">{t("nav.structureSettings")}</span>
+                          )}
+                          <a
+                            href={n.href}
+                            class={active === n.href ? "active" : ""}
+                            aria-current={active === n.href ? "page" : undefined}
+                          >
+                            {n.label}
+                          </a>
+                        </>
                       ))}
                     </div>
                   </details>
