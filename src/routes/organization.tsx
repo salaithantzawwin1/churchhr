@@ -102,6 +102,11 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english,
                     NULLIF(p.name, ''), p.name_en) AS member_name,
            (COALESCE(m.photo, p.photo) IS NOT NULL) AS has_photo,
+           CASE
+             WHEN m.photo IS NOT NULL THEN '/members/' || m.id || '/photo?v=' || m.updated_at
+             WHEN p.photo IS NOT NULL THEN '/organization/pastors/' || p.id || '/photo?v=' || p.updated_at
+             ELSE NULL
+           END AS photo_url,
            COALESCE(m.updated_at, p.updated_at) AS updated_at
     FROM member_positions mp
     LEFT JOIN members m ON m.id = mp.member_id
@@ -114,7 +119,11 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
            cp.cluster_id AS supervision_cluster_id,
            NULL AS member_id,
            COALESCE(NULLIF(p.name, ''), p.name_en) AS member_name,
-           0 AS has_photo, p.updated_at
+           (p.photo IS NOT NULL) AS has_photo,
+           CASE WHEN p.photo IS NOT NULL
+                THEN '/organization/pastors/' || p.id || '/photo?v=' || p.updated_at
+                ELSE NULL END AS photo_url,
+           p.updated_at
     FROM cluster_pastor_assignments cp
     JOIN pastors p ON p.id = cp.pastor_id
     WHERE p.active = 1

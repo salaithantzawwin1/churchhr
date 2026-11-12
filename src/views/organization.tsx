@@ -38,6 +38,8 @@ export type OrgLeader = {
   member_id: number | null;
   member_name: string | null;
   has_photo: number | boolean;
+  /** Ready-made avatar URL: member photo, or the pastor directory photo. */
+  photo_url?: string | null;
   updated_at: number;
 };
 
@@ -127,10 +129,15 @@ function initialOf(name: string | null | undefined): string {
 function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm" }) {
   const { leader, size } = props;
   if (!leader) return <span class={`org-avatar ${size} vacant`} aria-hidden="true">?</span>;
+  // The query supplies photo_url so pastors (no member row) get their own photo.
+  const src = leader.photo_url
+    ?? (leader.has_photo && leader.member_id
+      ? `/members/${leader.member_id}/photo?v=${leader.updated_at}`
+      : null);
   return (
-    <span class={`org-avatar ${size}`} aria-hidden="true">
-      {leader.has_photo && leader.member_id
-        ? <img src={`/members/${leader.member_id}/photo?v=${leader.updated_at}`} alt="" loading="lazy" />
+    <span class={`org-avatar ${size}`} aria-hidden="true" data-initial={initialOf(leader.member_name)}>
+      {src
+        ? <img src={src} alt="" loading="lazy" decoding="async" />
         : initialOf(leader.member_name)}
     </span>
   );

@@ -1899,40 +1899,57 @@ td.empty-state .small { margin-top: 4px; }
 }
 
 .org-node {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
-  width: 190px; min-width: 150px; padding: var(--space-3) var(--space-2); text-align: center;
-  background: var(--card); border: 1px solid var(--hairline); border-radius: var(--radius);
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 208px; min-width: 160px; padding: 16px 14px 14px; text-align: center;
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: calc(var(--radius) + 4px);
   box-shadow: 0 0 0 1px var(--node-ring), var(--elev-1);
 }
-/* Leadership tree: any depth. Siblings share a bus, each child drops a stem from
-   it, and nested children repeat the same pattern one level down. */
+.org-node-lead {
+  width: 248px;
+  box-shadow: inset 0 3px 0 var(--brand), 0 0 0 1px var(--node-ring), var(--elev-1);
+}
+/* Vacant slots read as an outline; filled ones are solid cards. */
+.org-node-vacant { border-style: dashed; background: transparent; box-shadow: none; }
+/* Leadership tree: any depth. The parent drops a short stem into a bus that runs
+   between its children's centres, and every child hangs from that bus. */
 .org-forest {
   display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start;
   gap: var(--space-7);
+  padding: var(--space-5) var(--space-2) var(--space-4);
 }
 .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; }
 .org-branch-kids {
   display: flex; align-items: flex-start; justify-content: center;
-  gap: 18px; padding-top: 24px; position: relative;
+  gap: 22px; padding-top: 28px; position: relative;
+}
+.org-branch-kids::before {
+  content: ""; position: absolute; top: 0; left: 50%; margin-left: -1px;
+  width: 2px; height: 14px; background: var(--connector); border-radius: 2px;
 }
 .org-branch-kids > .org-branch { position: relative; }
 .org-branch-kids > .org-branch::before {
-  content: ""; position: absolute; top: -24px; left: 50%; width: 2px; height: 24px;
-  background: var(--connector);
+  content: ""; position: absolute; top: -14px; left: 50%; margin-left: -1px;
+  width: 2px; height: 14px; background: var(--connector); border-radius: 2px;
 }
 .org-branch-kids > .org-branch::after {
-  content: ""; position: absolute; top: -24px; height: 2px; left: -9px; right: -9px;
-  background: var(--connector);
+  content: ""; position: absolute; top: -14px; height: 2px; left: -11px; right: -11px;
+  background: var(--connector); border-radius: 2px;
 }
 .org-branch-kids > .org-branch:first-child::after { left: 50%; }
 .org-branch-kids > .org-branch:last-child::after { right: 50%; }
 .org-branch-kids > .org-branch:only-child::after { display: none; }
 @media (max-width: 760px) {
+  .org-forest { padding: var(--space-4) var(--space-2); gap: var(--space-5); }
   .org-branch-kids {
-    flex-direction: column; align-items: center; gap: 18px; padding-top: 18px;
+    flex-direction: column; align-items: flex-start; gap: 14px;
+    padding: 16px 0 0 16px;
   }
+  .org-branch-kids::before { height: 16px; }
+  .org-branch-kids > .org-branch { align-items: flex-start; }
+  .org-branch-kids > .org-branch::before,
   .org-branch-kids > .org-branch::after { display: none; }
-  .org-branch-kids > .org-branch::before { top: -18px; height: 18px; }
+  .org-node, .org-node-lead { width: min(260px, 100%); }
 }
 
 /* A vacant node is the place to act: the whole card opens the assign dialog. */
@@ -1946,8 +1963,14 @@ td.empty-state .small { margin-top: 4px; }
 }
 .org-node-action:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 .org-node-lead { width: 240px; }
-.org-node-role { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
-.org-node-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.org-node-role {
+  color: var(--muted); font-size: 10.5px; font-weight: 650; letter-spacing: .045em;
+  line-height: 1.45; text-transform: uppercase;
+}
+.org-node-name {
+  font-size: 15.5px; font-weight: 650; line-height: 1.5;
+  letter-spacing: .01em; overflow-wrap: anywhere;
+}
 .org-node-name a { color: var(--ink); text-decoration: none; }
 .org-node-name a:hover { color: var(--link); text-decoration: underline; }
 .org-node-vacant { opacity: .88; }
@@ -1965,6 +1988,9 @@ td.empty-state .small { margin-top: 4px; }
 .org-avatar.lg { width: 88px; height: 88px; font-size: 30px; }
 .org-avatar.md { width: 62px; height: 62px; font-size: 22px; }
 .org-avatar.sm { width: 38px; height: 38px; font-size: 14px; box-shadow: 0 0 0 1px var(--card), 0 0 0 2px var(--line); }
+/* Photo could not load: fall back to the initial rather than an empty circle. */
+.org-avatar.no-photo img { display: none; }
+.org-avatar.no-photo::before { content: attr(data-initial); }
 .org-avatar.vacant {
   color: var(--muted); background: var(--surface-3);
   box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--node-ring);
@@ -2012,8 +2038,6 @@ td.empty-state .small { margin-top: 4px; }
   .org-chart { padding: 16px 14px 20px; }
   .org-chart-level { gap: 8px; }
   .org-chart-level-team::before { left: 8%; right: 8%; }
-  .org-node { width: calc(33.333% - 8px); min-width: 0; padding: 8px 4px; }
-  .org-node-lead { width: 220px; }
   .org-avatar.lg { width: 76px; height: 76px; font-size: 26px; }
   .org-avatar.md { width: 54px; height: 54px; font-size: 19px; }
 }
@@ -2022,10 +2046,10 @@ td.empty-state .small { margin-top: 4px; }
   .org-chart-level-team::before,
   .org-chart-level-team .org-node::before { display: none; }
   .org-chart-level-team { display: grid; grid-template-columns: 1fr; gap: 4px; }
-  .org-node { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
-  .org-node .org-avatar { order: 0; }
-  .org-node .org-node-role { order: 1; }
-  .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  .org-chart-level .org-node { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
+  .org-chart-level .org-node .org-avatar { order: 0; }
+  .org-chart-level .org-node .org-node-role { order: 1; }
+  .org-chart-level .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
   .org-node-lead { width: 100%; flex-direction: column; text-align: center; }
   .org-node-lead .org-node-name { margin-left: 0; text-align: center; }
   .dept-members-card { align-items: flex-start; }

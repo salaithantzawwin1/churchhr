@@ -1473,6 +1473,14 @@
     }
   })();
 
+  // Organization avatars fall back to the person's initial when a photo cannot
+  // be loaded, rather than leaving an empty circle.
+  document.querySelectorAll('.org-avatar img').forEach(function (img) {
+    img.addEventListener('error', function () {
+      if (img.parentElement) img.parentElement.classList.add('no-photo');
+    });
+  });
+
   // Confirmation banners are transient: fade them out, then drop the flash key
   // from the URL so a reload does not replay an old "saved" message.
   (function initFlash() {
