@@ -164,17 +164,18 @@ async function userAssignments(db: DB, userId: number) {
   };
 }
 
-/** Home Cells offered as an optional member-list limit, grouped by state. */
-async function homeCellOptions(db: DB, lang: Lang = "en"): Promise<{ id: number; name: string }[]> {
-  const rows = await db.all<{ id: number; label: string; state_name: string | null; state_name_en: string | null }>(sql`
-    SELECT o.id, o.label, r.name AS state_name, r.name_en AS state_name_en
+/** Home Cells offered as an optional member-list limit, grouped by state. The
+ *  state id travels along so the form can hide cells outside the ticked states. */
+async function homeCellOptions(db: DB, lang: Lang = "en"): Promise<{ id: number; name: string; regionId: number }[]> {
+  const rows = await db.all<{ id: number; label: string; regionId: number | null; state_name: string | null; state_name_en: string | null }>(sql`
+    SELECT o.id, o.label, o.region_id AS regionId, r.name AS state_name, r.name_en AS state_name_en
     FROM lookup_options o
     LEFT JOIN regions r ON r.id = o.region_id
     WHERE o.type = 'home_cell' AND o.active = 1
     ORDER BY o.region_id, o.label`);
   return rows.map((r) => {
     const state = lang !== "mm" && r.state_name_en ? r.state_name_en : r.state_name;
-    return { id: r.id, name: state ? `${state} · ${r.label}` : r.label };
+    return { id: r.id, name: state ? `${state} · ${r.label}` : r.label, regionId: r.regionId ?? 0 };
   });
 }
 

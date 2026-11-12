@@ -48,7 +48,7 @@ type UsersProps = Common & {
   roles: { id: number; name: string; description: string | null }[];
   regions: { id: number; name: string }[];
   editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] }) | null;
-  homeCells?: { id: number; name: string }[];
+  homeCells?: { id: number; name: string; regionId?: number }[];
   createErrors: string[];
   editErrors: string[];
 };
@@ -72,7 +72,7 @@ function userForm(v: {
 }, props: {
   roles: { id: number; name: string }[];
   regions: { id: number; name: string }[];
-  homeCells: { id: number; name: string }[];
+  homeCells: { id: number; name: string; regionId?: number }[];
 }, t: (k: string) => string) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
   return (
@@ -120,14 +120,15 @@ function userForm(v: {
       <fieldset class="form-section">
         <legend>{t("adm.homeCellScope")}</legend>
         <p class="hint">{t("adm.homeCellScopeHint")}</p>
-        <div class="check-grid">
+        <div class="check-grid" data-cell-scope>
           {props.homeCells.map((cell) => (
-            <label class="check-chip">
+            <label class="check-chip" data-state={String(cell.regionId ?? 0)}>
               <input type="checkbox" name="home_cells" value={String(cell.id)}
                 checked={v.homeCellIds.includes(cell.id)} /> <span>{cell.name}</span>
             </label>
           ))}
         </div>
+        <p class="hint" data-cell-scope-empty hidden>{t("adm.noCellForState")}</p>
       </fieldset>
       <fieldset class="form-section">
         <legend>{t("members.status")}</legend>
@@ -153,7 +154,7 @@ export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
   values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
   roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
-  homeCells?: { id: number; name: string }[];
+  homeCells?: { id: number; name: string; regionId?: number }[];
 }) {
   const t = getDict(props.lang ?? "en");
   return (

@@ -536,6 +536,9 @@ th.bar-col { width: 42%; }
 }
 .check-chip:hover { border-color: var(--line-strong); background: var(--btn2-hover); }
 .check-chip:has(input:checked) { border-color: var(--brand); background: var(--chip-brand-bg); }
+/* Chips the account form hides when their state is out of scope. */
+.check-chip[hidden] { display: none; }
+.hint[hidden] { display: none; }
 .check-chip input { accent-color: var(--brand); margin: 0; flex: none; }
 .check-chip span { overflow-wrap: anywhere; }
 .check-chip-all { margin-bottom: 8px; }

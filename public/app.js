@@ -338,6 +338,44 @@
   }
   initRegionCascade(document);
 
+  // Member-list scope (Home Cell) chips follow the State scope ticks: a cell is
+  // only offered for the states this account may see. A cell that is already
+  // ticked stays visible, so saving never drops an existing limit unnoticed.
+  function applyCellStateScope(form) {
+    var scope = form.querySelector("[data-cell-scope]");
+    if (!scope) return;
+    var picked = {};
+    var any = false;
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="states"]'), function (b) {
+      if (b.checked) { picked[b.value] = true; any = true; }
+    });
+    var allStates = form.querySelector('input[name="all_states"]');
+    var showAll = !any || (allStates && allStates.checked);
+    var shown = 0;
+    Array.prototype.forEach.call(scope.querySelectorAll("label[data-state]"), function (lbl) {
+      var st = lbl.getAttribute("data-state");
+      var box = lbl.querySelector('input[type="checkbox"]');
+      var show = showAll || !st || st === "0" || picked[st] === true || (box && box.checked);
+      lbl.hidden = !show;
+      if (show) shown++;
+    });
+    var empty = form.querySelector("[data-cell-scope-empty]");
+    if (empty) empty.hidden = shown > 0;
+  }
+
+  function initCellStateScope(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("form"), function (form) {
+      if (!form.querySelector("[data-cell-scope]") || form.getAttribute("data-cell-scope-init")) return;
+      form.setAttribute("data-cell-scope-init", "1");
+      applyCellStateScope(form);
+      Array.prototype.forEach.call(
+        form.querySelectorAll('input[name="states"], input[name="all_states"]'),
+        function (b) { b.addEventListener("change", function () { applyCellStateScope(form); }); },
+      );
+    });
+  }
+  initCellStateScope(document);
+
   // Household head picker: the native select stays as the no-JS fallback, but
   // when JS runs it becomes a type-to-search combobox. Picking a head copies
   // that member's placement (state, township, home cell, group, family group)
@@ -1186,6 +1224,7 @@
       bodyEl.appendChild(document.importNode(n, true));
     });
     initRegionCascade(bodyEl);
+    initCellStateScope(bodyEl);
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
     initListFilter(bodyEl);
