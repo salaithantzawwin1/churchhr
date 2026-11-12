@@ -2,6 +2,7 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { pastorName, type PastorRow } from "../pastors";
+import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 type ChurchOption = { id: number; name: string; regionId: number };
@@ -285,6 +286,7 @@ export function PastorsPage(props: Common & {
           <p class="page-sub">{t("org.pastorsIntro")}</p>
         </div>
         <div class="page-head-actions">
+          <CardViewToggle lang={lang} viewKey="pastors" />
           {canUpdate && (
             <a class="btn js-add-modal" href="/organization/pastors/new"
               data-modal-title={t("org.addPastor")}>
@@ -318,41 +320,51 @@ export function PastorsPage(props: Common & {
           {filtered && <p class="small"><a href="/organization/pastors">{t("members.clearFilters")}</a></p>}
         </div>
       ) : (
-        <div class="pastor-list">
+        <div class="hh-grid" data-view-grid>
           {visible.map((pastor) => {
             const photo = pastorPhotoUrl(pastor);
             const initial = Array.from((pastor.name || pastor.nameEn || "?").trim())[0] ?? "?";
+            const state = L !== "mm" && pastor.stateNameEn ? pastor.stateNameEn : pastor.stateName;
+            const church = L !== "mm" && pastor.churchNameEn ? pastor.churchNameEn : pastor.churchName;
             return (
-              <article class={`card pastor-card${pastor.active ? "" : " is-inactive"}`}>
-                <div class="pastor-main">
-                  <div class="pastor-avatar" aria-hidden="true">
+              <article class={`hh-card pastor-card-v2${pastor.active ? "" : " is-inactive"}`}>
+                <div class="hh-card-head">
+                  <span class="hh-avatar" aria-hidden="true">
                     {photo ? <img src={photo} alt="" /> : <span>{initial}</span>}
-                  </div>
-                  <div class="pastor-title">
-                    <h3><a href={`/organization/pastors/${pastor.id}`}>{displayName(pastor, L)}</a></h3>
-                    <p class="muted small">
-                      {pastor.position || t("org.pastor")}
-                      {" · "}
-                      {L !== "mm" && pastor.stateNameEn ? pastor.stateNameEn : pastor.stateName}
-                      {" · "}
-                      {L !== "mm" && pastor.churchNameEn ? pastor.churchNameEn : pastor.churchName || t("org.noPastorChurch")}
-                    </p>
-                    <p class="muted small">
-                      {pastor.phone || pastor.email || "—"}
-                    </p>
-                  </div>
-                  <div class="role-card-actions pastor-actions">
-                    <span class={`badge ${pastor.active ? "active" : "inactive"}`}>
-                      {pastor.active ? t("dept.active") : t("dept.inactive")}
+                  </span>
+                  <div class="hh-card-title">
+                    <a href={`/organization/pastors/${pastor.id}`} title={displayName(pastor, L)}>
+                      {displayName(pastor, L)}
+                    </a>
+                    <span class="hh-card-meta">
+                      <span class="muted small">{pastor.position || t("org.pastor")}</span>
                     </span>
-                    <a class="btn sm secondary" href={`/organization/pastors/${pastor.id}`}>{t("org.viewPastor")}</a>
-                    {canUpdate && (
-                      <a class="btn sm secondary js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-                        data-modal-title={t("org.editPastor")}>
-                        {t("members.edit")}
-                      </a>
-                    )}
                   </div>
+                </div>
+
+                <div class="hh-facts">
+                  <div class="hh-fact">
+                    <span class="hh-fact-label">{t("detail.state")}</span>
+                    <span class="hh-fact-value">{state || "—"}</span>
+                  </div>
+                  <div class="hh-fact">
+                    <span class="hh-fact-label">{t("org.pastorChurch")}</span>
+                    <span class="hh-fact-value">{church || t("org.noPastorChurch")}</span>
+                  </div>
+                  <div class="hh-fact wide">
+                    <span class="hh-fact-label">{t("detail.phone")}</span>
+                    <span class="hh-fact-value">{pastor.phone || pastor.email || "—"}</span>
+                  </div>
+                </div>
+
+                <div class="hh-card-actions">
+                  <a class="btn sm secondary" href={`/organization/pastors/${pastor.id}`}>{t("org.viewPastor")}</a>
+                  {canUpdate && (
+                    <a class="btn sm secondary js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
+                      data-modal-title={t("org.editPastor")}>
+                      {t("members.edit")}
+                    </a>
+                  )}
                 </div>
               </article>
             );

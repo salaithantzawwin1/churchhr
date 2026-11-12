@@ -974,29 +974,32 @@
     });
   })();
 
-  // Household card/list preference. Both views use the same server markup; the
-  // choice is stored locally so it survives navigation without changing URLs.
-  (function initHouseholdView() {
-    var grid = document.querySelector("[data-hh-grid]");
-    var toggle = document.querySelector("[data-hh-view-switch]");
-    if (!grid || !toggle) return;
-    var buttons = toggle.querySelectorAll("[data-hh-view]");
-    var saved = "card";
-    try { if (localStorage.getItem("hh-view") === "list") saved = "list"; } catch (e) {}
-    function apply(view, persist) {
-      var list = view === "list";
-      grid.classList.toggle("is-list", list);
-      Array.prototype.forEach.call(buttons, function (b) {
-        b.setAttribute("aria-pressed", b.getAttribute("data-hh-view") === view ? "true" : "false");
-      });
-      if (persist) {
-        try { localStorage.setItem("hh-view", view); } catch (e) {}
+  // Card/list preference for collection pages. Both views use the same server
+  // markup; the choice is stored locally so it survives navigation.
+  (function initCollectionViews() {
+    var grids = document.querySelectorAll("[data-view-grid]");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view-switch]"), function (toggle) {
+      var buttons = toggle.querySelectorAll("[data-view]");
+      var key = toggle.getAttribute("data-view-key") || "collection";
+      var saved = "card";
+      try { if (localStorage.getItem("view:" + key) === "list") saved = "list"; } catch (e) {}
+      function apply(view, persist) {
+        var list = view === "list";
+        Array.prototype.forEach.call(grids, function (grid) {
+          grid.classList.toggle("is-list", list);
+        });
+        Array.prototype.forEach.call(buttons, function (b) {
+          b.setAttribute("aria-pressed", b.getAttribute("data-view") === view ? "true" : "false");
+        });
+        if (persist) {
+          try { localStorage.setItem("view:" + key, view); } catch (e) {}
+        }
       }
-    }
-    Array.prototype.forEach.call(buttons, function (b) {
-      b.addEventListener("click", function () { apply(b.getAttribute("data-hh-view"), true); });
+      Array.prototype.forEach.call(buttons, function (b) {
+        b.addEventListener("click", function () { apply(b.getAttribute("data-view"), true); });
+      });
+      apply(saved, false);
     });
-    apply(saved, false);
   })();
 
   // Department role depends on a chosen department; keep the second select

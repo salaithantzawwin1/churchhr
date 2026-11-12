@@ -1,9 +1,22 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
+import { CardViewToggle } from "./view-toggle";
 import { clusterName, type SupervisionClusterRow } from "../org-units";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
+
+function ClusterGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="5" r="2.4" />
+      <circle cx="5" cy="18" r="2.4" />
+      <circle cx="19" cy="18" r="2.4" />
+      <path d="M12 7.4v3.2M5 15.6v-1.2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1.2M7.4 18h9.2" />
+    </svg>
+  );
+}
 
 export type ClusterHomeCell = {
   id: number;
@@ -272,6 +285,7 @@ export function SupervisionClustersPage(props: Common & {
           <p class="page-sub">{t("org.clustersIntro")}</p>
         </div>
         <div class="page-head-actions">
+          <CardViewToggle lang={lang} viewKey="clusters" />
           <a class="btn js-add-modal" href="/organization/clusters/new"
             data-modal-title={t("org.addCluster")}>
             + {t("org.addCluster")}
@@ -303,33 +317,38 @@ export function SupervisionClustersPage(props: Common & {
           {filtered && <p class="small"><a href="/organization/clusters">{t("members.clearFilters")}</a></p>}
         </div>
       ) : (
-        <div class="cluster-list">
+        <div class="hh-grid" data-view-grid>
           {visible.map((cluster) => {
             const cells = homeCells.filter((c) => c.supervisionClusterId === cluster.id);
             return (
-              <article class={`card cluster-card${cluster.active ? "" : " is-inactive"}`}>
-                <div class="cluster-card-main">
-                  <div class="cluster-card-title">
-                    <h3>{clusterName(cluster, L)}</h3>
-                    <p class="muted small">
-                      {L !== "mm" && cluster.stateNameEn ? cluster.stateNameEn : cluster.stateName}
-                      {" · "}{cells.length} {t("org.cells")}
-                    </p>
+              <article class={`hh-card cluster-card-v2${cluster.active ? "" : " is-inactive"}`}>
+                <div class="hh-card-head">
+                  <span class="hh-avatar" aria-hidden="true"><ClusterGlyph /></span>
+                  <div class="hh-card-title">
+                    <span class="hh-card-name" title={clusterName(cluster, L)}>{clusterName(cluster, L)}</span>
+                    <span class="hh-card-meta">
+                      <span class="muted small">
+                        {L !== "mm" && cluster.stateNameEn ? cluster.stateNameEn : cluster.stateName}
+                      </span>
+                      <span class="hh-count"><b>{cells.length}</b> {t("org.cells")}</span>
+                    </span>
                   </div>
-                  <div class="cluster-card-pastor">
-                    <span class="cluster-kicker">{t("org.clusterPastor")}</span>
-                    <span class={cluster.pastorName ? "" : "muted"}>
+                </div>
+
+                <div class="hh-facts">
+                  <div class="hh-fact">
+                    <span class="hh-fact-label">{t("org.clusterPastor")}</span>
+                    <span class={`hh-fact-value${cluster.pastorName ? "" : " muted"}`}>
                       {cluster.pastorName || t("org.noPastor")}
                     </span>
                   </div>
-                  <div class="role-card-actions cluster-card-actions">
-                    <span class={`badge ${cluster.active ? "active" : "inactive"}`}>
-                      {cluster.active ? t("dept.active") : t("dept.inactive")}
+                  <div class="hh-fact">
+                    <span class="hh-fact-label">{t("members.status")}</span>
+                    <span class="hh-fact-value">
+                      <span class={`badge ${cluster.active ? "active" : "inactive"}`}>
+                        {cluster.active ? t("dept.active") : t("dept.inactive")}
+                      </span>
                     </span>
-                    <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
-                      data-modal-title={t("org.editCluster")}>
-                      {t("members.edit")}
-                    </a>
                   </div>
                 </div>
 
@@ -347,6 +366,13 @@ export function SupervisionClustersPage(props: Common & {
                     ))}
                   </div>
                 )}
+
+                <div class="hh-card-actions">
+                  <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
+                    data-modal-title={t("org.editCluster")}>
+                    {t("members.edit")}
+                  </a>
+                </div>
               </article>
             );
           })}

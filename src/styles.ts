@@ -1167,6 +1167,11 @@ td.empty-state .small { margin-top: 4px; }
   background: var(--chip-brand-bg); color: var(--link); font-weight: 700;
 }
 .hh-avatar svg { width: 20px; height: 20px; display: block; }
+.hh-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.hh-card-name {
+  display: block; color: var(--ink); font-size: 16px; font-weight: 600;
+  line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .hh-avatar.sm { width: 32px; height: 32px; border-radius: 50%; font-size: 13px; }
 .hh-avatar.lg { width: 52px; height: 52px; border-radius: 14px; margin: 0 auto 10px; }
 .hh-card-title { flex: 1; min-width: 0; }
@@ -1197,6 +1202,29 @@ td.empty-state .small { margin-top: 4px; }
 .hh-card-actions .btn { flex: 1 1 auto; min-width: 0; text-align: center; }
 .hh-card-actions form { display: flex; flex: 1 1 auto; min-width: 0; margin: 0; }
 .hh-card-actions form .btn { width: 100%; }
+.cluster-card-v2 .cluster-cell-strip,
+.regional-card-v2 .regional-attached {
+  border-top: 1px dashed var(--line); background: transparent;
+  padding: 9px 0 0;
+}
+.cluster-card-v2 .cluster-empty-line,
+.regional-card-v2 .regional-attached-empty { margin: 0; padding: 1px 0 0; border-top: 0; }
+.cluster-card-v2.is-inactive,
+.regional-card-v2.is-inactive,
+.pastor-card-v2.is-inactive { opacity: .72; }
+.hh-grid.is-list .cluster-card-v2 .hh-card-actions,
+.hh-grid.is-list .regional-card-v2 .hh-card-actions,
+.hh-grid.is-list .pastor-card-v2 .hh-card-actions {
+  grid-column: 3; grid-row: 1; align-self: center; justify-content: flex-end;
+  margin: 0; padding: 0;
+}
+.hh-grid.is-list .cluster-card-v2 .cluster-cell-strip,
+.hh-grid.is-list .regional-card-v2 .regional-attached { grid-column: 1 / -1; }
+@media (max-width: 1180px) {
+  .hh-grid.is-list .cluster-card-v2 .hh-card-actions,
+  .hh-grid.is-list .regional-card-v2 .hh-card-actions,
+  .hh-grid.is-list .pastor-card-v2 .hh-card-actions { grid-column: 2; grid-row: 1; }
+}
 .hh-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; padding: 34px 20px; margin-bottom: 18px; text-align: center;

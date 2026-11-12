@@ -8,8 +8,18 @@ import {
   type PositionDefRow,
 } from "../position-catalog";
 import type { RegionalChurchRow } from "../org-units";
+import { CardViewToggle } from "./view-toggle";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
+
+function ChurchGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 21h18M5 21V10l7-4 7 4v11M9 21v-4h6v4M12 3v3M10.5 4.5h3" />
+    </svg>
+  );
+}
 
 const SCOPE_KEYS: Record<ConfigurablePositionScope, string> = {
   church: "org.scopeChurch",
@@ -441,27 +451,38 @@ export function RegionalChurchesPage(props: Common & {
     const cells = homeCells.filter((c) => c.regionalChurchId === church.id);
     const attachedGroups = groupCellsByTownship(cells, t("org.townshipUnassigned"));
     return (
-      <article class={`card regional-card${church.active ? "" : " is-inactive"}`}>
-        <header class="regional-card-head">
-          <div>
-            <h3>{L !== "mm" && church.nameEn ? church.nameEn : church.name}</h3>
-            <p class="muted small">
-              {(L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName)}
-              {" · "}{cells.length} {t("org.cells")}
-            </p>
-          </div>
-          <div class="role-card-actions">
-            {church.isMain === 1 && <span class="badge position">{t("org.mainChurchBadge")}</span>}
-            <span class={`badge ${church.active ? "active" : "inactive"}`}>
-              {church.active ? t("dept.active") : t("dept.inactive")}
+      <article class={`hh-card regional-card-v2${church.active ? "" : " is-inactive"}`}>
+        <div class="hh-card-head">
+          <span class="hh-avatar" aria-hidden="true"><ChurchGlyph /></span>
+          <div class="hh-card-title">
+            <span class="hh-card-name" title={L !== "mm" && church.nameEn ? church.nameEn : church.name}>
+              {L !== "mm" && church.nameEn ? church.nameEn : church.name}
             </span>
-            <a
-              class="btn sm secondary js-edit-modal"
-              href={`/organization/regional-churches/${church.id}/edit`}
-              data-modal-title={t("org.editRegional")}
-            >{t("members.edit")}</a>
+            <span class="hh-card-meta">
+              <span class="muted small">
+                {L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName}
+              </span>
+              <span class="hh-count"><b>{cells.length}</b> {t("org.cells")}</span>
+            </span>
           </div>
-        </header>
+        </div>
+
+        <div class="hh-facts">
+          <div class="hh-fact">
+            <span class="hh-fact-label">{t("detail.state")}</span>
+            <span class="hh-fact-value">
+              {L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName}
+            </span>
+          </div>
+          <div class="hh-fact">
+            <span class="hh-fact-label">{t("members.status")}</span>
+            <span class="hh-fact-value">
+              <span class={`badge ${church.active ? "active" : "inactive"}`}>
+                {church.active ? t("dept.active") : t("dept.inactive")}
+              </span>
+            </span>
+          </div>
+        </div>
 
         {cells.length === 0 ? (
           <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
@@ -477,6 +498,14 @@ export function RegionalChurchesPage(props: Common & {
             ))}
           </div>
         )}
+
+        <div class="hh-card-actions">
+          <a
+            class="btn sm secondary js-edit-modal"
+            href={`/organization/regional-churches/${church.id}/edit`}
+            data-modal-title={t("org.editRegional")}
+          >{t("members.edit")}</a>
+        </div>
       </article>
     );
   };
@@ -489,6 +518,7 @@ export function RegionalChurchesPage(props: Common & {
           <p class="page-sub">{t("org.regionalIntro")}</p>
         </div>
         <div class="page-head-actions">
+          <CardViewToggle lang={lang} viewKey="regional-churches" />
           <a
             class="btn js-add-modal"
             href="/organization/regional-churches/new"
@@ -535,7 +565,7 @@ export function RegionalChurchesPage(props: Common & {
                   <p class="muted small">{t("org.mainChurchHint")}</p>
                 </div>
               </div>
-              <div class="regional-list">{visibleMain.map(renderChurchCard)}</div>
+              <div class="hh-grid" data-view-grid>{visibleMain.map(renderChurchCard)}</div>
             </section>
           )}
 
@@ -551,7 +581,7 @@ export function RegionalChurchesPage(props: Common & {
                 <p class="muted">{t("org.noRegionalChurch")}</p>
               </div>
             ) : (
-              <div class="regional-list">{visibleRegional.map(renderChurchCard)}</div>
+              <div class="hh-grid" data-view-grid>{visibleRegional.map(renderChurchCard)}</div>
             )}
           </section>
         </>
