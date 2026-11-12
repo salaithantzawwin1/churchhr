@@ -16,5 +16,7 @@ export type AppEnv = {
     perms: Set<string>;
     scopeAll: boolean;
     stateIds: number[];
+    /** Home Cells the account's member list is limited to (empty = no limit). */
+    homeCellIds: number[];
   };
 };

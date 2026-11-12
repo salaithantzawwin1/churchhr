@@ -308,7 +308,7 @@ export function PastorsPage(props: Common & {
   const canUpdate = perms.has("options.manage");
 
   return (
-    <Layout title={t("org.pastorsTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
+    <Layout title={t("org.pastorsTitle")} lang={lang} user={user} perms={perms} active="/organization/pastors" flash={flash ?? null}>
       <div class="page-head">
         <div>
           <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span></h1>
@@ -445,7 +445,7 @@ export function PastorDetailPage(props: Common & { pastor: PastorRow }) {
   ];
 
   return (
-    <Layout title={displayName(pastor, L)} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
+    <Layout title={displayName(pastor, L)} lang={lang} user={user} perms={perms} active="/organization/pastors" flash={flash ?? null}>
       <div class="breadcrumb">
         <a href="/organization">{t("org.title")}</a>
         <span>/</span>

@@ -46,7 +46,8 @@ type UsersProps = Common & {
   users: (AdminUserRow & { state_names?: string })[];
   roles: { id: number; name: string; description: string | null }[];
   regions: { id: number; name: string }[];
-  editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[] }) | null;
+  editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] }) | null;
+  homeCells?: { id: number; name: string }[];
   createErrors: string[];
   editErrors: string[];
 };
@@ -64,9 +65,14 @@ function userForm(v: {
   allStates: boolean;
   selectedRoles: number[];
   selectedStates: number[];
+  homeCellIds: number[];
   active: number;
   mustChange: number;
-}, props: { roles: { id: number; name: string }[]; regions: { id: number; name: string }[] }, t: (k: string) => string) {
+}, props: {
+  roles: { id: number; name: string }[];
+  regions: { id: number; name: string }[];
+  homeCells: { id: number; name: string }[];
+}, t: (k: string) => string) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
   return (
     <form method="post" action={action} data-flash-ok={v.id ? "user-updated" : "user-created"}>
@@ -111,6 +117,18 @@ function userForm(v: {
         </div>
       </fieldset>
       <fieldset class="form-section">
+        <legend>{t("adm.homeCellScope")}</legend>
+        <p class="hint">{t("adm.homeCellScopeHint")}</p>
+        <div class="check-grid">
+          {props.homeCells.map((cell) => (
+            <label class="check-chip">
+              <input type="checkbox" name="home_cells" value={String(cell.id)}
+                checked={v.homeCellIds.includes(cell.id)} /> <span>{cell.name}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset class="form-section">
         <legend>{t("members.status")}</legend>
         <div class="check-grid">
           <label class="check-chip">
@@ -132,8 +150,9 @@ function userForm(v: {
  * reused by error responses inside the same modal. */
 export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
-  values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; active: number; mustChange: number };
+  values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
   roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
+  homeCells?: { id: number; name: string }[];
 }) {
   const t = getDict(props.lang ?? "en");
   return (
@@ -144,7 +163,8 @@ export function UserFormFragment(props: {
           <ul class="err-list">{props.errors.map((e) => <li>{e}</li>)}</ul>
         </div>
       )}
-      {userForm(props.values, { roles: props.roles, regions: props.regions }, t)}
+      {userForm({ ...props.values, homeCellIds: props.values.homeCellIds ?? [] },
+        { roles: props.roles, regions: props.regions, homeCells: props.homeCells ?? [] }, t)}
     </>
   );
 }
@@ -213,7 +233,7 @@ export function AdminUsersPage(props: UsersProps) {
           {editErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ id: editUser.id, username: editUser.username, allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
         </div>
       )}
 
@@ -222,9 +242,10 @@ export function AdminUsersPage(props: UsersProps) {
 }
 
 export function AdminUserEditPage(props: Common & {
-  editUser: AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[] };
+  editUser: AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] };
   roles: { id: number; name: string; description: string | null }[];
   regions: { id: number; name: string }[];
+  homeCells?: { id: number; name: string }[];
   editErrors: string[];
   modal?: boolean;
 }) {
@@ -233,8 +254,8 @@ export function AdminUserEditPage(props: Common & {
   if (modal) {
     return (
       <UserFormFragment lang={lang} errors={editErrors}
-        values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }}
-        roles={roles} regions={regions} />
+        values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+        roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
     );
   }
   return (
@@ -248,8 +269,8 @@ export function AdminUserEditPage(props: Common & {
           <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
         )}
         <UserFormFragment lang={lang} errors={editErrors}
-          values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, active: u.active, mustChange: u.must_change_password }}
-          roles={roles} regions={regions} />
+          values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+          roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
       </div>
     </Layout>
   );

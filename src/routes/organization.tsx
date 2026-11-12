@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { churchDepartments, memberPositions } from "../db/schema";
-import { requirePermission } from "../middleware";
+import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
@@ -1280,7 +1280,7 @@ function pastorFormFields(body: Record<string, unknown>) {
   };
 }
 
-organizationRoutes.get("/pastors", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/pastors", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   return c.html(
@@ -1296,7 +1296,7 @@ organizationRoutes.get("/pastors", requirePermission("options.manage"), async (c
   );
 });
 
-organizationRoutes.get("/pastors/new", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/pastors/new", requirePermission("pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   if (!modalRequest(c)) return c.redirect("/organization/pastors", 303);
@@ -1310,7 +1310,7 @@ organizationRoutes.get("/pastors/new", requirePermission("options.manage"), asyn
   );
 });
 
-organizationRoutes.get("/pastors/:id/photo", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/pastors/:id/photo", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1332,7 +1332,7 @@ organizationRoutes.get("/pastors/:id/photo", requirePermission("options.manage")
   return new Response(photo, { headers });
 });
 
-organizationRoutes.get("/pastors/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/pastors/:id", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1349,7 +1349,7 @@ organizationRoutes.get("/pastors/:id", requirePermission("options.manage"), asyn
   );
 });
 
-organizationRoutes.get("/pastors/:id/edit", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/pastors/:id/edit", requirePermission("pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1370,7 +1370,7 @@ organizationRoutes.get("/pastors/:id/edit", requirePermission("options.manage"),
   );
 });
 
-organizationRoutes.post("/pastors", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/pastors", requirePermission("pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
@@ -1438,7 +1438,7 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/pastors/:id", requirePermission("pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1511,7 +1511,7 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/pastors/:id/delete", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/pastors/:id/delete", requirePermission("pastors.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));

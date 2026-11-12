@@ -13,6 +13,8 @@ export const PERMISSIONS = [
   "users.manage",
   "roles.manage",
   "options.manage",
+  "pastors.view",
+  "pastors.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -31,6 +33,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "users.manage": "User Account စီမံခွင့်",
   "roles.manage": "Role / Permission စီမံခွင့်",
   "options.manage": "Dropdown စာရင်း စီမံခွင့်",
+  "pastors.view": "သင်းအုပ်ဆရာ စာရင်း ကြည့်ခွင့်",
+  "pastors.manage": "သင်းအုပ်ဆရာ စာရင်း စီမံခွင့်",
 };
 
 export const PERMISSION_LABELS_KR: Record<Permission, string> = {
@@ -47,6 +51,8 @@ export const PERMISSION_LABELS_KR: Record<Permission, string> = {
   "users.manage": "사용자 계정 관리",
   "roles.manage": "역할 / 권한 관리",
   "options.manage": "드롭다운 옵션 관리",
+  "pastors.view": "목회자 목록 보기",
+  "pastors.manage": "목회자 목록 관리",
 };
 
 export const PERMISSION_LABELS_EN: Record<Permission, string> = {
@@ -63,6 +69,8 @@ export const PERMISSION_LABELS_EN: Record<Permission, string> = {
   "users.manage": "Manage user accounts",
   "roles.manage": "Manage roles / permissions",
   "options.manage": "Manage dropdown options",
+  "pastors.view": "View pastor list",
+  "pastors.manage": "Manage pastor list",
 };
 
 /** Special region_id row meaning "every state". Kept out of FK constraints on purpose. */

@@ -82,6 +82,17 @@ export const userRoles = sqliteTable(
 );
 
 /** region_id = ALL_STATES_WILDCARD (0) means every state -> intentionally no FK. */
+export const userHomeCellAssignments = sqliteTable(
+  "user_home_cell_assignments",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    homeCellId: integer("home_cell_id").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.homeCellId] }) }),
+);
+
 export const userStateAssignments = sqliteTable(
   "user_state_assignments",
   {

@@ -4,7 +4,7 @@ import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
   ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, OPTION_TYPES, regions,
-  rolePermissions, roles, userRoles, userStateAssignments, users, type OptionType,
+  rolePermissions, roles, userHomeCellAssignments, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
@@ -154,11 +154,28 @@ async function userAssignments(db: DB, userId: number) {
   const roleRows = await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, userId));
   const stateRows = await db.select({ regionId: userStateAssignments.regionId })
     .from(userStateAssignments).where(eq(userStateAssignments.userId, userId));
+  const homeCellRows = await db.select({ homeCellId: userHomeCellAssignments.homeCellId })
+    .from(userHomeCellAssignments).where(eq(userHomeCellAssignments.userId, userId));
   return {
     selectedRoles: roleRows.map((r) => r.roleId),
     selectedStates: stateRows.filter((r) => r.regionId !== 0).map((r) => r.regionId),
+    selectedHomeCells: homeCellRows.map((r) => r.homeCellId),
     allStates: stateRows.some((r) => r.regionId === 0),
   };
+}
+
+/** Home Cells offered as an optional member-list limit, grouped by state. */
+async function homeCellOptions(db: DB, lang: Lang = "en"): Promise<{ id: number; name: string }[]> {
+  const rows = await db.all<{ id: number; label: string; state_name: string | null; state_name_en: string | null }>(sql`
+    SELECT o.id, o.label, r.name AS state_name, r.name_en AS state_name_en
+    FROM lookup_options o
+    LEFT JOIN regions r ON r.id = o.region_id
+    WHERE o.type = 'home_cell' AND o.active = 1
+    ORDER BY o.region_id, o.label`);
+  return rows.map((r) => {
+    const state = lang !== "mm" && r.state_name_en ? r.state_name_en : r.state_name;
+    return { id: r.id, name: state ? `${state} · ${r.label}` : r.label };
+  });
 }
 
 // ---------- Users ----------
@@ -170,6 +187,7 @@ adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
     <AdminUsersPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       users={usersList} roles={roleList} regions={regionsList}
+      homeCells={await homeCellOptions(db, c.get("lang"))}
       editUser={null} createErrors={[]} editErrors={[]}
       lang={c.get("lang")}
     />,
@@ -196,7 +214,8 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) 
     <AdminUserEditPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       editUser={{ ...target, ...assignments }}
-      roles={await loadRoles(db)} regions={await loadRegionsLite(db, c.get("lang"))} editErrors={[]}
+      roles={await loadRoles(db)} regions={await loadRegionsLite(db, c.get("lang"))}
+      homeCells={await homeCellOptions(db, c.get("lang"))} editErrors={[]}
       lang={c.get("lang")} modal={c.req.query("modal") === "1"}
     />,
   );
@@ -208,8 +227,9 @@ adminRoutes.get("/users/new", requirePermission("users.manage"), async (c) => {
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={[]}
-      values={{ username: "", allStates: false, selectedRoles: [], selectedStates: [], active: 1, mustChange: 1 }}
+      values={{ username: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
       roles={(await loadRoles(db)) as any} regions={await loadRegionsLite(db, c.get("lang"))}
+      homeCells={await homeCellOptions(db, c.get("lang"))}
     />,
   );
 });
@@ -220,15 +240,19 @@ function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) 
   const newPassword = s(body.new_password);
   const roleIds = ints(multi(body.roles));
   const statesRaw = ints(multi(body.states));
+  const homeCellsRaw = ints(multi(body.home_cells));
   const allStates = s(body.all_states) === "1";
   const active = s(body.active) === "1" ? 1 : 0;
   const mustChange = s(body.must_change) === "1" ? 1 : 0;
   const errors: string[] = [];
   if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
-  return { id: undefined as number | undefined, username, password, newPassword, roleIds, statesRaw, allStates, active, mustChange, errors };
+  return { id: undefined as number | undefined, username, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
 }
 
-async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[], allStates: boolean, errors: string[], _t: (k: string) => string) {
+async function validateAssignments(
+  db: DB, roleIds: number[], statesRaw: number[], homeCellsRaw: number[], allStates: boolean,
+  errors: string[], _t: (k: string) => string,
+) {
   const roleList = await loadRoles(db);
   if (roleIds.length === 0) errors.push("adm.errRoleRequired");
   if (roleIds.some((id) => !roleList.some((r) => r.id === id))) errors.push("adm.errRoleBad");
@@ -236,6 +260,10 @@ async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[
   if (statesRaw.length > 0) {
     const regionIds = new Set((await loadRegionsLite(db)).map((r) => r.id));
     if (statesRaw.some((id) => !regionIds.has(id))) errors.push("adm.errStateBad");
+  }
+  if (homeCellsRaw.length > 0) {
+    const cellIds = new Set((await homeCellOptions(db)).map((c) => c.id));
+    if (homeCellsRaw.some((id) => !cellIds.has(id))) errors.push("adm.errHomeCellBad");
   }
   return errors.length === 0;
 }
@@ -247,9 +275,10 @@ async function validateAssignments(db: DB, roleIds: number[], statesRaw: number[
  * been clobbered by the earlier validate call in a separate DB pool. */
 async function userFail(
   c: any,
-  p: { username: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
+  p: { username: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; homeCellsRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
   roleList: { id: number; name: string }[],
   regionList: { id: number; name: string }[],
+  homeCellList: { id: number; name: string }[],
 ) {
   const t = getDict(c.get("lang"));
   const errors = p.errors.map((e) => (e.startsWith("adm.") ? t(e) : e));
@@ -259,8 +288,8 @@ async function userFail(
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={errors}
-      values={{ id: p.id, username: p.username, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, active: p.active, mustChange: p.mustChange }}
-      roles={roleList} regions={regionList}
+      values={{ id: p.id, username: p.username, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, homeCellIds: p.homeCellsRaw, active: p.active, mustChange: p.mustChange }}
+      roles={roleList} regions={regionList} homeCells={homeCellList}
     />,
     400,
   );
@@ -280,8 +309,9 @@ adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   }
   const dup = await db.select({ id: users.id }).from(users).where(eq(users.username, p.username)).limit(1);
   if (dup.length > 0) p.errors.push(t("adm.errDupUser"));
-  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
-    return userFail(c, p, roleList, allRegions);
+  const homeCellList = await homeCellOptions(db, c.get("lang"));
+  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.homeCellsRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
+    return userFail(c, p, roleList, allRegions, homeCellList);
   }
 
   const passwordHash = await hashPassword(p.password, parseIterations(c.env.PBKDF2_ITERATIONS));
@@ -292,6 +322,9 @@ adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: newId, roleId });
   const stateIds = p.allStates ? [0] : p.statesRaw;
   for (const regionId of stateIds) await db.insert(userStateAssignments).values({ userId: newId, regionId });
+  for (const homeCellId of p.homeCellsRaw) {
+    await db.insert(userHomeCellAssignments).values({ userId: newId, homeCellId });
+  }
   return c.redirect("/admin/users?ok=user-created", 302);
 });
 
@@ -320,8 +353,9 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
       if (pwFailNew) p.errors.push(t(pwFailNew));
     }
   }
-  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
-    return userFail(c, p, roleList, allRegions);
+  const homeCellList = await homeCellOptions(db, c.get("lang"));
+  if (!(await validateAssignments(db, p.roleIds, p.statesRaw, p.homeCellsRaw, p.allStates, p.errors, t)) || p.errors.length > 0) {
+    return userFail(c, p, roleList, allRegions, homeCellList);
   }
 
   const updates: Record<string, string | number> = {
@@ -338,6 +372,10 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   await db.delete(userStateAssignments).where(eq(userStateAssignments.userId, id));
   for (const regionId of p.allStates ? [0] : p.statesRaw) {
     await db.insert(userStateAssignments).values({ userId: id, regionId });
+  }
+  await db.delete(userHomeCellAssignments).where(eq(userHomeCellAssignments.userId, id));
+  for (const homeCellId of p.homeCellsRaw) {
+    await db.insert(userHomeCellAssignments).values({ userId: id, homeCellId });
   }
   return c.redirect("/admin/users?ok=user-updated", 302);
 });

@@ -3,7 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { eq, inArray } from "drizzle-orm";
 import type { AppEnv } from "./env";
 import { getDb } from "./db/client";
-import { rolePermissions, userRoles, userStateAssignments, users } from "./db/schema";
+import { rolePermissions, userHomeCellAssignments, userRoles, userStateAssignments, users } from "./db/schema";
 import { ALL_STATES_WILDCARD, type Permission } from "./rbac";
 import { getSessionUser } from "./session";
 import { LANG_COOKIE, langFromQuery, normalizeLang } from "./i18n";
@@ -13,6 +13,7 @@ export type Access = {
   perms: Set<string>;
   scopeAll: boolean;
   stateIds: number[];
+  homeCellIds: number[];
 };
 
 /** Loads effective permissions (union of the user's roles) and state scope. */
@@ -40,7 +41,20 @@ export async function loadAccess(db: ReturnType<typeof getDb>, userId: number): 
     .filter((r) => r.regionId !== ALL_STATES_WILDCARD)
     .map((r) => r.regionId);
 
-  return { perms: new Set(permRows.map((r) => r.permission)), scopeAll, stateIds };
+  // Optional per-account member-list limit by Home Cell (0033).
+  let homeCellIds: number[] = [];
+  try {
+    const homeCellRows = await db
+      .select({ homeCellId: userHomeCellAssignments.homeCellId })
+      .from(userHomeCellAssignments)
+      .where(eq(userHomeCellAssignments.userId, userId));
+    homeCellIds = homeCellRows.map((r) => r.homeCellId);
+  } catch (err) {
+    // Deploy-before-migration safety: the table may not exist yet.
+    homeCellIds = [];
+  }
+
+  return { perms: new Set(permRows.map((r) => r.permission)), scopeAll, stateIds, homeCellIds };
 }
 
 /** Redirects to /login when no live session; loads perms + scope into context vars. */
@@ -86,6 +100,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   c.set("perms", access.perms);
   c.set("scopeAll", access.scopeAll);
   c.set("stateIds", access.stateIds);
+  c.set("homeCellIds", access.homeCellIds);
   await next();
 });
 
@@ -94,6 +109,17 @@ export function requirePermission(perm: Permission) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const perms = c.get("perms");
     if (!perms || !perms.has(perm)) {
+      return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
+    }
+    await next();
+  });
+}
+
+/** Gate that accepts any one of the given permissions (e.g. view OR manage). */
+export function requireAnyPermission(...perms: Permission[]) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const granted = c.get("perms");
+    if (!granted || !perms.some((p) => granted.has(p))) {
       return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
     }
     await next();

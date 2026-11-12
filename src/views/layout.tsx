@@ -31,10 +31,15 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
   const t = getDict(L);
   const PRIMARY_NAV: { href: string; label: string; perm: Permission }[] = [
     { href: "/", label: t("nav.dashboard"), perm: "dashboard.view" },
-    { href: "/members", label: t("nav.members"), perm: "members.view" },
     { href: "/organization", label: t("nav.organization"), perm: "members.view" },
-    { href: "/admin/households", label: t("nav.households"), perm: "members.view" },
     { href: "/reports", label: t("nav.reports"), perm: "reports.view" },
+  ];
+  // People records sit under one "Members" heading: the list, households and
+  // the pastor directory (each gated by its own permission).
+  const MEMBER_NAV: { href: string; label: string; perm: Permission[] }[] = [
+    { href: "/members", label: t("nav.members"), perm: ["members.view"] },
+    { href: "/admin/households", label: t("nav.households"), perm: ["members.view"] },
+    { href: "/organization/pastors", label: t("nav.pastors"), perm: ["pastors.view", "pastors.manage"] },
   ];
   const ADMIN_NAV: { href: string; label: string; perm: Permission; section?: string }[] = [
     { href: "/members/import", label: t("nav.import"), perm: "members.import" },
@@ -45,12 +50,14 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/organization/departments", label: t("nav.departments"), perm: "options.manage", section: "structure" },
     { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: "options.manage", section: "structure" },
     { href: "/organization/clusters", label: t("nav.clusters"), perm: "options.manage", section: "structure" },
-    { href: "/organization/pastors", label: t("nav.pastors"), perm: "options.manage", section: "structure" },
     { href: "/organization/vacancies", label: t("vacancy.link"), perm: "members.view", section: "structure" },
   ];
   const allowed = (n: { perm: Permission }) => !perms || perms.has(n.perm);
+  const allowedAny = (n: { perm: Permission[] }) => !perms || n.perm.some((p) => perms.has(p));
   const primaryItems = PRIMARY_NAV.filter(allowed);
+  const memberItems = MEMBER_NAV.filter(allowedAny);
   const adminItems = ADMIN_NAV.filter(allowed);
+  const memberActive = memberItems.some((n) => n.href === active);
   const adminActive = adminItems.some((n) => n.href === active);
   return (
     <html lang={L === "mm" ? "my" : L === "kr" ? "ko" : "en"}>
@@ -83,14 +90,35 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
           </a>
           {user && (
             <nav aria-label={t("nav.main")}>
-              {primaryItems.map((n) => (
-                <a
-                  href={n.href}
-                  class={active === n.href ? "active" : ""}
-                  aria-current={active === n.href ? "page" : undefined}
-                >
-                  {n.label}
-                </a>
+              {primaryItems.map((n, i) => (
+                <>
+                  <a
+                    href={n.href}
+                    class={active === n.href ? "active" : ""}
+                    aria-current={active === n.href ? "page" : undefined}
+                  >
+                    {n.label}
+                  </a>
+                  {/* People records sit right after Dashboard. */}
+                  {i === 0 && memberItems.length > 0 && (
+                    <details class={`nav-admin${memberActive ? " active" : ""}`}>
+                      <summary aria-current={memberActive ? "page" : undefined}>
+                        {t("nav.memberGroup")} <span class="chev" aria-hidden="true">▾</span>
+                      </summary>
+                      <div class="nav-menu">
+                        {memberItems.map((n2) => (
+                          <a
+                            href={n2.href}
+                            class={active === n2.href ? "active" : ""}
+                            aria-current={active === n2.href ? "page" : undefined}
+                          >
+                            {n2.label}
+                          </a>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
               ))}
               {adminItems.length > 0 && (
                 <>

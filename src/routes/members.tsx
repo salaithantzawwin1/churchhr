@@ -101,20 +101,30 @@ function renderMsg(raw: string, lang: Lang): string {
   return key ? `${t(key)}${rest}` : body;
 }
 
-type Scope = { scopeAll: boolean; stateIds: number[] };
+type Scope = { scopeAll: boolean; stateIds: number[]; homeCellIds: number[] };
 type Region = { id: number; name: string; nameEn: string; slug: string; code: string | null };
 
-function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
-  return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
+function scopeOf(c: { get: (k: "scopeAll" | "stateIds" | "homeCellIds") => any }): Scope {
+  return {
+    scopeAll: c.get("scopeAll"),
+    stateIds: c.get("stateIds"),
+    homeCellIds: (c.get("homeCellIds") ?? []) as number[],
+  };
 }
 
-/** SQL fragment: restrict rows to assigned states (all-state users see everything). */
+/** SQL fragment: assigned states (all-state users see everything), then the
+ * account's optional Home Cell limit. */
 function scopeCond(scope: Scope) {
-  if (scope.scopeAll) return sql`1=1`;
-  if (scope.stateIds.length === 0) return sql`1=0`;
+  let cond: any;
+  if (scope.scopeAll) cond = sql`1=1`;
+  else if (scope.stateIds.length === 0) cond = sql`1=0`;
   // Qualified: /members joins regions + lookup tables, so a bare region_id
   // would be ambiguous (members and regions both have that column).
-  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
+  else cond = sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
+  if (scope.homeCellIds.length > 0) {
+    cond = sql`${cond} AND m.home_cell_id IN (${sql.join(scope.homeCellIds.map((id) => sql`${id}`), sql`, `)})`;
+  }
+  return cond;
 }
 
 function parseFilters(q: Record<string, string | undefined>): Filters {
@@ -927,8 +937,12 @@ async function loadMemberDetail(db: DB, id: number): Promise<(MemberDetail & { r
   return rows[0] as any;
 }
 
-function inScope(row: { region_id: number }, scope: Scope): boolean {
-  return scope.scopeAll || scope.stateIds.includes(row.region_id);
+function inScope(row: { region_id: number; home_cell_id?: number | null }, scope: Scope): boolean {
+  if (!scope.scopeAll && !scope.stateIds.includes(row.region_id)) return false;
+  if (scope.homeCellIds.length > 0) {
+    return row.home_cell_id != null && scope.homeCellIds.includes(row.home_cell_id);
+  }
+  return true;
 }
 
 /** Client-side canvas output is small; keep a hard cap on what reaches D1. */
