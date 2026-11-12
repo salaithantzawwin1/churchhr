@@ -1,4 +1,4 @@
-import { and, eq, gt, lte } from "drizzle-orm";
+import { and, eq, gt, lte, ne } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { sessions, users } from "./db/schema";
 
@@ -96,6 +96,14 @@ export async function getSessionUser(db: DB, token: string): Promise<SessionUser
     mustChangePassword: row.mustChangePassword === 1,
     language: row.language ?? null,
   };
+}
+
+/** Signs out every other device for this account, keeping the current session. */
+export async function destroyOtherSessions(db: DB, userId: number, keepToken: string | null): Promise<void> {
+  const keepHash = keepToken ? await sha256Hex(keepToken) : null;
+  await db.delete(sessions).where(
+    keepHash ? and(eq(sessions.userId, userId), ne(sessions.tokenHash, keepHash)) : eq(sessions.userId, userId),
+  );
 }
 
 export async function purgeExpiredSessions(db: DB): Promise<void> {

@@ -25,6 +25,25 @@ const app = new Hono<AppEnv>();
 const CANONICAL_HOST = "www.mmgoodnewshr.online";
 const APEX_HOST = "mmgoodnewshr.online";
 
+/** SHA-256 of the one inline <script> in layout.tsx (the theme bootstrap that
+ *  must run before paint). Pinned so CSP can stay strict; if that script text
+ *  changes, recompute this or the browser drops the script (and the page simply
+ *  falls back to the dark theme until app.js reads the saved choice). */
+const INLINE_THEME_HASH = "sha256-bsIc6P//SoFYo1DS1od1VPsWhvFCRt+s/elRqEMHSZU=";
+
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "img-src 'self' data: blob:", // member photos + the client-side resize preview
+  `script-src 'self' '${INLINE_THEME_HASH}'`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // inline style attributes are used throughout
+  "font-src https://fonts.gstatic.com",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join("; ");
+
 // Security headers for every response, including redirects.
 app.use("*", async (c, next) => {
   await next();
@@ -32,7 +51,10 @@ app.use("*", async (c, next) => {
   c.header("X-Frame-Options", "DENY");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  c.header("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  c.header("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  c.header("Cross-Origin-Opener-Policy", "same-origin");
+  c.header("Cross-Origin-Resource-Policy", "same-origin");
+  c.header("X-Permitted-Cross-Domain-Policies", "none");
   const url = new URL(c.req.url);
   if ((url.hostname === CANONICAL_HOST || url.hostname === APEX_HOST) && isHttpsRequest(c)) {
     c.header("Strict-Transport-Security", "max-age=15552000");
@@ -80,6 +102,13 @@ app.use("*", async (c, next) => {
         return c.text("Bad request", 400);
       }
       if (host && originHost !== host) return c.text("Bad request (origin)", 403);
+    } else {
+      // Older clients may omit Origin on form posts; Sec-Fetch-Site is sent by
+      // every modern browser and still separates a cross-site post from ours.
+      const site = c.req.header("Sec-Fetch-Site")?.toLowerCase();
+      if (site && site !== "same-origin" && site !== "none") {
+        return c.text("Bad request (origin)", 403);
+      }
     }
   }
   await next();

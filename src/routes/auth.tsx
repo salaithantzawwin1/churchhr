@@ -14,6 +14,7 @@ import {
   destroySession,
   nowSeconds,
   purgeExpiredSessions,
+  destroyOtherSessions,
 } from "../session";
 import { LoginPage, ProfilePage } from "../views/auth";
 import { getDict } from "../i18n";
@@ -95,6 +96,9 @@ publicAuthRoutes.post("/login", async (c) => {
 
   const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
   if (!user || user.active !== 1) {
+    // Spend the same PBKDF2 work as a real check so response timing does not
+    // reveal whether a username exists.
+    await hashPassword(password || "x", parseIterations(c.env.PBKDF2_ITERATIONS));
     await recordAttempt(db, ip, now);
     return fail(t("login.error"));
   }
@@ -196,5 +200,7 @@ profileRoutes.post("/profile", async (c) => {
     .update(users)
     .set({ passwordHash, mustChangePassword: 0 })
     .where(eq(users.id, user.id));
+  // A changed password signs out the account's other devices but keeps this one.
+  await destroyOtherSessions(db, user.id, getCookie(c, "session") ?? null);
   return redirect();
 });

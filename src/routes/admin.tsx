@@ -10,6 +10,7 @@ import { requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
+import { destroyOtherSessions } from "../session";
 import { checkPasswordPolicy } from "../password";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
 import { PERMISSIONS, type Permission } from "../rbac";
@@ -373,6 +374,8 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
     updates.mustChangePassword = 1;
   }
   await db.update(users).set(updates).where(eq(users.id, id));
+  // A reset password or a deactivated account must not keep its live sessions.
+  if (p.newPassword || p.active !== 1) await destroyOtherSessions(db, id, null);
 
   await db.delete(userRoles).where(eq(userRoles.userId, id));
   for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: id, roleId });
