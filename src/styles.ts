@@ -1315,6 +1315,13 @@ td.empty-state .small { margin-top: 4px; }
 .org-state-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .org-state-head h2 { margin: 0 0 2px; }
 .org-state-head p { margin: 0 0 12px; }
+/* Home Cells group State/Region → Church → Township. */
+.org-church-block { margin-top: var(--space-3); }
+.org-church-block-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; padding: 6px 0;
+}
+.org-church-block-head h3 { margin: 0; font-size: 14px; color: var(--ink); }
 .org-township { border-top: 1px solid var(--line); }
 .org-township > summary {
   display: flex; align-items: center; gap: 10px; min-height: 46px;

@@ -96,30 +96,35 @@ function groupCells(cells: OrgCell[], clusters: SupervisionClusterRow[], lang: L
       group.cells.push(cell);
     }
     state.townships = [...towns.values()];
-    const clusterById = new Map(clusters.map((c) => [c.id, c]));
-    const groups = new Map<string, SupervisionGroup>();
-    for (const cell of state.cells) {
-      const cluster = cell.supervision_cluster_id
-        ? clusterById.get(cell.supervision_cluster_id) ?? null
-        : null;
-      const key = cluster
-        ? `cluster:${cluster.id}`
-        : `township:${cell.township_id ?? "none"}:${cell.township ?? "-"}`;
-      let group = groups.get(key);
-      if (!group) {
-        group = {
-          kind: cluster ? "cluster" : "township",
-          id: cluster ? cluster.id : cell.township_id,
-          name: cluster ? clusterName(cluster, lang) : cell.township || "—",
-          cells: [], cluster,
-        };
-        groups.set(key, group);
-      }
-      group.cells.push(cell);
-    }
-    state.groups = [...groups.values()];
+    state.groups = supervisionGroups(state.cells, clusters, lang);
   }
   return [...states.values()];
+}
+
+/** Supervision clusters (or townships without one) for any cell list. */
+function supervisionGroups(cells: OrgCell[], clusters: SupervisionClusterRow[], lang: Lang): SupervisionGroup[] {
+  const clusterById = new Map(clusters.map((c) => [c.id, c]));
+  const groups = new Map<string, SupervisionGroup>();
+  for (const cell of cells) {
+    const cluster = cell.supervision_cluster_id
+      ? clusterById.get(cell.supervision_cluster_id) ?? null
+      : null;
+    const key = cluster
+      ? `cluster:${cluster.id}`
+      : `township:${cell.township_id ?? "none"}:${cell.township ?? "-"}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        kind: cluster ? "cluster" : "township",
+        id: cluster ? cluster.id : cell.township_id,
+        name: cluster ? clusterName(cluster, lang) : cell.township || "—",
+        cells: [], cluster,
+      };
+      groups.set(key, group);
+    }
+    group.cells.push(cell);
+  }
+  return [...groups.values()];
 }
 
 function initialOf(name: string | null | undefined): string {
@@ -540,6 +545,21 @@ export function OrganizationPage(props: Common & {
 
   const renderStateHierarchy = (state: StateGroup) => {
     const stateMembers = state.cells.reduce((sum, cell) => sum + cell.member_count, 0);
+    // Home Cells read State/Region → Church → supervision group → cell.
+    const churchGroups = new Map<string, { key: string; name: string; cells: OrgCell[] }>();
+    for (const cell of state.cells) {
+      const church = cell.regional_church_id
+        ? regionalChurches.find((c) => c.id === cell.regional_church_id) ?? null
+        : null;
+      const key = church ? String(church.id) : "none";
+      const group = churchGroups.get(key) ?? {
+        key,
+        name: church ? regionalChurchName(church, L) : t("org.noChurchGroup"),
+        cells: [],
+      };
+      group.cells.push(cell);
+      churchGroups.set(key, group);
+    }
     return (
       <section class="org-flow-state">
         <div class="org-flow-state-head">
@@ -548,9 +568,17 @@ export function OrganizationPage(props: Common & {
             {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")}
           </span>
         </div>
-        <div class="org-flow-clusters">
-          {state.groups.map(renderSupervisionGroup)}
-        </div>
+        {[...churchGroups.values()].map((churchGroup) => (
+          <div class="org-church-block">
+            <div class="org-church-block-head">
+              <h3>{churchGroup.name}</h3>
+              <span class="muted small">{churchGroup.cells.length} {t("org.cells")}</span>
+            </div>
+            <div class="org-flow-clusters">
+              {supervisionGroups(churchGroup.cells, clusters, L).map(renderSupervisionGroup)}
+            </div>
+          </div>
+        ))}
       </section>
     );
   };
@@ -566,10 +594,10 @@ export function OrganizationPage(props: Common & {
 
       <div class="page-toolbar">
         <div class="tabs">
-          <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization"
-            aria-current={tab === "church" ? "page" : undefined}>{t("org.churchTab")}</a>
-          <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization?tab=main"
+          <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
+          <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization?tab=church"
+            aria-current={tab === "church" ? "page" : undefined}>{t("org.churchTab")}</a>
           <a class={`btn sm ${tab === "regional" ? "" : "secondary"}`} href="/organization?tab=regional"
             aria-current={tab === "regional" ? "page" : undefined}>{t("org.regionalTab")}</a>
           <a class={`btn sm ${tab === "home-cells" ? "" : "secondary"}`} href="/organization?tab=home-cells"
@@ -741,6 +769,21 @@ export function OrganizationPage(props: Common & {
                 const stateLeaders = leadCode
                   ? state.cells.filter((c) => homeRole(c.id, leadCode)).length
                   : 0;
+                // Home Cells read State/Region → Church → Township → cell.
+                const churchGroups = new Map<string, { key: string; name: string; cells: OrgCell[] }>();
+                for (const cell of state.cells) {
+                  const church = cell.regional_church_id
+                    ? regionalChurches.find((c) => c.id === cell.regional_church_id) ?? null
+                    : null;
+                  const key = church ? String(church.id) : "none";
+                  const group = churchGroups.get(key) ?? {
+                    key,
+                    name: church ? regionalChurchName(church, L) : t("org.noChurchGroup"),
+                    cells: [],
+                  };
+                  group.cells.push(cell);
+                  churchGroups.set(key, group);
+                }
                 return (
                   <section class="card org-state">
                     <div class="org-state-head">
@@ -751,7 +794,15 @@ export function OrganizationPage(props: Common & {
                         </p>
                       </div>
                     </div>
-                    {state.townships.map((town) => (
+                    {[...churchGroups.values()].map((churchGroup) => (
+                    <div class="org-church-block">
+                      <div class="org-church-block-head">
+                        <h3>{churchGroup.name}</h3>
+                        <span class="muted small">
+                          {churchGroup.cells.length} {t("org.cells")}
+                        </span>
+                      </div>
+                    {groupByTownship(churchGroup.cells, churchGroup.name).map((town) => (
                       <details class="org-township">
                         <summary>
                           <span class="org-township-name">{town.name}</span>
@@ -775,6 +826,8 @@ export function OrganizationPage(props: Common & {
                           ))}
                         </div>
                       </details>
+                    ))}
+                    </div>
                     ))}
                   </section>
                 );

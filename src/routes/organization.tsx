@@ -58,11 +58,12 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const tabParam = c.req.query("tab");
+  // Main Church leads the page; the other tabs are explicit links.
   const tab: "church" | "main" | "regional" | "home-cells" =
     tabParam === "home-cells" ? "home-cells"
       : tabParam === "regional" ? "regional"
-        : tabParam === "main" ? "main"
-          : "church";
+        : tabParam === "church" ? "church"
+          : "main";
 
   const cells = await db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,
@@ -229,7 +230,7 @@ function assignTab(raw: unknown): AssignTab {
 function assignLanding(tab: AssignTab, churchId: number | null, ok?: string): string {
   const base = tab === "main"
     ? "/organization?tab=main"
-    : churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
+    : churchId ? `/organization?tab=church&church=${churchId}` : "/organization?tab=church";
   return ok ? `${base}&ok=${ok}` : base;
 }
 
