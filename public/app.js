@@ -1047,6 +1047,30 @@
     });
   })();
 
+  // "Swipe sideways" is only true while a table is wider than its scroller: on a
+  // phone the secondary columns are hidden and nothing scrolls, so the hint is
+  // wrong there and just takes up space.
+  (function initScrollHints() {
+    function sync() {
+      Array.prototype.forEach.call(document.querySelectorAll(".scroll-hint"), function (hint) {
+        var wrap = hint.nextElementSibling;
+        if (!wrap || !wrap.classList.contains("tbl-wrap")) return;
+        hint.style.display = wrap.scrollWidth > wrap.clientWidth + 1 ? "" : "none";
+      });
+    }
+    sync();
+    window.addEventListener("resize", sync);
+  })();
+
+  // A phone has room for the filter panel or the list, not both, so the panel
+  // starts closed there unless a filter is already narrowing the results.
+  (function initFilterPanels() {
+    if (!window.matchMedia("(max-width: 640px)").matches) return;
+    Array.prototype.forEach.call(document.querySelectorAll("details.filter-box[open]"), function (panel) {
+      if (!panel.querySelector(".filter-count")) panel.removeAttribute("open");
+    });
+  })();
+
   // Card/list preference for collection pages. Both views use the same server
   // markup; the choice is stored locally so it survives navigation.
   (function initCollectionViews() {

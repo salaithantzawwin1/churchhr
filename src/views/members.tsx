@@ -296,12 +296,15 @@ export function MembersListPage(props: ListProps) {
             <button class="btn sm" type="submit" data-confirm={t("bulk.confirm")}>{t("bulk.apply")}</button>
             <button class="btn sm secondary" type="button" data-bulk-clear="1">{t("members.clear")}</button>
           </div>
+        </form>
+      )}
+
       <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
-        <table class="list-tbl">
+        <table class="list-tbl members-tbl">
           <thead>
             <tr>
-              <th style="width:28px"><input type="checkbox" id="bulk-check-all" aria-label={t("members.selectAll")} /></th>
+              <th style="width:28px"><input type="checkbox" id="bulk-check-all" form="bulk-form" aria-label={t("members.selectAll")} /></th>
               {cols.map((c) => {
                 // Server-side sort: header links toggle asc/desc and keep the
                 // filters; the active column shows a direction arrow.
@@ -342,7 +345,7 @@ export function MembersListPage(props: ListProps) {
             )}
             {rows.map((m) => (
               <tr>
-                <td style="width:28px"><input type="checkbox" class="bulk-check" value={String(m.id)} aria-label={m.name_myanmar || m.name_english || `#${m.id}`} /></td>
+                <td style="width:28px"><input type="checkbox" class="bulk-check" form="bulk-form" value={String(m.id)} aria-label={m.name_myanmar || m.name_english || `#${m.id}`} /></td>
                 <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
                 <td data-col="name">
                   {m.has_photo ? (
@@ -407,8 +410,6 @@ export function MembersListPage(props: ListProps) {
           </tbody>
         </table>
       </div>
-        </form>
-      )}
 
       {pages > 1 && (
         <div class="actions" style="justify-content:center">

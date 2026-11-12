@@ -235,7 +235,7 @@ tbody tr:hover { background: var(--row-hover); }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   border: 0; opacity: 0; pointer-events: none; overflow: hidden;
 }
-.filter-toolbar .dp { width: 250px; max-width: 100%; }
+.filter-toolbar .dp { width: 100%; max-width: 262px; }
 .filter-toolbar .dp .dp-part { height: 36px; font-size: 13.5px; }
 /* Sent forms lock their button until the response arrives (app.js). */
 .btn.is-submitting { pointer-events: none; opacity: .65; }
@@ -865,7 +865,9 @@ td.empty-state .small { margin-top: 4px; }
 .dash-head .filter-toolbar-box { margin: 0; flex: 0 1 auto; max-width: 100%; }
 .filter-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; }
 .filter-toolbar select {
-  width: 150px; max-width: 100%; height: 36px; padding: 0 30px 0 10px;
+  /* Wide enough for the longest option label ("All departments"); at 150px it
+     was clipped to "All departmen" on desktop. */
+  width: 172px; max-width: 100%; height: 36px; padding: 0 28px 0 10px;
   font-size: 13.5px; border-radius: var(--radius-sm);
 }
 .filter-toolbar input[type="search"] {
@@ -917,6 +919,12 @@ td.empty-state .small { margin-top: 4px; }
   .filter-clear { grid-column: 1 / -1; text-align: left; }
 }
 @media (max-width: 400px) {
+  /* Two columns still fit a 360px phone; one column made the panel taller than
+     the list it filters. The date picker keeps a full row of its own. */
+  .filter-toolbar { grid-template-columns: 1fr 1fr; }
+  .filter-toolbar .dp { grid-column: 1 / -1; max-width: none; }
+}
+@media (max-width: 340px) {
   .filter-toolbar { grid-template-columns: 1fr; }
 }
 .dash-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -2554,4 +2562,55 @@ th { font-size: 13px; }
   .pastor-section legend, .detail-item .k, .edit-change .k, .edit-pair .k,
   .regional-candidate-group h4, .cluster-kicker, .cluster-cell-group h4
 ) { text-transform: none; letter-spacing: 0; }
+
+/* ---------- members list on a phone ----------
+   Fifteen columns are unreadable on a phone and force a long sideways scroll,
+   so the secondary columns step aside and the list keeps the columns that
+   identify a member and tell you what you came for: name, age, home cell, status
+   and the row actions. Wider screens (and the column chooser) still show them. */
+@media (max-width: 900px) {
+  .list-tbl :is(th, td):is(
+    [data-col="id"], [data-col="phone"], [data-col="state"], [data-col="township"],
+    [data-col="marital"], [data-col="role"], [data-col="group"],
+    [data-col="familyGroup"], [data-col="fellowship"], [data-col="sector"]
+  ) { display: none; }
+  /* The remaining columns fit, so drop the forced scroll width. */
+  table.list-tbl.members-tbl { min-width: 0; }
+}
+@media (max-width: 520px) {
+  .list-tbl :is(th, td):is([data-col="gender"], [data-col="homeCell"]) { display: none; }
+  .list-tbl :is(th, td) { padding: 10px 10px; }
+  .list-tbl td[data-col="name"] { max-width: none; }
+  /* Three columns left, so they have to wrap instead of forcing a sideways
+     swipe: the name may take two lines and the badge may break after the word. */
+  .members-tbl :is(th, td) { padding: 9px 8px; }
+  .members-tbl td[data-col="name"],
+  .members-tbl td[data-col="status"] { white-space: normal; overflow-wrap: anywhere; }
+  .members-tbl td:nth-child(2) { min-width: 0; }
+  .members-tbl .row-icon-actions { gap: 4px; }
+  /* Role badges and their Change link turn a two-line row into six lines on a
+     phone; roles are on the member page, which the row already links to. */
+  .members-tbl .member-role-inline { display: none; }
+  .members-tbl td[data-col="status"] .badge { white-space: nowrap; }
+  /* One row action on a phone: Edit stays, Delete is on the member page and in
+     the bulk bar, where it is harder to hit by accident. */
+  .members-tbl .row-icon-actions form { display: none; }
+}
+@media (max-width: 380px) {
+  .members-tbl :is(th, td)[data-col="age"] { display: none; }
+  .members-tbl .list-avatar { display: none; }
+}
+/* Touch targets: the header pills and the "View all" links were sized for a
+   mouse pointer; on a phone they are the smallest things on the screen. */
+@media (max-width: 640px) {
+  .topbar .langswitch a { min-height: 34px; padding: 2px 11px; }
+  .topbar .who-link { display: inline-flex; align-items: center; min-height: 34px; }
+  .dc-head a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 2px; }
+  .members-tbl input[type="checkbox"],
+  .bulk-check-all { width: 18px; height: 18px; }
+}
+@media (max-width: 400px) {
+  .members-tbl .list-avatar { display: none; }
+  .members-tbl td[data-col="age"], .members-tbl th[data-col="age"] { padding-left: 4px; padding-right: 4px; }
+}
 `; // end of stylesheet
