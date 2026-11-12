@@ -10,6 +10,7 @@ export type RegionalChurchRow = {
   stateNameEn: string | null;
   active: number;
   sortOrder: number;
+  isMain: number;
   cellCount?: number;
 };
 
@@ -55,7 +56,7 @@ export async function loadRegionalChurches(db: DB, opts: LoadRegionalOptions = {
   return db.all<RegionalChurchRow>(sql`
     SELECT rc.id, rc.name, rc.name_en AS nameEn, rc.region_id AS regionId,
            r.name AS stateName, r.name_en AS stateNameEn,
-           rc.active, rc.sort_order AS sortOrder,
+           rc.active, rc.sort_order AS sortOrder, rc.is_main AS isMain,
            (SELECT COUNT(*) FROM lookup_options hc
              WHERE hc.regional_church_id = rc.id AND hc.type = 'home_cell' AND hc.active = 1) AS cellCount
     FROM regional_churches rc

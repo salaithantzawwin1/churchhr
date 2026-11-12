@@ -322,8 +322,9 @@ export function RegionalChurchModal(props: {
   const t = getDict(L);
   const values = props.values ?? regionalValues(church);
   const cells = church ? homeCells.filter((c) => c.regionalChurchId === church.id) : [];
-  const candidates = church
-    ? homeCells.filter((c) => c.regionId === church.regionId && (c.regionalChurchId == null || c.regionalChurchId === church.id))
+  const selectedRegion = values.regionId === "" ? church?.regionId : values.regionId;
+  const candidates = church && selectedRegion != null
+    ? homeCells.filter((c) => c.regionId === selectedRegion && (c.regionalChurchId == null || c.regionalChurchId === church.id))
     : [];
   const isPicked = (cell: HomeCellOption) =>
     props.selectedCellIds ? props.selectedCellIds.includes(cell.id) : cell.regionalChurchId === church?.id;
@@ -331,27 +332,28 @@ export function RegionalChurchModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
+      {/* One form and one Save, matching the cluster editor: details and Home
+          Cell attachment are written together instead of two separate saves. */}
+      <form method="post" class="cluster-main-form"
+        action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
         <RegionalFields values={values} regions={regions} lang={L} editing={Boolean(church)} />
-        <div class="actions">
-          <button class="btn" type="submit">{church ? t("dept.save") : t("form.add")}</button>
-        </div>
-      </form>
 
-      {church && (
-        <>
-          <form method="post" action={`/organization/regional-churches/${church.id}/cells`} class="regional-cells-form" data-modal-ajax>
-            <div class="regional-cells-head">
-              <strong>{t("org.regionalCellAssignment")}</strong>
-              <span class="muted small">{t("org.regionalCellHint")}</span>
+        {church && (
+          <section class="cluster-cells-section" aria-labelledby="church-cells-title">
+            <input type="hidden" name="cells_present" value="1" />
+            <div class="cluster-section-head">
+              <div class="cluster-section-title">
+                <strong id="church-cells-title">{t("org.regionalCellAssignment")}</strong>
+              </div>
+              <p class="muted small">{t("org.regionalCellHint")}</p>
             </div>
             {cellError && <div class="modal-error" role="alert">{cellError}</div>}
             {candidates.length === 0 ? (
               <p class="muted small">{t("org.regionalNoCells")}</p>
             ) : (
-              <div class="regional-cell-groups">
+              <div class="cluster-cell-groups">
                 {groupCellsByTownship(candidates, t("org.townshipUnassigned")).map((group) => (
-                  <div class="regional-candidate-group">
+                  <div class="cluster-cell-group">
                     <h4>{group.name}</h4>
                     <div class="check-grid">
                       {group.cells.map((cell) => (
@@ -366,11 +368,16 @@ export function RegionalChurchModal(props: {
                 ))}
               </div>
             )}
-            <div class="actions">
-              <button class="btn sm secondary" type="submit">{t("org.saveCells")}</button>
-            </div>
-          </form>
+          </section>
+        )}
 
+        <div class="actions">
+          <button class="btn" type="submit">{church ? t("dept.save") : t("form.add")}</button>
+        </div>
+      </form>
+
+      {church && (
+        <div class="cluster-modal-foot">
           {cells.length === 0 ? (
             <form
               method="post"
@@ -387,7 +394,7 @@ export function RegionalChurchModal(props: {
           ) : (
             <p class="muted small modal-note">{t("org.deleteRegionalHint")}</p>
           )}
-        </>
+        </div>
       )}
     </>
   );
@@ -411,6 +418,55 @@ export function RegionalChurchesPage(props: Common & {
   const filtered = q.trim().length > 0 || status !== "all";
   const attachedCount = homeCells.filter((c) => c.regionalChurchId != null).length;
   const unattachedCount = homeCells.length - attachedCount;
+  const mainChurches = churches.filter((c) => c.isMain === 1);
+  const regionalChurches = churches.filter((c) => c.isMain !== 1);
+  const visibleMain = visible.filter((c) => c.isMain === 1);
+  const visibleRegional = visible.filter((c) => c.isMain !== 1);
+
+  const renderChurchCard = (church: RegionalChurchRow) => {
+    const cells = homeCells.filter((c) => c.regionalChurchId === church.id);
+    const attachedGroups = groupCellsByTownship(cells, t("org.townshipUnassigned"));
+    return (
+      <article class={`card regional-card${church.active ? "" : " is-inactive"}`}>
+        <header class="regional-card-head">
+          <div>
+            <h3>{L !== "mm" && church.nameEn ? church.nameEn : church.name}</h3>
+            <p class="muted small">
+              {(L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName)}
+              {" · "}{cells.length} {t("org.cells")}
+            </p>
+          </div>
+          <div class="role-card-actions">
+            {church.isMain === 1 && <span class="badge position">{t("org.mainChurchBadge")}</span>}
+            <span class={`badge ${church.active ? "active" : "inactive"}`}>
+              {church.active ? t("dept.active") : t("dept.inactive")}
+            </span>
+            <a
+              class="btn sm secondary js-edit-modal"
+              href={`/organization/regional-churches/${church.id}/edit`}
+              data-modal-title={t("org.editRegional")}
+              data-modal-size="md"
+            >{t("members.edit")}</a>
+          </div>
+        </header>
+
+        {cells.length === 0 ? (
+          <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
+        ) : (
+          <div class="regional-attached">
+            {attachedGroups.map((group) => (
+              <div class="regional-township-line">
+                <span class="town">{group.name}</span>
+                {group.cells.map((cell) => (
+                  <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </article>
+    );
+  };
 
   return (
     <Layout title={t("org.regionalTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -431,7 +487,8 @@ export function RegionalChurchesPage(props: Common & {
       </div>
 
       <div class="stat-grid org-stats">
-        <div class="stat"><div class="n">{churches.length}</div><div class="t">{t("org.regionalChurchesStat")}</div></div>
+        <div class="stat"><div class="n">{mainChurches.length}</div><div class="t">{t("org.mainChurchStat")}</div></div>
+        <div class="stat"><div class="n">{regionalChurches.length}</div><div class="t">{t("org.regionalChurchesStat")}</div></div>
         <div class="stat"><div class="n">{attachedCount}</div><div class="t">{t("org.attachedCells")}</div></div>
         <div class="stat"><div class="n">{unattachedCount}</div><div class="t">{t("org.unattachedCells")}</div></div>
       </div>
@@ -457,52 +514,35 @@ export function RegionalChurchesPage(props: Common & {
           )}
         </div>
       ) : (
-        <div class="regional-list">
-          {visible.map((church) => {
-            const cells = homeCells.filter((c) => c.regionalChurchId === church.id);
-            const attachedGroups = groupCellsByTownship(cells, t("org.townshipUnassigned"));
+        <>
+          {visibleMain.length > 0 && (
+            <section class="org-departments">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.mainChurch")}</h2>
+                  <p class="muted small">{t("org.mainChurchHint")}</p>
+                </div>
+              </div>
+              <div class="regional-list">{visibleMain.map(renderChurchCard)}</div>
+            </section>
+          )}
 
-            return (
-              <article class={`card regional-card${church.active ? "" : " is-inactive"}`}>
-                <header class="regional-card-head">
-                  <div>
-                    <h3>{L !== "mm" && church.nameEn ? church.nameEn : church.name}</h3>
-                    <p class="muted small">
-                      {(L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName)}
-                      {" · "}{cells.length} {t("org.cells")}
-                    </p>
-                  </div>
-                  <div class="role-card-actions">
-                    <span class={`badge ${church.active ? "active" : "inactive"}`}>
-                      {church.active ? t("dept.active") : t("dept.inactive")}
-                    </span>
-                    <a
-                      class="btn sm secondary js-edit-modal"
-                      href={`/organization/regional-churches/${church.id}/edit`}
-                      data-modal-title={t("org.editRegional")}
-                      data-modal-size="md"
-                    >{t("members.edit")}</a>
-                  </div>
-                </header>
-
-                {cells.length === 0 ? (
-                  <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
-                ) : (
-                  <div class="regional-attached">
-                    {attachedGroups.map((group) => (
-                      <div class="regional-township-line">
-                        <span class="town">{group.name}</span>
-                        {group.cells.map((cell) => (
-                          <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+          <section class="org-departments">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.regionalOnlyTitle")}</h2>
+                <p class="muted small">{t("org.regionalOnlyIntro")}</p>
+              </div>
+            </div>
+            {visibleRegional.length === 0 ? (
+              <div class="card org-empty org-empty-small">
+                <p class="muted">{t("org.noRegionalChurch")}</p>
+              </div>
+            ) : (
+              <div class="regional-list">{visibleRegional.map(renderChurchCard)}</div>
+            )}
+          </section>
+        </>
       )}
     </Layout>
   );

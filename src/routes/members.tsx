@@ -1166,6 +1166,7 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       department: department?.position ?? "",
       departmentId: department?.departmentId ?? null,
       church: church?.position ?? "",
+      churchId: church?.regionalChurchId ?? row.home_cell_regional_church_id ?? null,
       regionalChurch: regional?.position ?? "",
       regionalChurchId: regional?.regionalChurchId ?? null,
       township: township?.position ?? "",
@@ -1237,6 +1238,8 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const regionalChurchId = regionalRaw && /^\d+$/.test(regionalRaw) ? Number(regionalRaw) : null;
   const departmentPosition = s(body.department_position);
   const churchPosition = s(body.church_position);
+  const churchRaw = s(body.church_id);
+  const churchId = churchRaw && /^\d+$/.test(churchRaw) ? Number(churchRaw) : null;
   const departmentRaw = s(body.department_id);
   const departmentId = departmentRaw && /^\d+$/.test(departmentRaw) ? Number(departmentRaw) : null;
   const state = {
@@ -1249,6 +1252,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     department: departmentPosition,
     departmentId: departmentId ?? departments[0]?.id ?? null,
     church: churchPosition,
+    churchId: churchId ?? row.home_cell_regional_church_id ?? null,
   };
   const memberState = {
     id, name: row.name_myanmar || row.name_english || `#${id}`,
@@ -1302,6 +1306,9 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   if (churchPosition && !validFor(churchPosition, "church")) {
     return renderError(t("flash.positionInvalid"));
   }
+  if (churchPosition && (!churchId || !regionalChurches.some((r) => r.id === churchId))) {
+    return renderError(t("flash.positionChurchRequired"));
+  }
 
   const assignments: PositionAssignment[] = [];
   if (homePosition && row.home_cell_id) {
@@ -1334,11 +1341,11 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     }
     assignments.push({ scopeType: "department", position: departmentPosition, departmentId });
   }
-  if (churchPosition) {
-    if (await positionTaken(db, "church", churchPosition, { exceptMemberId: id })) {
+  if (churchPosition && churchId) {
+    if (await positionTaken(db, "church", churchPosition, { regionalChurchId: churchId, exceptMemberId: id })) {
       return renderError(t("flash.positionTaken"));
     }
-    assignments.push({ scopeType: "church", position: churchPosition });
+    assignments.push({ scopeType: "church", position: churchPosition, regionalChurchId: churchId });
   }
 
   const previous = await getMemberPositions(db, id);
@@ -1372,6 +1379,10 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       case "department": {
         const department = departments.find((d) => d.id === a.departmentId);
         return `${roleLabel(a.position, "department")} · ${department?.name ?? ""}`;
+      }
+      case "church": {
+        const church = regionalChurches.find((r) => r.id === a.regionalChurchId);
+        return `${roleLabel(a.position, "church")} · ${church?.nameEn || church?.name || ""}`;
       }
       default: return roleLabel(a.position, "church");
     }

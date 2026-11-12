@@ -648,6 +648,7 @@ export type PositionFormAssignments = {
   department: string;
   departmentId: number | null;
   church: string;
+  churchId: number | null;
 };
 
 export type PositionMember = {
@@ -709,6 +710,7 @@ export function MemberPositionForm(props: PositionFormProps) {
   const churchDefs = defsForScope(positionDefs, "church");
   const label = (code: string) => positionLabelForCode(positionDefs, code, L);
   const regionalId = assignments.regionalChurchId ?? member.regionalChurchId ?? null;
+  const churchId = assignments.churchId ?? member.regionalChurchId ?? null;
   const currentRoles = [
     assignments.homeCell && label(assignments.homeCell),
     assignments.township && `${label(assignments.township)} · ${member.townshipName ?? t("org.supervision")}`,
@@ -928,12 +930,25 @@ export function MemberPositionForm(props: PositionFormProps) {
               <div><h3>{t("org.churchSection")}</h3></div>
             </div>
             {churchDefs.length === 0 ? managePositions("church") : (
-              <label class="field">
-                <span class="lbl">{t("org.churchLeadership")}</span>
-                <select name="church_position">
-                  {positionOptions(churchDefs, assignments.church)}
-                </select>
-              </label>
+              <div class="form-grid">
+                <label class="field">
+                  <span class="lbl">{t("org.church")}</span>
+                  <select name="church_id">
+                    <option value="">{t("org.noChurch")}</option>
+                    {regionalChurches.map((church) => (
+                      <option value={String(church.id)} selected={churchId === church.id}>
+                        {regionalChurchName(church, L)}{church.isMain === 1 ? ` · ${t("org.mainChurchBadge")}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field">
+                  <span class="lbl">{t("org.churchLeadership")}</span>
+                  <select name="church_position">
+                    {positionOptions(churchDefs, assignments.church)}
+                  </select>
+                </label>
+              </div>
             )}
           </section>
         </div>

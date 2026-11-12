@@ -237,6 +237,9 @@ tbody tr:hover { background: var(--row-hover); }
 .head-empty { padding: 10px; color: var(--muted); font-size: 13px; }
 .head-empty[hidden] { display: none; }
 .member-avatar-head { display: inline-grid; place-items: center; width: 46px; height: 46px; margin-right: 10px; border-radius: 50%; overflow: hidden; vertical-align: middle; background: var(--chip-brand-bg); color: var(--brand); font-size: 20px; font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+.member-head { display: flex; align-items: center; gap: 14px; }
+.member-avatar { display: grid; place-items: center; width: 82px; height: 82px; border-radius: 50%; overflow: hidden; background: var(--chip-brand-bg); color: var(--brand); font-size: 28px; font-weight: 700; box-shadow: 0 0 0 1px var(--line); flex: 0 0 auto; }
+.member-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .member-avatar-head img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .list-avatar { width: 28px; height: 28px; margin-right: 8px; border-radius: 50%; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px var(--line); }
 @media (max-width: 560px) {
@@ -1464,9 +1467,15 @@ td.empty-state .small { margin-top: 4px; }
 .pastor-card { padding: 0; overflow: hidden; }
 .pastor-card.is-inactive { opacity: .72; }
 .pastor-main {
-  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(130px, .7fr) auto;
-  align-items: center; gap: 8px 20px; padding: 13px 18px;
+  display: grid; grid-template-columns: auto minmax(0, 1.5fr) auto;
+  align-items: center; gap: 8px 16px; padding: 13px 18px;
 }
+.pastor-avatar {
+  display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+  overflow: hidden; background: var(--chip-brand-bg); color: var(--brand);
+  font-size: 20px; font-weight: 700; box-shadow: 0 0 0 1px var(--line);
+}
+.pastor-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pastor-title { min-width: 0; }
 .pastor-title h3 { margin: 0 0 2px; font-size: 16.5px; overflow-wrap: anywhere; }
 .pastor-title p { margin: 0; }
@@ -1532,7 +1541,8 @@ td.empty-state .small { margin-top: 4px; }
 .modal-body .cluster-modal-foot form.modal-danger > .actions { margin: 0; padding: 0; border: 0; }
 
 @media (max-width: 640px) {
-  .pastor-main { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 14px; }
+  .pastor-main { grid-template-columns: auto minmax(0, 1fr); align-items: start; padding: 12px 14px; }
+  .pastor-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .pastor-phone { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 6px; }
   .pastor-actions { align-self: start; }
   .cluster-card-main { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 14px; }

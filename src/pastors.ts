@@ -5,15 +5,25 @@ export type PastorRow = {
   id: number;
   name: string;
   nameEn: string | null;
+  title: string | null;
+  position: string | null;
+  gender: string;
+  maritalStatus: string;
+  dateOfBirth: string | null;
   regionId: number;
   regionalChurchId: number | null;
   phone: string | null;
+  email: string | null;
+  address: string | null;
+  ordinationDate: string | null;
+  notes: string | null;
   active: number;
   sortOrder: number;
   stateName: string;
   stateNameEn: string | null;
   churchName: string | null;
   churchNameEn: string | null;
+  hasPhoto: number | boolean;
 };
 
 type PastorFilter = {
@@ -36,16 +46,25 @@ export async function loadPastors(db: DB, opts: PastorFilter = {}): Promise<Past
     else conditions.push(sql`p.region_id IN (${sql.join(opts.stateIds.map((id) => sql`${id}`), sql`, `)})`);
   }
   return db.all<PastorRow>(sql`
-    SELECT p.id, p.name, p.name_en AS nameEn, p.region_id AS regionId,
-           p.regional_church_id AS regionalChurchId, p.phone, p.active,
-           p.sort_order AS sortOrder,
+    SELECT p.id, p.name, p.name_en AS nameEn, p.title, p.position, p.gender,
+           p.marital_status AS maritalStatus, p.date_of_birth AS dateOfBirth,
+           p.region_id AS regionId, p.regional_church_id AS regionalChurchId,
+           p.phone, p.email, p.address, p.ordination_date AS ordinationDate,
+           p.notes, p.active, p.sort_order AS sortOrder,
            r.name AS stateName, r.name_en AS stateNameEn,
-           rc.name AS churchName, rc.name_en AS churchNameEn
+           rc.name AS churchName, rc.name_en AS churchNameEn,
+           (p.photo IS NOT NULL) AS hasPhoto
     FROM pastors p
     JOIN regions r ON r.id = p.region_id
     LEFT JOIN regional_churches rc ON rc.id = p.regional_church_id
     WHERE ${sql.join(conditions, sql` AND `)}
     ORDER BY p.active DESC, p.sort_order, p.name`);
+}
+
+/** One pastor, scoped like the directory list. */
+export async function loadPastor(db: DB, id: number, opts: PastorFilter = {}): Promise<PastorRow | null> {
+  const rows = await loadPastors(db, { ...opts, activeOnly: false });
+  return rows.find((p) => p.id === id) ?? null;
 }
 
 /** Active pastors in one state, used by the cluster editor instead of the

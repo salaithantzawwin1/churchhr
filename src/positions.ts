@@ -129,7 +129,9 @@ export async function setMemberPositions(
     scopeType: a.scopeType,
     scopeId: a.scopeType === "home_cell" || a.scopeType === "township" ? a.homeCellId ?? null : null,
     departmentId: a.scopeType === "department" ? a.departmentId ?? null : null,
-    regionalChurchId: a.scopeType === "regional_church" ? a.regionalChurchId ?? null : null,
+    regionalChurchId: a.scopeType === "regional_church" || a.scopeType === "church"
+      ? a.regionalChurchId ?? null
+      : null,
     supervisionClusterId: a.scopeType === "cluster" ? a.supervisionClusterId ?? null : null,
     createdBy: actorId,
     createdAt: now,
@@ -188,7 +190,7 @@ export async function positionTaken(
     if (!opts.departmentId) return false;
     conditions.push(eq(memberPositions.departmentId, opts.departmentId));
   }
-  if (scopeType === "regional_church") {
+  if (scopeType === "regional_church" || scopeType === "church") {
     if (!opts.regionalChurchId) return false;
     conditions.push(eq(memberPositions.regionalChurchId, opts.regionalChurchId));
   }

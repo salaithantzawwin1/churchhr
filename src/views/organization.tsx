@@ -182,16 +182,22 @@ export function OrganizationPage(props: Common & {
   canManageClusters: boolean;
   canManagePositions: boolean;
   unassignedMembers: number;
+  /** Church selected for the Church Leadership panel (query ?church=). */
+  selectedChurchId?: number | null;
 }) {
   const {
     user, perms, flash, lang, tab, cells, departments, leaders,
     regionalChurches, clusters, positionDefs, canManageDepartments, canManageStructure,
-    canManageClusters, canManagePositions, unassignedMembers,
+    canManageClusters, canManagePositions, unassignedMembers, selectedChurchId,
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const states = groupCells(cells, clusters, L);
   const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
+  const mainChurches = regionalChurches.filter((c) => c.isMain === 1);
+  const regionalOnly = regionalChurches.filter((c) => c.isMain !== 1);
+  const selectedChurch = regionalChurches.find((c) => c.id === selectedChurchId)
+    ?? mainChurches[0] ?? regionalChurches[0] ?? null;
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -206,7 +212,8 @@ export function OrganizationPage(props: Common & {
   const regionalRows = positionRows(positionDefs, "regional_church", L);
   const deptRows = positionRows(positionDefs, "department", L);
 
-  const churchRole = (position: string) => leaderFor(leaders, "church", position);
+  const churchRole = (position: string) =>
+    selectedChurch ? leaderFor(leaders, "church", position, { regionalChurchId: selectedChurch.id }) : null;
   const departmentRole = (departmentId: number, position: string) =>
     leaderFor(leaders, "department", position, { departmentId });
   const homeRole = (cellId: number, position: string) =>
@@ -431,6 +438,27 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
+            {regionalChurches.length > 0 && (
+              <form class="filters settings-filters org-church-picker" method="get" action="/organization" data-auto-submit="1">
+                <input type="hidden" name="tab" value="church" />
+                <label class="field">
+                  <span class="lbl">{t("org.selectChurch")}</span>
+                  <select name="church">
+                    {regionalChurches.map((church) => (
+                      <option value={String(church.id)} selected={selectedChurch?.id === church.id}>
+                        {regionalChurchName(church, L)}{church.isMain === 1 ? ` · ${t("org.mainChurchBadge")}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div class="actions"><button class="btn sm" type="submit">{t("members.search")}</button></div>
+              </form>
+            )}
+
+            {!selectedChurch ? (
+              <p class="muted">{t("org.noRegional")}</p>
+            ) : (
+            <>
             <div class="org-chart-level org-chart-level-top">
               {churchRows.lead && (() => {
                 const leader = churchRole(churchRows.lead.code);
@@ -457,6 +485,8 @@ export function OrganizationPage(props: Common & {
                 );
               })}
             </div>
+            </>
+            )}
           </section>
 
           <section class="org-departments">
@@ -577,6 +607,38 @@ export function OrganizationPage(props: Common & {
         </>
       ) : tab === "regional" ? (
         <>
+          {mainChurches.length > 0 && (
+            <section class="org-departments">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.mainChurch")}</h2>
+                  <p class="muted small">{t("org.mainChurchHint")}</p>
+                </div>
+              </div>
+              <div class="org-grid org-dept-grid">
+                {mainChurches.map((church) => {
+                  const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+                  const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
+                  return (
+                    <article class="card org-dept-card org-regional-card">
+                      <div class="org-dept-head">
+                        <div class="org-dept-title">
+                          <h3>{regionalChurchName(church, L)}</h3>
+                          <span class="muted small">
+                            {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
+                          </span>
+                        </div>
+                      </div>
+                      <a class="org-card-link" href={`/organization?tab=church&church=${church.id}`}>
+                        {t("org.churchLeadership")} <span aria-hidden="true">→</span>
+                      </a>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           <section class="org-departments">
             <div class="org-section-head">
               <div>
@@ -588,7 +650,7 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
-            {regionalChurches.length === 0 ? (
+            {regionalOnly.length === 0 ? (
               <div class="card org-empty org-empty-small">
                 <p class="muted">{t("org.noRegional")}</p>
                 {canManageStructure && (
@@ -597,7 +659,7 @@ export function OrganizationPage(props: Common & {
               </div>
             ) : (
               <div class="org-grid org-dept-grid">
-                {regionalChurches.map((church) => {
+                {regionalOnly.map((church) => {
                   const churchCells = cells.filter((c) => c.regional_church_id === church.id);
                   const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
                   const lead = regionalRows.lead ? regionalRole(church.id, regionalRows.lead.code) : null;

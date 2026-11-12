@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  blob,
   index,
   integer,
   primaryKey,
@@ -312,6 +313,8 @@ export const regionalChurches = sqliteTable(
     regionId: integer("region_id").notNull().references(() => regions.id),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Central/main church for its state; shown separately from Regional Churches. */
+    isMain: integer("is_main").notNull().default(0),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
   },
   (t) => ({
@@ -348,9 +351,19 @@ export const pastors = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     nameEn: text("name_en"),
+    title: text("title"),
+    position: text("position"),
+    gender: text("gender").notNull().default(""),
+    maritalStatus: text("marital_status").notNull().default(""),
+    dateOfBirth: text("date_of_birth"),
     regionId: integer("region_id").notNull().references(() => regions.id),
     regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
     phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    ordinationDate: text("ordination_date"),
+    notes: text("notes"),
+    photo: blob("photo"),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
     sourceMemberId: integer("source_member_id"),

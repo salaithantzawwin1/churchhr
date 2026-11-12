@@ -71,6 +71,8 @@ function positionKey(row: {
   supervision_cluster_id: number | null;
 }): string {
   switch (row.scope_type) {
+    case "church":
+      return assignedKey("church", row.position, row.regional_church_id);
     case "regional_church":
       return assignedKey("regional_church", row.position, row.regional_church_id);
     case "department":
@@ -81,7 +83,7 @@ function positionKey(row: {
     case "township":
       return assignedKey(row.scope_type, row.position, row.scope_id);
     default:
-      return assignedKey("church", row.position, null);
+      return assignedKey(row.scope_type, row.position, null);
   }
 }
 
@@ -196,8 +198,10 @@ export async function loadVacancyReport(
     });
   };
 
-  push("church", null, null, opts.lang === "mm" ? "အသင်း" : "Church");
-  for (const row of regionalRows) push("regional_church", row.id, row, localized(row.name, row.nameEn));
+  for (const row of regionalRows) {
+    push("church", row.id, row, localized(row.name, row.nameEn));
+    push("regional_church", row.id, row, localized(row.name, row.nameEn));
+  }
   for (const row of clusterRows) push("cluster", row.id, row, localized(row.name, row.nameEn));
   for (const row of homeCellRows) push("home_cell", row.id, row, row.name);
   for (const row of townshipRows) push("township", row.id, row, row.name);

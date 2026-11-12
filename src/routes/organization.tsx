@@ -17,8 +17,8 @@ import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacanci
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
 import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
-import { loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
-import { PastorsPage, PastorModal, type PastorValues } from "../views/pastors";
+import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
+import { PastorsPage, PastorModal, PastorDetailPage, type PastorValues } from "../views/pastors";
 import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
@@ -124,6 +124,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       canManageStructure={c.get("perms").has("options.manage")}
       canManageClusters={c.get("perms").has("options.manage")}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
+      selectedChurchId={intParam(c.req.query("church"))}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
   );
@@ -691,16 +692,24 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   if (!current || !regionInScope(scope, current.regionId)) {
     return c.redirect("/organization/regional-churches?err=err-notfound", 303);
   }
-  const body = await c.req.parseBody();
-  const name = s(body.name).slice(0, 80);
-  const nameEn = s(body.name_en).slice(0, 120);
-  const regionId = asInt(s(body.region_id)) ?? current.regionId;
-  const active = s(body.active) === "1" ? 1 : 0;
-  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  // Details + Home Cells are one form now: read the raw form data so every
+  // ticked Home Cell survives repeated checkbox names.
+  const form = await c.req.formData();
+  const field = (key: string) => String(form.get(key) ?? "");
+  const name = field("name").slice(0, 80);
+  const nameEn = field("name_en").slice(0, 120);
+  const regionId = asInt(field("region_id")) ?? current.regionId;
+  const active = field("active") === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(field("sort_order"), current.sortOrder);
+  const selectedCellIds = form.getAll("home_cell_ids")
+    .map((v) => Number(String(v)))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  const cellsPresent = form.has("cells_present");
   const values: RegionalValues = { name, nameEn, regionId, sortOrder, active: active === 1 };
   const modal = modalRequest(c);
-  const fail = async (err: string) => {
-    if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
+  const fail = async (err: string | null, cellErr?: string) => {
+    const code = cellErr || err || "err-notfound";
+    if (!modal) return c.redirect(`/organization/regional-churches?err=${code}`, 303);
     const church = (await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds }))
       .find((r) => r.id === id);
     return c.html(
@@ -708,7 +717,11 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
         church={church}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope)}
-        values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
+        values={values}
+        error={err ? flashText(err, c.get("lang")) : null}
+        cellError={cellErr ? flashText(cellErr, c.get("lang")) : null}
+        selectedCellIds={selectedCellIds}
+        lang={c.get("lang")}
       />,
       422,
     );
@@ -717,25 +730,36 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   const allowedRegions = await orgRegions(db, scope, c.get("lang"));
   if (!allowedRegions.some((r) => r.id === regionId)) return await fail("err-scope");
   if (await regionalChurchNameTaken(db, name, id)) return await fail("regional-name-taken");
-  if (regionId !== current.regionId) {
-    const attached = await db.all<{ n: number }>(sql`
-      SELECT
-        (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
-        (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
-    if ((attached[0]?.n ?? 0) > 0) return await fail("regional-state-locked");
-  }
-  if (current.active === 1 && active === 0) {
-    const used = await db.all<{ n: number }>(sql`
-      SELECT
-        (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
-        (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
-    if ((used[0]?.n ?? 0) > 0) return await fail("regional-in-use");
+  const attached = await db.all<{ n: number }>(sql`
+    SELECT
+      (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
+      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+  const used = attached[0]?.n ?? 0;
+  if (regionId !== current.regionId && used > 0) return await fail("regional-state-locked");
+  if (current.active === 1 && active === 0 && used > 0) return await fail("regional-in-use");
+  if (cellsPresent && selectedCellIds.length > 0) {
+    const valid = await db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM lookup_options
+      WHERE type = 'home_cell' AND region_id = ${regionId}
+        AND (regional_church_id IS NULL OR regional_church_id = ${id})
+        AND id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== selectedCellIds.length) {
+      return await fail(null, "regional-cell-invalid");
+    }
   }
   await db.run(sql`
     UPDATE regional_churches
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
            active = ${active}, sort_order = ${sortOrder}
      WHERE id = ${id}`);
+  if (cellsPresent) {
+    await db.run(sql`UPDATE lookup_options SET regional_church_id = NULL WHERE regional_church_id = ${id}`);
+    if (selectedCellIds.length > 0) {
+      await db.run(sql`
+        UPDATE lookup_options SET regional_church_id = ${id}
+        WHERE id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
+    }
+  }
   const landing = "/organization/regional-churches?ok=regional-updated";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
@@ -850,6 +874,55 @@ async function validPastorChurch(db: DB, churchId: number | null, regionId: numb
   return rows.length > 0;
 }
 
+/** Same 500×500 WebP data URL contract the member photo pipeline produces. */
+const MAX_PASTOR_PHOTO_BYTES = 400 * 1024;
+type PastorPhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
+
+function parsePastorPhoto(body: Record<string, unknown>): PastorPhotoInput {
+  if (s(body.photo_remove) === "1") return { bytes: null, touched: true, error: null };
+  const raw = s(body.photo_data);
+  if (!raw) return { bytes: null, touched: false, error: null };
+  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
+  if (!match) return { bytes: null, touched: true, error: "photo.badType" };
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(match[1]!.replace(/\s+/g, ""));
+    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  } catch {
+    return { bytes: null, touched: true, error: "photo.badType" };
+  }
+  if (bytes.length > MAX_PASTOR_PHOTO_BYTES) return { bytes: null, touched: true, error: "photo.tooLarge" };
+  const webp = bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  if (!webp) return { bytes: null, touched: true, error: "photo.badType" };
+  return { bytes, touched: true, error: null };
+}
+
+async function savePastorPhoto(db: DB, id: number, bytes: Uint8Array | null): Promise<void> {
+  const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
+  await db.run(sql`UPDATE pastors SET photo = ${value}, updated_at = unixepoch() WHERE id = ${id}`);
+}
+
+function pastorFormFields(body: Record<string, unknown>) {
+  return {
+    name: s(body.name).slice(0, 100),
+    nameEn: s(body.name_en).slice(0, 100),
+    title: s(body.title).slice(0, 40),
+    position: s(body.position).slice(0, 80),
+    gender: s(body.gender).slice(0, 20),
+    maritalStatus: s(body.marital_status).slice(0, 20),
+    dateOfBirth: s(body.date_of_birth).slice(0, 10),
+    regionId: asInt(s(body.region_id)),
+    churchId: asInt(s(body.regional_church_id)),
+    phone: s(body.phone).slice(0, 40),
+    email: s(body.email).slice(0, 120),
+    address: s(body.address).slice(0, 300),
+    ordinationDate: s(body.ordination_date).slice(0, 10),
+    notes: s(body.notes).slice(0, 1000),
+  };
+}
+
 organizationRoutes.get("/pastors", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -872,6 +945,45 @@ organizationRoutes.get("/pastors/new", requirePermission("options.manage"), asyn
     <PastorModal
       regions={await orgRegions(db, scope, c.get("lang"))}
       churches={await pastorChurches(db, scope, c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/pastors/:id/photo", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.notFound();
+  const rows = await db.all<{ photo: ArrayBuffer | number[] | null; region_id: number; updated_at: number }>(sql`
+    SELECT photo, region_id, updated_at FROM pastors WHERE id = ${id}`);
+  const row = rows[0];
+  if (!row?.photo || !regionInScope(scope, row.region_id)) return c.notFound();
+  const photo = Array.isArray(row.photo) ? Uint8Array.from(row.photo) : new Uint8Array(row.photo);
+  const etag = `W/"pastor-${id}-${row.updated_at}-${photo.byteLength}"`;
+  const headers: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Content-Length": String(photo.byteLength),
+    "Cache-Control": "private, no-cache",
+    "ETag": etag,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (c.req.header("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(photo, { headers });
+});
+
+organizationRoutes.get("/pastors/:id", requirePermission("options.manage"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const pastor = await loadPastor(db, id, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  return c.html(
+    <PastorDetailPage
+      pastor={pastor}
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")}
     />,
   );
@@ -901,15 +1013,26 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
-  const name = s(body.name).slice(0, 100);
-  const nameEn = s(body.name_en).slice(0, 100);
-  const regionId = asInt(s(body.region_id));
-  const churchId = asInt(s(body.regional_church_id));
-  const phone = s(body.phone).slice(0, 40);
+  const f = pastorFormFields(body);
+  const photo = parsePastorPhoto(body);
   const sortOrder = pastorSortOrder(s(body.sort_order));
   const values: PastorValues = {
-    name, nameEn, regionId: regionId ?? "", regionalChurchId: churchId ?? "",
-    phone, sortOrder, active: true,
+    name: f.name,
+    nameEn: f.nameEn,
+    title: f.title,
+    position: f.position,
+    gender: f.gender,
+    maritalStatus: f.maritalStatus,
+    dateOfBirth: f.dateOfBirth,
+    regionId: f.regionId ?? "",
+    regionalChurchId: f.churchId ?? "",
+    phone: f.phone,
+    email: f.email,
+    address: f.address,
+    ordinationDate: f.ordinationDate,
+    notes: f.notes,
+    sortOrder,
+    active: true,
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -923,15 +1046,26 @@ organizationRoutes.post("/pastors", requirePermission("options.manage"), async (
       422,
     );
   };
-  if (!name) return await fail("pastor-name-required");
-  if (!regionId) return await fail("pastor-state-required");
+  if (!f.name) return await fail("pastor-name-required");
+  if (!f.regionId) return await fail("pastor-state-required");
+  if (photo.error) return await fail("pastor-photo-invalid");
   const allowed = await orgRegions(db, scope, c.get("lang"));
-  if (!allowed.some((r) => r.id === regionId)) return await fail("err-scope");
-  if (!await validPastorChurch(db, churchId, regionId)) return await fail("pastor-church-invalid");
-  if (await pastorNameTaken(db, name, regionId, churchId)) return await fail("pastor-name-taken");
+  if (!allowed.some((r) => r.id === f.regionId)) return await fail("err-scope");
+  if (!await validPastorChurch(db, f.churchId, f.regionId)) return await fail("pastor-church-invalid");
+  if (await pastorNameTaken(db, f.name, f.regionId, f.churchId)) return await fail("pastor-name-taken");
   await db.run(sql`
-    INSERT INTO pastors (name, name_en, region_id, regional_church_id, phone, active, sort_order)
-    VALUES (${name}, ${nameEn || null}, ${regionId}, ${churchId}, ${phone || null}, 1, ${sortOrder})`);
+    INSERT INTO pastors (name, name_en, title, position, gender, marital_status, date_of_birth,
+                         region_id, regional_church_id, phone, email, address, ordination_date, notes, active, sort_order)
+    VALUES (${f.name}, ${f.nameEn || null}, ${f.title || null}, ${f.position || null},
+            ${f.gender}, ${f.maritalStatus}, ${f.dateOfBirth || null}, ${f.regionId}, ${f.churchId},
+            ${f.phone || null}, ${f.email || null}, ${f.address || null}, ${f.ordinationDate || null},
+            ${f.notes || null}, 1, ${sortOrder})`);
+  if (photo.touched) {
+    const created = await db.all<{ id: number }>(sql`
+      SELECT id FROM pastors WHERE name = ${f.name} AND region_id = ${f.regionId}
+        AND COALESCE(regional_church_id, 0) = ${f.churchId ?? 0} ORDER BY id DESC LIMIT 1`);
+    if (created[0]) await savePastorPhoto(db, created[0].id, photo.bytes);
+  }
   const landing = "/organization/pastors?ok=pastor-created";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
@@ -945,16 +1079,28 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
     .find((p) => p.id === id);
   if (!current) return c.redirect("/organization/pastors?err=err-notfound", 303);
   const body = await c.req.parseBody();
-  const name = s(body.name).slice(0, 100);
-  const nameEn = s(body.name_en).slice(0, 100);
-  const regionId = asInt(s(body.region_id)) ?? current.regionId;
-  const churchId = asInt(s(body.regional_church_id));
-  const phone = s(body.phone).slice(0, 40);
+  const f = pastorFormFields(body);
+  const photo = parsePastorPhoto(body);
+  const regionId = f.regionId ?? current.regionId;
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = pastorSortOrder(s(body.sort_order), current.sortOrder);
   const values: PastorValues = {
-    name, nameEn, regionId, regionalChurchId: churchId ?? "",
-    phone, sortOrder, active: active === 1,
+    name: f.name,
+    nameEn: f.nameEn,
+    title: f.title,
+    position: f.position,
+    gender: f.gender,
+    maritalStatus: f.maritalStatus,
+    dateOfBirth: f.dateOfBirth,
+    regionId,
+    regionalChurchId: f.churchId ?? "",
+    phone: f.phone,
+    email: f.email,
+    address: f.address,
+    ordinationDate: f.ordinationDate,
+    notes: f.notes,
+    sortOrder,
+    active: active === 1,
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -969,17 +1115,23 @@ organizationRoutes.post("/pastors/:id", requirePermission("options.manage"), asy
       422,
     );
   };
-  if (!name) return await fail("pastor-name-required");
+  if (!f.name) return await fail("pastor-name-required");
+  if (photo.error) return await fail("pastor-photo-invalid");
   const allowed = await orgRegions(db, scope, c.get("lang"));
   if (!allowed.some((r) => r.id === regionId)) return await fail("err-scope");
-  if (!await validPastorChurch(db, churchId, regionId)) return await fail("pastor-church-invalid");
-  if (await pastorNameTaken(db, name, regionId, churchId, id)) return await fail("pastor-name-taken");
+  if (!await validPastorChurch(db, f.churchId, regionId)) return await fail("pastor-church-invalid");
+  if (await pastorNameTaken(db, f.name, regionId, f.churchId, id)) return await fail("pastor-name-taken");
   await db.run(sql`
     UPDATE pastors
-       SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
-           regional_church_id = ${churchId}, phone = ${phone || null},
-           active = ${active}, sort_order = ${sortOrder}, updated_at = unixepoch()
+       SET name = ${f.name}, name_en = ${f.nameEn || null}, title = ${f.title || null},
+           position = ${f.position || null}, gender = ${f.gender}, marital_status = ${f.maritalStatus},
+           date_of_birth = ${f.dateOfBirth || null}, region_id = ${regionId},
+           regional_church_id = ${f.churchId}, phone = ${f.phone || null}, email = ${f.email || null},
+           address = ${f.address || null}, ordination_date = ${f.ordinationDate || null},
+           notes = ${f.notes || null}, active = ${active}, sort_order = ${sortOrder},
+           updated_at = unixepoch()
      WHERE id = ${id}`);
+  if (photo.touched) await savePastorPhoto(db, id, photo.bytes);
   const landing = "/organization/pastors?ok=pastor-updated";
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
