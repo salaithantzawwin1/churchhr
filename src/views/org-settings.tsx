@@ -430,16 +430,19 @@ export function RegionalChurchesPage(props: Common & {
   homeCells: HomeCellOption[];
   q?: string;
   status?: ListStatus;
+  region?: number | null;
 }) {
   const { user, perms, flash, lang, churches, regions, homeCells } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const q = props.q ?? "";
   const status = props.status ?? "all";
+  const region = props.region ?? null;
   const visible = churches.filter((c) =>
+    (region == null || c.regionId === region) &&
     statusMatches(status, c.active === 1) &&
     matchesQuery(q, [c.name, c.nameEn, c.stateName, c.stateNameEn]));
-  const filtered = q.trim().length > 0 || status !== "all";
+  const filtered = q.trim().length > 0 || status !== "all" || region != null;
   const attachedCount = homeCells.filter((c) => c.regionalChurchId != null).length;
   const unattachedCount = homeCells.length - attachedCount;
   const mainChurches = churches.filter((c) => c.isMain === 1);
@@ -538,6 +541,12 @@ export function RegionalChurchesPage(props: Common & {
       <form class="filters settings-filters" method="get" action="/organization/regional-churches" data-auto-submit="1">
         <input type="search" name="q" value={q} placeholder={t("org.searchRegional")}
           aria-label={t("members.search")} enterkeyhint="search" />
+        <select name="region" aria-label={t("detail.state")}>
+          <option value="" selected={region == null}>{t("org.allStates")}</option>
+          {regions.map((r) => (
+            <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+          ))}
+        </select>
         <select name="status" aria-label={t("members.status")}>
           <option value="" selected={status === "all"}>{t("members.allStatuses")}</option>
           <option value="active" selected={status === "active"}>{t("dept.active")}</option>

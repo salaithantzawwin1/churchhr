@@ -25,6 +25,7 @@ export type OrgDepartment = {
   name_en: string | null;
   sort_order: number;
   member_count: number;
+  church_ids?: string | null;
 };
 
 export type OrgLeader = {
@@ -184,20 +185,39 @@ export function OrganizationPage(props: Common & {
   unassignedMembers: number;
   /** Church selected for the Church Leadership panel (query ?church=). */
   selectedChurchId?: number | null;
+  /** State/Region filter for the Regional Churches tab (query ?region=). */
+  region?: number | null;
 }) {
   const {
     user, perms, flash, lang, tab, cells, departments, leaders,
     regionalChurches, clusters, positionDefs, canManageDepartments, canManageStructure,
-    canManageClusters, canManagePositions, unassignedMembers, selectedChurchId,
+    canManageClusters, canManagePositions, unassignedMembers, selectedChurchId, region,
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
-  const states = groupCells(cells, clusters, L);
-  const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const mainChurches = regionalChurches.filter((c) => c.isMain === 1);
-  const regionalOnly = regionalChurches.filter((c) => c.isMain !== 1);
+  const allRegional = regionalChurches.filter((c) => c.isMain !== 1);
+  const regionalOnly = region == null ? allRegional : allRegional.filter((c) => c.regionId === region);
+  const regionalStateOptions = (() => {
+    const seen = new Map<number, string>();
+    for (const church of allRegional) {
+      if (!seen.has(church.regionId)) {
+        seen.set(church.regionId, L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName);
+      }
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  })();
   const selectedChurch = regionalOnly.find((c) => c.id === selectedChurchId)
     ?? regionalOnly[0] ?? null;
+  const churchScoped = tab === "church" && selectedChurch != null;
+  const scopedCells = churchScoped
+    ? cells.filter((c) => c.regional_church_id === selectedChurch.id)
+    : cells;
+  const scopedDepartments = churchScoped
+    ? departments.filter((d) => (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
+    : departments;
+  const states = groupCells(scopedCells, clusters, L);
+  const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const orderedChurches = regionalOnly;
   const regionalStates = (() => {
     const groups = new Map<number, { id: number; name: string; churches: RegionalChurchRow[] }>();
@@ -498,9 +518,11 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
-            {departments.length === 0 ? (
+            {scopedDepartments.length === 0 ? (
               <div class="card org-empty org-empty-small">
-                <p class="muted">{t("org.noDepartments")}</p>
+                <p class="muted">
+                  {churchScoped ? t("org.noChurchDepartments") : t("org.noDepartments")}
+                </p>
                 {canManageDepartments && (
                   <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
                 )}
@@ -508,12 +530,12 @@ export function OrganizationPage(props: Common & {
             ) : (
               <details class="org-collapse">
                 <summary class="org-collapse-summary">
-                  <span>{departments.length} {t("org.departmentsShort")} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
+                  <span>{scopedDepartments.length} {t("org.departmentsShort")} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
                   <span class="chev" aria-hidden="true">▾</span>
                 </summary>
                 <div class="org-collapse-body">
               <div class="org-grid org-dept-grid">
-                {departments.map((d) => {
+                {scopedDepartments.map((d) => {
                   const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
                   const departmentLeaders = deptRows.rest
                     .map((p) => ({ position: p, leader: departmentRole(d.id, p.code) }));
@@ -562,10 +584,10 @@ export function OrganizationPage(props: Common & {
             )}
           </section>
 
-          {cells.length === 0 ? (
+          {scopedCells.length === 0 ? (
             <div class="card org-empty">
               <h2>{t("org.emptyTitle")}</h2>
-              <p class="muted">{t("org.emptyBody")}</p>
+              <p class="muted">{churchScoped ? t("org.noChurchCells") : t("org.emptyBody")}</p>
               {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
             </div>
           ) : (
@@ -693,10 +715,25 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
+            <form class="filters settings-filters" method="get" action="/organization" data-auto-submit="1">
+              <input type="hidden" name="tab" value="regional" />
+              <select name="region" aria-label={t("detail.state")}>
+                <option value="" selected={region == null}>{t("org.allStates")}</option>
+                {regionalStateOptions.map((r) => (
+                  <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+                ))}
+              </select>
+              <div class="actions">
+                <button class="btn sm secondary" type="submit">{t("members.search")}</button>
+              </div>
+            </form>
+
             {regionalOnly.length === 0 ? (
               <div class="card org-empty org-empty-small">
                 <p class="muted">{t("org.noRegional")}</p>
-                {canManageStructure && (
+                {region != null ? (
+                  <p class="small"><a href="/organization?tab=regional">{t("members.clearFilters")}</a></p>
+                ) : canManageStructure && (
                   <a class="btn secondary sm" href="/organization/regional-churches">{t("org.addRegional")}</a>
                 )}
               </div>

@@ -158,17 +158,26 @@ export function HouseholdFormFragment(props: Common & {
   );
 }
 
-export function HouseholdsListPage(props: Common & { rows: any[]; q: string; township?: string; townshipOptions?: { id: number; label: string }[] }) {
+export function HouseholdsListPage(props: Common & {
+  rows: any[]; q: string; township?: string;
+  townshipOptions?: { id: number; label: string }[];
+  region?: number | null; regions?: { id: number; name: string }[];
+}) {
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "en");
   // Korean reads the English data labels (region/township names).
   const isEn = (lang ?? "en") !== "mm";
-  const filtered = Boolean(q.trim() || props.township);
-  const activeParams = { q: q.trim(), township: props.township ?? null };
+  const region = props.region ?? null;
+  const filtered = Boolean(q.trim() || props.township || region);
+  const activeParams = { q: q.trim(), township: props.township ?? null, region: region ? String(region) : null };
   const withoutFilter = (key: keyof typeof activeParams) => `/admin/households${qs({ ...activeParams, [key]: null })}`;
   const chips: { label: string; href: string }[] = [];
   if (q.trim()) chips.push({ label: `“${q.trim()}”`, href: withoutFilter("q") });
   if (props.township) chips.push({ label: props.township, href: withoutFilter("township") });
+  if (region) {
+    const state = (props.regions ?? []).find((r) => r.id === region);
+    chips.push({ label: state?.name ?? String(region), href: withoutFilter("region") });
+  }
   return (
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
@@ -192,6 +201,12 @@ export function HouseholdsListPage(props: Common & { rows: any[]; q: string; tow
         <form class="filter-toolbar" method="get" action="/admin/households" data-auto-submit="1">
           <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")}
             aria-label={t("hh.searchLabel")} enterkeyhint="search" />
+          <select name="region" aria-label={t("detail.state")}>
+            <option value="" selected={region == null}>{t("org.allStates")}</option>
+            {(props.regions ?? []).map((r) => (
+              <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+            ))}
+          </select>
           <select name="township" aria-label={t("hh.townshipLabel")}>
             <option value="">{t("dash.allTownships")}</option>
             {(props.townshipOptions ?? []).map((o) => (

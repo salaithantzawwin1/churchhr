@@ -218,6 +218,8 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   // Township filter — f.township stores the option LABEL (free text).
   const township = (c.req.query("township") ?? "").trim().slice(0, 120);
   const townshipCond = township ? sql`AND f.township = ${township}` : sql``;
+  const region = intParam(c.req.query("region"));
+  const regionCond = region ? sql`AND f.region_id = ${region}` : sql``;
   const rows = (await db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
            r.name AS state_name, r.name_en AS state_name_en,
@@ -233,7 +235,7 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = COALESCE(f.family_group_id, head.family_group_id)
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
-    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond}
+    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}
     ORDER BY f.id DESC
     LIMIT 200`)) as any[];
   const lang = c.get("lang");
@@ -243,10 +245,14 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
     ? allOptions.filter((o) => o.type === "township" && o.active === 1)
     : allOptions.filter((o) => o.type === "township" && o.active === 1 &&
         (o.regionId === 0 || scope.stateIds.includes(o.regionId)));
+  const regionOptions = (await loadRegions(db))
+    .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
+    .map((r) => ({ id: r.id, name: lang !== "mm" && r.nameEn ? r.nameEn : r.name }));
   return c.html(
     <HouseholdsListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       rows={rows} q={q} township={township} townshipOptions={townshipsInScope} lang={lang}
+      region={region} regions={regionOptions}
     />,
   );
 });

@@ -15,29 +15,76 @@ export type AdminDepartmentRow = DepartmentRow & {
   treasurer_name: string | null;
 };
 
-function DepartmentFields(props: { department?: AdminDepartmentRow; lang: Lang }) {
-  const { department, lang } = props;
+type DepartmentFormValues = { name: string; nameEn: string; sortOrder: number; active: boolean };
+
+function DepartmentFields(props: {
+  department?: AdminDepartmentRow;
+  values?: DepartmentFormValues;
+  lang: Lang;
+}) {
+  const { department, values, lang } = props;
   const t = getDict(lang);
+  const name = values?.name ?? department?.name ?? "";
+  const nameEn = values?.nameEn ?? department?.nameEn ?? "";
+  const sortOrder = values?.sortOrder ?? department?.sortOrder ?? 0;
+  const active = values?.active ?? department?.active === 1;
   return (
     <>
       <label class="field">
         <span class="lbl">{t("dept.name")}</span>
-        <input name="name" value={department?.name ?? ""} maxlength={80} required />
+        <input name="name" value={name} maxlength={80} required autofocus />
       </label>
       <label class="field">
         <span class="lbl">{t("dept.nameEn")}</span>
-        <input name="name_en" value={department?.nameEn ?? ""} maxlength={120} />
+        <input name="name_en" value={nameEn} maxlength={120} />
       </label>
       <label class="field">
         <span class="lbl">{t("dept.sortOrder")}</span>
-        <input name="sort_order" type="number" min="0" max="9999" value={String(department?.sortOrder ?? 0)} />
+        <input name="sort_order" type="number" min="0" max="9999" value={String(sortOrder)} />
       </label>
       {department && (
         <label class="dept-active">
-          <input type="checkbox" name="active" value="1" checked={department.active === 1} />
+          <input type="checkbox" name="active" value="1" checked={active} />
           <span>{t("dept.active")}</span>
         </label>
       )}
+    </>
+  );
+}
+
+function DepartmentGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="7" r="2.6" />
+      <circle cx="5.5" cy="17" r="2.2" />
+      <circle cx="18.5" cy="17" r="2.2" />
+      <path d="M12 9.6v2.2M5.5 14.8v-1.1a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1.1M7.7 17h8.6" />
+    </svg>
+  );
+}
+
+export function DepartmentModal(props: {
+  department?: AdminDepartmentRow;
+  values?: DepartmentFormValues;
+  error?: string | null;
+  lang?: Lang;
+}) {
+  const { department, values, error, lang } = props;
+  const L = lang ?? "en";
+  const t = getDict(L);
+  return (
+    <>
+      {error && <div class="modal-error" role="alert">{error}</div>}
+      <form method="post" action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
+        data-modal-ajax>
+        <div class="form-grid dept-fields">
+          <DepartmentFields department={department} values={values} lang={L} />
+        </div>
+        <div class="actions">
+          <button class="btn" type="submit">{department ? t("dept.save") : t("dept.add")}</button>
+        </div>
+      </form>
     </>
   );
 }
@@ -134,49 +181,56 @@ export function DepartmentsPage(props: Common & {
   return (
     <Layout title={t("dept.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
-        <h1>{t("dept.title")}<span class="count-pill">{departments.length}</span></h1>
-        <a class="btn secondary" href="/organization">{t("dept.back")}</a>
-      </div>
-      <p class="muted small">{t("dept.intro")}</p>
-
-      <section class="card dept-add">
-        <div class="org-section-head">
-          <div>
-            <h2>{t("dept.addTitle")}</h2>
-            <p class="muted small">{t("dept.addHint")}</p>
-          </div>
+        <div>
+          <h1>{t("dept.title")}<span class="count-pill">{departments.length}</span></h1>
+          <p class="page-sub">{t("dept.intro")}</p>
         </div>
-        <form method="post" action="/organization/departments">
-          <div class="form-grid dept-fields">
-            <DepartmentFields lang={L} />
-          </div>
-          <div class="actions">
-            <button class="btn" type="submit">{t("dept.add")}</button>
-          </div>
-        </form>
-      </section>
+        <div class="page-head-actions">
+          <a class="btn js-add-modal" href="/organization/departments/new"
+            data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+          <a class="btn secondary" href="/organization">{t("dept.back")}</a>
+        </div>
+      </div>
 
       {departments.length === 0 ? (
         <div class="card org-empty">
           <h2>{t("dept.emptyTitle")}</h2>
           <p class="muted">{t("dept.emptyBody")}</p>
+          <a class="btn js-add-modal" href="/organization/departments/new"
+            data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
         </div>
       ) : (
-        <div class="dept-list">
+        <div class="hh-grid">
           {departments.map((d) => (
-            <form class={`card dept-row${d.active ? "" : " dept-inactive"}`} method="post"
-              action={`/organization/departments/${d.id}`}>
-              <div class="dept-row-head">
-                <div>
-                  <h3>{L !== "mm" && d.nameEn ? d.nameEn : d.name}</h3>
-                  <p class="muted small">
-                    {d.member_count} {t("org.membersShort")} · {d.role_count} / {DEPARTMENT_POSITIONS.length} {t("dept.rolesFilled")}
-                  </p>
+            <article class={`hh-card dept-card-v2${d.active ? "" : " is-inactive"}`}>
+              <div class="hh-card-head">
+                <span class="hh-avatar" aria-hidden="true"><DepartmentGlyph /></span>
+                <div class="hh-card-title">
+                  <span class="hh-card-name" title={L !== "mm" && d.nameEn ? d.nameEn : d.name}>
+                    {L !== "mm" && d.nameEn ? d.nameEn : d.name}
+                  </span>
+                  <span class="hh-card-meta">
+                    <span class="hh-count"><b>{d.member_count}</b> {t("org.membersShort")}</span>
+                    <span class="muted small">{d.role_count} / {DEPARTMENT_POSITIONS.length} {t("dept.rolesFilled")}</span>
+                  </span>
                 </div>
-                <span class={`badge ${d.active ? "active" : "inactive"}`}>
-                  {d.active ? t("dept.active") : t("dept.inactive")}
-                </span>
               </div>
+
+              <div class="hh-facts">
+                <div class="hh-fact">
+                  <span class="hh-fact-label">{t("members.status")}</span>
+                  <span class="hh-fact-value">
+                    <span class={`badge ${d.active ? "active" : "inactive"}`}>
+                      {d.active ? t("dept.active") : t("dept.inactive")}
+                    </span>
+                  </span>
+                </div>
+                <div class="hh-fact">
+                  <span class="hh-fact-label">{t("dept.sortOrder")}</span>
+                  <span class="hh-fact-value">{d.sortOrder}</span>
+                </div>
+              </div>
+
               <dl class="dept-roles">
                 {DEPARTMENT_POSITIONS.map((p) => (
                   <div>
@@ -191,13 +245,13 @@ export function DepartmentsPage(props: Common & {
                   </div>
                 ))}
               </dl>
-              <div class="form-grid dept-fields">
-                <DepartmentFields department={d} lang={L} />
+
+              <div class="hh-card-actions">
+                <a class="btn sm secondary" href={`/organization/departments/${d.id}`}>{t("org.viewDepartment")}</a>
+                <a class="btn sm secondary js-edit-modal" href={`/organization/departments/${d.id}/edit`}
+                  data-modal-title={t("dept.editTitle")}>{t("members.edit")}</a>
               </div>
-              <div class="actions">
-                <button class="btn sm" type="submit">{t("dept.save")}</button>
-              </div>
-            </form>
+            </article>
           ))}
         </div>
       )}

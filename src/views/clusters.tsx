@@ -264,16 +264,19 @@ export function SupervisionClustersPage(props: Common & {
   homeCells: ClusterHomeCell[];
   q?: string;
   status?: "all" | "active" | "inactive";
+  region?: number | null;
 }) {
   const { user, perms, flash, lang, clusters, regions, homeCells } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const q = props.q ?? "";
   const status = props.status ?? "all";
+  const region = props.region ?? null;
   const visible = clusters.filter((c) =>
+    (region == null || c.regionId === region) &&
     (status === "all" || (status === "active" ? c.active === 1 : c.active === 0)) &&
     matchesQuery(q, [c.name, c.nameEn, c.stateName, c.stateNameEn]));
-  const filtered = q.trim().length > 0 || status !== "all";
+  const filtered = q.trim().length > 0 || status !== "all" || region != null;
   const attached = homeCells.filter((c) => c.supervisionClusterId != null).length;
   const unattached = homeCells.length - attached;
 
@@ -303,6 +306,12 @@ export function SupervisionClustersPage(props: Common & {
       <form class="filters settings-filters" method="get" action="/organization/clusters" data-auto-submit="1">
         <input type="search" name="q" value={q} placeholder={t("org.searchClusters")}
           aria-label={t("members.search")} enterkeyhint="search" />
+        <select name="region" aria-label={t("detail.state")}>
+          <option value="" selected={region == null}>{t("org.allStates")}</option>
+          {regions.map((r) => (
+            <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+          ))}
+        </select>
         <select name="status" aria-label={t("members.status")}>
           <option value="" selected={status === "all"}>{t("members.allStatuses")}</option>
           <option value="active" selected={status === "active"}>{t("dept.active")}</option>

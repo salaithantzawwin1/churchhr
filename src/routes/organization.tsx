@@ -7,7 +7,7 @@ import { churchDepartments } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
-import { DepartmentDetailPage, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
+import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
 import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
@@ -85,7 +85,11 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const departments = await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order,
       (SELECT COUNT(*) FROM members m
-        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
+        WHERE m.department_id = d.id AND m.status = 'active') AS member_count,
+      (SELECT GROUP_CONCAT(DISTINCT hc.regional_church_id)
+         FROM members m JOIN lookup_options hc ON hc.id = m.home_cell_id
+        WHERE m.department_id = d.id AND m.status = 'active'
+          AND hc.regional_church_id IS NOT NULL) AS church_ids
     FROM church_departments d
     WHERE d.active = 1
     ORDER BY d.sort_order, d.name`);
@@ -129,12 +133,27 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       canManageClusters={c.get("perms").has("options.manage")}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       selectedChurchId={intParam(c.req.query("church"))}
+      region={intParam(c.req.query("region"))}
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
   );
 });
 
 // ---------- Department detail ----------
+
+organizationRoutes.get("/departments/new", requirePermission("options.manage"), requireAllStates, async (c) => {
+  if (!modalRequest(c)) return c.redirect("/organization/departments", 303);
+  return c.html(<DepartmentModal lang={c.get("lang")} />);
+});
+
+organizationRoutes.get("/departments/:id/edit", requirePermission("options.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  const department = id ? (await loadAdminDepartments(db)).find((d) => d.id === id) : undefined;
+  if (!department) return c.redirect("/organization/departments?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect("/organization/departments", 303);
+  return c.html(<DepartmentModal department={department} lang={c.get("lang")} />);
+});
 
 organizationRoutes.get("/departments/:id", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
@@ -229,20 +248,26 @@ organizationRoutes.post("/departments", requirePermission("options.manage"), req
   const body = await c.req.parseBody();
   const name = s(body.name);
   const nameEn = s(body.name_en);
+  const sortOrder = departmentSortOrder(s(body.sort_order));
+  const values = { name, nameEn, sortOrder, active: true };
+  const modal = modalRequest(c);
+  const fail = async (code: string) => modal
+    ? c.html(<DepartmentModal values={values} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />, 422)
+    : c.redirect(`/organization/departments?err=${code}`, 303);
   const invalid = departmentNameError(name, nameEn);
-  if (invalid) return c.redirect(`/organization/departments?err=${invalid}`, 303);
+  if (invalid) return await fail(invalid);
   try {
     const duplicate = await db.all<{ id: number }>(sql`
       SELECT id FROM church_departments WHERE lower(name) = lower(${name}) LIMIT 1`);
-    if (duplicate.length > 0) return c.redirect("/organization/departments?err=department-name-taken", 303);
+    if (duplicate.length > 0) return await fail("department-name-taken");
     await db.insert(churchDepartments).values({
-      name, nameEn: nameEn || null, active: 1,
-      sortOrder: departmentSortOrder(s(body.sort_order)),
+      name, nameEn: nameEn || null, active: 1, sortOrder,
     });
   } catch {
-    return c.redirect("/organization/departments?err=department-name-taken", 303);
+    return await fail("department-name-taken");
   }
-  return c.redirect("/organization/departments?ok=department-created", 303);
+  const landing = "/organization/departments?ok=department-created";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 organizationRoutes.post("/departments/:id", requirePermission("options.manage"), requireAllStates, async (c) => {
@@ -257,10 +282,20 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   const body = await c.req.parseBody();
   const name = s(body.name);
   const nameEn = s(body.name_en);
-  const invalid = departmentNameError(name, nameEn);
-  if (invalid) return c.redirect(`/organization/departments?err=${invalid}`, 303);
-
   const active = s(body.active) === "1" ? 1 : 0;
+  const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const department = (await loadAdminDepartments(db)).find((d) => d.id === id)!;
+  const values = { name, nameEn, sortOrder, active: active === 1 };
+  const modal = modalRequest(c);
+  const fail = async (code: string) => modal
+    ? c.html(
+      <DepartmentModal department={department} values={values} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />,
+      422,
+    )
+    : c.redirect(`/organization/departments?err=${code}`, 303);
+  const invalid = departmentNameError(name, nameEn);
+  if (invalid) return await fail(invalid);
+
   if (current.active === 1 && active === 0) {
     const assigned = await db.all<{ n: number }>(sql`
       SELECT
@@ -269,7 +304,7 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
         (SELECT COUNT(*) FROM members
           WHERE department_id = ${id}) AS n`);
     if ((assigned[0]?.n ?? 0) > 0) {
-      return c.redirect("/organization/departments?err=department-in-use", 303);
+      return await fail("department-in-use");
     }
   }
 
@@ -277,15 +312,15 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
     const duplicate = await db.all<{ id: number }>(sql`
       SELECT id FROM church_departments
        WHERE lower(name) = lower(${name}) AND id <> ${id} LIMIT 1`);
-    if (duplicate.length > 0) return c.redirect("/organization/departments?err=department-name-taken", 303);
+    if (duplicate.length > 0) return await fail("department-name-taken");
     await db.update(churchDepartments).set({
-      name, nameEn: nameEn || null, active,
-      sortOrder: departmentSortOrder(s(body.sort_order), current.sortOrder),
+      name, nameEn: nameEn || null, active, sortOrder,
     }).where(eq(churchDepartments.id, id));
   } catch {
-    return c.redirect("/organization/departments?err=department-name-taken", 303);
+    return await fail("department-name-taken");
   }
-  return c.redirect("/organization/departments?ok=department-updated", 303);
+  const landing = "/organization/departments?ok=department-updated";
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 // ---------- Editable position catalogue ----------
@@ -604,6 +639,7 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} churches={churches} regions={regions} homeCells={homeCells}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
+      region={intParam(c.req.query("region"))}
     />,
   );
 });
@@ -1185,6 +1221,7 @@ organizationRoutes.get("/clusters", requirePermission("options.manage"), async (
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
+      region={intParam(c.req.query("region"))}
     />,
   );
 });

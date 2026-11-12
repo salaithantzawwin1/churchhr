@@ -1723,6 +1723,8 @@ td.empty-state .small { margin-top: 4px; }
 .dept-row-head h3 { margin: 0 0 2px; font-size: 16px; }
 .dept-row-head p { margin: 0; }
 .dept-roles { display: grid; gap: 4px; margin: 10px 0; }
+.dept-card-v2 .dept-roles { margin: 0; padding-top: 9px; border-top: 1px dashed var(--line); }
+.dept-card-v2.is-inactive { opacity: .72; }
 .dept-roles > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .dept-roles dt { color: var(--muted); font-size: 12px; }
 .dept-roles dd { margin: 0; font-size: 13px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
