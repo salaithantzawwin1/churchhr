@@ -647,6 +647,7 @@ export type PositionFormAssignments = {
   regionalChurchId: number | null;
   department: string;
   departmentId: number | null;
+  memberDepartmentId: number | null;
   church: string;
   churchId: number | null;
 };
@@ -659,6 +660,7 @@ export type PositionMember = {
   townshipId?: number | null;
   townshipName?: string | null;
   regionalChurchId?: number | null;
+  departmentId?: number | null;
 };
 
 type PositionFormProps = {
@@ -702,6 +704,11 @@ export function MemberPositionForm(props: PositionFormProps) {
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
   const department = departments.find((d) => d.id === assignments.departmentId);
+  // A department role also implies membership, so show that department in the
+  // membership field even for records created before membership was tracked.
+  const memberDepartmentId = member.departmentId ?? assignments.departmentId ?? null;
+  const memberDepartment = departments.find((d) => d.id === memberDepartmentId);
+  const roleDepartmentId = assignments.departmentId ?? member.departmentId ?? null;
   const homeDefs = defsForScope(positionDefs, "home_cell");
   const townshipDefs = defsForScope(positionDefs, "township");
   const clusterDefs = defsForScope(positionDefs, "cluster");
@@ -713,6 +720,7 @@ export function MemberPositionForm(props: PositionFormProps) {
   const churchId = assignments.churchId ?? member.regionalChurchId ?? null;
   const orderedChurches = [...regionalChurches].sort((a, b) => (b.isMain ?? 0) - (a.isMain ?? 0));
   const currentRoles = [
+    memberDepartment && `${departmentName(memberDepartment, L)}`,
     assignments.homeCell && label(assignments.homeCell),
     assignments.township && `${label(assignments.township)} · ${member.townshipName ?? t("org.supervision")}`,
     assignments.regionalChurch && label(assignments.regionalChurch),
@@ -902,25 +910,39 @@ export function MemberPositionForm(props: PositionFormProps) {
                 {canManageDepartments && <> <a href="/organization/departments">{t("org.manageDepartments")}</a></>}
               </p>
             ) : (
-              <div class="form-grid" data-dept-position>
+              <>
                 <label class="field">
-                  <span class="lbl">{t("org.department")}</span>
-                  <select name="department_id">
+                  <span class="lbl">{t("org.departmentMembership")}</span>
+                  <select name="department_member_id">
                     <option value="">{t("org.noDepartment")}</option>
                     {departments.map((d) => (
-                      <option value={String(d.id)} selected={assignments.departmentId === d.id}>
+                      <option value={String(d.id)} selected={memberDepartmentId === d.id}>
                         {departmentName(d, L)}
                       </option>
                     ))}
                   </select>
+                  <span class="hint">{t("org.departmentMemberHint")}</span>
                 </label>
-                <label class="field">
-                  <span class="lbl">{t("org.departmentPosition")}</span>
-                  <select name="department_position" disabled={!assignments.departmentId}>
-                    {positionOptions(departmentDefs, assignments.department)}
-                  </select>
-                </label>
-              </div>
+                <div class="form-grid" data-dept-position>
+                  <label class="field">
+                    <span class="lbl">{t("org.department")}</span>
+                    <select name="department_id">
+                      <option value="">{t("org.noDepartment")}</option>
+                      {departments.map((d) => (
+                        <option value={String(d.id)} selected={roleDepartmentId === d.id}>
+                          {departmentName(d, L)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="lbl">{t("org.departmentPosition")}</span>
+                    <select name="department_position" disabled={!roleDepartmentId}>
+                      {positionOptions(departmentDefs, assignments.department)}
+                    </select>
+                  </label>
+                </div>
+              </>
             )}
             {departmentDefs.length === 0 && managePositions("department")}
           </section>

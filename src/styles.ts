@@ -1314,6 +1314,36 @@ td.empty-state .small { margin-top: 4px; }
 .org-lead.org-vacant { border-style: dashed; }
 .org-departments { margin: 0 0 18px; }
 .org-dept-grid { margin-top: 0; }
+.org-section-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.org-structure-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: -4px 0 16px; padding: 8px 10px; border: 1px dashed var(--line);
+  border-radius: 10px; background: var(--row-alt, rgba(15,23,42,.025));
+}
+.org-structure-bar .org-manage-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.org-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: auto; padding-top: 8px; }
+.org-card-actions .org-card-link { margin-top: 0; padding-top: 0; }
+.org-collapse { border: 1px solid var(--line); border-radius: 11px; background: var(--card); overflow: hidden; }
+.org-collapse-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 44px; padding: 10px 14px; cursor: pointer; list-style: none;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+}
+.org-collapse-summary::-webkit-details-marker { display: none; }
+.org-collapse-summary .chev { font-size: 12px; transition: transform .15s ease; }
+.org-collapse[open] > .org-collapse-summary .chev { transform: rotate(180deg); }
+.org-collapse-body { padding: 0 14px 14px; }
+.org-collapse-hint { font-weight: 400; }
+.org-main-church .org-chart-level { margin-top: 6px; }
+.org-main-church .org-collapse { margin-top: 16px; }
+.org-main-cells .org-collapse-body { padding-bottom: 4px; }
+.org-main-township + .org-main-township { margin-top: 8px; }
+.org-region-groups { display: grid; gap: 16px; }
+.org-region-group-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.org-region-group-head h3 { margin: 0; font-size: 16px; }
 .org-dept-card { gap: 10px; }
 .org-dept-card .org-card-head h3 { margin: 0; }
 /* Position assignment modal: a compact identity summary followed by three

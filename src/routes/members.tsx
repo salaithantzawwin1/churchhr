@@ -1140,6 +1140,7 @@ type PositionMemberState = {
   townshipId: number | null;
   townshipName: string | null;
   regionalChurchId: number | null;
+  departmentId: number | null;
 };
 
 async function positionFormState(db: DB, memberId: number, row: MemberDetail & { region_id: number }) {
@@ -1160,11 +1161,13 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       townshipId,
       townshipName: row.home_cell_township ?? null,
       regionalChurchId: row.home_cell_regional_church_id ?? null,
+      departmentId: row.department_id ?? null,
     } as PositionMemberState,
     assignments: {
       homeCell: home?.position ?? "",
       department: department?.position ?? "",
       departmentId: department?.departmentId ?? null,
+      memberDepartmentId: row.department_id ?? null,
       church: church?.position ?? "",
       churchId: church?.regionalChurchId ?? row.home_cell_regional_church_id ?? null,
       regionalChurch: regional?.position ?? "",
@@ -1242,6 +1245,8 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const churchId = churchRaw && /^\d+$/.test(churchRaw) ? Number(churchRaw) : null;
   const departmentRaw = s(body.department_id);
   const departmentId = departmentRaw && /^\d+$/.test(departmentRaw) ? Number(departmentRaw) : null;
+  const memberDepartmentRaw = s(body.department_member_id);
+  const memberDepartmentId = memberDepartmentRaw && /^\d+$/.test(memberDepartmentRaw) ? Number(memberDepartmentRaw) : null;
   const state = {
     homeCell: homePosition,
     township: townshipPosition,
@@ -1250,7 +1255,8 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     regionalChurch: regionalPosition,
     regionalChurchId: regionalChurchId ?? row.home_cell_regional_church_id ?? null,
     department: departmentPosition,
-    departmentId: departmentId ?? departments[0]?.id ?? null,
+    departmentId: departmentId ?? null,
+    memberDepartmentId,
     church: churchPosition,
     churchId: churchId ?? row.home_cell_regional_church_id ?? null,
   };
@@ -1260,6 +1266,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     townshipId: row.home_cell_township_id ?? null,
     townshipName: row.home_cell_township ?? null,
     regionalChurchId: row.home_cell_regional_church_id ?? null,
+    departmentId: row.department_id ?? null,
   };
   const renderError = (message: string) => c.html(
     <MemberPositionForm
@@ -1301,6 +1308,9 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     return renderError(t("flash.positionInvalid"));
   }
   if (departmentPosition && (!departmentId || !departments.some((d) => d.id === departmentId))) {
+    return renderError(t("flash.departmentRequired"));
+  }
+  if (memberDepartmentRaw && (!memberDepartmentId || !departments.some((d) => d.id === memberDepartmentId))) {
     return renderError(t("flash.departmentRequired"));
   }
   if (churchPosition && !validFor(churchPosition, "church")) {
@@ -1348,15 +1358,26 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     assignments.push({ scopeType: "church", position: churchPosition, regionalChurchId: churchId });
   }
 
+  // Department membership is independent from the department role: a member
+  // can belong to a department without holding one of its leadership roles.
+  // Choosing a role also keeps the member attached to that department.
+  const effectiveDepartmentId = departmentPosition && departmentId ? departmentId : memberDepartmentId;
   const previous = await getMemberPositions(db, id);
   try {
     await setMemberPositions(db, id, assignments, c.get("user").id);
+    if ((row.department_id ?? null) !== effectiveDepartmentId) {
+      await db.update(members).set({
+        departmentId: effectiveDepartmentId,
+        updatedAt: Math.floor(Date.now() / 1000),
+        updatedBy: c.get("user").id,
+      }).where(eq(members.id, id));
+    }
   } catch {
     return renderError(t("flash.positionTaken"));
   }
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "position",
-    snapshotJson: JSON.stringify({ assignments, home_cell_id: row.home_cell_id }),
+    snapshotJson: JSON.stringify({ assignments, home_cell_id: row.home_cell_id, department_id: effectiveDepartmentId }),
   });
 
   // Record who changed which roles, with the previous assignments for the audit trail.

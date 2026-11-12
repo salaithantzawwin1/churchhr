@@ -170,7 +170,7 @@ function positionRows(defs: PositionDefRow[], scope: Parameters<typeof defsForSc
 }
 
 export function OrganizationPage(props: Common & {
-  tab: "church" | "home-cells" | "regional";
+  tab: "church" | "main" | "home-cells" | "regional";
   cells: OrgCell[];
   departments: OrgDepartment[];
   leaders: OrgLeader[];
@@ -196,9 +196,25 @@ export function OrganizationPage(props: Common & {
   const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const mainChurches = regionalChurches.filter((c) => c.isMain === 1);
   const regionalOnly = regionalChurches.filter((c) => c.isMain !== 1);
-  const selectedChurch = regionalChurches.find((c) => c.id === selectedChurchId)
-    ?? mainChurches[0] ?? regionalChurches[0] ?? null;
-  const orderedChurches = [...mainChurches, ...regionalOnly];
+  const selectedChurch = regionalOnly.find((c) => c.id === selectedChurchId)
+    ?? regionalOnly[0] ?? null;
+  const orderedChurches = regionalOnly;
+  const regionalStates = (() => {
+    const groups = new Map<number, { id: number; name: string; churches: RegionalChurchRow[] }>();
+    for (const church of regionalOnly) {
+      let group = groups.get(church.regionId);
+      if (!group) {
+        group = {
+          id: church.regionId,
+          name: L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName,
+          churches: [],
+        };
+        groups.set(church.regionId, group);
+      }
+      group.churches.push(church);
+    }
+    return [...groups.values()];
+  })();
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -213,8 +229,6 @@ export function OrganizationPage(props: Common & {
   const regionalRows = positionRows(positionDefs, "regional_church", L);
   const deptRows = positionRows(positionDefs, "department", L);
 
-  const churchRole = (position: string) =>
-    selectedChurch ? leaderFor(leaders, "church", position, { regionalChurchId: selectedChurch.id }) : null;
   const departmentRole = (departmentId: number, position: string) =>
     leaderFor(leaders, "department", position, { departmentId });
   const homeRole = (cellId: number, position: string) =>
@@ -226,10 +240,13 @@ export function OrganizationPage(props: Common & {
   const regionalRole = (churchId: number, position: string) =>
     leaderFor(leaders, "regional_church", position, { regionalChurchId: churchId });
 
-  const manageLinks = (canManagePositions || canManageStructure) && (
+  const manageLinks = (canManagePositions || canManageStructure || canManageDepartments) && (
     <div class="org-manage-links">
       {canManagePositions && (
         <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
+      )}
+      {canManageDepartments && (
+        <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
       )}
       {canManageStructure && (
         <a class="btn secondary sm" href="/organization/regional-churches">{t("org.manageRegional")}</a>
@@ -315,7 +332,7 @@ export function OrganizationPage(props: Common & {
     </div>
   );
 
-  const renderSupervisionGroup = (group: SupervisionGroup, index: number) => {
+  const renderSupervisionGroup = (group: SupervisionGroup) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
       ? clusterRole(group.id, position)
@@ -324,7 +341,7 @@ export function OrganizationPage(props: Common & {
     const supervisor = defs[0] ?? null;
     const assistants = defs.slice(1);
     return (
-      <details class="org-flow-cluster" open={index === 0}>
+      <details class="org-flow-cluster">
         <summary class="org-flow-cluster-head">
           <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
@@ -377,6 +394,38 @@ export function OrganizationPage(props: Common & {
     );
   };
 
+  const renderChurchChart = (church: RegionalChurchRow) => {
+    const role = (position: string) =>
+      leaderFor(leaders, "church", position, { regionalChurchId: church.id });
+    const lead = churchRows.lead ? role(churchRows.lead.code) : null;
+    return (
+      <>
+        <div class="org-chart-level org-chart-level-top">
+          {churchRows.lead && (
+            <div class={`org-node org-node-lead${lead ? "" : " org-node-vacant"}`}>
+              <LeaderAvatar leader={lead} size="lg" />
+              <span class="org-node-role">{positionDefLabel(churchRows.lead, L)}</span>
+              <span class="org-node-name"><LeaderLink leader={lead} empty={t("org.vacant")} /></span>
+            </div>
+          )}
+        </div>
+        <div class="org-chart-connector" aria-hidden="true" />
+        <div class="org-chart-level org-chart-level-team">
+          {churchRows.rest.map((p) => {
+            const leader = role(p.code);
+            return (
+              <div class={`org-node${leader ? "" : " org-node-vacant"}`}>
+                <LeaderAvatar leader={leader} size="md" />
+                <span class="org-node-role">{positionDefLabel(p, L)}</span>
+                <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
   const renderStateHierarchy = (state: StateGroup) => {
     const stateMembers = state.cells.reduce((sum, cell) => sum + cell.member_count, 0);
     return (
@@ -402,7 +451,6 @@ export function OrganizationPage(props: Common & {
           <p class="page-sub">{t("org.intro")}</p>
         </div>
         <div class="page-head-actions">
-          {manageLinks}
           <a class="btn secondary sm" href="/organization/vacancies">{t("vacancy.link")}</a>
           <a class="btn secondary sm" href="/members">{t("org.membersLink")}</a>
         </div>
@@ -412,12 +460,21 @@ export function OrganizationPage(props: Common & {
         <div class="tabs">
           <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "church" ? "page" : undefined}>{t("org.churchTab")}</a>
+          <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization?tab=main"
+            aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
           <a class={`btn sm ${tab === "regional" ? "" : "secondary"}`} href="/organization?tab=regional"
             aria-current={tab === "regional" ? "page" : undefined}>{t("org.regionalTab")}</a>
           <a class={`btn sm ${tab === "home-cells" ? "" : "secondary"}`} href="/organization?tab=home-cells"
             aria-current={tab === "home-cells" ? "page" : undefined}>{t("org.cellsTab")}</a>
         </div>
       </div>
+
+      {manageLinks && (
+        <div class="org-structure-bar">
+          <span class="muted small">{t("org.structureActions")}</span>
+          {manageLinks}
+        </div>
+      )}
 
       <div class="stat-grid org-stats">
         <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
@@ -439,7 +496,7 @@ export function OrganizationPage(props: Common & {
               )}
             </div>
 
-            {regionalChurches.length > 0 && (
+            {orderedChurches.length > 0 && (
               <form class="filters settings-filters org-church-picker" method="get" action="/organization" data-auto-submit="1">
                 <input type="hidden" name="tab" value="church" />
                 <label class="field">
@@ -458,36 +515,7 @@ export function OrganizationPage(props: Common & {
 
             {!selectedChurch ? (
               <p class="muted">{t("org.noRegional")}</p>
-            ) : (
-            <>
-            <div class="org-chart-level org-chart-level-top">
-              {churchRows.lead && (() => {
-                const leader = churchRole(churchRows.lead.code);
-                return (
-                  <div class="org-node org-node-lead">
-                    <LeaderAvatar leader={leader} size="lg" />
-                    <span class="org-node-role">{positionDefLabel(churchRows.lead, L)}</span>
-                    <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div class="org-chart-connector" aria-hidden="true" />
-            <div class="org-chart-level org-chart-level-team">
-              {churchRows.rest.map((p) => {
-                const leader = churchRole(p.code);
-                return (
-                  <div class={`org-node${leader ? "" : " org-node-vacant"}`}>
-                    <LeaderAvatar leader={leader} size="md" />
-                    <span class="org-node-role">{positionDefLabel(p, L)}</span>
-                    <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
-                  </div>
-                );
-              })}
-            </div>
-            </>
-            )}
+            ) : renderChurchChart(selectedChurch)}
           </section>
 
           <section class="org-departments">
@@ -509,6 +537,12 @@ export function OrganizationPage(props: Common & {
                 )}
               </div>
             ) : (
+              <details class="org-collapse">
+                <summary class="org-collapse-summary">
+                  <span>{departments.length} {t("org.departmentsShort")} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
+                  <span class="chev" aria-hidden="true">▾</span>
+                </summary>
+                <div class="org-collapse-body">
               <div class="org-grid org-dept-grid">
                 {departments.map((d) => {
                   const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
@@ -542,13 +576,20 @@ export function OrganizationPage(props: Common & {
                           </div>
                         ))}
                       </div>
-                      <a class="org-card-link" href={`/organization/departments/${d.id}`}>
-                        {t("org.viewDepartment")} <span aria-hidden="true">→</span>
-                      </a>
+                      <div class="org-card-actions">
+                        <a class="org-card-link" href={`/organization/departments/${d.id}`}>
+                          {t("org.viewDepartment")} <span aria-hidden="true">→</span>
+                        </a>
+                        {canManageDepartments && (
+                          <a class="org-card-link" href="/organization/departments">{t("org.editStructure")}</a>
+                        )}
+                      </div>
                     </article>
                   );
                 })}
               </div>
+                </div>
+              </details>
             )}
           </section>
 
@@ -576,7 +617,7 @@ export function OrganizationPage(props: Common & {
                       </div>
                     </div>
                     {state.townships.map((town) => (
-                      <details class="org-township" open={town.cells.length <= 4}>
+                      <details class="org-township">
                         <summary>
                           <span class="org-township-name">{town.name}</span>
                           <span class="muted small">{town.cells.length} {t("org.cells")}</span>
@@ -606,40 +647,72 @@ export function OrganizationPage(props: Common & {
             </div>
           )}
         </>
-      ) : tab === "regional" ? (
-        <>
-          {mainChurches.length > 0 && (
-            <section class="org-departments">
+      ) : tab === "main" ? (
+        mainChurches.length === 0 ? (
+          <div class="card org-empty">
+            <h2>{t("org.mainChurch")}</h2>
+            <p class="muted">{t("org.mainChurchEmpty")}</p>
+            {canManageStructure && (
+              <a class="btn secondary" href="/organization/regional-churches">{t("org.addRegional")}</a>
+            )}
+          </div>
+        ) : mainChurches.map((church) => {
+          const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+          const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
+          return (
+            <section class="card org-chart org-main-church">
               <div class="org-section-head">
                 <div>
-                  <h2>{t("org.mainChurch")}</h2>
-                  <p class="muted small">{t("org.mainChurchHint")}</p>
+                  <h2>{regionalChurchName(church, L)}</h2>
+                  <p class="muted small">
+                    {t("org.mainChurchHint")} · {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
+                  </p>
+                </div>
+                <div class="org-section-actions">
+                  {canManagePositions && (
+                    <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
+                  )}
+                  {canManageStructure && (
+                    <a class="btn secondary sm" href="/organization/regional-churches">{t("org.editStructure")}</a>
+                  )}
                 </div>
               </div>
-              <div class="org-grid org-dept-grid">
-                {mainChurches.map((church) => {
-                  const churchCells = cells.filter((c) => c.regional_church_id === church.id);
-                  const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
-                  return (
-                    <article class="card org-dept-card org-regional-card">
-                      <div class="org-dept-head">
-                        <div class="org-dept-title">
-                          <h3>{regionalChurchName(church, L)}</h3>
-                          <span class="muted small">
-                            {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
-                          </span>
+              {renderChurchChart(church)}
+              {churchCells.length > 0 && (
+                <details class="org-collapse org-main-cells">
+                  <summary class="org-collapse-summary">
+                    <span>{t("org.homeCells")} · {churchCells.length}</span>
+                    <span class="chev" aria-hidden="true">▾</span>
+                  </summary>
+                  <div class="org-collapse-body org-cell-list">
+                    {groupByTownship(churchCells, t("org.townshipUnassigned")).map((town) => (
+                      <div class="org-main-township">
+                        <div class="org-regional-township-head">
+                          <span class="org-township-name">{town.name}</span>
+                          <span class="muted small">{town.cells.length} {t("org.cells")}</span>
                         </div>
+                        {town.cells.map((cell) => (
+                          <div class="org-cell-row">
+                            <div class="org-cell-name">
+                              <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
+                              <a href={cellHref(cell.id)}>{cell.label}</a>
+                              {cell.code && <span class="org-code">{cell.code}</span>}
+                            </div>
+                            <a class="org-cell-count" href={cellHref(cell.id)}>
+                              {cell.member_count} {t("org.membersShort")}
+                            </a>
+                          </div>
+                        ))}
                       </div>
-                      <a class="org-card-link" href={`/organization?tab=church&church=${church.id}`}>
-                        {t("org.churchLeadership")} <span aria-hidden="true">→</span>
-                      </a>
-                    </article>
-                  );
-                })}
-              </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </section>
-          )}
-
+          );
+        })
+      ) : tab === "regional" ? (
+        <>
           <section class="org-departments">
             <div class="org-section-head">
               <div>
@@ -659,8 +732,15 @@ export function OrganizationPage(props: Common & {
                 )}
               </div>
             ) : (
-              <div class="org-grid org-dept-grid">
-                {regionalOnly.map((church) => {
+              <div class="org-region-groups">
+                {regionalStates.map((state) => (
+                  <section class="org-region-group">
+                    <div class="org-region-group-head">
+                      <h3>{state.name}</h3>
+                      <span class="muted small">{state.churches.length} {t("org.churchesShort")}</span>
+                    </div>
+                    <div class="org-grid org-dept-grid">
+                {state.churches.map((church) => {
                   const churchCells = cells.filter((c) => c.regional_church_id === church.id);
                   const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
                   const lead = regionalRows.lead ? regionalRole(church.id, regionalRows.lead.code) : null;
@@ -725,9 +805,17 @@ export function OrganizationPage(props: Common & {
                           ))}
                         </div>
                       )}
+                      {canManageStructure && (
+                        <a class="org-card-link" href="/organization/regional-churches">
+                          {t("org.editStructure")} <span aria-hidden="true">→</span>
+                        </a>
+                      )}
                     </article>
                   );
                 })}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </section>

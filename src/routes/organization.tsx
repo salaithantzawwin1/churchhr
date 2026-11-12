@@ -57,7 +57,11 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const tabParam = c.req.query("tab");
-  const tab: "church" | "regional" | "home-cells" = tabParam === "home-cells" ? "home-cells" : tabParam === "regional" ? "regional" : "church";
+  const tab: "church" | "main" | "regional" | "home-cells" =
+    tabParam === "home-cells" ? "home-cells"
+      : tabParam === "regional" ? "regional"
+        : tabParam === "main" ? "main"
+          : "church";
 
   const cells = await db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,
