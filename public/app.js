@@ -1235,6 +1235,13 @@
     var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     function pad(n) { return (n < 10 ? "0" : "") + n; }
     function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+    // "Today" must agree with the server, which dates reports in Myanmar time
+    // (UTC+6:30); a browser in another timezone can otherwise pick tomorrow.
+    function yangonToday() {
+      var now = new Date();
+      var shifted = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
+      return { y: shifted.getFullYear(), m: shifted.getMonth() + 1, d: shifted.getDate() };
+    }
     function labelFor(input, part) {
       var lbl = input.closest("label");
       var text = "";
@@ -1355,7 +1362,39 @@
       wrap.appendChild(day);
       wrap.appendChild(month);
       wrap.appendChild(year);
-      native.parentNode.insertBefore(wrap, native.nextSibling);
+
+      // Optional "Today" shortcut, for dates that usually mean now (a daily
+      // report) rather than a birth date. The label travels on the input so it
+      // stays translated.
+      var container = wrap;
+      if (native.hasAttribute("data-today")) {
+        var todayBtn = document.createElement("button");
+        todayBtn.type = "button";
+        todayBtn.className = "btn secondary dp-today";
+        todayBtn.textContent = native.getAttribute("data-today-label") || "Today";
+        todayBtn.addEventListener("click", function () {
+          var now = yangonToday();
+          var yv = String(now.y);
+          if (Number(yv) < minYear || Number(yv) > maxYear) return;
+          year.value = yv;
+          month.value = pad(now.m);
+          fillDays();
+          day.value = pad(now.d);
+          apply();
+          var form = native.form;
+          if (form && form.hasAttribute("data-auto-submit")) {
+            window.setTimeout(function () {
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+            }, 0);
+          }
+        });
+        container = document.createElement("span");
+        container.className = "dp-row";
+        container.appendChild(wrap);
+        container.appendChild(todayBtn);
+      }
+      native.parentNode.insertBefore(container, native.nextSibling);
     });
   }
   initDatePickers(document);

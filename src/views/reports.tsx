@@ -302,7 +302,8 @@ export function ReportFormPage(props: Common & {
           <div class="form-grid">
             <label class="field">
               <span class="lbl">{t("rep.date")}</span>
-              <input type="date" name="report_date" required max={maxDate} value={v.report_date ?? ""} />
+              <input type="date" name="report_date" required max={maxDate} value={v.report_date ?? ""}
+                data-today="1" data-today-label={t("rep.today")} />
             </label>
             <label class="field">
               <span class="lbl">{t("rep.state")}</span>

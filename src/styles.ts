@@ -234,6 +234,17 @@ tbody tr:hover { background: var(--row-hover); }
 .dp .dp-part:first-child { width: 58px; } /* day */
 .dp .dp-part:nth-child(2) { flex: 1 1 0; min-width: 66px; } /* month name */
 .dp .dp-part:last-child { width: 78px; } /* year */
+/* Optional "Today" shortcut: the picker needs the full field width, so the
+   button sits under it, right-aligned, rather than squeezing the year select. */
+.dp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.dp-row .dp { flex: 1 1 100%; }
+.dp-today {
+  flex: 0 0 auto; margin-left: auto; height: 32px; min-height: 32px;
+  padding: 0 11px; font-size: 12.5px; white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .dp-today { min-height: 40px; height: 40px; }
+}
 .dp-native {
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   border: 0; opacity: 0; pointer-events: none; overflow: hidden;
