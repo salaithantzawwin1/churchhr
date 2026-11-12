@@ -1604,14 +1604,54 @@ td.empty-state .small { margin-top: 4px; }
 }
 /* Position rows are short records; keep the list dense and easy to scan. */
 .role-list { gap: 8px; }
-/* Card view tiles the roles, list view keeps the dense row. Both render the same
-   markup; app.js only flips the is-list class on [data-view-grid]. */
-.role-list[data-view-grid] { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+/* Positions: card view tiles the roles, list view keeps one dense row. Both
+   render the same markup; app.js only flips the is-list class. */
+.role-list[data-view-grid] { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.role-list .role-card {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px 18px;
+}
+.role-list .role-card-head { display: block; }
+.role-card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.role-list .role-card-text h3 { margin: 0; font-size: 16px; line-height: 1.3; }
+.role-list .role-card-meta { margin: 8px 0 0; gap: 6px; }
+.role-list .role-card-meta code {
+  padding: 2px 8px; border-radius: 999px; background: var(--field-bg);
+  color: var(--ink); font-size: 11.5px;
+}
+.role-chip {
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums;
+}
+.role-chip.church {
+  border-color: transparent; background: var(--chip-brand-bg);
+  color: var(--link); font-weight: 600;
+}
+/* The action row sits on the card floor, so tiles of different heights still
+   read as one grid instead of leaving their button floating mid-card. */
+.role-list .role-card-actions {
+  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--hairline);
+  justify-content: flex-end; flex-wrap: nowrap;
+}
+.role-list .role-card-actions .btn { flex: 0 0 auto; }
+/* List view: identity and chips share one line, actions stay on the right. */
 .role-list.is-list { grid-template-columns: 1fr; gap: 8px; }
-.role-list:not(.is-list) .role-card { display: flex; flex-direction: column; gap: 12px; height: 100%; }
-.role-list:not(.is-list) .role-card-head { flex-direction: column; align-items: flex-start; gap: 10px; }
-.role-list:not(.is-list) .role-card-text h3 { font-size: 16px; }
-.role-list:not(.is-list) .role-card-actions { justify-content: flex-start; width: 100%; }
+.role-list.is-list .role-card { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; }
+.role-list.is-list .role-card-head { flex: 1 1 auto; display: block; }
+.role-list.is-list .role-card-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.role-list.is-list .role-card-title { gap: 8px; }
+.role-list.is-list .role-card-text h3 { font-size: 15px; }
+.role-list.is-list .role-card-meta { margin: 0; }
+.role-list.is-list .role-card-actions { margin: 0; padding: 0; border: 0; flex: 0 0 auto; }
+/* Header actions read as one row: same height for every control, the view
+   switch as one segmented pill, and the primary action left to stand out. */
+.page-head-actions { gap: 8px; }
+.page-head-actions .btn { min-height: 36px; padding: 7px 14px; font-size: 13.5px; }
+.page-head-actions .btn.js-add-modal:not(.secondary) { font-weight: 600; }
+.page-head-actions .hh-view-toggle { flex: none; padding: 2px; }
+.page-head-actions .hh-view-toggle button { min-height: 32px; padding: 4px 10px; }
+@media (max-width: 640px) {
+  .role-list.is-list .role-card { flex-direction: column; align-items: stretch; gap: 10px; }
+}
 .role-card { padding: 12px 16px; transition: border-color .12s ease, box-shadow .12s ease; }
 .role-card:hover { border-color: var(--line-strong); box-shadow: 0 3px 10px rgba(2, 8, 23, .06); }
 .role-card-head { align-items: center; }
@@ -1804,6 +1844,25 @@ td.empty-state .small { margin-top: 4px; }
 .dept-roles { display: grid; gap: 4px; margin: 10px 0; }
 .dept-card-v2 .dept-roles { margin: 0; padding-top: 9px; border-top: 1px dashed var(--line); }
 .dept-card-v2.is-inactive { opacity: .72; }
+/* Department list view: identity, facts, roles and actions read as one row. */
+.hh-grid.is-list .dept-card-v2 {
+  grid-template-columns: minmax(190px, 1.1fr) minmax(0, 1.5fr) minmax(0, 1.7fr) auto;
+  align-items: center;
+}
+.hh-grid.is-list .dept-card-v2 .hh-card-head { grid-column: 1; }
+.hh-grid.is-list .dept-card-v2 .hh-facts {
+  grid-column: 2; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 14px;
+}
+.hh-grid.is-list .dept-card-v2 .dept-roles { grid-column: 3; padding-top: 0; border-top: 0; }
+.hh-grid.is-list .dept-card-v2 .hh-card-actions {
+  grid-column: 4; grid-row: 1; align-self: center; margin: 0; padding: 0; flex-wrap: nowrap;
+}
+@media (max-width: 1180px) {
+  .hh-grid.is-list .dept-card-v2 { grid-template-columns: minmax(0, 1fr) auto; }
+  .hh-grid.is-list .dept-card-v2 .hh-facts,
+  .hh-grid.is-list .dept-card-v2 .dept-roles { grid-column: 1 / -1; }
+  .hh-grid.is-list .dept-card-v2 .hh-card-actions { grid-column: 2; grid-row: 1; }
+}
 .dept-roles > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .dept-roles dt { color: var(--muted); font-size: 12px; }
 .dept-roles dd { margin: 0; font-size: 13px; font-weight: 600; text-align: right; overflow-wrap: anywhere; }

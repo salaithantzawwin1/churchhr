@@ -255,33 +255,31 @@ export function PositionsPage(props: Common & {
             <article class={`card role-card${def.active ? "" : " is-inactive"}`}>
               <header class="role-card-head">
                 <div class="role-card-text">
-                  <h3>{positionDefLabel(def, L)}</h3>
+                  <div class="role-card-title">
+                    <h3>{positionDefLabel(def, L)}</h3>
+                    <span class={`badge ${def.active ? "active" : "inactive"}`}>
+                      {def.active ? t("dept.active") : t("dept.inactive")}
+                    </span>
+                  </div>
                   <p class="role-card-meta">
                     <code>{def.code}</code>
-                    <span aria-hidden="true">·</span>
-                    <span>{def.usageCount ?? 0} {t("org.positionUsage")}</span>
+                    <span class="role-chip">{def.usageCount ?? 0} {t("org.positionUsage")}</span>
                     {def.regionalChurchId != null && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span class="badge">
-                          {L !== "mm" && def.churchNameEn ? def.churchNameEn : def.churchName}
-                        </span>
-                      </>
+                      <span class="role-chip church">
+                        {L !== "mm" && def.churchNameEn ? def.churchNameEn : def.churchName}
+                      </span>
                     )}
                   </p>
                 </div>
-                <div class="role-card-actions">
-                  <span class={`badge ${def.active ? "active" : "inactive"}`}>
-                    {def.active ? t("dept.active") : t("dept.inactive")}
-                  </span>
-                  <a
-                    class="btn sm secondary js-edit-modal"
-                    href={`/organization/positions/${def.id}/edit`}
-                    data-modal-title={t("org.editRole")}
-                    data-modal-size="md"
-                  >{t("members.edit")}</a>
-                </div>
               </header>
+              <div class="role-card-actions">
+                <a
+                  class="btn sm secondary js-edit-modal"
+                  href={`/organization/positions/${def.id}/edit`}
+                  data-modal-title={t("org.editRole")}
+                  data-modal-size="md"
+                >{t("members.edit")}</a>
+              </div>
             </article>
           ))}
         </div>
