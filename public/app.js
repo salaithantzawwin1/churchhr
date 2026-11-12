@@ -519,6 +519,24 @@
   // Generic type-to-search select. Unlike the household head picker it only
   // writes the native select value; it never copies placement or contact data
   // into sibling fields.
+  // Assign dialog: picking a member who already holds a church position warns
+  // that saving moves that role, before the form is submitted.
+  function initAssignWarn(root) {
+    var warn = root.querySelector("[data-assign-warn]");
+    if (!warn) return;
+    var radios = root.querySelectorAll('input[name="member_id"]');
+    var update = function () {
+      var checked = root.querySelector('input[name="member_id"]:checked');
+      var msg = checked ? checked.getAttribute("data-warn") || "" : "";
+      warn.textContent = msg;
+      warn.hidden = !msg;
+    };
+    Array.prototype.forEach.call(radios, function (radio) {
+      radio.addEventListener("change", update);
+    });
+    update();
+  }
+
   // In-dialog list filter: typing narrows a rendered radio list without a round
   // trip, which keeps the assign dialog usable on a church with many members.
   function initListFilter(root) {
@@ -1171,6 +1189,7 @@
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
     initListFilter(bodyEl);
+    initAssignWarn(bodyEl);
     initDepartmentPosition(bodyEl);
     initTabs(bodyEl);
     initPhotoInputs(bodyEl);

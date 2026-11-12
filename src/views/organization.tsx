@@ -437,6 +437,12 @@ export function OrganizationPage(props: Common & {
           <div>
             <h3>{t("org.allVacant")}</h3>
             <p class="muted small">{t("org.allVacantHint")}</p>
+            {/* Keep the slots themselves visible so the hierarchy still reads as a structure. */}
+            <ul class="org-vacant-roles">
+              {churchRows.all.map((p) => (
+                <li>{positionDefLabel(p, L)}</li>
+              ))}
+            </ul>
           </div>
           <div class="org-section-actions">
             <span class="org-vacant-count">{churchRows.all.length} {t("org.positionsVacant")}</span>

@@ -2333,9 +2333,26 @@ th { font-size: 13px; }
 .assign-row:hover { border-color: var(--line-strong); }
 .assign-row input { margin: 0; }
 .assign-row.is-current { border-color: var(--link); }
+.assign-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .assign-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
+/* Replace notice: shown in the row that owns the conflict and repeated under the
+   list once that member is selected, so the consequence is visible at Save time. */
+.assign-row-note { color: var(--warn-ink); font-size: 12px; line-height: 1.5; }
+.assign-warn {
+  margin: var(--space-3) 0 0; padding: 9px 11px; border-radius: var(--radius-sm);
+  background: var(--warn-bg); color: var(--warn-ink); font-size: 12.5px; line-height: 1.6;
+}
+.assign-warn[hidden] { display: none; }
+/* The all-vacant prompt still lists its slots, so the structure never disappears. */
+.org-vacant-roles {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none;
+}
+.org-vacant-roles li {
+  padding: 3px 10px; border: 1px dashed var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 12px;
+}
 
 :not(:lang(en)) :is(
   .org-node-role, .org-church-kicker, .org-supervision-title, .nav-menu-label,

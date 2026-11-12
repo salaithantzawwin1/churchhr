@@ -16,7 +16,7 @@ import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
-import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
+import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import { PastorsPage, PastorModal, PastorDetailPage, type PastorValues } from "../views/pastors";
@@ -142,22 +142,42 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
 // ---------- Church leadership assignment ----------
 
-/** Members of one church, offered as candidates for a leadership slot. */
+/** Members of one church, offered as candidates for a leadership slot. Each row
+ *  carries the church position the member already holds, so the dialog can warn
+ *  before a save moves that role. */
 async function assignCandidates(db: DB, churchId: number, q: string) {
   const like = `%${q}%`;
-  return db.all<{ id: number; name: string; home_cell: string | null }>(sql`
+  return db.all<{
+    id: number; name: string; home_cell: string | null;
+    church_position: string | null; church_id: number | null; church_name: string | null;
+  }>(sql`
     SELECT m.id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '#') AS name,
-           hc.label AS home_cell
+           hc.label AS home_cell,
+           mp.position AS church_position,
+           mp.regional_church_id AS church_id,
+           rc.name AS church_name
     FROM members m
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'church'
+    LEFT JOIN regional_churches rc ON rc.id = mp.regional_church_id
     WHERE m.status = 'active' AND hc.regional_church_id = ${churchId}
       ${q ? sql`AND (m.name_myanmar LIKE ${like} OR m.name_english LIKE ${like})` : sql``}
     ORDER BY name LIMIT 300`);
 }
 
-function assignLanding(churchId: number | null): string {
-  return churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
+/** code → localized church position label, for labels on a member's current slot. */
+function churchPositionLabels(defs: PositionDefRow[], lang: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const def of defs) {
+    if (def.scopeType === "church") out[def.code] = positionDefLabel(def, lang);
+  }
+  return out;
+}
+
+function assignLanding(churchId: number | null, ok?: string): string {
+  const base = churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
+  return ok ? `${base}&ok=${ok}` : base;
 }
 
 /** Dialog opened from a vacant node: pick the member who fills this slot. */
@@ -187,6 +207,7 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
       def={def}
       candidates={await assignCandidates(db, church.id, q)}
       currentId={current[0]?.member_id ?? null}
+      labels={churchPositionLabels(await loadPositionDefs(db), c.get("lang"))}
     />,
   );
 });
@@ -201,6 +222,7 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
   const code = s(body.position);
   const memberId = intParam(s(body.member_id));
   const landing = assignLanding(churchId);
+  const done = assignLanding(churchId, memberId ? "church-leader-saved" : "church-leader-cleared");
 
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
@@ -246,7 +268,7 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
       updatedAt: now,
     });
   }
-  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+  return modal ? c.json({ ok: true, redirect: done }) : c.redirect(done, 303);
 });
 
 // ---------- Department detail ----------
