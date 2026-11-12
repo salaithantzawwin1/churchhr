@@ -2106,7 +2106,17 @@ body { background: var(--bg); }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
 }
 .topbar .who { gap: 10px; }
-.container { max-width: 1240px; margin: 28px auto 8px; padding: 0 22px; }
+.container { max-width: 1320px; margin: 28px auto 8px; padding: 0 24px; }
+/* Wide desktops: use the room for card grids, while tables get a little more
+   width so the 14-column member list stops hugging the middle of the screen. */
+@media (min-width: 1280px) {
+  .container { max-width: 1480px; }
+  .container:has(.tbl-wrap) { max-width: 1600px; }
+}
+@media (min-width: 1760px) {
+  .container { max-width: 1560px; }
+  .container:has(.tbl-wrap) { max-width: 1680px; }
+}
 .page-head { align-items: flex-start; gap: 16px; margin-bottom: 20px; }
 .page-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
 .page-head h1 .count-pill { margin-left: 10px; font-size: 12px; font-weight: 700; vertical-align: middle; }
