@@ -263,8 +263,14 @@ async function validateAssignments(
     if (statesRaw.some((id) => !regionIds.has(id))) errors.push("adm.errStateBad");
   }
   if (homeCellsRaw.length > 0) {
-    const cellIds = new Set((await homeCellOptions(db)).map((c) => c.id));
-    if (homeCellsRaw.some((id) => !cellIds.has(id))) errors.push("adm.errHomeCellBad");
+    const cells = new Map((await homeCellOptions(db)).map((c) => [c.id, c.regionId] as const));
+    if (homeCellsRaw.some((id) => !cells.has(id))) errors.push("adm.errHomeCellBad");
+    // A member-list limit may only narrow what the State scope already allows:
+    // a cell counts as in scope when it has no state or its state was ticked.
+    else if (!allStates && homeCellsRaw.some((id) => {
+      const regionId = cells.get(id) ?? 0;
+      return regionId !== 0 && !statesRaw.includes(regionId);
+    })) errors.push("adm.errHomeCellState");
   }
   return errors.length === 0;
 }
