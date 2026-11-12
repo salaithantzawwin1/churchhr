@@ -238,15 +238,13 @@
     arm();
   })();
 
-  // Manual dark/light toggle — persists the explicit choice; without one the
-  // CSS media query follows the OS preference.
+  // Manual dark/light toggle — dark is the product default, and the explicit
+  // choice is persisted so every page opens in the same theme.
   var themeBtn = document.querySelector(".theme-toggle");
   if (themeBtn) {
     var t = null;
     try { t = localStorage.getItem("theme"); } catch (e) {}
-    var eff = t === "dark" || t === "light"
-      ? t
-      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var eff = t === "light" ? "light" : "dark";
     var title = themeBtn.getAttribute(eff === "dark" ? "data-to-light" : "data-to-dark");
     if (title) themeBtn.setAttribute("title", title);
     themeBtn.addEventListener("click", function () {

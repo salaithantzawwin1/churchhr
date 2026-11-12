@@ -3,45 +3,46 @@
 /* Dark palette, defined once and emitted under both the OS-preference media query
    (no-JS fallback) and the explicit [data-theme] attribute (user toggle). */
 const DARK_VARS = `
-    --bg: #10151f; --card: #1a2030; --ink: #e7eaf3; --muted: #98a1b6;
-    --line: #2a3245; --line-strong: #3d4763; --brand: #1f4e8c; --brand-ink: #ffffff;
-    --link: #8ab0f0;
-    --ok-bg: #14301f; --ok-ink: #82d8a4; --err-bg: #3a161a; --err-ink: #f0a3a3;
-    --warn-bg: #38280f; --warn-ink: #eec27e;
-    --male: #6da0e0; --female: #d989b1;
-    --th-bg: #202839; --row-hover: #222b3f;
-    --chip-bg: #253048; --chip-brand-bg: #223350;
-    --chip-purple-bg: #332b4d; --chip-purple-ink: #b79aec;
-    --track: #263149; --sep: #5b6783;
-    --btn2-bg: #253048; --btn2-hover: #2d3952;
-    --field-bg: #131a29; --count-bg: rgba(231,234,243,.12);
-    --hover-shadow: 0 4px 14px rgba(0,0,0,.45);
+    --bg: #0b1220; --card: #161f30; --ink: #edf2fb; --muted: #94a3b8;
+    --line: #263248; --line-strong: #3b4a63; --brand: #2563eb; --brand-ink: #ffffff;
+    --link: #7db2ff;
+    --ok-bg: #123123; --ok-ink: #86efac; --err-bg: #3b171d; --err-ink: #fda4af;
+    --warn-bg: #38280f; --warn-ink: #fcd34d;
+    --male: #60a5fa; --female: #f472b6;
+    --th-bg: #1b2538; --row-hover: #1d2a40;
+    --chip-bg: #22314b; --chip-brand-bg: #1d335c;
+    --chip-purple-bg: #34284f; --chip-purple-ink: #c4b5fd;
+    --track: #26344d; --sep: #60708c;
+    --btn2-bg: #1e2b40; --btn2-hover: #28384f;
+    --field-bg: #0e1726; --count-bg: rgba(237,242,251,.13);
+    --hover-shadow: 0 10px 28px rgba(0,0,0,.32);
+  `;
+
+const LIGHT_VARS = `
+    --bg: #eef2f8; --card: #ffffff; --ink: #182134; --muted: #64748b;
+    --line: #e2e8f0; --line-strong: #cbd5e1; --brand: #2563eb; --brand-ink: #ffffff;
+    --link: #1d4ed8;
+    --ok-bg: #e7f6ec; --ok-ink: #14683a; --err-bg: #fdecec; --err-ink: #a11b1b;
+    --warn-bg: #fff4e0; --warn-ink: #8a5300;
+    --male: #2563eb; --female: #db2777;
+    --th-bg: #f8fafc; --row-hover: #f4f7fc;
+    --chip-bg: #eef2f7; --chip-brand-bg: #e8efff;
+    --chip-purple-bg: #f1e9fb; --chip-purple-ink: #6d3fb4;
+    --track: #eef1f6; --sep: #94a3b8;
+    --btn2-bg: #eef2f7; --btn2-hover: #e2e8f0;
+    --field-bg: #ffffff; --count-bg: rgba(24,33,52,.08);
+    --hover-shadow: 0 10px 26px rgba(15,23,42,.10);
   `;
 
 export const CSS = `
 :root {
-  /* Slightly darker page tint than the cards, so the centered content column
-     reads as a deliberate "sheet" on wide desktops instead of dead white space. */
-  --bg: #e9edf4; --card: #ffffff; --ink: #1c2333; --muted: #667085;
-  --line: #e4e7ec; --line-strong: #ccd6e6; --brand: #1f4e8c; --brand-ink: #ffffff;
-  --link: #1f4e8c;
-  --ok-bg: #e7f6ec; --ok-ink: #14683a; --err-bg: #fdecec; --err-ink: #a11b1b;
-  --warn-bg: #fff4e0; --warn-ink: #8a5300;
-  --male: #2f6fb5; --female: #c2558f;
-  --th-bg: #f8f9fc; --row-hover: #f4f6fb;
-  --chip-bg: #eef1f6; --chip-brand-bg: #e8effa;
-  --chip-purple-bg: #f1e9fb; --chip-purple-ink: #6d3fb4;
-  --track: #eef1f6; --sep: #a8b3c4;
-  --btn2-bg: #eef1f6; --btn2-hover: #e3e8f0;
-  --field-bg: #ffffff; --count-bg: rgba(28,35,51,.08);
-  --hover-shadow: 0 4px 14px rgba(28,35,51,.07);
+  color-scheme: dark;
+  ${DARK_VARS}
 }
-/* Dark palette: default follows the OS preference; a saved manual choice on <html>
-   data-theme wins (see the inline script in layout.tsx and public/app.js). Every
-   component reads the vars above, so flipping them re-themes the whole app. */
-:root[data-theme="dark"] {${DARK_VARS}}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {${DARK_VARS}}
+/* The product ships dark-first; the header toggle stores an explicit light choice. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  ${LIGHT_VARS}
 }
 * { box-sizing: border-box; }
 body {
@@ -897,21 +898,22 @@ td.empty-state .small { margin-top: 4px; }
 .kpi .k-lbl { color: var(--muted); font-size: 13px; line-height: 1.4; }
 .kpi .k-bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: auto; }
 .kpi .k-bar span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
-/* hero (total) card */
+/* hero (total) card: same dark surface as the rest of the dashboard,
+   with the blue accent line carrying the emphasis. */
 .kpi.hero {
-  --accent: #fff;
-  border-color: transparent; color: #fff;
-  background: linear-gradient(145deg, var(--brand) 0%, #14355f 100%);
-  box-shadow: 0 8px 22px rgba(16, 40, 74, .22);
+  --accent: var(--link);
+  border-color: var(--line); color: var(--ink);
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(2,6,18,.14);
 }
-.kpi.hero::before { background: rgba(255,255,255,.55); }
-.kpi.hero .ico { background: rgba(255,255,255,.18); color: #fff; }
-.kpi.hero .k-pct { background: rgba(255,255,255,.18); color: #fff; font-weight: 500; }
-.kpi.hero .k-lbl { color: rgba(255,255,255,.82); }
+.kpi.hero::before { background: var(--link); opacity: .85; }
+.kpi.hero .ico { background: var(--chip-brand-bg); color: var(--link); }
+.kpi.hero .k-pct { background: var(--chip-bg); color: var(--ink); font-weight: 600; }
+.kpi.hero .k-lbl { color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) {
   .kpi { transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
   .kpi:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--hover-shadow); }
-  .kpi.hero:hover { box-shadow: 0 12px 26px rgba(16, 40, 74, .3); }
+  .kpi.hero:hover { box-shadow: var(--hover-shadow); }
 }
 
 /* Paired cards share a row height: the region list and the gender panel line up
@@ -2079,5 +2081,112 @@ img.photo-previewing { outline: 2px solid var(--brand); outline-offset: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .photo-preview-float { transition: none; }
+}
+
+/* ---------- product-wide visual language ----------
+   Shared finish for every page: deep navy surfaces, a blue gradient header,
+   larger page titles and calmer, roomier cards. Component styles above still
+   own their layout; this layer only unifies colour, radius, spacing and type. */
+body { background: var(--bg); }
+::selection { background: rgba(37,99,235,.4); color: var(--ink); }
+.topbar {
+  min-height: 64px; padding: 10px 22px; gap: 18px;
+  background: linear-gradient(100deg, #172554 0%, #1e3a8a 55%, #2563eb 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.08), 0 10px 30px rgba(2,6,18,.28);
+}
+.topbar .brand { gap: 11px; }
+.topbar .brand img { width: 36px; height: 36px; border-radius: 9px; }
+.topbar .brand-name { font-size: 16.5px; font-weight: 800; letter-spacing: -.015em; }
+.topbar nav { gap: 3px; }
+.topbar nav a, .topbar nav .nav-admin > summary {
+  padding: 8px 14px; border-radius: 9px; font-size: 14.5px; font-weight: 500;
+}
+.topbar nav a.active {
+  background: rgba(8,15,35,.38); font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+}
+.topbar .who { gap: 10px; }
+.container { max-width: 1240px; margin: 28px auto 8px; padding: 0 22px; }
+.page-head { align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.page-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
+.page-head h1 .count-pill { margin-left: 10px; font-size: 12px; font-weight: 700; vertical-align: middle; }
+.page-sub { margin-top: 5px; font-size: 14px; line-height: 1.6; }
+.page-head-actions { gap: 10px; align-items: center; }
+.card {
+  border-radius: 14px; padding: 22px 24px; margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(2,6,18,.14);
+}
+.card h1 { font-size: 24px; }
+.card h2 { font-size: 17px; }
+.stat-grid { gap: 16px; }
+.stat {
+  min-height: 122px; justify-content: center; gap: 8px;
+  padding: 22px 24px; border-radius: 14px;
+}
+.stat .n { font-size: 36px; font-weight: 800; letter-spacing: -.045em; }
+.stat .t { font-size: 14px; }
+.hh-grid { gap: 16px; }
+.hh-card {
+  padding: 18px 20px; border-radius: 14px; gap: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.02), transparent 46%), var(--card);
+}
+.hh-card-name, .hh-card-title a { font-size: 17px; font-weight: 700; }
+.hh-avatar { border-radius: 12px; }
+.btn {
+  border-radius: 9px; padding: 9px 18px; font-weight: 600; letter-spacing: .005em;
+  min-height: 42px;
+}
+.btn.sm { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+.btn:not(.secondary):not(.danger):not(.outline-danger) {
+  background: linear-gradient(180deg, #3478f6, var(--brand));
+  box-shadow: 0 2px 7px rgba(37,99,235,.28);
+}
+.btn.secondary { border-color: var(--line-strong); }
+input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=email], input[type=tel], input[type=url],
+input[type=number], input[type=file], select, textarea {
+  border-radius: 9px;
+}
+input[type=text], input[type=search], input[type=password], input[type=date],
+input[type=email], input[type=tel], input[type=url],
+input[type=number], select { height: 42px; }
+input:focus, select:focus, textarea:focus {
+  outline: 3px solid rgba(37,99,235,.22); border-color: #4f8bf7;
+}
+.filters { gap: 12px; margin-bottom: 18px; }
+.filters input, .filters select { height: 42px; }
+.tbl-wrap { border-radius: 14px; }
+th, td { padding: 11px 14px; }
+th { font-size: 13px; }
+.modal-backdrop { background: rgba(2,6,18,.78); }
+.modal-card { border-radius: 16px; border: 1px solid var(--line); }
+.modal-head { padding: 18px 24px; }
+.modal-head h3 { font-size: 19px; font-weight: 700; }
+.modal-body { padding: 22px 24px; }
+.modal-body form > .actions:last-child {
+  margin-left: -24px; margin-right: -24px; margin-bottom: -22px; padding: 14px 24px;
+}
+.flash { border-radius: 10px; }
+.footer { padding: 30px 16px 38px; font-size: 12.5px; }
+@media (max-width: 760px) {
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .topbar nav {
+    order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto;
+    scrollbar-width: none; padding: 2px 0;
+  }
+  .topbar nav::-webkit-scrollbar { display: none; }
+  .topbar nav a, .topbar nav .nav-admin > summary {
+    padding: 6px 10px; font-size: 13.5px; white-space: nowrap;
+  }
+  .topbar .brand img { width: 32px; height: 32px; }
+  .topbar .who { margin-left: auto; gap: 6px; }
+  .container { margin-top: 22px; padding: 0 16px; }
+  .page-head h1 { font-size: 25px; }
+  .card { padding: 18px 18px; }
+  .stat { padding: 18px 20px; min-height: 108px; }
+  .stat .n { font-size: 31px; }
+  .modal-body form > .actions:last-child {
+    margin-left: -18px; margin-right: -18px; margin-bottom: -22px; padding: 13px 18px;
+  }
 }
 `; // end of stylesheet

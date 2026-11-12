@@ -57,6 +57,8 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark light" />
+        <meta name="theme-color" content="#172554" />
         <title>
           {title} — {t("app.name")}
         </title>
@@ -65,7 +67,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
         <script>
           {/* Raw JS (no double quotes / &-entities) so Hono's HTML escaper cannot
               rewrite it — inside <script>, `&quot;` is a literal SyntaxError. */}
-          {html`try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}`}
+          {html`try{var t=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}`}
         </script>
         <script src={`/app.js?v=${ASSET_V}`} defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
