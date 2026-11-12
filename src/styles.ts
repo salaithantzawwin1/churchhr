@@ -1053,6 +1053,17 @@ td.empty-state .small { margin-top: 4px; }
 .age-row .a-bar .m { background: var(--male); height: 100%; }
 .age-row .a-bar .f { background: var(--female); height: 100%; }
 .age-row .a-sub { display: flex; gap: 10px; margin-top: 4px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+/* Age group rows double as a drill-down into the member list. */
+.age-row-link {
+  display: block; color: inherit; text-decoration: none; padding: 5px 7px; margin: -5px -7px;
+  border-radius: var(--radius-sm);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .age-row-link { transition: background .15s ease; }
+}
+.age-row-link:hover { background: var(--chip-bg); }
+.age-row-link:hover .a-name { color: var(--link); }
+.age-row-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 
 /* recent members list */
 .recent-list { list-style: none; margin: 0; padding: 0; }

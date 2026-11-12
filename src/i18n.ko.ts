@@ -107,6 +107,7 @@ export const KO: Record<string, string> = {
   "dash.recent": "최근 추가된 성도",
   "dash.recentEmpty": "아직 추가된 성도가 없습니다.",
   "dash.ageGroups": "연령대",
+  "dash.ageGroupOpen": "이 연령대의 교인 보기",
   "dash.groupUnit": "그룹",
   "dash.reports": "일일 보고서 · 최근 7일",
   "dash.repSubmitted": "제출",

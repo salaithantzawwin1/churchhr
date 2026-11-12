@@ -137,10 +137,19 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     department: intParam(q.department),
     group: intParam(q.group),
     fellowship: intParam(q.fellowship),
+    ageGroup: intParam(q.age_group),
   };
 }
 
-function listCond(scope: Scope, f: Filters) {
+/** Age Group behind a dashboard drill-down, with the range used for filtering. */
+async function loadAgeGroup(db: DB, id: number) {
+  const rows = await db.all<{ name: string; min_age: number; max_age: number }>(
+    sql`SELECT name, min_age, max_age FROM age_groups WHERE id = ${id} LIMIT 1`,
+  );
+  return rows[0] ?? null;
+}
+
+function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: number } | null) {
   let cond = scopeCond(scope);
   if (f.state) cond = sql`${cond} AND m.region_id = ${f.state}`;
   if (f.q) {
@@ -153,6 +162,14 @@ function listCond(scope: Scope, f: Filters) {
   if (f.department) cond = sql`${cond} AND m.department_id = ${f.department}`;
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
   if (f.fellowship) cond = sql`${cond} AND m.fellowship_category_id = ${f.fellowship}`;
+  // Same age bucket and population the dashboard card counts (active members
+  // with a birth date), so the drilled-down total matches the number clicked.
+  if (age) {
+    cond = sql`${cond} AND m.status = 'active' AND m.gender IN ('male', 'female')
+      AND m.date_of_birth IS NOT NULL AND m.date_of_birth <> ''
+      AND CAST((julianday('now') - julianday(m.date_of_birth)) / 365.25 AS INTEGER)
+        BETWEEN ${age.min_age} AND ${age.max_age}`;
+  }
   return cond;
 }
 
@@ -204,8 +221,10 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const f = parseFilters(c.req.query());
+  const ageGroup = f.ageGroup ? await loadAgeGroup(db, f.ageGroup) : null;
+  if (!ageGroup) f.ageGroup = null;
   const page = Math.max(1, intParam(c.req.query("page")) ?? 1);
-  const cond = listCond(scope, f);
+  const cond = listCond(scope, f, ageGroup);
 
   const countRows = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members m WHERE ${cond}`);
   const total = countRows[0]?.n ?? 0;
@@ -240,7 +259,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      rows={rows as any} total={total} page={currentPage} pages={pages} filters={f}
+      rows={rows as any} total={total} page={currentPage} pages={pages} filters={f} ageGroup={ageGroup}
       sort={SORT_EXPR[c.req.query("sort") ?? ""] ? (c.req.query("sort") as string) : ""}
       dir={c.req.query("dir") === "desc" ? "desc" : "asc"}
       regions={scopedRegions(allRegions, scope, c.get("lang"))}
@@ -386,7 +405,7 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const f = parseFilters(c.req.query());
-  const cond = listCond(scope, f);
+  const cond = listCond(scope, f, f.ageGroup ? await loadAgeGroup(db, f.ageGroup) : null);
   const rows = await db.all(sql`
     SELECT m.*, r.name AS state_name,
       e.label AS ethnicity, ed.label AS education, fg.label AS family_group,

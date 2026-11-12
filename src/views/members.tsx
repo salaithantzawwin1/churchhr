@@ -45,6 +45,8 @@ export type Filters = {
   department: number | null;
   group: number | null;
   fellowship: number | null;
+  /** Dashboard Age Group drill-down; narrows to that group's age range. */
+  ageGroup: number | null;
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -62,18 +64,21 @@ type ListProps = Common & {
   groups: OptionRow[];
   fellowships: OptionRow[];
   positionDefs?: PositionDefRow[];
+  /** Resolved Age Group behind the age_group filter, for the chip label. */
+  ageGroup?: { name: string; min_age: number; max_age: number } | null;
 };
 
 function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship, page: page ?? null,
+    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    age_group: f.ageGroup, page: page ?? null,
   });
 }
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -131,6 +136,7 @@ export function MembersListPage(props: ListProps) {
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    age_group: f.ageGroup,
     sort: sort || null, dir: sort ? dir : null,
   };
   const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
@@ -157,6 +163,13 @@ export function MembersListPage(props: ListProps) {
   if (f.fellowship) {
     const fellowship = fellowships.find((o) => o.id === f.fellowship);
     if (fellowship) chips.push({ label: fellowship.label, href: withoutFilter("fellowship") });
+  }
+  if (f.ageGroup && props.ageGroup) {
+    const g = props.ageGroup;
+    chips.push({
+      label: `${g.name} (${g.min_age}–${g.max_age})`,
+      href: withoutFilter("age_group"),
+    });
   }
   return (
     <Layout title={t("members.title")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -221,6 +234,7 @@ export function MembersListPage(props: ListProps) {
             <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
           ))}
         </select>
+        {f.ageGroup && <input type="hidden" name="age_group" value={String(f.ageGroup)} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
         {filtered && <a class="filter-clear" href="/members">{t("members.clear")}</a>}

@@ -355,11 +355,14 @@ export function DashboardPage(props: {
             <div class="age-list">
               {data.ageGroups.map((g) => {
                 const tot = g.male + g.female;
-                return (
-                  <div class="age-row">
+                const range = `${g.min_age}–${g.max_age}`;
+                // Each row opens the member list already narrowed to this age
+                // range, matching the count shown here.
+                const body = (
+                  <>
                     <div class="a-top">
                       <span class="a-name">
-                        {g.name} <span class="a-rng">({g.min_age}–{g.max_age})</span>
+                        {g.name} <span class="a-rng">({range})</span>
                       </span>
                       <span class="a-val">{tot}</span>
                     </div>
@@ -371,7 +374,13 @@ export function DashboardPage(props: {
                       <span class="gm">{t("dash.maleShort")} {g.male}</span>
                       <span class="gf">{t("dash.femaleShort")} {g.female}</span>
                     </div>
-                  </div>
+                  </>
+                );
+                return canView ? (
+                  <a class="age-row age-row-link" href={`/members?age_group=${g.id}`}
+                     title={`${t("dash.ageGroupOpen")}: ${g.name} (${range})`}>{body}</a>
+                ) : (
+                  <div class="age-row">{body}</div>
                 );
               })}
             </div>
