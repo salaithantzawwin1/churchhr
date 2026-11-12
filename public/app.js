@@ -519,6 +519,23 @@
   // Generic type-to-search select. Unlike the household head picker it only
   // writes the native select value; it never copies placement or contact data
   // into sibling fields.
+  // In-dialog list filter: typing narrows a rendered radio list without a round
+  // trip, which keeps the assign dialog usable on a church with many members.
+  function initListFilter(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-filter-list]"), function (input) {
+      if (input.getAttribute("data-filter-bound")) return;
+      input.setAttribute("data-filter-bound", "1");
+      var list = root.querySelector(input.getAttribute("data-filter-list"));
+      if (!list) return;
+      input.addEventListener("input", function () {
+        var q = input.value.trim().toLowerCase();
+        Array.prototype.forEach.call(list.querySelectorAll("[data-name]"), function (row) {
+          row.hidden = !!q && row.getAttribute("data-name").toLowerCase().indexOf(q) < 0;
+        });
+      });
+    });
+  }
+
   function initSearchPicker(root) {
     Array.prototype.forEach.call(root.querySelectorAll("[data-search-picker]"), function (picker) {
       if (picker.getAttribute("data-search-bound")) return;
@@ -1153,6 +1170,7 @@
     initRegionCascade(bodyEl);
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
+    initListFilter(bodyEl);
     initDepartmentPosition(bodyEl);
     initTabs(bodyEl);
     initPhotoInputs(bodyEl);

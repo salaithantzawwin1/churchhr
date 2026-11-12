@@ -405,29 +405,62 @@ export function OrganizationPage(props: Common & {
     const role = (position: string) =>
       leaderFor(leaders, "church", position, { regionalChurchId: church.id });
     const lead = churchRows.lead ? role(churchRows.lead.code) : null;
+    const assignHref = (position: string) =>
+      `/organization/assign?church=${church.id}&position=${encodeURIComponent(position)}`;
+    const assignTitle = (p: PositionDefRow) => `${t("org.assignLeader")} · ${positionDefLabel(p, L)}`;
+
+    // A vacant slot is the place to act: the card itself opens the assign dialog.
+    const node = (p: PositionDefRow, leader: OrgLeader | null, size: "lg" | "md", isLead = false) => {
+      const cls = `org-node${isLead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`;
+      const body = (
+        <>
+          <LeaderAvatar leader={leader} size={size} />
+          <span class="org-node-role">{positionDefLabel(p, L)}</span>
+          <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+        </>
+      );
+      if (!leader && canEdit) {
+        return (
+          <a class={`${cls} org-node-action js-edit-modal`} href={assignHref(p.code)}
+            data-modal-title={assignTitle(p)} data-modal-size="md"
+            aria-label={assignTitle(p)}>{body}</a>
+        );
+      }
+      return <div class={cls}>{body}</div>;
+    };
+
+    const filled = churchRows.all.filter((p) => role(p.code)).length;
+    // Nothing assigned: four empty cards say less than one prompt with the action.
+    if (churchRows.all.length > 0 && filled === 0) {
+      return (
+        <div class="org-vacant-state">
+          <div>
+            <h3>{t("org.allVacant")}</h3>
+            <p class="muted small">{t("org.allVacantHint")}</p>
+          </div>
+          <div class="org-section-actions">
+            <span class="org-vacant-count">{churchRows.all.length} {t("org.positionsVacant")}</span>
+            {canEdit && churchRows.lead ? (
+              <a class="btn sm js-edit-modal" href={assignHref(churchRows.lead.code)}
+                data-modal-title={assignTitle(churchRows.lead)} data-modal-size="md">
+                {t("org.assignLeader")}
+              </a>
+            ) : canManagePositions ? (
+              <a class="btn sm secondary" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <>
         <div class="org-chart-level org-chart-level-top">
-          {churchRows.lead && (
-            <div class={`org-node org-node-lead${lead ? "" : " org-node-vacant"}`}>
-              <LeaderAvatar leader={lead} size="lg" />
-              <span class="org-node-role">{positionDefLabel(churchRows.lead, L)}</span>
-              <span class="org-node-name"><LeaderLink leader={lead} empty={t("org.vacant")} /></span>
-            </div>
-          )}
+          {churchRows.lead && node(churchRows.lead, lead, "lg", true)}
         </div>
         <div class="org-chart-connector" aria-hidden="true" />
         <div class="org-chart-level org-chart-level-team">
-          {churchRows.rest.map((p) => {
-            const leader = role(p.code);
-            return (
-              <div class={`org-node${leader ? "" : " org-node-vacant"}`}>
-                <LeaderAvatar leader={leader} size="md" />
-                <span class="org-node-role">{positionDefLabel(p, L)}</span>
-                <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
-              </div>
-            );
-          })}
+          {churchRows.rest.map((p) => node(p, role(p.code), "md"))}
         </div>
       </>
     );

@@ -1,15 +1,16 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
-import { churchDepartments } from "../db/schema";
+import { churchDepartments, memberPositions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
+import { AssignLeaderModal } from "../views/org-assign";
 import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
@@ -137,6 +138,115 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       unassignedMembers={unassignedRows[0]?.n ?? 0}
     />,
   );
+});
+
+// ---------- Church leadership assignment ----------
+
+/** Members of one church, offered as candidates for a leadership slot. */
+async function assignCandidates(db: DB, churchId: number, q: string) {
+  const like = `%${q}%`;
+  return db.all<{ id: number; name: string; home_cell: string | null }>(sql`
+    SELECT m.id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '#') AS name,
+           hc.label AS home_cell
+    FROM members m
+    LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    WHERE m.status = 'active' AND hc.regional_church_id = ${churchId}
+      ${q ? sql`AND (m.name_myanmar LIKE ${like} OR m.name_english LIKE ${like})` : sql``}
+    ORDER BY name LIMIT 300`);
+}
+
+function assignLanding(churchId: number | null): string {
+  return churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
+}
+
+/** Dialog opened from a vacant node: pick the member who fills this slot. */
+organizationRoutes.get("/assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const churchId = intParam(c.req.query("church"));
+  const code = s(c.req.query("position"));
+  const q = listQuery(c.req.query("q"));
+  if (!modalRequest(c)) return c.redirect("/organization", 303);
+
+  const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
+  const def = (await loadPositionDefs(db)).find((d) => d.scopeType === "church" && d.code === code) ?? null;
+  if (!church || !def) return c.html(<p class="muted">Not found</p>, 404);
+
+  const current = await db.all<{ member_id: number }>(sql`
+    SELECT mp.member_id FROM member_positions mp
+    WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
+      AND mp.regional_church_id = ${church.id} LIMIT 1`);
+
+  return c.html(
+    <AssignLeaderModal
+      lang={c.get("lang")}
+      churchId={church.id}
+      churchName={regionalChurchName(church, c.get("lang"))}
+      def={def}
+      candidates={await assignCandidates(db, church.id, q)}
+      currentId={current[0]?.member_id ?? null}
+    />,
+  );
+});
+
+/** Saves the slot. An empty member_id clears it, so one dialog handles both. */
+organizationRoutes.post("/assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const modal = modalRequest(c);
+  const churchId = intParam(s(body.church));
+  const code = s(body.position);
+  const memberId = intParam(s(body.member_id));
+  const landing = assignLanding(churchId);
+
+  const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
+  const def = (await loadPositionDefs(db))
+    .find((d) => d.scopeType === "church" && d.code === code && d.active === 1) ?? null;
+  if (!church || !def) {
+    return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
+  }
+
+  let target: { id: number } | null = null;
+  if (memberId) {
+    const rows = await db.all<{ id: number; region_id: number }>(sql`
+      SELECT m.id, m.region_id FROM members m
+      WHERE m.id = ${memberId} AND m.status = 'active' LIMIT 1`);
+    if (!rows[0] || !regionInScope(scope, rows[0].region_id)) {
+      return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
+    }
+    target = { id: rows[0].id };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  // One holder per slot, and at most one church position per member.
+  await db.delete(memberPositions).where(and(
+    eq(memberPositions.scopeType, "church"),
+    eq(memberPositions.position, def.code),
+    eq(memberPositions.regionalChurchId, church.id),
+  ));
+  if (target) {
+    await db.delete(memberPositions).where(and(
+      eq(memberPositions.scopeType, "church"),
+      eq(memberPositions.memberId, target.id),
+    ));
+    await db.insert(memberPositions).values({
+      memberId: target.id,
+      position: def.code,
+      scopeType: "church",
+      scopeId: null,
+      departmentId: null,
+      regionalChurchId: church.id,
+      supervisionClusterId: null,
+      createdBy: c.get("user").id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
 // ---------- Department detail ----------
