@@ -711,6 +711,7 @@ export function MemberPositionForm(props: PositionFormProps) {
   const label = (code: string) => positionLabelForCode(positionDefs, code, L);
   const regionalId = assignments.regionalChurchId ?? member.regionalChurchId ?? null;
   const churchId = assignments.churchId ?? member.regionalChurchId ?? null;
+  const orderedChurches = [...regionalChurches].sort((a, b) => (b.isMain ?? 0) - (a.isMain ?? 0));
   const currentRoles = [
     assignments.homeCell && label(assignments.homeCell),
     assignments.township && `${label(assignments.township)} · ${member.townshipName ?? t("org.supervision")}`,
@@ -935,7 +936,7 @@ export function MemberPositionForm(props: PositionFormProps) {
                   <span class="lbl">{t("org.church")}</span>
                   <select name="church_id">
                     <option value="">{t("org.noChurch")}</option>
-                    {regionalChurches.map((church) => (
+                    {orderedChurches.map((church) => (
                       <option value={String(church.id)} selected={churchId === church.id}>
                         {regionalChurchName(church, L)}{church.isMain === 1 ? ` · ${t("org.mainChurchBadge")}` : ""}
                       </option>

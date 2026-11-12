@@ -198,6 +198,7 @@ export function OrganizationPage(props: Common & {
   const regionalOnly = regionalChurches.filter((c) => c.isMain !== 1);
   const selectedChurch = regionalChurches.find((c) => c.id === selectedChurchId)
     ?? mainChurches[0] ?? regionalChurches[0] ?? null;
+  const orderedChurches = [...mainChurches, ...regionalOnly];
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -444,7 +445,7 @@ export function OrganizationPage(props: Common & {
                 <label class="field">
                   <span class="lbl">{t("org.selectChurch")}</span>
                   <select name="church">
-                    {regionalChurches.map((church) => (
+                    {orderedChurches.map((church) => (
                       <option value={String(church.id)} selected={selectedChurch?.id === church.id}>
                         {regionalChurchName(church, L)}{church.isMain === 1 ? ` · ${t("org.mainChurchBadge")}` : ""}
                       </option>
