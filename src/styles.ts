@@ -904,8 +904,8 @@ td.empty-state .small { margin-top: 4px; }
 .dash-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .kpi {
   position: relative; overflow: hidden; background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 15px 16px 14px;
-  display: flex; flex-direction: column; gap: 8px; --accent: var(--link);
+  border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 12px 14px 11px;
+  display: flex; flex-direction: column; gap: 6px; --accent: var(--link);
 }
 .kpi::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--accent); opacity: .85; }
 .kpi.ok { --accent: var(--ok-ink); }
@@ -913,7 +913,7 @@ td.empty-state .small { margin-top: 4px; }
 .kpi.err { --accent: var(--err-ink); }
 .kpi .k-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kpi .ico {
-  width: 34px; height: 34px; border-radius: var(--radius); flex: none;
+  width: 30px; height: 30px; border-radius: var(--radius); flex: none;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--chip-bg); color: var(--accent);
 }
@@ -926,9 +926,9 @@ td.empty-state .small { margin-top: 4px; }
   background: var(--chip-bg); border-radius: 999px; padding: 2px 8px;
   max-width: 60%; overflow: hidden; text-overflow: ellipsis;
 }
-.kpi .k-num { font-size: 30px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.kpi .k-lbl { color: var(--muted); font-size: 13px; line-height: 1.4; }
-.kpi .k-bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: auto; }
+.kpi .k-num { font-size: 25px; font-weight: 700; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi .k-lbl { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.kpi .k-bar { height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: auto; }
 .kpi .k-bar span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 /* hero (total) card: same dark surface as the rest of the dashboard,
    with the blue accent line carrying the emphasis. */
@@ -1312,11 +1312,6 @@ td.empty-state .small { margin-top: 4px; }
 }
 /* ---------- organization structure ---------- */
 .org-stats { margin: 0 0 18px; }
-/* The structure page counts four small numbers, so they read better as one tight
-   strip than as tall dashboard tiles: same card, less air and a smaller figure. */
-.org-stats .stat { min-height: 0; padding: 13px 16px; gap: 3px; }
-.org-stats .stat .n { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
-.org-stats .stat .t { font-size: 12.5px; line-height: 1.35; }
 .org-church { display: grid; gap: 14px; }
 .org-state { padding: 18px 20px; }
 .org-state-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -2365,10 +2360,12 @@ body { background: var(--bg); }
 .page-head-actions { gap: 10px; align-items: center; }
 .card h1 { font-size: 24px; }
 .card h2 { font-size: 17px; }
-.stat-grid { gap: var(--space-4); }
-.stat { min-height: 122px; justify-content: center; gap: var(--space-2); }
-.stat .n { font-size: 36px; font-weight: 800; letter-spacing: -.045em; }
-.stat .t { font-size: 14px; }
+/* A lone count does not need a tall tile: keep every stat strip (structure
+   pages, settings, pastors, vacancies) as one compact row of numbers. */
+.stat-grid { gap: 12px; }
+.stat { min-height: 0; padding: 13px 16px; gap: 3px; }
+.stat .n { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+.stat .t { font-size: 12.5px; line-height: 1.35; }
 .hh-grid { gap: 16px; }
 .hh-card {
   padding: 18px 20px; border-radius: var(--radius-lg); gap: 14px;
