@@ -224,6 +224,19 @@ tbody tr:hover { background: var(--row-hover); }
   line-height: 1.35; min-height: 40px;
 }
 .btn:hover { filter: brightness(1.08); }
+/* Easy date entry (app.js): day / month / year selects in front of the native
+   input, which stays in the form as the submitted value. */
+.dp { display: inline-flex; gap: 6px; width: 100%; min-width: 0; }
+.dp .dp-part { flex: 0 0 auto; width: auto; padding: 0 4px 0 8px; }
+.dp .dp-part:first-child { width: 58px; } /* day */
+.dp .dp-part:nth-child(2) { flex: 1 1 0; min-width: 66px; } /* month name */
+.dp .dp-part:last-child { width: 78px; } /* year */
+.dp-native {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  border: 0; opacity: 0; pointer-events: none; overflow: hidden;
+}
+.filter-toolbar .dp { width: 250px; max-width: 100%; }
+.filter-toolbar .dp .dp-part { height: 36px; font-size: 13.5px; }
 /* Sent forms lock their button until the response arrives (app.js). */
 .btn.is-submitting { pointer-events: none; opacity: .65; }
 .btn.secondary { background: var(--btn2-bg); color: var(--ink); border: 1px solid var(--line); }

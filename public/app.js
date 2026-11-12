@@ -1037,6 +1037,8 @@
       form.addEventListener("change", function (e) {
         var el = e.target;
         if (!el || el.tagName !== "SELECT") return;
+        // Date picker parts submit once, when the whole date is settled.
+        if (el.hasAttribute("data-dp-part")) return;
         window.setTimeout(function () {
           if (form.requestSubmit) form.requestSubmit();
           else form.submit();
@@ -1200,6 +1202,140 @@
     }, 0);
   }, false);
 
+  // Date fields: the browser's date input makes you click a masked year segment
+  // and step back decade by decade, which is slow for 1940s birth dates. Each
+  // date input is given day / month / year selects instead. The native input
+  // stays in the form (so the submitted value and no-JS behaviour are
+  // unchanged) and hands its constraints to the selects.
+  function initDatePickers(root) {
+    var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+    function labelFor(input, part) {
+      var lbl = input.closest("label");
+      var text = "";
+      if (lbl) {
+        var span = lbl.querySelector(".lbl");
+        text = (span ? span.textContent : lbl.textContent) || "";
+      } else if (input.getAttribute("aria-label")) {
+        text = input.getAttribute("aria-label");
+      }
+      text = text.replace(/\s*\*\s*$/, "").replace(/\(.*?\)/g, "").trim();
+      return (text ? text + " " : "") + part;
+    }
+
+    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"]'), function (native) {
+      if (native.getAttribute("data-dp-ready")) return;
+      native.setAttribute("data-dp-ready", "1");
+
+      var nowDate = new Date();
+      var minAttr = native.getAttribute("min") || "";
+      var maxAttr = native.getAttribute("max") || "";
+      var minYear = /^\d{4}/.test(minAttr) ? Number(minAttr.slice(0, 4)) : 1900;
+      var maxYear = /^\d{4}/.test(maxAttr) ? Number(maxAttr.slice(0, 4)) : nowDate.getFullYear() + 1;
+      if (minYear > maxYear) minYear = maxYear;
+      var required = native.hasAttribute("required");
+      native.removeAttribute("required");
+      native.removeAttribute("min");
+      native.removeAttribute("max");
+      native.classList.add("dp-native");
+      native.setAttribute("tabindex", "-1");
+
+      var wrap = document.createElement("span");
+      wrap.className = "dp";
+      var makePart = function (part) {
+        var sel = document.createElement("select");
+        sel.className = "dp-part";
+        sel.setAttribute("data-dp-part", "1");
+        sel.setAttribute("aria-label", labelFor(native, part));
+        return sel;
+      };
+      var day = makePart("day");
+      var month = makePart("month");
+      var year = makePart("year");
+      if (required) year.setAttribute("required", "required");
+
+      var blank = function () {
+        var o = document.createElement("option");
+        o.value = "";
+        o.textContent = "—";
+        return o;
+      };
+      month.appendChild(blank());
+      MONTHS.forEach(function (name, i) {
+        var o = document.createElement("option");
+        o.value = pad(i + 1);
+        o.textContent = name;
+        month.appendChild(o);
+      });
+      year.appendChild(blank());
+      for (var y = maxYear; y >= minYear; y--) {
+        var yo = document.createElement("option");
+        yo.value = String(y);
+        yo.textContent = String(y);
+        year.appendChild(yo);
+      }
+
+      function fillDays() {
+        var keep = day.value;
+        day.textContent = "";
+        day.appendChild(blank());
+        var yv = Number(year.value) || 2000;
+        var mv = Number(month.value) || 1;
+        var total = daysInMonth(yv, mv);
+        for (var d = 1; d <= total; d++) {
+          var o = document.createElement("option");
+          o.value = pad(d);
+          o.textContent = String(d);
+          day.appendChild(o);
+        }
+        day.value = keep && Number(keep) <= total ? keep : "";
+      }
+
+      function apply() {
+        var yv = year.value;
+        var mv = month.value;
+        var dv = day.value;
+        native.value = yv && mv && dv ? yv + "-" + mv + "-" + dv : "";
+      }
+
+      function settled() {
+        var parts = [year.value, month.value, day.value];
+        var filled = parts.filter(function (p) { return p; }).length;
+        return filled === 0 || filled === 3;
+      }
+
+      fillDays();
+      var value = /^(\d{4})-(\d{2})-(\d{2})$/.exec(native.value || "");
+      if (value) {
+        year.value = value[1];
+        month.value = value[2];
+        fillDays();
+        day.value = value[3];
+      }
+
+      Array.prototype.forEach.call([day, month, year], function (sel) {
+        sel.addEventListener("change", function () {
+          if (sel === month || sel === year) fillDays();
+          apply();
+          var form = native.form;
+          if (form && form.hasAttribute("data-auto-submit") && settled()) {
+            window.setTimeout(function () {
+              if (form.requestSubmit) form.requestSubmit();
+              else form.submit();
+            }, 0);
+          }
+        });
+      });
+
+      wrap.appendChild(day);
+      wrap.appendChild(month);
+      wrap.appendChild(year);
+      native.parentNode.insertBefore(wrap, native.nextSibling);
+    });
+  }
+  initDatePickers(document);
+
   // Delete confirm modal (replaces window.confirm for data-confirm forms)
   document.addEventListener("submit", function (e) {
     var f = e.target;
@@ -1247,6 +1383,7 @@
     });
     initRegionCascade(bodyEl);
     initCellStateScope(bodyEl);
+    initDatePickers(bodyEl);
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
     initListFilter(bodyEl);
