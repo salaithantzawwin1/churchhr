@@ -2384,6 +2384,16 @@ th { font-size: 13px; }
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
 .assign-hint { margin: 0 0 var(--space-2); color: var(--muted); font-size: 12px; }
 .assign-list-clear { margin-top: var(--space-2); }
+
+/* Nested roles in the Home Cell and Department charts: children hang off their
+   parent on a connector rail, the same reading as the church tree. */
+.org-role-kids {
+  margin-left: 12px; padding-left: 10px;
+  border-left: 2px solid var(--connector);
+  display: grid; gap: 2px;
+}
+.org-role-branch { display: grid; gap: 2px; }
+.org-role-kids .org-mini { margin-top: 0; }
 /* Replace notice: shown in the row that owns the conflict and repeated under the
    list once that member is selected, so the consequence is visible at Save time. */
 .assign-row-note { color: var(--warn-ink); font-size: 12px; line-height: 1.5; }

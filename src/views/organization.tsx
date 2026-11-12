@@ -177,6 +177,33 @@ function positionRows(defs: PositionDefRow[], scope: Parameters<typeof defsForSc
   return { lead, rest: rows.filter((r) => r !== lead), all: rows };
 }
 
+/**
+ * Groups a scope's ordered roles into a parent → children forest. A role with no
+ * parent hangs under the lead role, so lead-plus-team stays intact and only an
+ * explicit "Reports to" moves a role deeper.
+ */
+function nestRoles(rows: PositionDefRow[], lead: PositionDefRow | null) {
+  const byCode = new Map(rows.map((d) => [d.code, d]));
+  const leadCode = lead && byCode.has(lead.code) ? lead.code : null;
+  const kids = new Map<string, PositionDefRow[]>();
+  const roots: PositionDefRow[] = [];
+  for (const def of rows) {
+    const parent = def.code === leadCode
+      ? null
+      : def.parentCode && def.parentCode !== def.code && byCode.has(def.parentCode)
+        ? def.parentCode
+        : leadCode;
+    if (parent) {
+      const list = kids.get(parent) ?? [];
+      list.push(def);
+      kids.set(parent, list);
+    } else {
+      roots.push(def);
+    }
+  }
+  return { roots, kids };
+}
+
 export function OrganizationPage(props: Common & {
   tab: "church" | "main" | "home-cells" | "regional";
   cells: OrgCell[];
@@ -377,7 +404,30 @@ export function OrganizationPage(props: Common & {
           </div>
           <div class="org-flow-line" aria-hidden="true" />
           <div class="org-flow-cells">
-          {group.cells.map((cell) => (
+          {group.cells.map((cell) => {
+            // Same parent_code rule as the church chart, one tree per Home Cell.
+            const cellForest = nestRoles(cellRows.all, cellRows.lead);
+            const cellRoleBranch = (target: OrgCell, def: PositionDefRow) => {
+              const children = cellForest.kids.get(def.code) ?? [];
+              return (
+                <div class="org-role-branch">
+                  <span class="org-flow-role">
+                    <span class="org-role-label">{positionDefLabel(def, L)}</span>
+                    <LeaderLink
+                      leader={homeRole(target.id, def.code)}
+                      empty={def.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
+                      photoPreview
+                    />
+                  </span>
+                  {children.length > 0 && (
+                    <div class="org-role-kids">
+                      {children.map((child) => cellRoleBranch(target, child))}
+                    </div>
+                  )}
+                </div>
+              );
+            };
+            return (
             <article class="org-flow-cell">
               <div class="org-flow-cell-head">
                 <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
@@ -389,19 +439,11 @@ export function OrganizationPage(props: Common & {
                 </div>
               </div>
               <div class="org-flow-cell-roles">
-                {cellRows.all.map((p) => (
-                  <span class="org-flow-role">
-                    <span class="org-role-label">{positionDefLabel(p, L)}</span>
-                    <LeaderLink
-                      leader={homeRole(cell.id, p.code)}
-                      empty={p.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
-                      photoPreview
-                    />
-                  </span>
-                ))}
+                {cellForest.roots.map((def) => cellRoleBranch(cell, def))}
               </div>
             </article>
-          ))}
+            );
+          })}
           </div>
         </div>
       </details>
@@ -441,30 +483,10 @@ export function OrganizationPage(props: Common & {
       return <div class={cls}>{body}</div>;
     };
 
-    // Positions nest by parent_code. A position with no parent still sits under
-    // the lead slot, so the familiar lead-plus-team chart stays intact and only
-    // an explicit parent moves a slot deeper.
-    const byCode = new Map(churchRows.all.map((d) => [d.code, d]));
-    const leadCode = churchRows.lead?.code ?? null;
-    const parentOf = (def: PositionDefRow): string | null => {
-      if (def.code === leadCode) return null;
-      if (def.parentCode && byCode.has(def.parentCode) && def.parentCode !== def.code) return def.parentCode;
-      return leadCode && byCode.has(leadCode) ? leadCode : null;
-    };
-    const kids = new Map<string, PositionDefRow[]>();
-    const roots: PositionDefRow[] = [];
-    for (const def of churchRows.all) {
-      const parent = parentOf(def);
-      if (parent) {
-        const list = kids.get(parent) ?? [];
-        list.push(def);
-        kids.set(parent, list);
-      } else {
-        roots.push(def);
-      }
-    }
+    // Positions nest by parent_code; a position with no parent sits under the lead.
+    const forest = nestRoles(churchRows.all, churchRows.lead);
     const branch = (def: PositionDefRow) => {
-      const children = kids.get(def.code) ?? [];
+      const children = forest.kids.get(def.code) ?? [];
       const isLead = def.code === churchRows.lead?.code;
       return (
         <div class="org-branch">
@@ -506,7 +528,7 @@ export function OrganizationPage(props: Common & {
       );
     }
 
-    return <div class="org-forest">{roots.map((root) => branch(root))}</div>;
+    return <div class="org-forest">{forest.roots.map((root) => branch(root))}</div>;
   };
 
   const renderStateHierarchy = (state: StateGroup) => {
@@ -636,8 +658,32 @@ export function OrganizationPage(props: Common & {
               <div class="org-grid org-dept-grid">
                 {scopedDepartments.map((d) => {
                   const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
-                  const departmentLeaders = deptRows.rest
-                    .map((p) => ({ position: p, leader: departmentRole(d.id, p.code) }));
+                  // Department roles nest exactly like church roles.
+                  const deptForest = nestRoles(deptRows.all, deptRows.lead);
+                  const deptLeaves = [
+                    ...deptForest.roots.filter((r) => r.code !== deptRows.lead?.code),
+                    ...(deptForest.kids.get(deptRows.lead?.code ?? "") ?? []),
+                  ];
+                  const deptRoleBranch = (def: PositionDefRow) => {
+                    const leader = departmentRole(d.id, def.code);
+                    const children = deptForest.kids.get(def.code) ?? [];
+                    return (
+                      <div class="org-role-branch">
+                        <div class={`org-mini${leader ? "" : " org-vacant"}`}>
+                          <LeaderAvatar leader={leader} size="sm" />
+                          <div>
+                            <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                            <LeaderLink leader={leader} empty={t("org.vacant")} />
+                          </div>
+                        </div>
+                        {children.length > 0 && (
+                          <div class="org-role-kids">
+                            {children.map((child) => deptRoleBranch(child))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
                   return (
                     <article class="card org-dept-card">
                       <div class="org-dept-head">
@@ -656,15 +702,7 @@ export function OrganizationPage(props: Common & {
                         <LeaderLink leader={head} empty={t("org.vacant")} />
                       </div>
                       <div class="org-mini-list">
-                        {departmentLeaders.map((p) => (
-                          <div class={`org-mini${p.leader ? "" : " org-vacant"}`}>
-                            <LeaderAvatar leader={p.leader} size="sm" />
-                            <div>
-                              <span class="org-mini-role">{positionDefLabel(p.position, L)}</span>
-                              <LeaderLink leader={p.leader} empty={t("org.vacant")} />
-                            </div>
-                          </div>
-                        ))}
+                        {deptLeaves.map((def) => deptRoleBranch(def))}
                       </div>
                       <div class="org-card-actions">
                         <a class="org-card-link" href={`/organization/departments/${d.id}`}>
