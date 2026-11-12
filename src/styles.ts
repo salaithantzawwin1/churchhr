@@ -2113,6 +2113,22 @@ body { background: var(--bg); }
   .container { max-width: 1480px; }
   .container:has(.tbl-wrap) { max-width: 1600px; }
 }
+/* 1280–1400px laptops: the member list's role column held several badge rows
+   on one line and made the table wider than the viewport. Let those badges
+   wrap and tighten the cell gutters so all columns fit without a horizontal
+   scrollbar, while keeping the sticky-name behaviour for narrower screens. */
+@media (min-width: 1181px) and (max-width: 1500px) {
+  .list-tbl th, .list-tbl td { padding: 8px 4px; font-size: 12.5px; }
+  .list-tbl th[data-col="role"],
+  .list-tbl td[data-col="role"] { width: 185px; max-width: 185px; }
+  .list-tbl td[data-col="role"] { white-space: normal; }
+  .list-tbl td[data-col="role"] .position-edit { white-space: nowrap; }
+  .list-tbl td[data-col="name"] { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+  .list-tbl td[data-col="group"],
+  .list-tbl td[data-col="familyGroup"],
+  .list-tbl td[data-col="fellowship"],
+  .list-tbl td[data-col="sector"] { white-space: normal; overflow-wrap: anywhere; }
+}
 @media (min-width: 1760px) {
   .container { max-width: 1560px; }
   .container:has(.tbl-wrap) { max-width: 1680px; }
