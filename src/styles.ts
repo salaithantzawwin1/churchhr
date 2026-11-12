@@ -2186,6 +2186,15 @@ body { background: var(--bg); }
   min-height: 42px;
 }
 .btn.sm { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+/* Compact icon actions for dense list rows: label stays in title/aria-label. */
+.row-actions-cell { width: 1%; white-space: nowrap; }
+.row-icon-actions { display: inline-flex; align-items: center; gap: 6px; }
+.row-icon-actions form { display: inline-flex; margin: 0; }
+.btn.icon-btn {
+  width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.btn.icon-btn svg { width: 16px; height: 16px; display: block; }
 .btn:not(.secondary):not(.danger):not(.outline-danger) {
   background: linear-gradient(180deg, #3478f6, var(--brand));
   box-shadow: 0 2px 7px rgba(37,99,235,.28);

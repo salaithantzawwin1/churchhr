@@ -105,6 +105,25 @@ const LIST_COLS = (t: (k: string) => string) => [
   { key: "status", label: t("members.status") },
 ];
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5" />
+    </svg>
+  );
+}
+
 export function MembersListPage(props: ListProps) {
   const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs } = props;
   const t = getDict(lang ?? "en");
@@ -361,16 +380,22 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="fellowship">{m.fellowship ?? ""}</td>
                 <td data-col="sector">{m.sector ?? ""}</td>
                 <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
-                <td style="white-space:nowrap">
-                  {perms.has("members.update") && (
-                    <a class="btn sm secondary js-edit-modal" href={`/members/${m.id}/edit`} data-modal-title={t("form.editTitle")}>{t("members.edit")}</a>
-                  )}{" "}
-                  {canDelete && (
-                    <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")} style="display:inline"
-                     >
-                      <button class="btn sm danger" type="submit">{t("members.delete")}</button>
-                    </form>
-                  )}
+                <td class="row-actions-cell">
+                  <div class="row-icon-actions">
+                    {perms.has("members.update") && (
+                      <a class="btn sm secondary icon-btn js-edit-modal" href={`/members/${m.id}/edit`}
+                        data-modal-title={t("form.editTitle")} title={t("members.edit")} aria-label={t("members.edit")}>
+                        <EditIcon />
+                      </a>
+                    )}
+                    {canDelete && (
+                      <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                        <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}>
+                          <TrashIcon />
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
