@@ -77,6 +77,13 @@ export function AssignLeaderModal(props: {
               )}
             </div>
           )}
+          {/* The card itself opens this dialog, so the profile gets its own
+              explicit way out. */}
+          {currentHref && (
+            <a href={currentHref} class="position-hero-link">
+              {t("org.viewProfile")} <span aria-hidden="true">→</span>
+            </a>
+          )}
         </div>
       </div>
 
