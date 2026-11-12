@@ -1473,6 +1473,25 @@
     }
   })();
 
+  // Confirmation banners are transient: fade them out, then drop the flash key
+  // from the URL so a reload does not replay an old "saved" message.
+  (function initFlash() {
+    var flash = document.querySelector(".flash");
+    if (!flash) return;
+    try {
+      var url = new URL(location.href);
+      if (url.searchParams.has("ok") || url.searchParams.has("err")) {
+        url.searchParams.delete("ok");
+        url.searchParams.delete("err");
+        history.replaceState(null, "", url.pathname + url.search + url.hash);
+      }
+    } catch (e) { /* older browser: keep the query, the message still fades */ }
+    setTimeout(function () {
+      flash.classList.add("flash-out");
+      setTimeout(function () { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 400);
+    }, 5000);
+  })();
+
   // Home Cell structure: expand or collapse every cluster branch at once.
   (function initClusterToggles() {
     document.addEventListener("click", function (e) {

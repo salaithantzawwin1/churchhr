@@ -148,7 +148,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
           </div>
         </header>
         <main class="container" id="main">
-          {flash && <div class={`flash ${flash.kind}`}>{flash.text}</div>}
+          {flash && <div class={`flash ${flash.kind}`} role="status">{flash.text}</div>}
           {children}
         </main>
         <footer class="footer">{footerNote ?? `${t("app.name")} — ${t("app.tagline")}`}</footer>

@@ -21,6 +21,8 @@ export type PositionDefRow = {
   nameMyanmar: string;
   nameEnglish: string | null;
   nameKorean: string | null;
+  /** Code of the position this one reports to, or null for a top-level slot. */
+  parentCode: string | null;
   active: number;
   sortOrder: number;
   usageCount?: number;
@@ -83,7 +85,7 @@ export async function loadPositionDefs(db: DB): Promise<PositionDefRow[]> {
   return db.all<PositionDefRow>(sql`
     SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
            name_english AS nameEnglish, name_korean AS nameKorean,
-           active, sort_order AS sortOrder
+           parent_code AS parentCode, active, sort_order AS sortOrder
     FROM position_defs
     ORDER BY scope_type, sort_order, id`);
 }

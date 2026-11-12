@@ -185,7 +185,14 @@ a { color: var(--link); }
 th.num, td.num { text-align: right; }
 td.empty-state { text-align: center; padding: 30px 12px; color: var(--muted); }
 td.empty-state .small { margin-top: 4px; }
-.flash { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 14px; }
+.flash {
+  padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 14px;
+  transition: opacity .35s ease, transform .35s ease;
+}
+.flash-out { opacity: 0; transform: translateY(-4px); }
+@media (prefers-reduced-motion: reduce) {
+  .flash, .flash-out { transition: none; transform: none; }
+}
 .flash.ok { background: var(--ok-bg); color: var(--ok-ink); }
 .flash.err { background: var(--err-bg); color: var(--err-ink); }
 .flash.warn { background: var(--warn-bg); color: var(--warn-ink); }
@@ -1890,6 +1897,37 @@ td.empty-state .small { margin-top: 4px; }
   background: var(--card); border: 1px solid var(--hairline); border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--node-ring), var(--elev-1);
 }
+/* Leadership tree: any depth. Siblings share a bus, each child drops a stem from
+   it, and nested children repeat the same pattern one level down. */
+.org-forest {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  gap: var(--space-7);
+}
+.org-branch { display: flex; flex-direction: column; align-items: center; position: relative; }
+.org-branch-kids {
+  display: flex; align-items: flex-start; justify-content: center;
+  gap: 18px; padding-top: 24px; position: relative;
+}
+.org-branch-kids > .org-branch { position: relative; }
+.org-branch-kids > .org-branch::before {
+  content: ""; position: absolute; top: -24px; left: 50%; width: 2px; height: 24px;
+  background: var(--connector);
+}
+.org-branch-kids > .org-branch::after {
+  content: ""; position: absolute; top: -24px; height: 2px; left: -9px; right: -9px;
+  background: var(--connector);
+}
+.org-branch-kids > .org-branch:first-child::after { left: 50%; }
+.org-branch-kids > .org-branch:last-child::after { right: 50%; }
+.org-branch-kids > .org-branch:only-child::after { display: none; }
+@media (max-width: 760px) {
+  .org-branch-kids {
+    flex-direction: column; align-items: center; gap: 18px; padding-top: 18px;
+  }
+  .org-branch-kids > .org-branch::after { display: none; }
+  .org-branch-kids > .org-branch::before { top: -18px; height: 18px; }
+}
+
 /* A vacant node is the place to act: the whole card opens the assign dialog. */
 .org-node-action {
   color: inherit; text-decoration: none; cursor: pointer;

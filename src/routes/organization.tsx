@@ -175,8 +175,17 @@ function churchPositionLabels(defs: PositionDefRow[], lang: string): Record<stri
   return out;
 }
 
-function assignLanding(churchId: number | null, ok?: string): string {
-  const base = churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
+type AssignTab = "church" | "main";
+
+/** The dialog remembers which tab opened it, so a save never changes tabs. */
+function assignTab(raw: unknown): AssignTab {
+  return raw === "main" ? "main" : "church";
+}
+
+function assignLanding(tab: AssignTab, churchId: number | null, ok?: string): string {
+  const base = tab === "main"
+    ? "/organization?tab=main"
+    : churchId ? `/organization?tab=church&church=${churchId}` : "/organization";
   return ok ? `${base}&ok=${ok}` : base;
 }
 
@@ -187,6 +196,7 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const churchId = intParam(c.req.query("church"));
   const code = s(c.req.query("position"));
   const q = listQuery(c.req.query("q"));
+  const tab = assignTab(c.req.query("tab"));
   if (!modalRequest(c)) return c.redirect("/organization", 303);
 
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
@@ -194,19 +204,24 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const def = (await loadPositionDefs(db)).find((d) => d.scopeType === "church" && d.code === code) ?? null;
   if (!church || !def) return c.html(<p class="muted">Not found</p>, 404);
 
-  const current = await db.all<{ member_id: number }>(sql`
-    SELECT mp.member_id FROM member_positions mp
+  // The holder may live in another church's Home Cell, so their name is resolved
+  // here and shown even when they are not among this church's candidates.
+  const current = await db.all<{ member_id: number; name: string | null }>(sql`
+    SELECT mp.member_id, COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name
+    FROM member_positions mp JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
       AND mp.regional_church_id = ${church.id} LIMIT 1`);
 
   return c.html(
     <AssignLeaderModal
       lang={c.get("lang")}
+      tab={tab}
       churchId={church.id}
       churchName={regionalChurchName(church, c.get("lang"))}
       def={def}
       candidates={await assignCandidates(db, church.id, q)}
       currentId={current[0]?.member_id ?? null}
+      currentName={current[0]?.name ?? null}
       labels={churchPositionLabels(await loadPositionDefs(db), c.get("lang"))}
     />,
   );
@@ -221,8 +236,9 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
   const churchId = intParam(s(body.church));
   const code = s(body.position);
   const memberId = intParam(s(body.member_id));
-  const landing = assignLanding(churchId);
-  const done = assignLanding(churchId, memberId ? "church-leader-saved" : "church-leader-cleared");
+  const tab = assignTab(body.tab);
+  const landing = assignLanding(tab, churchId);
+  const done = assignLanding(tab, churchId, memberId ? "church-leader-saved" : "church-leader-cleared");
 
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
@@ -461,11 +477,32 @@ async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
   return db.all<PositionDefRow>(sql`
     SELECT pd.id, pd.scope_type AS scopeType, pd.code,
            pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
-           pd.name_korean AS nameKorean, pd.active, pd.sort_order AS sortOrder,
+           pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
+           pd.active, pd.sort_order AS sortOrder,
            (SELECT COUNT(*) FROM member_positions mp
              WHERE mp.position = pd.code AND mp.scope_type = pd.scope_type) AS usageCount
     FROM position_defs pd
     ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+}
+
+/** Parent choices for the position form: same scope, never the position itself. */
+function parentOptions(defs: PositionDefRow[], scope: string, lang: string, exceptCode?: string) {
+  return defs
+    .filter((d) => d.scopeType === scope && d.code !== exceptCode)
+    .map((d) => ({ code: d.code, label: positionDefLabel(d, lang) }));
+}
+
+/** True when the chosen parent is this position or sits under it, which would
+ *  make the chart a loop. */
+function parentFormsCycle(defs: PositionDefRow[], scope: string, code: string, parentCode: string): boolean {
+  let cursor: string | null = parentCode;
+  const seen = new Set<string>();
+  while (cursor) {
+    if (cursor === code || seen.has(cursor)) return true;
+    seen.add(cursor);
+    cursor = defs.find((d) => d.scopeType === scope && d.code === cursor)?.parentCode ?? null;
+  }
+  return false;
 }
 
 function positionScopeFrom(value: string | undefined): ConfigurablePositionScope {
@@ -507,18 +544,26 @@ organizationRoutes.get("/positions", requirePermission("options.manage"), requir
 });
 
 organizationRoutes.get("/positions/new", requirePermission("options.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
   const scope = positionScopeFrom(c.req.query("scope"));
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${scope}`, 303);
-  return c.html(<PositionModal scope={scope} lang={c.get("lang")} />);
+  return c.html(
+    <PositionModal scope={scope} lang={c.get("lang")}
+      parents={parentOptions(await adminPositionDefs(db), scope, c.get("lang"))} />,
+  );
 });
 
 organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
-  const def = id ? (await adminPositionDefs(db)).find((d) => d.id === id) : undefined;
+  const defs = await adminPositionDefs(db);
+  const def = id ? defs.find((d) => d.id === id) : undefined;
   if (!def) return c.redirect("/organization/positions?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${def.scopeType}`, 303);
-  return c.html(<PositionModal scope={def.scopeType} def={def} lang={c.get("lang")} />);
+  return c.html(
+    <PositionModal scope={def.scopeType} def={def} lang={c.get("lang")}
+      parents={parentOptions(defs, def.scopeType, c.get("lang"), def.code)} />,
+  );
 });
 
 organizationRoutes.post("/positions", requirePermission("options.manage"), requireAllStates, async (c) => {
@@ -530,7 +575,8 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   const nameEn = s(body.name_english).slice(0, 100);
   const nameKr = s(body.name_korean).slice(0, 100);
   const sortOrder = departmentSortOrder(s(body.sort_order));
-  const values = { nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true };
+  const parentCode = s(body.parent_code) || null;
+  const values = { nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true, parentCode };
   // A modal submit gets the form back with the error instead of a redirect, so
   // the dialog stays open and keeps what was typed.
   const modal = modalRequest(c);
@@ -540,6 +586,10 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return fail(invalid);
   if (!nameEn) return fail("position-name-en");
+  if (parentCode) {
+    const exists = (await adminPositionDefs(db)).some((d) => d.scopeType === scope && d.code === parentCode);
+    if (!exists) return fail("position-parent-invalid");
+  }
 
   const base = codeFromEnglishName(scope, nameEn);
   let code = base;
@@ -551,8 +601,8 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   }
   try {
     await db.run(sql`
-      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order)
-      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder})`);
+      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order, parent_code)
+      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder}, ${parentCode})`);
   } catch {
     return fail("position-code-taken");
   }
@@ -584,9 +634,10 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   const nameKr = s(body.name_korean).slice(0, 100);
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const parentCode = s(body.parent_code) || null;
   const values = {
     nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr,
-    sortOrder, active: active === 1,
+    sortOrder, active: active === 1, parentCode,
   };
   const modal = modalRequest(c);
   const fail = async (err: string) => {
@@ -600,6 +651,15 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   };
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return await fail(invalid);
+  if (parentCode) {
+    const defs = await adminPositionDefs(db);
+    if (!defs.some((d) => d.scopeType === current.scopeType && d.code === parentCode)) {
+      return await fail("position-parent-invalid");
+    }
+    if (parentFormsCycle(defs, current.scopeType, current.code, parentCode)) {
+      return await fail("position-parent-cycle");
+    }
+  }
   if (current.active === 1 && active === 0) {
     const used = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM member_positions
@@ -609,7 +669,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   await db.run(sql`
     UPDATE position_defs
        SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
-           active = ${active}, sort_order = ${sortOrder},
+           active = ${active}, sort_order = ${sortOrder}, parent_code = ${parentCode},
            updated_at = unixepoch()
      WHERE id = ${id}`);
   const changes = diffPositionDefs(current, {
@@ -640,6 +700,10 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
     WHERE position = ${current.code} AND scope_type = ${current.scopeType}`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect(`${back}&err=position-in-use`, 303);
   await db.run(sql`DELETE FROM position_defs WHERE id = ${id}`);
+  // Children of a removed position become top level instead of vanishing.
+  await db.run(sql`
+    UPDATE position_defs SET parent_code = NULL, updated_at = unixepoch()
+     WHERE scope_type = ${current.scopeType} AND parent_code = ${current.code}`);
   await recordPositionHistory(db, {
     entity: "def", action: "deleted", actorId: c.get("user").id,
     scopeType: current.scopeType, code: current.code, positionDefId: id,

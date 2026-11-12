@@ -15,16 +15,20 @@ export type AssignCandidate = {
  *  name, so typing never posts; the radio list is what the handler reads. */
 export function AssignLeaderModal(props: {
   lang: Lang;
+  /** Tab the dialog was opened from; the save returns to it. */
+  tab: "church" | "main";
   churchId: number;
   churchName: string;
   def: PositionDefRow;
   candidates: AssignCandidate[];
   currentId: number | null;
+  /** Name of the current holder (shown even when they are not a candidate here). */
+  currentName?: string | null;
   /** code → localized label for church positions a candidate may already hold. */
   labels: Record<string, string>;
   error?: string | null;
 }) {
-  const { lang, churchId, churchName, def, candidates, currentId, labels, error } = props;
+  const { lang, tab, churchId, churchName, def, candidates, currentId, currentName, labels, error } = props;
   const t = getDict(lang);
   const label = positionDefLabel(def, lang);
 
@@ -40,6 +44,7 @@ export function AssignLeaderModal(props: {
 
   return (
     <form method="post" action="/organization/assign" data-modal-ajax>
+      <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="church" value={String(churchId)} />
       <input type="hidden" name="position" value={def.code} />
       {error && <p class="flash err modal-error">{error}</p>}
@@ -48,6 +53,9 @@ export function AssignLeaderModal(props: {
         <div class="position-hero-main">
           <div class="position-hero-title"><h4>{label}</h4></div>
           <div class="position-hero-home">{t("org.assignFor")} <strong>{churchName}</strong></div>
+          {currentName && (
+            <div class="position-hero-home">{t("org.assignCurrently")} <strong>{currentName}</strong></div>
+          )}
         </div>
       </div>
 

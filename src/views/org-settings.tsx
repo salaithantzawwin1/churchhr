@@ -36,6 +36,8 @@ type PositionValues = {
   nameKorean: string;
   sortOrder: number;
   active: boolean;
+  /** Code of the position this one reports to ("" = top level). */
+  parentCode: string | null;
 };
 
 function positionValues(def?: PositionDefRow): PositionValues {
@@ -45,11 +47,18 @@ function positionValues(def?: PositionDefRow): PositionValues {
     nameKorean: def?.nameKorean ?? "",
     sortOrder: def?.sortOrder ?? 0,
     active: def ? def.active === 1 : true,
+    parentCode: def?.parentCode ?? null,
   };
 }
 
-function PositionFields(props: { values: PositionValues; lang: Lang; editing: boolean }) {
-  const { values, lang, editing } = props;
+function PositionFields(props: {
+  values: PositionValues;
+  lang: Lang;
+  editing: boolean;
+  /** Same-scope positions this one can report to. */
+  parents: { code: string; label: string }[];
+}) {
+  const { values, lang, editing, parents } = props;
   const t = getDict(lang);
   return (
     <div class="form-grid">
@@ -69,6 +78,16 @@ function PositionFields(props: { values: PositionValues; lang: Lang; editing: bo
         <span class="lbl">{t("org.positionSort")}</span>
         <input name="sort_order" type="number" min="0" max="9999" value={String(values.sortOrder)} />
       </label>
+      <label class="field">
+        <span class="lbl">{t("org.positionParent")}</span>
+        <select name="parent_code">
+          <option value="" selected={!values.parentCode}>{t("org.positionParentNone")}</option>
+          {parents.map((p) => (
+            <option value={p.code} selected={values.parentCode === p.code}>{p.label}</option>
+          ))}
+        </select>
+        <span class="field-hint">{t("org.positionParentHint")}</span>
+      </label>
       {editing && (
         <label class="dept-active">
           <input type="checkbox" name="active" value="1" checked={values.active} />
@@ -85,10 +104,11 @@ export function PositionModal(props: {
   scope: ConfigurablePositionScope;
   def?: PositionDefRow;
   values?: PositionValues;
+  parents?: { code: string; label: string }[];
   error?: string | null;
   lang?: Lang;
 }) {
-  const { scope, def, error } = props;
+  const { scope, def, error, parents = [] } = props;
   const L = props.lang ?? "en";
   const t = getDict(L);
   const inUse = (def?.usageCount ?? 0) > 0;
@@ -97,7 +117,7 @@ export function PositionModal(props: {
       {error && <div class="modal-error" role="alert">{error}</div>}
       <form method="post" action={def ? `/organization/positions/${def.id}` : "/organization/positions"} data-modal-ajax>
         {!def && <input type="hidden" name="scope" value={scope} />}
-        <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} />
+        <PositionFields values={props.values ?? positionValues(def)} lang={L} editing={Boolean(def)} parents={parents} />
         <div class={`actions${def && !inUse ? " modal-actions-split" : ""}`}>
           {def && !inUse && (
             <button class="btn sm outline-danger" type="submit" form={`delete-position-${def.id}`}>

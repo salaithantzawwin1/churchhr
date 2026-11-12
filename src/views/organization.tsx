@@ -136,14 +136,16 @@ function LeaderAvatar(props: { leader: OrgLeader | null; size: "lg" | "md" | "sm
   );
 }
 
-function LeaderLink(props: { leader: OrgLeader | null; empty: string; photoPreview?: boolean }) {
-  const { leader, empty, photoPreview } = props;
+function LeaderLink(props: { leader: OrgLeader | null; empty: string; photoPreview?: boolean; link?: boolean }) {
+  const { leader, empty, photoPreview, link = true } = props;
   if (!leader) return <span class="muted">{empty}</span>;
   const previewUrl = photoPreview && leader.has_photo && leader.member_id
     ? `/members/${leader.member_id}/photo?v=${leader.updated_at}`
     : undefined;
   // A pastor from the separate directory has no member record to open.
   if (!leader.member_id) return <span>{leader.member_name || "—"}</span>;
+  // Inside a clickable chart card a nested link is invalid HTML: the card wins.
+  if (!link) return <span>{leader.member_name || "—"}</span>;
   return (
     <a href={`/members/${leader.member_id}`} data-photo-preview={previewUrl}>
       {leader.member_name || "—"}
@@ -164,10 +166,15 @@ function leaderFor(
   ) ?? null;
 }
 
-/** Role rows for a scope, lead position first. */
+/**
+ * Role rows for a scope, lead position first. The lead is the first position that
+ * is not nested under another one, so a newly added sub-role can never take the
+ * top slot just because it sorts early.
+ */
 function positionRows(defs: PositionDefRow[], scope: Parameters<typeof defsForScope>[1], lang: Lang) {
   const rows = defsForScope(defs, scope);
-  return { lead: rows[0] ?? null, rest: rows.slice(1), all: rows };
+  const lead = rows.find((r) => !r.parentCode) ?? rows[0] ?? null;
+  return { lead, rest: rows.filter((r) => r !== lead), all: rows };
 }
 
 export function OrganizationPage(props: Common & {
@@ -401,32 +408,72 @@ export function OrganizationPage(props: Common & {
     );
   };
 
-  const renderChurchChart = (church: RegionalChurchRow) => {
+  const renderChurchChart = (church: RegionalChurchRow, tab: "church" | "main") => {
     const role = (position: string) =>
       leaderFor(leaders, "church", position, { regionalChurchId: church.id });
-    const lead = churchRows.lead ? role(churchRows.lead.code) : null;
-    const assignHref = (position: string) =>
-      `/organization/assign?church=${church.id}&position=${encodeURIComponent(position)}`;
-    const assignTitle = (p: PositionDefRow) => `${t("org.assignLeader")} · ${positionDefLabel(p, L)}`;
+    const assignHref = (position: string) => {
+      const params = new URLSearchParams({ tab, church: String(church.id), position });
+      return `/organization/assign?${params.toString()}`;
+    };
+    const assignTitle = (p: PositionDefRow, leader: OrgLeader | null) =>
+      `${leader ? t("org.changeLeader") : t("org.assignLeader")} · ${positionDefLabel(p, L)}`;
 
-    // A vacant slot is the place to act: the card itself opens the assign dialog.
+    // Every slot opens the dialog when the user may edit: vacant to assign, filled
+    // to change or clear. The dialog itself decides what to offer.
     const node = (p: PositionDefRow, leader: OrgLeader | null, size: "lg" | "md", isLead = false) => {
       const cls = `org-node${isLead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`;
       const body = (
         <>
           <LeaderAvatar leader={leader} size={size} />
           <span class="org-node-role">{positionDefLabel(p, L)}</span>
-          <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+          <span class="org-node-name">
+            <LeaderLink leader={leader} empty={t("org.vacant")} link={!canEdit} />
+          </span>
         </>
       );
-      if (!leader && canEdit) {
+      if (canEdit) {
         return (
           <a class={`${cls} org-node-action js-edit-modal`} href={assignHref(p.code)}
-            data-modal-title={assignTitle(p)} data-modal-size="md"
-            aria-label={assignTitle(p)}>{body}</a>
+            data-modal-title={assignTitle(p, leader)} data-modal-size="md"
+            aria-label={assignTitle(p, leader)}>{body}</a>
         );
       }
       return <div class={cls}>{body}</div>;
+    };
+
+    // Positions nest by parent_code. A position with no parent still sits under
+    // the lead slot, so the familiar lead-plus-team chart stays intact and only
+    // an explicit parent moves a slot deeper.
+    const byCode = new Map(churchRows.all.map((d) => [d.code, d]));
+    const leadCode = churchRows.lead?.code ?? null;
+    const parentOf = (def: PositionDefRow): string | null => {
+      if (def.code === leadCode) return null;
+      if (def.parentCode && byCode.has(def.parentCode) && def.parentCode !== def.code) return def.parentCode;
+      return leadCode && byCode.has(leadCode) ? leadCode : null;
+    };
+    const kids = new Map<string, PositionDefRow[]>();
+    const roots: PositionDefRow[] = [];
+    for (const def of churchRows.all) {
+      const parent = parentOf(def);
+      if (parent) {
+        const list = kids.get(parent) ?? [];
+        list.push(def);
+        kids.set(parent, list);
+      } else {
+        roots.push(def);
+      }
+    }
+    const branch = (def: PositionDefRow) => {
+      const children = kids.get(def.code) ?? [];
+      const isLead = def.code === churchRows.lead?.code;
+      return (
+        <div class="org-branch">
+          {node(def, role(def.code), isLead ? "lg" : "md", isLead)}
+          {children.length > 0 && (
+            <div class="org-branch-kids">{children.map((child) => branch(child))}</div>
+          )}
+        </div>
+      );
     };
 
     const filled = churchRows.all.filter((p) => role(p.code)).length;
@@ -448,7 +495,7 @@ export function OrganizationPage(props: Common & {
             <span class="org-vacant-count">{churchRows.all.length} {t("org.positionsVacant")}</span>
             {canEdit && churchRows.lead ? (
               <a class="btn sm js-edit-modal" href={assignHref(churchRows.lead.code)}
-                data-modal-title={assignTitle(churchRows.lead)} data-modal-size="md">
+                data-modal-title={assignTitle(churchRows.lead, null)} data-modal-size="md">
                 {t("org.assignLeader")}
               </a>
             ) : canManagePositions ? (
@@ -459,17 +506,7 @@ export function OrganizationPage(props: Common & {
       );
     }
 
-    return (
-      <>
-        <div class="org-chart-level org-chart-level-top">
-          {churchRows.lead && node(churchRows.lead, lead, "lg", true)}
-        </div>
-        <div class="org-chart-connector" aria-hidden="true" />
-        <div class="org-chart-level org-chart-level-team">
-          {churchRows.rest.map((p) => node(p, role(p.code), "md"))}
-        </div>
-      </>
-    );
+    return <div class="org-forest">{roots.map((root) => branch(root))}</div>;
   };
 
   const renderStateHierarchy = (state: StateGroup) => {
@@ -566,7 +603,7 @@ export function OrganizationPage(props: Common & {
 
             {!selectedChurch ? (
               <p class="muted">{t("org.noRegional")}</p>
-            ) : renderChurchChart(selectedChurch)}
+            ) : renderChurchChart(selectedChurch, "church")}
           </section>
 
           <section class="org-departments">
@@ -730,7 +767,7 @@ export function OrganizationPage(props: Common & {
                   )}
                 </div>
               </div>
-              {renderChurchChart(church)}
+              {renderChurchChart(church, "main")}
               {churchCells.length > 0 && (
                 <details class="org-collapse org-main-cells">
                   <summary class="org-collapse-summary">
