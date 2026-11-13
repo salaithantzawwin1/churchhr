@@ -60,7 +60,7 @@ function ClusterFields(props: {
     <div class="form-grid">
       <label class="field">
         <span class="lbl">{t("org.clusterName")}</span>
-        <input type="text" name="name" value={values.name} maxlength={80} required />
+        <input type="text" name="name" value={values.name} maxlength={80} required autofocus />
       </label>
       <label class="field">
         <span class="lbl">{t("org.clusterNameEn")}</span>
@@ -103,9 +103,9 @@ function ClusterFields(props: {
         </label>
       )}
       {editing && (
-        <label class="dept-active span-2">
+        <label class="dept-toggle span-2">
           <input type="checkbox" name="active" value="1" checked={values.active} />
-          <span>{t("dept.active")}</span>
+          <span class="dept-toggle-text">{t("dept.active")}</span>
         </label>
       )}
     </div>
@@ -188,6 +188,10 @@ export function SupervisionClusterModal(props: {
               <section class="modal-form-pane" data-tab-pane="cells" role="tabpanel">
                 <input type="hidden" name="cells_present" value="1" />
                 <div class="cluster-section-head">
+                  <div class="cluster-section-title">
+                    <strong>{t("org.clusterCellAssignment")}</strong>
+                    <span class="count-pill">{cells.length}</span>
+                  </div>
                   <p class="muted small">{t("org.clusterCellHint")}</p>
                 </div>
                 {candidates.length === 0 ? (
@@ -224,6 +228,7 @@ export function SupervisionClusterModal(props: {
         )}
 
         <div class="actions">
+          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
           <button class="btn" type="submit">{cluster ? t("dept.save") : t("form.add")}</button>
         </div>
       </form>

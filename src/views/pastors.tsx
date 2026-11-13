@@ -447,13 +447,19 @@ export function PastorDetailPage(props: Common & {
   const church = L !== "mm" && pastor.churchNameEn ? pastor.churchNameEn : pastor.churchName;
   const state = L !== "mm" && pastor.stateNameEn ? pastor.stateNameEn : pastor.stateName;
   const initials = Array.from((pastor.name || pastor.nameEn || "?").trim())[0] ?? "?";
+  const gender = pastor.gender === "male" ? t("org.male")
+    : pastor.gender === "female" ? t("org.female") : pastor.gender;
+  const marital = pastor.maritalStatus === "single" ? t("org.single")
+    : pastor.maritalStatus === "married" ? t("org.married")
+      : pastor.maritalStatus === "widowed" ? t("org.widowed")
+        : pastor.maritalStatus === "divorced" ? t("org.divorced") : pastor.maritalStatus;
   const rows: [string, string | null][] = [
     [t("org.pastorTitle"), pastor.title],
     [t("org.pastorPosition"), pastor.position],
     [t("detail.state"), state],
     [t("org.pastorChurch"), church],
-    [t("form.gender"), pastor.gender],
-    [t("form.marital"), pastor.maritalStatus],
+    [t("form.gender"), gender],
+    [t("form.marital"), marital],
     [t("form.dob"), pastor.dateOfBirth],
     [t("org.ordinationDate"), pastor.ordinationDate],
     [t("detail.phone"), pastor.phone],
@@ -469,24 +475,24 @@ export function PastorDetailPage(props: Common & {
         <span>/</span>
         <a href="/organization/pastors">{t("org.pastorsTitle")}</a>
       </div>
-      <div class="page-head">
-        <div class="member-head">
-          <div class="member-avatar">
+      <div class="page-head pastor-head">
+        <div class="member-head pastor-head-main">
+          <div class="member-avatar pastor-avatar">
             {photo ? <img src={photo} alt="" /> : <span>{initials}</span>}
           </div>
-          <div>
+          <div class="pastor-head-text">
             <h1>{displayName(pastor, L)}</h1>
-            <p class="page-sub">
-              {pastor.position || t("org.pastor")}
-              {church ? ` · ${church}` : ""}
-              {state ? ` · ${state}` : ""}
-            </p>
-            <span class={`badge ${pastor.active ? "active" : "inactive"}`}>
-              {pastor.active ? t("dept.active") : t("dept.inactive")}
-            </span>
+            <div class="pastor-tags">
+              <span class="pastor-tag">{pastor.position || t("org.pastor")}</span>
+              {church && <span class="pastor-tag">{church}</span>}
+              {state && <span class="pastor-tag">{state}</span>}
+              <span class={`badge ${pastor.active ? "active" : "inactive"}`}>
+                {pastor.active ? t("dept.active") : t("dept.inactive")}
+              </span>
+            </div>
           </div>
         </div>
-        <div class="page-head-actions">
+        <div class="page-head-actions pastor-actions">
           {canUpdate && (
             <a class="btn js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
               data-modal-title={t("org.editPastor")}>
@@ -494,7 +500,7 @@ export function PastorDetailPage(props: Common & {
             </a>
           )}
           {canUpdate && (
-            <form method="post" action={`/organization/pastors/${pastor.id}/delete`}
+            <form method="post" class="pastor-delete" action={`/organization/pastors/${pastor.id}/delete`}
               data-confirm={t("org.deletePastorConfirm")}>
               <button class="btn outline-danger" type="submit">{t("members.delete")}</button>
             </form>

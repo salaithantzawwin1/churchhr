@@ -1,7 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
-import { defsForScope, positionDefLabel, type PositionDefRow } from "../position-catalog";
+import { defsForScope, positionDefLabel, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { departmentName, type DepartmentRow } from "../departments";
 import { CardViewToggle } from "./view-toggle";
 
@@ -31,29 +31,44 @@ function DepartmentFields(props: {
   const t = getDict(lang);
   const name = values?.name ?? department?.name ?? "";
   const nameEn = values?.nameEn ?? department?.nameEn ?? "";
-  const sortOrder = values?.sortOrder ?? department?.sortOrder ?? 0;
-  const active = values?.active ?? department?.active === 1;
   return (
     <>
       <label class="field">
         <span class="lbl">{t("dept.name")}</span>
-        <input name="name" value={name} maxlength={80} required autofocus />
+        <input type="text" name="name" value={name} maxlength={80} required autofocus />
       </label>
       <label class="field">
         <span class="lbl">{t("dept.nameEn")}</span>
-        <input name="name_en" value={nameEn} maxlength={120} />
+        <input type="text" name="name_en" value={nameEn} maxlength={120} />
       </label>
+    </>
+  );
+}
+
+/** Order and visibility sit in their own row so the name fields keep the full
+ *  width and the status reads as a deliberate setting, not a stray checkbox. */
+function DepartmentMeta(props: {
+  department?: AdminDepartmentRow;
+  values?: DepartmentFormValues;
+  lang: Lang;
+}) {
+  const { department, values, lang } = props;
+  const t = getDict(lang);
+  const sortOrder = values?.sortOrder ?? department?.sortOrder ?? 0;
+  const active = values?.active ?? department?.active === 1;
+  return (
+    <div class="dept-meta">
       <label class="field">
         <span class="lbl">{t("dept.sortOrder")}</span>
         <input name="sort_order" type="number" min="0" max="9999" value={String(sortOrder)} />
       </label>
       {department && (
-        <label class="dept-active">
+        <label class="dept-toggle">
           <input type="checkbox" name="active" value="1" checked={active} />
-          <span>{t("dept.active")}</span>
+          <span class="dept-toggle-text">{t("dept.active")}</span>
         </label>
       )}
-    </>
+    </div>
   );
 }
 
@@ -81,12 +96,16 @@ export function DepartmentModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
+      <form method="post" class="dept-form"
+        action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
         data-modal-ajax>
         <div class="form-grid dept-fields">
           <DepartmentFields department={department} values={values} lang={L} />
         </div>
+        <DepartmentMeta department={department} values={values} lang={L} />
+        {!department && <p class="muted small dept-form-note">{t("dept.addHint")}</p>}
         <div class="actions">
+          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
           <button class="btn" type="submit">{department ? t("dept.save") : t("dept.add")}</button>
         </div>
       </form>
@@ -109,14 +128,29 @@ export type DepartmentDetailData = {
   member_count: number;
 };
 
+/** An active member of the department, with the church their Home Cell belongs
+ *  to and the department positions they hold. */
+export type DepartmentMemberRow = {
+  id: number;
+  name_myanmar: string | null;
+  name_english: string | null;
+  gender: string;
+  state_name: string;
+  state_name_en: string | null;
+  church_name: string | null;
+  church_name_en: string | null;
+  positions: string | null;
+};
+
 export function DepartmentDetailPage(props: Common & {
   department: DepartmentDetailData;
   leaders: DepartmentDetailLeader[];
   /** Department roles come from the editable catalogue, not a fixed list. */
   positionDefs: PositionDefRow[];
+  members: DepartmentMemberRow[];
   canManage: boolean;
 }) {
-  const { user, perms, flash, lang, department, leaders, positionDefs, canManage } = props;
+  const { user, perms, flash, lang, department, leaders, positionDefs, members, canManage } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const leaderFor = (position: string) => leaders.find((l) => l.position === position) ?? null;
@@ -164,15 +198,53 @@ export function DepartmentDetailPage(props: Common & {
       </section>
 
       <section class="card dept-members-card">
-        <div>
-          <h2>{t("dept.membersTitle")}</h2>
-          <p class="muted small">{t("dept.membersHint")}</p>
+        <div class="dept-members-head">
+          <div>
+            <h2>{t("dept.membersTitle")}</h2>
+            <p class="muted small">{t("dept.membersHint")}</p>
+          </div>
+          <div class="dept-members-count">
+            <strong>{department.member_count}</strong>
+            <span>{t("org.membersShort")}</span>
+          </div>
         </div>
-        <div class="dept-members-count">
-          <strong>{department.member_count}</strong>
-          <span>{t("org.membersShort")}</span>
+        <div class="tbl-wrap">
+          <table class="dept-members-tbl">
+            <thead>
+              <tr>
+                <th>{t("members.thName")}</th>
+                <th>{t("form.gender")}</th>
+                <th>{t("detail.state")}</th>
+                <th>{t("org.church")}</th>
+                <th>{t("org.position")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.length === 0 ? (
+                <tr>
+                  <td class="empty-state" colspan={5}>{t("dept.noMembers")}</td>
+                </tr>
+              ) : members.map((m) => {
+                const name = L !== "mm" && m.name_english ? m.name_english : (m.name_myanmar || m.name_english || "—");
+                const state = L !== "mm" && m.state_name_en ? m.state_name_en : m.state_name;
+                const church = L !== "mm" && m.church_name_en ? m.church_name_en : m.church_name;
+                const positions = positionLabelsForCsv(positionDefs, m.positions, L);
+                return (
+                  <tr>
+                    <td><a href={`/members/${m.id}`}>{name}</a></td>
+                    <td>{m.gender === "male" ? t("org.male") : m.gender === "female" ? t("org.female") : "—"}</td>
+                    <td>{state || "—"}</td>
+                    <td>{church || <span class="muted">—</span>}</td>
+                    <td>{positions.length > 0 ? positions.join(" · ") : <span class="muted">—</span>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <a class="btn" href={`/members?department=${department.id}`}>{t("dept.viewMembers")}</a>
+        <p class="dept-members-foot">
+          <a href={`/members?department=${department.id}`}>{t("dept.viewMembers")} →</a>
+        </p>
       </section>
     </Layout>
   );

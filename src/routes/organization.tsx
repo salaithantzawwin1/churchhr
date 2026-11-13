@@ -7,7 +7,7 @@ import { churchDepartments, memberPositions } from "../db/schema";
 import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
-import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow } from "../views/departments";
+import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow, type DepartmentMemberRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
 import { AssignLeaderModal } from "../views/org-assign";
@@ -410,10 +410,17 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.notFound();
+  // State-scoped managers only see members inside their assigned states, so the
+  // count and the table below always agree with the rest of the member list.
+  const memberScope = scope.scopeAll
+    ? sql`1=1`
+    : scope.stateIds.length > 0
+      ? sql`m.region_id IN (${sql.join(scope.stateIds.map((sid) => sql`${sid}`), sql`, `)})`
+      : sql`1=0`;
   const department = (await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order,
       (SELECT COUNT(*) FROM members m
-        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
+        WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScope}) AS member_count
     FROM church_departments d WHERE d.id = ${id} LIMIT 1`))[0];
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
@@ -426,11 +433,25 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'department' AND mp.department_id = ${id} AND m.status = 'active'
     ORDER BY mp.position`);
+  const members = await db.all<DepartmentMemberRow>(sql`
+    SELECT m.id, m.name_myanmar, m.name_english, m.gender,
+           r.name AS state_name, r.name_en AS state_name_en,
+           rc.name AS church_name, rc.name_en AS church_name_en,
+           (SELECT GROUP_CONCAT(mp.position, ',')
+              FROM member_positions mp
+             WHERE mp.member_id = m.id AND mp.scope_type = 'department'
+               AND mp.department_id = ${id}) AS positions
+    FROM members m
+    JOIN regions r ON r.id = m.region_id
+    LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN regional_churches rc ON rc.id = hc.regional_church_id
+    WHERE m.department_id = ${id} AND m.status = 'active' AND ${memberScope}
+    ORDER BY COALESCE(NULLIF(m.name_myanmar, ''), m.name_english), m.id`);
   return c.html(
     <DepartmentDetailPage
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      lang={c.get("lang")} department={department} leaders={leaders}
+      lang={c.get("lang")} department={department} leaders={leaders} members={members}
       positionDefs={await loadPositionDefs(db)}
       canManage={c.get("perms").has("options.manage") && scope.scopeAll}
     />,

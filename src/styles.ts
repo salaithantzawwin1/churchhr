@@ -1565,6 +1565,37 @@ td.empty-state .small { margin-top: 4px; }
 
 /* ---------- organization settings (positions / regional churches) ---------- */
 .page-head-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* A delete form in the header must not knock its button out of line with the
+   neighbouring links: the form is only a wrapper, the button carries the size. */
+.page-head-actions form { display: inline-flex; align-items: stretch; margin: 0; }
+.page-head-actions form .btn { height: 100%; }
+/* Pastor detail: one soft hero holding the portrait, name and the facts that
+   identify the record, with the action buttons aligned as one row beside it. */
+.pastor-head {
+  padding: 16px 18px; border: 1px solid var(--hairline); border-radius: var(--radius-lg);
+  background: var(--surface-3); box-shadow: var(--elev-1); align-items: center;
+}
+.pastor-head-main { flex: 1 1 320px; min-width: 0; gap: 14px; }
+.pastor-avatar { width: 76px; height: 76px; font-size: 26px; }
+.pastor-head-text { min-width: 0; }
+.pastor-head-text h1 { margin: 0 0 7px; font-size: 24px; overflow-wrap: anywhere; }
+.pastor-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pastor-tag {
+  display: inline-flex; align-items: center; padding: 2px 9px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  color: var(--muted); font-size: 12px; line-height: 1.7;
+}
+.pastor-actions { gap: 8px; }
+.pastor-actions .btn { min-width: 86px; }
+.pastor-actions form.pastor-delete { display: flex; }
+.pastor-actions form.pastor-delete .btn { width: 100%; }
+@media (max-width: 640px) {
+  .pastor-head { padding: 14px; }
+  .pastor-avatar { width: 60px; height: 60px; font-size: 21px; }
+  .pastor-head-text h1 { font-size: 20px; }
+  .pastor-actions { width: 100%; }
+  .pastor-actions .btn, .pastor-actions form { flex: 1 1 auto; }
+}
 .org-manage-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .org-settings-add { padding: 16px 18px; }
 .org-settings-add h2 { margin: 0 0 2px; }
@@ -1810,10 +1841,14 @@ td.empty-state .small { margin-top: 4px; }
    grid of township columns, so a state with many cells scrolls inside its own
    panel instead of stretching the dialog. */
 .modal-body .cluster-main-form > .actions:last-child {
-  position: static; margin: 0; padding: 0; border: 0; background: none;
+  position: static; margin: 0; padding: 12px 0 0; border: 0;
+  border-top: 1px dashed var(--line); background: none; justify-content: flex-end;
 }
-.modal-body .cluster-main-form { flex: 0 0 auto; gap: 12px; }
-.modal-body .cluster-main-form .form-grid { gap: 10px 16px; }
+.modal-body .cluster-main-form { flex: 0 0 auto; gap: 14px; margin-bottom: 0; }
+.modal-body .cluster-main-form .form-grid { gap: 12px 16px; }
+.cluster-main-form .dept-toggle { width: fit-content; min-width: 190px; }
+.cluster-main-form .modal-form-panes { padding-top: 2px; }
+.cluster-main-form .cluster-cell-groups { box-shadow: inset 0 1px 2px rgba(2, 8, 23, .04); }
 .cluster-cells-section { display: grid; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .cluster-cells-section .modal-error { margin: 0; }
 .cluster-section-head { display: grid; gap: 2px; }
@@ -2175,13 +2210,46 @@ td.empty-state .small { margin-top: 4px; }
 .dept-leader { align-items: center; text-align: center; }
 .dept-leader a { color: var(--ink); font-weight: 600; text-decoration: none; }
 .dept-leader a:hover { color: var(--link); text-decoration: underline; }
-.dept-members-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 18px 20px; }
-.dept-members-card > div:first-child { flex: 1 1 240px; }
+.dept-members-card { padding: 18px 20px; }
+.dept-members-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px 18px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.dept-members-head > div:first-child { flex: 1 1 280px; min-width: 0; }
 .dept-members-card h2 { margin: 0 0 2px; }
 .dept-members-card p { margin: 0; }
 .dept-members-count { display: flex; align-items: baseline; gap: 5px; }
-.dept-members-count strong { font-size: 30px; line-height: 1; color: var(--brand); }
+.dept-members-count strong { font-size: 28px; line-height: 1; color: var(--brand); }
 .dept-members-count span { color: var(--muted); font-size: 12px; }
+.dept-members-tbl { min-width: 620px; }
+.dept-members-tbl th { white-space: nowrap; }
+.dept-members-tbl td { white-space: nowrap; }
+.dept-members-tbl td:nth-child(2) { width: 76px; }
+.dept-members-tbl td:nth-child(5) { white-space: normal; min-width: 150px; }
+.dept-members-tbl a { color: var(--link); font-weight: 600; text-decoration: none; }
+.dept-members-tbl a:hover { text-decoration: underline; }
+.dept-members-foot { margin: 10px 0 0; font-size: 12.5px; }
+.dept-members-foot a { color: var(--link); text-decoration: none; font-weight: 600; }
+.dept-members-foot a:hover { text-decoration: underline; }
+/* Department editor: names first, then a short order/status row, so the dialog
+   reads top-down instead of scattering one small number field into the grid. */
+.dept-form { gap: 16px; }
+.dept-form-note { margin: -2px 0 0; }
+.dept-meta {
+  display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+  gap: 12px; align-items: end;
+}
+.dept-toggle {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 42px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--field-bg); color: var(--ink); font-size: 13.5px; cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.dept-toggle:hover { border-color: var(--line-strong); }
+.dept-toggle:has(input:checked) { border-color: var(--brand); background: var(--chip-brand-bg); }
+.dept-toggle input { width: 17px; height: 17px; flex: none; margin: 0; accent-color: var(--brand); }
+.dept-toggle-text { font-weight: 600; }
+.dept-toggle:has(input:checked) .dept-toggle-text { color: var(--link); }
 @media (max-width: 760px) {
   .org-chart { padding: 16px 14px 20px; }
   .org-chart-level { gap: 8px; }
@@ -2200,9 +2268,10 @@ td.empty-state .small { margin-top: 4px; }
   .org-chart-level .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
   .org-node-lead { width: 100%; flex-direction: column; text-align: center; }
   .org-node-lead .org-node-name { margin-left: 0; text-align: center; }
-  .dept-members-card { align-items: flex-start; }
 }
 @media (max-width: 640px) {
+  .dept-meta { grid-template-columns: 1fr; }
+  .dept-members-card { padding: 15px 14px; }
   .org-leadership, .dept-add, .dept-row { padding: 14px 16px; }
   .org-lead-grid { grid-template-columns: 1fr 1fr; }
   .dept-row .form-grid { grid-template-columns: 1fr; }
