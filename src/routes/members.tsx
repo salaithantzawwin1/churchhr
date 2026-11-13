@@ -12,7 +12,7 @@ import {
   getMemberPositions, isPositionForScope, positionLabel, positionTaken, setHomeCellPosition, setMemberPositions,
   type PositionAssignment,
 } from "../positions";
-import { isDefinedForScope, loadPositionDefs, positionDefLabel, type PositionDefRow } from "../position-catalog";
+import { isDefinedForScope, isPastorPositionCode, loadPositionDefs, positionDefLabel, type PositionDefRow } from "../position-catalog";
 import { recordPositionHistory } from "../position-history";
 import { loadRegionalChurches, loadSupervisionClusters } from "../org-units";
 import { loadDepartments } from "../departments";
@@ -1345,7 +1345,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     ? defs.find((d) => d.scopeType === "region" && d.code === regionPosition && d.active === 1)
     : undefined;
   if (regionPosition) {
-    if (!regionDef || regionDef.code === "regional_pastor") return renderError(t("flash.positionInvalid"));
+    if (!regionDef || isPastorPositionCode(regionDef.code)) return renderError(t("flash.positionInvalid"));
   }
   if (departmentPosition && !validFor(departmentPosition, "department")) {
     return renderError(t("flash.positionInvalid"));

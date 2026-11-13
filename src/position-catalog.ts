@@ -119,6 +119,11 @@ export async function loadPositionDefs(db: DB): Promise<PositionDefRow[]> {
   }));
 }
 
+/** Pastor seats are filled from the pastor directory, never from a member form. */
+export function isPastorPositionCode(code: string): boolean {
+  return /pastor/i.test(code);
+}
+
 /** Positions usable in a church: state-wide ones plus the ones ticked for it. */
 export function defsForChurch<T extends { regionalChurchIds?: number[] }>(
   defs: T[],

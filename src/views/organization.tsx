@@ -1007,7 +1007,6 @@ export function OrganizationPage(props: Common & {
                         <div class="org-region-team-grid">
                           {regionalRows.all.map((def) => {
                             const team = regionalTeam(group.id, def.code);
-                            const isLead = def.code === regionalRows.lead?.code;
                             return (
                               <div class={`org-region-role${team.length ? "" : " org-vacant"}`}>
                                 <span class="org-mini-role">{positionDefLabel(def, L)}</span>
@@ -1028,8 +1027,8 @@ export function OrganizationPage(props: Common & {
                                     ))}
                                   </div>
                                 )}
-                                {isLead && canEdit && def.allowMultiple === 1 && (
-                                  <a class="btn sm secondary" href={`/organization/region-assign?region=${group.id}&position=${def.code}`}
+                                {canEdit && def.allowMultiple === 1 && (
+                                  <a class="btn sm secondary js-add-modal" href={`/organization/region-assign?region=${group.id}&position=${def.code}`}
                                     data-modal-title={`${t("org.addHolder")} · ${positionDefLabel(def, L)}`} data-modal-size="md">
                                     + {t("org.addHolder")}
                                   </a>

@@ -6,7 +6,7 @@ import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, type Lang } from "../i18n";
 import { positionLabels } from "../positions";
-import { defsForScope, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
+import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
 import { EditIcon, TrashIcon } from "./action-icons";
@@ -745,9 +745,10 @@ export function MemberPositionForm(props: PositionFormProps) {
   const homeDefs = defsForScope(positionDefs, "home_cell");
   const townshipDefs = defsForScope(positionDefs, "township");
   const clusterDefs = defsForScope(positionDefs, "cluster");
-  // Regional Pastor is assigned from the pastor directory, not from a member
-  // record. Members may still serve as Regional Secretary or Treasurer.
-  const regionalDefs = defsForScope(positionDefs, "region").filter((d) => d.code !== "regional_pastor");
+  // Pastor seats (Regional Pastor, State Assistant Pastor) are assigned from the
+  // pastor directory, not from a member record. Members may still serve as
+  // Regional Secretary, Treasurer or the Women's Department team.
+  const regionalDefs = defsForScope(positionDefs, "region").filter((d) => !isPastorPositionCode(d.code));
   const departmentDefs = defsForScope(positionDefs, "department");
   const churchDefs = defsForScope(positionDefs, "church");
   const label = (code: string) => positionLabelForCode(positionDefs, code, L);

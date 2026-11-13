@@ -17,7 +17,7 @@ import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
-import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
+import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isConfigurableScope, isPastorPositionCode, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
@@ -196,7 +196,7 @@ async function assignCandidates(db: DB, churchId: number, q: string) {
 
 /** Pastoral posts are filled from the pastor directory, not the member list. */
 function isPastorSlot(def: PositionDefRow): boolean {
-  return def.scopeType === "church" && /pastor/i.test(def.code);
+  return def.scopeType === "church" && isPastorPositionCode(def.code);
 }
 
 /** Pastors of this church's state, offered for a pastoral post. Pastors already
