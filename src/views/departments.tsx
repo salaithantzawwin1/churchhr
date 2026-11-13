@@ -142,19 +142,35 @@ export type DepartmentMemberRow = {
   positions: string | null;
 };
 
+export type DepartmentMemberFilters = {
+  q: string;
+  gender: string;
+  state: number | null;
+  position: string;
+};
+
 export function DepartmentDetailPage(props: Common & {
   department: DepartmentDetailData;
   leaders: DepartmentDetailLeader[];
   /** Department roles come from the editable catalogue, not a fixed list. */
   positionDefs: PositionDefRow[];
   members: DepartmentMemberRow[];
+  filters: DepartmentMemberFilters;
+  /** States the signed-in manager may filter by. */
+  regions: { id: number; name: string }[];
+  /** Current filter query (with the leading ?), so an assignment can return here. */
+  filterQuery: string;
   canManage: boolean;
+  canAssign: boolean;
 }) {
-  const { user, perms, flash, lang, department, leaders, positionDefs, members, canManage } = props;
+  const { user, perms, flash, lang, department, leaders, positionDefs, members, filters, regions, filterQuery, canManage, canAssign } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const leaderFor = (position: string) => leaders.find((l) => l.position === position) ?? null;
   const initial = (name: string | null | undefined) => Array.from((name ?? "").trim())[0] ?? "?";
+  const deptDefs = defsForScope(positionDefs, "department");
+  const filtered = Boolean(filters.q || filters.gender || filters.state != null || filters.position);
+  const clearHref = `/organization/departments/${department.id}`;
 
   return (
     <Layout title={departmentName(department, L)} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -178,7 +194,7 @@ export function DepartmentDetailPage(props: Common & {
           </div>
         </div>
         <div class="org-lead-grid">
-          {defsForScope(positionDefs, "department").map((def) => {
+          {deptDefs.map((def) => {
             const leader = leaderFor(def.code);
             return (
               <div class={`org-lead dept-leader${leader ? "" : " org-vacant"}`}>
@@ -204,10 +220,38 @@ export function DepartmentDetailPage(props: Common & {
             <p class="muted small">{t("dept.membersHint")}</p>
           </div>
           <div class="dept-members-count">
-            <strong>{department.member_count}</strong>
-            <span>{t("org.membersShort")}</span>
+            <strong>{members.length}</strong>
+            <span>
+              {filtered ? `/ ${department.member_count} ${t("org.membersShort")}` : t("org.membersShort")}
+            </span>
           </div>
         </div>
+        <form class="filters dept-member-filters" method="get"
+          action={`/organization/departments/${department.id}`} data-auto-submit="1">
+          <input type="search" name="q" value={filters.q}
+            placeholder={t("members.search")} aria-label={t("members.search")} enterkeyhint="search" />
+          <select name="gender" aria-label={t("form.gender")}>
+            <option value="" selected={!filters.gender}>{t("members.all")}</option>
+            <option value="male" selected={filters.gender === "male"}>{t("org.male")}</option>
+            <option value="female" selected={filters.gender === "female"}>{t("org.female")}</option>
+          </select>
+          <select name="state" aria-label={t("detail.state")}>
+            <option value="" selected={filters.state == null}>{t("org.allStates")}</option>
+            {regions.map((r) => (
+              <option value={String(r.id)} selected={filters.state === r.id}>{r.name}</option>
+            ))}
+          </select>
+          <select name="position" aria-label={t("org.position")}>
+            <option value="" selected={!filters.position}>{t("dept.filterAllPositions")}</option>
+            <option value="__none" selected={filters.position === "__none"}>{t("org.noPosition")}</option>
+            {deptDefs.map((def) => (
+              <option value={def.code} selected={filters.position === def.code}>
+                {positionDefLabel(def, L)}
+              </option>
+            ))}
+          </select>
+          {filtered && <a class="dept-filter-clear" href={clearHref}>{t("members.clearFilters")}</a>}
+        </form>
         <div class="tbl-wrap">
           <table class="dept-members-tbl">
             <thead>
@@ -222,20 +266,39 @@ export function DepartmentDetailPage(props: Common & {
             <tbody>
               {members.length === 0 ? (
                 <tr>
-                  <td class="empty-state" colspan={5}>{t("dept.noMembers")}</td>
+                  <td class="empty-state" colspan={5}>
+                    {filtered ? t("org.filterEmpty") : t("dept.noMembers")}
+                  </td>
                 </tr>
               ) : members.map((m) => {
                 const name = L !== "mm" && m.name_english ? m.name_english : (m.name_myanmar || m.name_english || "—");
                 const state = L !== "mm" && m.state_name_en ? m.state_name_en : m.state_name;
                 const church = L !== "mm" && m.church_name_en ? m.church_name_en : m.church_name;
                 const positions = positionLabelsForCsv(positionDefs, m.positions, L);
+                const currentPosition = (m.positions ?? "").split(",")[0]?.trim() ?? "";
                 return (
                   <tr>
                     <td><a href={`/members/${m.id}`}>{name}</a></td>
                     <td>{m.gender === "male" ? t("org.male") : m.gender === "female" ? t("org.female") : "—"}</td>
                     <td>{state || "—"}</td>
                     <td>{church || <span class="muted">—</span>}</td>
-                    <td>{positions.length > 0 ? positions.join(" · ") : <span class="muted">—</span>}</td>
+                    <td>
+                      {canAssign && deptDefs.length > 0 ? (
+                        <form class="dept-pos-form" method="post"
+                          action={`/organization/departments/${department.id}/members/${m.id}/position`}>
+                          <input type="hidden" name="return_query" value={filterQuery} />
+                          <select name="position" aria-label={t("org.position")}>
+                            <option value="" selected={!currentPosition}>{t("org.noPosition")}</option>
+                            {deptDefs.map((def) => (
+                              <option value={def.code} selected={currentPosition === def.code}>
+                                {positionDefLabel(def, L)}
+                              </option>
+                            ))}
+                          </select>
+                          <button class="btn sm secondary" type="submit">{t("org.assign")}</button>
+                        </form>
+                      ) : positions.length > 0 ? positions.join(" · ") : <span class="muted">—</span>}
+                    </td>
                   </tr>
                 );
               })}

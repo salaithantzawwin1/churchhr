@@ -3,7 +3,7 @@ import { createMiddleware } from "hono/factory";
 import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
-import { churchDepartments, memberPositions } from "../db/schema";
+import { churchDepartments, memberHistory, memberPositions, members } from "../db/schema";
 import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
@@ -16,11 +16,12 @@ import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
-import { loadPositionDefs, codeFromEnglishName, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
+import { loadPositionDefs, codeFromEnglishName, defsForScope, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
 import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues } from "../pastor-history";
+import { positionTaken } from "../positions";
 import { buildCsv } from "../csv";
 import { getDict } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
@@ -41,6 +42,13 @@ type Scope = { scopeAll: boolean; stateIds: number[] };
 
 function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
   return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
+}
+
+/** Restrict member rows by the signed-in user's assigned states. */
+function memberScopeCond(scope: Scope) {
+  if (scope.scopeAll) return sql`1=1`;
+  if (scope.stateIds.length === 0) return sql`1=0`;
+  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
 /** Restrict the structure to the assigned states (all-state users see all). */
@@ -412,11 +420,8 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   if (!id) return c.notFound();
   // State-scoped managers only see members inside their assigned states, so the
   // count and the table below always agree with the rest of the member list.
-  const memberScope = scope.scopeAll
-    ? sql`1=1`
-    : scope.stateIds.length > 0
-      ? sql`m.region_id IN (${sql.join(scope.stateIds.map((sid) => sql`${sid}`), sql`, `)})`
-      : sql`1=0`;
+  const memberScope = memberScopeCond(scope);
+  const positionDefs = await loadPositionDefs(db);
   const department = (await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order,
       (SELECT COUNT(*) FROM members m
@@ -433,6 +438,39 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'department' AND mp.department_id = ${id} AND m.status = 'active'
     ORDER BY mp.position`);
+  // Filters are additive and only narrow the members table; the department's
+  // total count above stays as the unfiltered reference.
+  const regions = await orgRegions(db, scope, c.get("lang"));
+  const q = s(c.req.query("q")).trim().slice(0, 80);
+  const genderRaw = s(c.req.query("gender"));
+  const gender = genderRaw === "male" || genderRaw === "female" ? genderRaw : "";
+  const stateRaw = asInt(s(c.req.query("state")));
+  const stateFilter = stateRaw != null && regions.some((r) => r.id === stateRaw) ? stateRaw : null;
+  const deptDefs = defsForScope(positionDefs, "department");
+  const positionRaw = s(c.req.query("position"));
+  const positionFilter = positionRaw === "__none" || deptDefs.some((def) => def.code === positionRaw)
+    ? positionRaw
+    : "";
+
+  const conditions = [
+    sql`m.department_id = ${id}`,
+    sql`m.status = 'active'`,
+    memberScope,
+  ];
+  if (q) conditions.push(sql`(m.name_myanmar LIKE ${`%${q}%`} OR m.name_english LIKE ${`%${q}%`} OR m.member_code LIKE ${`%${q}%`})`);
+  if (gender) conditions.push(sql`m.gender = ${gender}`);
+  if (stateFilter != null) conditions.push(sql`m.region_id = ${stateFilter}`);
+  if (positionFilter === "__none") {
+    conditions.push(sql`NOT EXISTS (
+      SELECT 1 FROM member_positions mp
+       WHERE mp.member_id = m.id AND mp.scope_type = 'department' AND mp.department_id = ${id})`);
+  } else if (positionFilter) {
+    conditions.push(sql`EXISTS (
+      SELECT 1 FROM member_positions mp
+       WHERE mp.member_id = m.id AND mp.scope_type = 'department'
+         AND mp.department_id = ${id} AND mp.position = ${positionFilter})`);
+  }
+
   const members = await db.all<DepartmentMemberRow>(sql`
     SELECT m.id, m.name_myanmar, m.name_english, m.gender,
            r.name AS state_name, r.name_en AS state_name_en,
@@ -445,17 +483,94 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     JOIN regions r ON r.id = m.region_id
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     LEFT JOIN regional_churches rc ON rc.id = hc.regional_church_id
-    WHERE m.department_id = ${id} AND m.status = 'active' AND ${memberScope}
+    WHERE ${sql.join(conditions, sql` AND `)}
     ORDER BY COALESCE(NULLIF(m.name_myanmar, ''), m.name_english), m.id`);
+
+  const filterParams = new URLSearchParams();
+  if (q) filterParams.set("q", q);
+  if (gender) filterParams.set("gender", gender);
+  if (stateFilter != null) filterParams.set("state", String(stateFilter));
+  if (positionFilter) filterParams.set("position", positionFilter);
+  const filterQs = filterParams.toString();
+
   return c.html(
     <DepartmentDetailPage
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} department={department} leaders={leaders} members={members}
-      positionDefs={await loadPositionDefs(db)}
+      filters={{ q, gender, state: stateFilter, position: positionFilter }}
+      regions={regions} filterQuery={filterQs ? `?${filterQs}` : ""}
+      positionDefs={positionDefs}
       canManage={c.get("perms").has("options.manage") && scope.scopeAll}
+      canAssign={c.get("perms").has("members.update")}
     />,
   );
+});
+
+/** Quick department role assignment from the department's member table. It
+ *  only touches the member's department-scoped row; other positions stay. */
+organizationRoutes.post("/departments/:id/members/:memberId/position", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = intParam(c.req.param("id"));
+  const memberId = intParam(c.req.param("memberId"));
+  const body = await c.req.parseBody();
+  const backRaw = s(body.return_query);
+  const back = /^\?[A-Za-z0-9_%=&.\-]*$/.test(backRaw) && backRaw.length <= 300 ? backRaw : "";
+  const done = (code: string) => `/organization/departments/${id}${back}${back ? "&" : "?"}${code}`;
+  if (!id || !memberId) return c.redirect(done("err=err-notfound"), 303);
+
+  const department = (await db.all<{ name: string }>(
+    sql`SELECT name FROM church_departments WHERE id = ${id} LIMIT 1`,
+  ))[0];
+  if (!department) return c.redirect(done("err=err-notfound"), 303);
+
+  const member = (await db.all<{ id: number }>(sql`
+    SELECT m.id FROM members m
+     WHERE m.id = ${memberId} AND m.department_id = ${id}
+       AND m.status = 'active' AND ${memberScopeCond(scope)} LIMIT 1`))[0];
+  if (!member) return c.redirect(done("err=err-notfound"), 303);
+
+  const position = s(body.position).slice(0, 100);
+  const defs = defsForScope(await loadPositionDefs(db), "department");
+  const def = position ? defs.find((d) => d.code === position) : undefined;
+  if (position && !def) return c.redirect(done("err=position-invalid"), 303);
+
+  const previous = (await db.all<{ position: string }>(sql`
+    SELECT position FROM member_positions
+     WHERE member_id = ${memberId} AND scope_type = 'department' LIMIT 1`))[0]?.position ?? "";
+  if (previous === position) return c.redirect(done("ok=member-position"), 303);
+
+  if (position && await positionTaken(db, "department", position, { departmentId: id, exceptMemberId: memberId })) {
+    return c.redirect(done("err=position-taken"), 303);
+  }
+
+  const actorId = c.get("user").id;
+  const now = Math.floor(Date.now() / 1000);
+  await db.run(sql`
+    DELETE FROM member_positions
+     WHERE member_id = ${memberId} AND scope_type = 'department'`);
+  if (position) {
+    await db.insert(memberPositions).values({
+      memberId, position, scopeType: "department", departmentId: id,
+      createdBy: actorId, createdAt: now, updatedAt: now,
+    });
+  }
+  await db.update(members).set({ updatedBy: actorId, updatedAt: now })
+    .where(eq(members.id, memberId));
+  await db.insert(memberHistory).values({
+    memberId, actorId, action: "position",
+    snapshotJson: JSON.stringify({ department_id: id, position: position || null }),
+  });
+  await recordPositionHistory(db, {
+    entity: "assignment", action: position ? "assigned" : "updated", actorId, memberId,
+    scopeType: "department", code: position || null, positionDefId: def?.id ?? null,
+    summary: position && def
+      ? `${positionDefLabel(def, c.get("lang"))} · ${department.name}`
+      : `${department.name}`,
+  });
+
+  return c.redirect(done("ok=member-position"), 303);
 });
 
 // ---------- Church departments ----------

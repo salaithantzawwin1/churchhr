@@ -808,6 +808,7 @@ export const KO: Record<string, string> = {
   "dept.membersTitle": "부서 회원",
   "dept.membersHint": "이 부서의 활성 회원 이름, 성별, 주/지역, 교회, 직책입니다.",
   "dept.noMembers": "이 부서에 아직 회원이 없습니다.",
+  "dept.filterAllPositions": "모든 직책",
   "dept.viewMembers": "회원 보기",
   "dept.title": "부서 관리",
   "dept.intro": "교회 부서를 추가하고 이름, 순서, 사용 여부를 관리하세요. 부서 직책은 회원 목록에서 지정합니다.",

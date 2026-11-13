@@ -2225,9 +2225,21 @@ td.empty-state .small { margin-top: 4px; }
 .dept-members-tbl th { white-space: nowrap; }
 .dept-members-tbl td { white-space: nowrap; }
 .dept-members-tbl td:nth-child(2) { width: 76px; }
-.dept-members-tbl td:nth-child(5) { white-space: normal; min-width: 150px; }
+.dept-members-tbl td:nth-child(5) { white-space: normal; min-width: 300px; }
 .dept-members-tbl a { color: var(--link); font-weight: 600; text-decoration: none; }
 .dept-members-tbl a:hover { text-decoration: underline; }
+.dept-member-filters { margin: 0 0 14px; gap: 8px; }
+.dept-member-filters input[type="search"] { flex: 1 1 220px; max-width: 340px; }
+.dept-member-filters select { flex: 0 1 240px; min-width: 132px; }
+.dept-member-filters .dept-filter-clear { margin-left: auto; font-size: 12.5px; white-space: nowrap; }
+/* Inline role picker: a compact select and one Assign button in the position
+   cell, so a department head can be set without leaving the member table. */
+.dept-pos-form { display: flex; align-items: center; gap: 6px; margin: 0; min-width: 0; }
+.dept-pos-form select {
+  height: 32px; min-height: 32px; padding: 0 8px; font-size: 12.5px;
+  max-width: 214px; min-width: 0;
+}
+.dept-pos-form .btn.sm { min-height: 32px; padding: 4px 9px; white-space: nowrap; }
 .dept-members-foot { margin: 10px 0 0; font-size: 12.5px; }
 .dept-members-foot a { color: var(--link); text-decoration: none; font-weight: 600; }
 .dept-members-foot a:hover { text-decoration: underline; }
@@ -2272,6 +2284,10 @@ td.empty-state .small { margin-top: 4px; }
 @media (max-width: 640px) {
   .dept-meta { grid-template-columns: 1fr; }
   .dept-members-card { padding: 15px 14px; }
+  .dept-member-filters input[type="search"],
+  .dept-member-filters select { flex: 1 1 100%; max-width: none; }
+  .dept-member-filters .dept-filter-clear { margin-left: 0; }
+  .dept-members-tbl { min-width: 720px; }
   .org-leadership, .dept-add, .dept-row { padding: 14px 16px; }
   .org-lead-grid { grid-template-columns: 1fr 1fr; }
   .dept-row .form-grid { grid-template-columns: 1fr; }
