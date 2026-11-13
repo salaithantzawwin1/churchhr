@@ -2240,7 +2240,7 @@ td.empty-state .small { margin-top: 4px; }
   gap: 12px; align-items: end;
 }
 .dept-toggle {
-  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 42px;
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 40px;
   padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: var(--field-bg); color: var(--ink); font-size: 13.5px; cursor: pointer;
   transition: border-color .12s ease, background-color .12s ease;
