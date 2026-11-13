@@ -189,7 +189,8 @@ export function PositionHoldersModal(props: {
     L !== "mm" && row.nameEnglish ? row.nameEnglish : (row.nameMyanmar || row.nameEnglish || "—");
   const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
   return (
-    <div class="modal-body position-holders-modal">
+    <div class="modal-body position-holders-modal" data-modal-static>
+      <p class="position-holders-role">{props.label}</p>
       <p class="muted small">{t("org.positionHoldersHint")}</p>
       {props.holders.length === 0 ? (
         <p class="empty-state">{t("org.positionHoldersEmpty")}</p>
@@ -333,7 +334,7 @@ export function PositionsPage(props: Common & {
                 <a
                   class="btn sm secondary js-edit-modal"
                   href={`/organization/positions/${def.id}/holders`}
-                  data-modal-title={`${t("org.positionHolders")} — ${positionDefLabel(def, L)}`}
+                  data-modal-title={t("org.positionHolders")}
                   data-modal-size="sm"
                 >{t("org.viewPosition")}</a>
                 <a

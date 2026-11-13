@@ -1658,6 +1658,7 @@ td.empty-state .small { margin-top: 4px; }
 
 .role-card-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .position-holders-modal .empty-state { margin: 12px 0 0; text-align: center; }
+.position-holders-role { margin: 0 0 2px; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
 .position-holder-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
 .position-holder-list li {
   display: flex; align-items: center; gap: 10px; padding: 9px 11px;

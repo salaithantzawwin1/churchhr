@@ -1471,7 +1471,9 @@
       .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.text(); })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, "text/html");
-        if (!doc.querySelector("form")) throw new Error("no form");
+        // Read-only panels (for example a role's assigned members) opt out of
+        // the form requirement with data-modal-static instead of a dummy form.
+        if (!doc.querySelector("form") && !doc.querySelector("[data-modal-static]")) throw new Error("no form");
         setModalHtml(doc);
         var first = bodyEl.querySelector("input:not([type=hidden]), select, textarea");
         if (first) first.focus();
