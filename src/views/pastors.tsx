@@ -151,7 +151,8 @@ function PastorFields(props: {
           </label>
           <label class="field">
             <span class="lbl">{t("form.dob")}</span>
-            <input type="date" name="date_of_birth" value={values.dateOfBirth} />
+            <input type="text" name="date_of_birth" value={values.dateOfBirth}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
           </label>
           <label class="field">
             <span class="lbl">{t("org.pastorSpouse")}</span>
@@ -203,7 +204,8 @@ function PastorFields(props: {
           </label>
           <label class="field">
             <span class="lbl">{t("org.ordinationDate")}</span>
-            <input type="date" name="ordination_date" value={values.ordinationDate} />
+            <input type="text" name="ordination_date" value={values.ordinationDate}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
           </label>
           <label class="field">
             <span class="lbl">{t("org.positionSort")}</span>

@@ -580,7 +580,7 @@ export function HouseholdAddMemberPage(props: Common & {
                 <option value="male" selected={v.gender === "male"}>{G.male}</option>
                 <option value="female" selected={v.gender === "female"}>{G.female}</option>
               </select></label>
-            <label class="field"><span class="lbl">{t("form.dob")}</span><input type="date" name="date_of_birth" value={v.date_of_birth ?? ""} /></label>
+            <label class="field"><span class="lbl">{t("form.dob")}</span><input type="text" name="date_of_birth" value={v.date_of_birth ?? ""} placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" /></label>
             <label class="field"><span class="lbl">{t("form.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.nrc")}</span><input type="text" name="nrc_number" value={v.nrc_number ?? ""} /></label>
             <label class="field"><span class="lbl">{t("form.marital")}</span>

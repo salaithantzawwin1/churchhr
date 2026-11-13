@@ -141,6 +141,7 @@ export const KO: Record<string, string> = {
   "dash.repState": "주 / 지역",
   "dash.repEmpty": "최근 7일 동안 보고서가 없습니다.",
   "dash.ageEmpty": "옵션 페이지에서 연령 범위를 정의하세요.",
+  "dash.ageScale": "막대 길이는 가장 큰 연령대를 기준으로 합니다.",
   "dash.maleShort": "남",
   "dash.femaleShort": "여",
   "dash.filterBtn": "필터",

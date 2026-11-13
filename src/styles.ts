@@ -169,6 +169,10 @@ a { color: var(--link); }
 .breadcrumb > span { color: var(--line-strong); }
 .page-head .member-head { align-items: flex-start; }
 .page-head .member-head h1 { margin: 0 0 3px; }
+/* A long Myanmar name has no spaces to break on; it must wrap inside the head
+   instead of squeezing the avatar or pushing the actions out of view. */
+.page-head h1.member-title { min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.page-head h1.member-title .member-avatar-head { flex: none; }
 .page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
 .page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* The options page has many tab pills: on narrow screens keep them on one
@@ -313,6 +317,31 @@ tbody tr:hover { background: var(--row-hover); }
   .photo-actions { justify-content: center; }
 }
 input[type=checkbox], input[type=radio] { accent-color: var(--brand); }
+/* Bulk selection boxes: the native control rendered as a pale filled square on
+   the dark theme, which read as "already selected". Draw an explicit empty box
+   and a visible tick so the state is unambiguous at a glance. */
+#bulk-check-all,
+input[type=checkbox].bulk-check {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0;
+  display: inline-grid; place-content: center; cursor: pointer;
+  border: 1.5px solid var(--line-strong); border-radius: 5px;
+  background: var(--card);
+  transition: background .12s ease, border-color .12s ease;
+}
+#bulk-check-all::before,
+input[type=checkbox].bulk-check::before {
+  content: ""; width: 11px; height: 11px; transform: scale(0);
+  transition: transform .12s ease;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 84% 0%, 45% 62%);
+  background: #fff;
+}
+#bulk-check-all:checked,
+input[type=checkbox].bulk-check:checked { background: var(--brand); border-color: var(--brand); }
+#bulk-check-all:checked::before,
+input[type=checkbox].bulk-check:checked::before { transform: scale(1); }
+#bulk-check-all:focus-visible,
+input[type=checkbox].bulk-check:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 label.field { display: block; font-size: 13.5px; color: var(--muted); }
 label.field span.lbl { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
 label.field .hint { font-weight: 400; color: var(--muted); }
@@ -357,6 +386,9 @@ textarea { min-height: 84px; resize: vertical; }
 /* Kept for the filters row: same fixed height as the global form rule above. */
 .filters input, .filters select { height: 40px; padding: 0 10px; }
 .filters .actions { margin-left: auto; }
+/* Reports: Filter sits next to the last field. Pushed to the far right it read
+   as detached from the form it submits. */
+.reports-filter-box .filters .actions { margin-left: 0; }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; background: var(--chip-bg); }
 .badge.active { background: var(--ok-bg); color: var(--ok-ink); }
 .badge.moved { background: var(--warn-bg); color: var(--warn-ink); }
@@ -775,7 +807,13 @@ th.bar-col { width: 42%; }
 
 /* Between tablet and desktop the nav needs its own row; keeping it inline
    would wrap a few items under the brand and leave an awkward gap. */
-@media (max-width: 1180px) {
+@media (max-width: 1100px) {
+  /* The wordmark is most of the brand's width; dropping the text keeps the
+     primary nav on the same row as the account controls, so the header stays
+     one line on ~1024px laptops instead of splitting in two. */
+  .topbar .brand-name { display: none; }
+}
+@media (max-width: 900px) {
   .topbar nav {
     order: 3; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto;
     -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -841,7 +879,6 @@ th.bar-col { width: 42%; }
   #bulk-bar { bottom: 10px; width: calc(100% - 16px); padding: 10px 12px; gap: 8px; }
   #bulk-bar select { flex: 1 1 100%; }
   #bulk-bar .btn { flex: 1 1 100%; }
-  .topbar nav { mask-image: linear-gradient(to right, #000 88%, transparent); -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); }
   .filter-box > summary {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     list-style: none; cursor: pointer; padding: 11px 14px;
@@ -946,6 +983,20 @@ td.empty-state .small { margin-top: 4px; }
   text-decoration: none; white-space: nowrap;
 }
 .filter-clear:hover { color: var(--ink); text-decoration: underline; }
+/* Member filters: the flex row left the last selects on a ragged second line.
+   A uniform grid gives every control the same column width and a tidy edge. */
+.members-filter {
+  display: grid; gap: 8px; align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+}
+.members-filter input, .members-filter select { width: 100%; }
+.members-filter input[type="search"] { grid-column: span 2; }
+.members-filter .filter-clear { justify-self: start; }
+@media (max-width: 640px) {
+  .members-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .members-filter input[type="search"],
+  .members-filter .filter-clear { grid-column: 1 / -1; }
+}
 /* Quick ranges are a secondary shortcut, so they stay a compact row of pills
    rather than competing with the primary actions above them. */
 .quick-ranges { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
@@ -1138,6 +1189,9 @@ td.empty-state .small { margin-top: 4px; }
 
 /* age-group distribution */
 .age-list { display: flex; flex-direction: column; gap: 12px; }
+/* Says what the bar length means: each bar is measured against the biggest age
+   group, while the two colours split that group into male/female. */
+.age-scale { margin: -4px 0 12px; }
 .age-row .a-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; margin-bottom: 5px; }
 .age-row .a-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .age-row .a-rng { color: var(--muted); font-size: 12px; }
@@ -1207,6 +1261,8 @@ td.empty-state .small { margin-top: 4px; }
   /* Phone nav: keep the five primary links on one row and put the admin group
      on its own clearly-labelled row below them. */
   .topbar nav { column-gap: 1px; }
+  /* The "|" separators only add line breaks once the links wrap. */
+  .topbar nav .sep { display: none; }
   .topbar nav a { padding: 5px 6px; font-size: 13px; line-height: 1.6; }
   /* Logo only: the language switch now has three options, so the brand text
      would push the controls past the viewport on a phone. */
@@ -2533,6 +2589,11 @@ td.empty-state .small { margin-top: 4px; }
     margin: 3px 0 0 7px; padding-left: 7px;
     border-left: 1px solid rgba(255,255,255,.3);
   }
+  /* Members is a primary destination: it stays on the same row as the other
+     links, so only Administration gets its own labelled row. */
+  .nav-admin.nav-members {
+    flex-basis: auto; order: 0; margin: 0; padding-left: 0; border-left: 0;
+  }
   .nav-admin > summary { display: inline-flex; padding: 4px 6px; font-size: 12px; line-height: 1.6; }
   .nav-admin .chev { font-size: 9px; }
 }
@@ -2704,8 +2765,10 @@ th { font-size: 13px; }
 @media (max-width: 760px) {
   .topbar { padding: 8px 12px; gap: 8px; }
   .topbar nav {
-    order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto;
-    scrollbar-width: none; padding: 2px 0;
+    /* Wraps onto a second line here: a sideways scroll with a hidden scrollbar
+       pushed "Administration" (and the active pill) off screen. */
+    order: 3; flex: 1 1 100%; flex-wrap: wrap; overflow: visible;
+    padding: 2px 0; row-gap: 2px;
   }
   .topbar nav::-webkit-scrollbar { display: none; }
   .topbar nav a, .topbar nav .nav-admin > summary {
@@ -2816,7 +2879,7 @@ th { font-size: 13px; }
   table.list-tbl.members-tbl { min-width: 0; }
 }
 @media (max-width: 520px) {
-  .list-tbl :is(th, td):is([data-col="gender"], [data-col="homeCell"]) { display: none; }
+  .list-tbl :is(th, td):is([data-col="gender"]) { display: none; }
   .list-tbl :is(th, td) { padding: 10px 10px; }
   .list-tbl td[data-col="name"] { max-width: none; }
   /* Three columns left, so they have to wrap instead of forcing a sideways
@@ -2961,6 +3024,19 @@ th { font-size: 13px; }
 }
 .brand-form .actions { margin-top: 18px; }
 
+/* Long member/report forms run several screens on a phone, so the primary save
+   action follows the viewport instead of living at the very bottom. */
+.form-actions-sticky {
+  position: sticky; bottom: 0; z-index: 6;
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;
+  margin-top: 18px; padding: 12px 0 2px;
+  background: var(--card); border-top: 1px solid var(--hairline);
+}
+@media (max-width: 640px) {
+  .form-actions-sticky { padding-bottom: max(2px, env(safe-area-inset-bottom)); }
+  .form-actions-sticky .btn { flex: 1; }
+}
+
 /* ---------- member + admin lists: phone cards ---------- */
 /* Long tables (members, users, roles) become labelled cards on phones so no
    list depends on a horizontal swipe. Column labels come from data-label. */
@@ -2973,6 +3049,8 @@ th { font-size: 13px; }
   .members-tbl tbody, .admin-tbl tbody { display: grid; gap: 10px; }
   .members-tbl tbody tr, .admin-tbl tbody tr {
     position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* dense: a full-width field never leaves a hole beside the field before it. */
+    grid-auto-flow: row dense;
     gap: 7px 12px; padding: 12px 13px; background: var(--card);
     border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
   }
@@ -2989,7 +3067,8 @@ th { font-size: 13px; }
   .members-tbl td[data-col="name"] {
     position: static; left: auto; z-index: auto; background: transparent; box-shadow: none;
     grid-column: 1 / -1; max-width: none; overflow: visible;
-    padding: 0 28px 8px 0; margin-bottom: 2px;
+    /* Leaves room for the checkbox and the edit action in the top corner. */
+    padding: 0 84px 8px 0; margin-bottom: 2px;
     border-bottom: 1px solid var(--hairline);
     font-size: 15.5px; white-space: normal;
   }
@@ -3000,12 +3079,27 @@ th { font-size: 13px; }
   }
   .members-tbl tbody td:first-child::before { display: none; }
   .members-tbl tbody td[data-col="role"] { grid-column: 1 / -1; }
+  /* Home cell is one of the facts you scan for on a phone, so it keeps its own
+     full-width line instead of being hidden below 520px. */
+  .members-tbl tbody td[data-col="homeCell"] { grid-column: 1 / -1; }
   .members-tbl .member-role-inline { display: none; }
-  .members-tbl tbody td.row-actions-cell,
   .admin-tbl tbody td.row-actions-cell {
     grid-column: 1 / -1; display: flex; justify-content: flex-end; width: auto;
     position: static; z-index: auto; background: transparent; box-shadow: none;
     padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--hairline);
+  }
+  /* Member cards put the edit action beside the row checkbox: a full-width
+     action line under every card was mostly empty space. Delete stays on the
+     member page, which has its own Delete button. */
+  .members-tbl tbody td.row-actions-cell {
+    position: absolute; top: 6px; right: 40px; left: auto; width: auto;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: 0; margin: 0; border: 0; box-shadow: none; z-index: 1;
+    background: transparent;
+  }
+  .members-tbl tbody td.row-actions-cell form { display: none; }
+  .members-tbl tbody td.row-actions-cell .btn.icon-btn {
+    width: 34px; min-width: 34px; height: 34px; min-height: 34px;
   }
   .members-tbl tbody td.row-actions-cell::before,
   .admin-tbl tbody td.row-actions-cell::before { display: none; }

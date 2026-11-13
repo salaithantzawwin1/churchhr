@@ -185,11 +185,13 @@ export function ReportsListPage(props: Common & {
           {team && <input type="hidden" name="scope" value="team" />}
           <label class="field range-field">
             <span class="lbl">{t("rep.from")}</span>
-            <input type="date" name="from" value={range.from} />
+            <input type="text" name="from" value={range.from}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
           </label>
           <label class="field range-field">
             <span class="lbl">{t("rep.to")}</span>
-            <input type="date" name="to" value={range.to} />
+            <input type="text" name="to" value={range.to}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
           </label>
           {team && authors.length > 0 && (
             <label class="field">
@@ -302,8 +304,8 @@ export function ReportFormPage(props: Common & {
           <div class="form-grid">
             <label class="field">
               <span class="lbl">{t("rep.date")}</span>
-              <input type="date" name="report_date" required max={maxDate} value={v.report_date ?? ""}
-                data-today="1" data-today-label={t("rep.today")} />
+              <input type="text" name="report_date" required max={maxDate} value={v.report_date ?? ""}
+                placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" data-today="1" data-today-label={t("rep.today")} />
             </label>
             <label class="field">
               <span class="lbl">{t("rep.state")}</span>

@@ -136,11 +136,13 @@ export function AuditLogPage(props: Common & {
         </select>
         <label class="field">
           <span class="lbl">{t("audit.from")}</span>
-          <input type="date" name="from" value={filters.from} />
+          <input type="text" name="from" value={filters.from}
+            placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
         </label>
         <label class="field">
           <span class="lbl">{t("audit.to")}</span>
-          <input type="date" name="to" value={filters.to} />
+          <input type="text" name="to" value={filters.to}
+            placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
         </label>
         <div class="actions">
           <button class="btn sm secondary" type="submit">{t("audit.apply")}</button>

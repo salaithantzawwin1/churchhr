@@ -106,7 +106,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
                   </a>
                   {/* People records sit right after Dashboard. */}
                   {i === 0 && memberItems.length > 0 && (
-                    <details class={`nav-admin${memberActive ? " active" : ""}`}>
+                    <details class={`nav-admin nav-members${memberActive ? " active" : ""}`}>
                       <summary aria-current={memberActive ? "page" : undefined}>
                         {t("nav.memberGroup")} <span class="chev" aria-hidden="true">▾</span>
                       </summary>

@@ -345,6 +345,7 @@ export function DashboardPage(props: {
             <h2>{t("dash.ageGroups")}</h2>
             {perms.has("options.manage") && <a href="/admin/options?type=age_group">{t("members.edit")}</a>}
           </div>
+          {data.ageGroups.length > 0 && <p class="muted small age-scale">{t("dash.ageScale")}</p>}
           {data.ageGroups.length === 0 ? (
             <p class="muted small">
               {perms.has("options.manage")

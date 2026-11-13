@@ -25,7 +25,7 @@ import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues
 import { positionTaken } from "../positions";
 import { buildCsv } from "../csv";
 import { getDict, type Lang } from "../i18n";
-import { asInt, intParam, s, todayInYangon } from "../util";
+import { asInt, intParam, parseDateFlexible, s, todayInYangon } from "../util";
 
 export const organizationRoutes = new Hono<AppEnv>();
 
@@ -1832,13 +1832,13 @@ function pastorFormFields(body: Record<string, unknown>) {
     position: s(body.position).slice(0, 80),
     gender: s(body.gender).slice(0, 20),
     maritalStatus: s(body.marital_status).slice(0, 20),
-    dateOfBirth: s(body.date_of_birth).slice(0, 10),
+    dateOfBirth: parseDateFlexible(s(body.date_of_birth)) ?? "",
     regionId: asInt(s(body.region_id)),
     churchId: asInt(s(body.regional_church_id)),
     phone: s(body.phone).slice(0, 40),
     email: s(body.email).slice(0, 120),
     address: s(body.address).slice(0, 300),
-    ordinationDate: s(body.ordination_date).slice(0, 10),
+    ordinationDate: parseDateFlexible(s(body.ordination_date)) ?? "",
     notes: s(body.notes).slice(0, 1000),
     spouseId: asInt(s(body.spouse_pastor_id)),
   };

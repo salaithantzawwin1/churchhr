@@ -1306,7 +1306,10 @@
       window.addEventListener("resize", place);
     }
 
-    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"]'), function (input) {
+    // Text date fields carry data-datepicker: they keep the same ISO value the
+    // native control produced, but show it as yyyy-mm-dd instead of the
+    // browser's locale order (an English browser drew every date as MM/DD/YYYY).
+    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"], input[data-datepicker]'), function (input) {
       if (input.getAttribute("data-dp-ready")) return;
       input.setAttribute("data-dp-ready", "1");
       input.classList.add("dp-input");

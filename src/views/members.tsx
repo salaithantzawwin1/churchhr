@@ -190,7 +190,7 @@ export function MembersListPage(props: ListProps) {
         <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
         <span class="chev" aria-hidden="true">▾</span>
       </summary>
-      <form class="filter-toolbar" method="get" action="/members" data-auto-submit="1">
+      <form class="filter-toolbar members-filter" method="get" action="/members" data-auto-submit="1">
         <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")}
           aria-label={t("members.search")} enterkeyhint="search" />
         <select name="state" data-region-select="1" aria-label={t("members.state")}>
@@ -568,7 +568,8 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             <label class="field"><span class="lbl">{t("form.marital")}</span>{select("marital_status", M, v.marital_status ?? "", t("form.choose"))}</label>
             <label class="field">
               <span class="lbl">{t("form.dob")}</span>
-              <input type="date" name="date_of_birth" value={dob} max={todayInYangon()} />
+              <input type="text" name="date_of_birth" value={dob} max={todayInYangon()}
+                placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
               {dob && <span class="hint">{t("form.age")}: {ageFromDate(dob) ?? "—"}</span>}
             </label>
             <label class="field">
@@ -653,13 +654,14 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
             <label class="field"><span class="lbl">{t("form.familyGroup")}</span><select name="family_group_id" data-region-filter="1" data-parent-filter="home_cell">{opts(options.family_group ?? [], v.family_group_id ?? "", t("form.choose"), undefined, true)}</select></label>
             <label class="field"><span class="lbl">{t("form.fellowship")}</span><select name="fellowship_category_id">{opts(options.fellowship_category ?? [], v.fellowship_category_id ?? "", t("form.choose"))}</select></label>
             <label class="field"><span class="lbl">{t("form.sector")}</span><select name="sector_id">{opts(options.sector ?? [], v.sector_id ?? "", t("form.choose"))}</select></label>
-            <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="date" name="salvation_date" value={v.salvation_date ?? ""} max={todayInYangon()} /></label>
+            <label class="field"><span class="lbl">{t("form.salvation")}</span><input type="text" name="salvation_date" value={v.salvation_date ?? ""} max={todayInYangon()}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" /></label>
             <label class="field"><span class="lbl">{t("form.statusLabel")}</span>{select("status", S, v.status || "active", "")}</label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
           </div>
         </div>
 
-        <div class="actions">
+        <div class="actions form-actions-sticky">
           <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
           {modal
             ? <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
@@ -1149,7 +1151,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
   return (
     <Layout title={m.name_myanmar || m.name_english || "Member"} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
       <div class="page-head">
-        <h1>
+        <h1 class="member-title">
           <span class="member-avatar-head" aria-hidden="true">
             {m.has_photo
               ? <img src={`/members/${m.id}/photo?v=${m.updated_at}`} alt="" />
