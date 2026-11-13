@@ -308,10 +308,10 @@ export function DepartmentDetailPage(props: Common & {
                 return (
                   <tr>
                     <td><a href={`/members/${m.id}`}>{name}</a></td>
-                    <td>{m.gender === "male" ? t("org.male") : m.gender === "female" ? t("org.female") : "—"}</td>
-                    <td>{state || "—"}</td>
-                    <td>{church || <span class="muted">—</span>}</td>
-                    <td>
+                    <td data-label={t("form.gender")}>{m.gender === "male" ? t("org.male") : m.gender === "female" ? t("org.female") : "—"}</td>
+                    <td data-label={t("detail.state")}>{state || "—"}</td>
+                    <td data-label={t("org.church")}>{church || <span class="muted">—</span>}</td>
+                    <td data-label={t("org.position")}>
                       {canAssign && deptDefs.length > 0 ? (
                         <form class="dept-pos-form" method="post"
                           action={`/organization/departments/${department.id}/members/${m.id}/position`}>

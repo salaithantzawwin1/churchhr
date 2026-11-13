@@ -39,19 +39,15 @@ export function LoginPage({ error, username, lang, flash, remember }: {
       <div class="auth-wrap">
         <section class="auth-card">
           <aside class="auth-aside">
-            <img class="auth-mark" src="/logo.png" alt="" />
-            <div>
-              <h1>{t("login.welcome")}</h1>
-              <p class="auth-lead">{t("login.systemNote")}</p>
+            <div class="auth-brand">
+              <img class="auth-mark" src="/logo.png" alt="" />
+              <span class="auth-brand-name">{t("login.systemNote")}</span>
             </div>
-            <ul class="auth-points">
-              {(["login.point1", "login.point2", "login.point3"] as const).map((k) => (
-                <li>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
-                  <span>{t(k)}</span>
-                </li>
-              ))}
-            </ul>
+            <div class="auth-welcome">
+              <h1>{t("login.welcome")}</h1>
+              <p class="auth-lead">{t("login.asideLead")}</p>
+            </div>
+            <p class="auth-aside-foot">{t("login.asideFoot")}</p>
           </aside>
 
           <div class="auth-main">
@@ -73,11 +69,13 @@ export function LoginPage({ error, username, lang, flash, remember }: {
                 </span>
                 <CapsHint label={t("pw.capsLock")} />
               </div>
-              <label class="check-chip auth-remember">
+              <label class="auth-remember">
                 <input type="checkbox" name="remember" value="1" checked={remember} />
-                <span>{t("login.savePassword")}</span>
+                <span class="auth-remember-text">
+                  <span>{t("login.savePassword")}</span>
+                  <small>{t("login.savePasswordHint")}</small>
+                </span>
               </label>
-              <p class="hint auth-remember-note">{t("login.savePasswordHint")}</p>
               <div class="actions">
                 <button class="btn full" type="submit">{t("login.submit")}</button>
               </div>

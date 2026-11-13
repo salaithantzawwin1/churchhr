@@ -167,6 +167,57 @@ export function PositionModal(props: {
   );
 }
 
+export type PositionHolderRow = {
+  id: number;
+  kind: "member" | "pastor";
+  nameMyanmar: string | null;
+  nameEnglish: string | null;
+  churchName: string | null;
+  churchNameEn: string | null;
+  contextName: string | null;
+};
+
+/** Read-only list behind a role card's View button. */
+export function PositionHoldersModal(props: {
+  label: string;
+  holders: PositionHolderRow[];
+  lang?: Lang;
+}) {
+  const L = props.lang ?? "en";
+  const t = getDict(L);
+  const displayName = (row: PositionHolderRow) =>
+    L !== "mm" && row.nameEnglish ? row.nameEnglish : (row.nameMyanmar || row.nameEnglish || "—");
+  const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
+  return (
+    <div class="modal-body position-holders-modal">
+      <p class="muted small">{t("org.positionHoldersHint")}</p>
+      {props.holders.length === 0 ? (
+        <p class="empty-state">{t("org.positionHoldersEmpty")}</p>
+      ) : (
+        <ul class="position-holder-list">
+          {props.holders.map((row) => {
+            const name = displayName(row);
+            const church = L !== "mm" && row.churchNameEn ? row.churchNameEn : row.churchName;
+            const context = row.kind === "pastor" || !row.contextName ? church : row.contextName;
+            return (
+              <li>
+                <span class="position-holder-avatar" aria-hidden="true">{initials(name)}</span>
+                <span class="position-holder-text">
+                  <a href={row.kind === "pastor" ? `/pastors/${row.id}` : `/members/${row.id}`}>{name}</a>
+                  <span class="small muted">
+                    {row.kind === "pastor" ? t("nav.pastors") : t("nav.members")}
+                    {context ? ` · ${context}` : ""}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export type ListStatus = "all" | "active" | "inactive";
 
 /** Case-insensitive substring match over the labels a row can be found by. */
@@ -279,6 +330,12 @@ export function PositionsPage(props: Common & {
                 </div>
               </header>
               <div class="role-card-actions">
+                <a
+                  class="btn sm secondary js-edit-modal"
+                  href={`/organization/positions/${def.id}/holders`}
+                  data-modal-title={`${t("org.positionHolders")} — ${positionDefLabel(def, L)}`}
+                  data-modal-size="sm"
+                >{t("org.viewPosition")}</a>
                 <a
                   class="btn sm secondary js-edit-modal"
                   href={`/organization/positions/${def.id}/edit`}

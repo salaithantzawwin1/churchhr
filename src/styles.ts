@@ -389,43 +389,50 @@ body.auth-page .container {
 body.auth-page .footer { padding-top: 0; }
 .auth-wrap { width: 100%; max-width: 940px; margin: 0 auto; }
 .auth-card {
-  display: grid; grid-template-columns: 1.05fr 1fr; background: var(--card);
-  border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
-  box-shadow: 0 18px 44px rgba(16, 40, 74, .12);
+  display: grid; grid-template-columns: .92fr 1.08fr; background: var(--card);
+  border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(16, 40, 74, .16);
 }
+/* Brand panel: compact logo row, one short welcome line and a quiet footer.
+   No feature list, so nothing has to wrap inside the narrow column. */
 .auth-aside {
-  position: relative; overflow: hidden; color: #fff; padding: 32px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center;
-  background: linear-gradient(150deg, var(--brand) 0%, #14355f 72%, #0f2a4c 100%);
+  position: relative; overflow: hidden; color: #fff; padding: 34px 32px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 24px; text-align: left;
+  background: linear-gradient(155deg, var(--brand) 0%, #163a66 62%, #0d2544 100%);
+}
+.auth-aside::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255,255,255,.12), transparent 42%),
+    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px) 0 0 / 100% 46px;
 }
 .auth-aside::after {
-  content: ""; position: absolute; right: -70px; bottom: -90px; width: 260px; height: 260px;
-  border-radius: 50%; background: rgba(255,255,255,.07); pointer-events: none;
+  content: ""; position: absolute; right: -90px; bottom: -110px; width: 280px; height: 280px;
+  border-radius: 50%; background: rgba(255,255,255,.06); pointer-events: none;
+}
+.auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; min-width: 0; }
+.auth-brand-name {
+  font-size: 12px; font-weight: 600; letter-spacing: .04em; line-height: 1.4;
+  color: rgba(255,255,255,.9); text-transform: uppercase;
 }
 .auth-mark {
-  width: 112px; height: 112px; border-radius: 24px; background: #fff; padding: 7px; flex: none;
-  box-shadow: 0 12px 28px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.16);
+  width: 46px; height: 46px; border-radius: 12px; background: #fff; padding: 4px; flex: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,.22);
 }
-.auth-aside h1 { margin: 0; font-size: 27px; line-height: 1.3; letter-spacing: -.01em; }
-.auth-lead { margin: 8px auto 0; max-width: 300px; color: rgba(255,255,255,.8); font-size: 13.5px; line-height: 1.6; }
-.auth-points {
-  list-style: none; margin: 0 auto; padding: 18px 0 0; width: 100%; max-width: 258px;
-  display: flex; flex-direction: column; gap: 11px; text-align: left;
-  font-size: 13.5px; color: rgba(255,255,255,.92); position: relative; z-index: 1;
-  border-top: 1px solid rgba(255,255,255,.16);
+.auth-welcome { position: relative; z-index: 1; margin: auto 0; }
+.auth-aside h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.015em; }
+.auth-lead { margin: 10px 0 0; max-width: 300px; color: rgba(255,255,255,.78); font-size: 14px; line-height: 1.65; }
+.auth-aside-foot {
+  position: relative; z-index: 1; margin: 0; padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.62); font-size: 11.5px; letter-spacing: .04em;
 }
-.auth-points li { display: flex; align-items: flex-start; gap: 10px; }
-.auth-points svg {
-  width: 14px; height: 14px; flex: none; margin-top: 1px; padding: 3px; box-sizing: content-box;
-  color: #d5e7fb; background: rgba(255,255,255,.12); border-radius: 50%;
-}
-/* Myanmar glyphs need extra leading in the narrow brand column. */
+/* Myanmar glyphs need extra leading in the brand column. */
 html[lang="my"] .auth-aside h1 { line-height: 1.7; }
-html[lang="my"] .auth-lead,
-html[lang="my"] .auth-points li { line-height: 1.9; }
-.auth-main { padding: 34px 32px 30px; display: flex; flex-direction: column; justify-content: center; }
-.auth-main h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.01em; }
-.auth-sub { margin: 0 0 18px; line-height: 1.5; }
+html[lang="my"] .auth-lead { line-height: 1.9; }
+.auth-main { padding: 42px 40px 36px; display: flex; flex-direction: column; justify-content: center; }
+.auth-main h2 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.015em; }
+.auth-sub { margin: 0 0 20px; line-height: 1.5; }
 .auth-main form { margin-top: 2px; }
 .auth-main .actions { margin-top: 18px; }
 /* Password visibility toggle: the button sits inside the field, so the input
@@ -449,23 +456,31 @@ html[lang="my"] .auth-points li { line-height: 1.9; }
 }
 .caps-hint[hidden] { display: none; }
 .auth-secure { display: flex; align-items: center; justify-content: center; text-align: center; gap: 6px; margin: 18px 0 0; font-size: 12px; color: var(--muted); }
-.auth-remember { margin: 14px 0 0; }
+.auth-remember {
+  display: flex; align-items: flex-start; gap: 9px; margin: 16px 0 0;
+  font-size: 13px; cursor: pointer;
+}
+.auth-remember input { width: auto; margin: 2px 0 0; flex: none; }
+.auth-remember-text { display: flex; flex-direction: column; gap: 1px; line-height: 1.45; }
+.auth-remember-text small { color: var(--muted); font-size: 11.5px; }
 .auth-remember-note { margin: 6px 0 0; }
 .auth-secure svg { width: 13px; height: 13px; flex: none; }
 .auth-card + * { margin-top: 18px; }
 @media (max-width: 820px) {
   body.auth-page .container { padding: 16px 12px; }
   .auth-card { grid-template-columns: 1fr; }
-  .auth-aside { padding: 22px; gap: 12px; }
-  .auth-aside h1 { font-size: 21px; }
-  .auth-mark { width: 84px; height: 84px; border-radius: 19px; padding: 5px; }
-  .auth-points { display: none; }
-  .auth-main { padding: 22px; }
+  .auth-aside { padding: 22px; gap: 14px; }
+  .auth-aside h1 { font-size: 22px; }
+  .auth-mark { width: 40px; height: 40px; border-radius: 10px; }
+  .auth-aside-foot { display: none; }
+  .auth-brand-name { display: none; }
+  .auth-lead { max-width: none; margin-top: 6px; font-size: 13px; }
+  .auth-main { padding: 26px 22px; }
 }
 @media (max-width: 420px) {
-  .auth-main { padding: 18px; }
+  .auth-main { padding: 22px 18px; }
   .auth-aside { padding: 18px; }
-  .auth-mark { width: 68px; height: 68px; border-radius: var(--radius-lg); }
+  .auth-mark { width: 36px; height: 36px; border-radius: 9px; }
   .auth-card { border-radius: var(--radius-lg); }
 }
 /* ---------- dashboard / KPI stat cards ---------- */
@@ -1642,6 +1657,20 @@ td.empty-state .small { margin-top: 4px; }
 .regional-card-head p { margin: 0; }
 
 .role-card-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.position-holders-modal .empty-state { margin: 12px 0 0; text-align: center; }
+.position-holder-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.position-holder-list li {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-3);
+}
+.position-holder-avatar {
+  width: 32px; height: 32px; flex: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--chip-brand-bg); color: var(--link); font-size: 11.5px; font-weight: 700;
+}
+.position-holder-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
+.position-holder-text a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.position-holder-text a:hover { color: var(--link); }
 .role-card-actions .btn { white-space: nowrap; }
 
 /* Modal sheets for the settings screens: body copy between forms, a quiet
@@ -2299,7 +2328,34 @@ td.empty-state .small { margin-top: 4px; }
   .dept-member-filters input[type="search"],
   .dept-member-filters select { flex: 1 1 100%; max-width: none; }
   .dept-member-filters .dept-filter-clear { margin-left: 0; }
-  .dept-members-tbl { min-width: 720px; }
+  /* Phones get one compact card per member instead of a sideways table. */
+  .dept-members-card .tbl-wrap { overflow: visible; }
+  .dept-members-tbl { display: block; min-width: 0; }
+  .dept-members-tbl thead { display: none; }
+  .dept-members-tbl tbody { display: grid; gap: 10px; }
+  .dept-members-tbl tr {
+    display: grid; gap: 4px; padding: 12px 13px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+  }
+  .dept-members-tbl td {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px;
+    align-items: center; padding: 0; border: 0; white-space: normal; min-width: 0;
+  }
+  .dept-members-tbl td::before {
+    content: attr(data-label); color: var(--muted);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .015em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .dept-members-tbl td:first-child {
+    display: block; padding-bottom: 7px; margin-bottom: 3px;
+    border-bottom: 1px solid var(--hairline); font-size: 15.5px;
+  }
+  .dept-members-tbl td:first-child::before { display: none; }
+  .dept-members-tbl td:nth-child(5) { min-width: 0; }
+  .dept-members-tbl td.empty-state { display: block; text-align: center; padding: 10px 0; }
+  .dept-members-tbl td.empty-state::before { display: none; }
+  .dept-pos-form { width: 100%; align-items: stretch; }
+  .dept-pos-form select { flex: 1 1 auto; min-width: 0; }
   .org-leadership, .dept-add, .dept-row { padding: 14px 16px; }
   .org-lead-grid { grid-template-columns: 1fr 1fr; }
   .dept-row .form-grid { grid-template-columns: 1fr; }

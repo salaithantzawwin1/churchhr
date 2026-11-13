@@ -9,7 +9,7 @@ import { flashFromQuery, flashText } from "../flash";
 import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow, type DepartmentMemberRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
-import { RegionalChurchesPage, PositionsPage, PositionModal, RegionalChurchModal, type ListStatus, type RegionalValues } from "../views/org-settings";
+import { RegionalChurchesPage, PositionsPage, PositionModal, PositionHoldersModal, RegionalChurchModal, type ListStatus, type PositionHolderRow, type RegionalValues } from "../views/org-settings";
 import { AssignLeaderModal } from "../views/org-assign";
 import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
@@ -884,6 +884,36 @@ organizationRoutes.get("/positions/:id/edit", requirePermission("options.manage"
     <PositionModal scope={def.scopeType} def={def} lang={c.get("lang")}
       churches={await positionChurchOptions(db, c.get("lang"))}
       parents={parentOptions(defs, def.scopeType, c.get("lang"), def.code)} />,
+  );
+});
+
+organizationRoutes.get("/positions/:id/holders", requirePermission("options.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  const def = id ? (await adminPositionDefs(db)).find((d) => d.id === id) : undefined;
+  if (!def) return c.redirect("/organization/positions?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${def.scopeType}`, 303);
+  const members = await db.all<PositionHolderRow>(sql`
+    SELECT 'member' AS kind, m.id, m.name_myanmar AS nameMyanmar, m.name_english AS nameEnglish,
+           rc.name AS churchName, rc.name_en AS churchNameEn,
+           COALESCE(d.name, hc.label) AS contextName
+      FROM member_positions mp
+      JOIN members m ON m.id = mp.member_id
+      LEFT JOIN regional_churches rc ON rc.id = mp.regional_church_id
+      LEFT JOIN church_departments d ON d.id = mp.department_id
+      LEFT JOIN lookup_options hc ON hc.id = mp.scope_id AND hc.type = 'home_cell'
+     WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND m.status = 'active'
+    UNION ALL
+    SELECT 'pastor' AS kind, p.id, p.name AS nameMyanmar, p.name_en AS nameEnglish,
+           rc.name AS churchName, rc.name_en AS churchNameEn,
+           NULL AS contextName
+      FROM member_positions mp
+      JOIN pastors p ON p.id = mp.pastor_id
+      LEFT JOIN regional_churches rc ON rc.id = mp.regional_church_id
+     WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND p.active = 1
+    ORDER BY nameMyanmar`);
+  return c.html(
+    <PositionHoldersModal label={def.nameEnglish || def.nameMyanmar} holders={members} lang={c.get("lang")} />,
   );
 });
 
