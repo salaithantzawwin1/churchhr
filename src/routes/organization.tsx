@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { churchDepartments, memberHistory, memberPositions, members } from "../db/schema";
@@ -45,19 +45,17 @@ function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
   return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
 }
 
-/** Restrict member rows by the signed-in user's assigned states. */
-function memberScopeCond(scope: Scope) {
+/** Restrict an aliased region id column to the assigned states; a user with no
+ *  assignment sees nothing. One rule covers members, Home Cells and churches. */
+function statesCond(scope: Scope, column: SQL): SQL {
   if (scope.scopeAll) return sql`1=1`;
   if (scope.stateIds.length === 0) return sql`1=0`;
-  return sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
+  return sql`${column} IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
 }
 
-/** Restrict the structure to the assigned states (all-state users see all). */
-function scopeCond(scope: Scope) {
-  if (scope.scopeAll) return sql`1=1`;
-  if (scope.stateIds.length === 0) return sql`1=0`;
-  return sql`hc.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`;
-}
+/** Member rows and Home Cell rows, in the aliases those queries use. */
+const memberScopeCond = (scope: Scope) => statesCond(scope, sql`m.region_id`);
+const scopeCond = (scope: Scope) => statesCond(scope, sql`hc.region_id`);
 
 /** True when a Regional Church's state is inside the signed-in user's scope. */
 function regionInScope(scope: Scope, regionId: number): boolean {
@@ -96,21 +94,22 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const regions = await db.all<{ id: number; name: string; nameEn: string | null }>(sql`
     SELECT r.id, r.name, r.name_en AS nameEn
     FROM regions r
-    WHERE ${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
-      ? sql`1=0`
-      : sql`r.id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`}
+    WHERE ${statesCond(scope, sql`r.id`)}
     ORDER BY r.name`);
 
+  // Same rule as the department page: a church-filed department belongs to that
+  // church's state, a shared one stays visible with its members scoped.
   const departments = await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
       (SELECT COUNT(*) FROM members m
-        WHERE m.department_id = d.id AND m.status = 'active') AS member_count,
+        WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScopeCond(scope)}) AS member_count,
       (SELECT GROUP_CONCAT(DISTINCT hc.regional_church_id)
          FROM members m JOIN lookup_options hc ON hc.id = m.home_cell_id
         WHERE m.department_id = d.id AND m.status = 'active'
           AND hc.regional_church_id IS NOT NULL) AS church_ids
     FROM church_departments d
-    WHERE d.active = 1
+    LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
+    WHERE d.active = 1 AND (d.regional_church_id IS NULL OR ${statesCond(scope, sql`rc.region_id`)})
     ORDER BY d.sort_order, d.name`);
 
   const leaders = await db.all<OrgLeader>(sql`
@@ -150,9 +149,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const unassignedRows = await db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM members m
     WHERE m.home_cell_id IS NULL AND m.status = 'active'
-      AND (${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
-        ? sql`1=0`
-        : sql`m.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`})`);
+      AND ${memberScopeCond(scope)}`);
 
   return c.html(
     <OrganizationPage
@@ -263,7 +260,8 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
 
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
-  const def = (await loadPositionDefs(db)).find((d) => d.scopeType === "church" && d.code === code) ?? null;
+  const defs = await loadPositionDefs(db);
+  const def = defs.find((d) => d.scopeType === "church" && d.code === code) ?? null;
   // A role ticked for specific churches is only offered there; the chart hides
   // it elsewhere, so the dialog must refuse it too.
   if (!church || !def || defsForChurch([def], church.id).length === 0) {
@@ -322,7 +320,7 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
         priority: row.priority,
       }))}
       allowMultiple={def.allowMultiple === 1}
-      labels={churchPositionLabels(await loadPositionDefs(db), c.get("lang"))}
+      labels={churchPositionLabels(defs, c.get("lang"))}
     />,
   );
 });
@@ -442,9 +440,7 @@ organizationRoutes.post("/assign/remove", requirePermission("members.update"), a
     FROM member_positions mp
     JOIN regional_churches rc ON rc.id = mp.regional_church_id
     WHERE mp.id = ${assignmentId} AND mp.scope_type = 'church'
-      AND ${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
-        ? sql`1=0`
-        : sql`rc.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`}`))[0];
+      AND ${statesCond(scope, sql`rc.region_id`)}`))[0];
   if (!row) return c.redirect(back, 303);
   await db.run(sql`DELETE FROM member_positions WHERE id = ${assignmentId}`);
   await recordPositionHistory(db, {
@@ -644,8 +640,9 @@ organizationRoutes.get("/departments/new", requirePermission("options.manage"), 
 
 organizationRoutes.get("/departments/:id/edit", requirePermission("options.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
+  const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
-  const department = id ? (await loadAdminDepartments(db)).find((d) => d.id === id) : undefined;
+  const department = id ? (await loadAdminDepartments(db, scope)).find((d) => d.id === id) : undefined;
   if (!department) return c.redirect("/organization/departments?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect("/organization/departments", 303);
   return c.html(
@@ -659,13 +656,12 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.notFound();
-  if (!scope.scopeAll && scope.stateIds.length === 0) return c.notFound();
   // State-scoped managers only see members inside their assigned states, so the
-  // count and the table below always agree with the rest of the member list.
+  // count and the table below always agree with the rest of the member list. A
+  // church-filed department belongs to that church's state; a shared one (no
+  // church) stays visible with its members scoped.
   const memberScope = memberScopeCond(scope);
-  const departmentStateScope = scope.scopeAll
-    ? sql`1=1`
-    : sql`rc.region_id IN (${sql.join(scope.stateIds.map((stateId) => sql`${stateId}`), sql`, `)})`;
+  const departmentScope = statesCond(scope, sql`rc.region_id`);
   const positionDefs = await loadPositionDefs(db);
   const department = (await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
@@ -675,9 +671,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     FROM church_departments d
     LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
     WHERE d.id = ${id}
-      -- A department filed under a church belongs to that church's state; a
-      -- shared department (no church) stays visible with its members scoped.
-      AND (d.regional_church_id IS NULL OR ${departmentStateScope})
+      AND (d.regional_church_id IS NULL OR ${departmentScope})
     LIMIT 1`))[0];
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
@@ -828,7 +822,7 @@ organizationRoutes.post("/departments/:id/members/:memberId/position", requirePe
 
 // ---------- Church departments ----------
 
-async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<AdminDepartmentRow[]> {
+async function loadAdminDepartments(db: ReturnType<typeof getDb>, scope: Scope): Promise<AdminDepartmentRow[]> {
   return db.all<AdminDepartmentRow>(sql`
     SELECT d.id, d.name, d.name_en AS nameEn, d.active, d.sort_order AS sortOrder,
       d.regional_church_id AS regionalChurchId,
@@ -836,15 +830,16 @@ async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<Admin
       (SELECT COUNT(*) FROM member_positions mp
         WHERE mp.scope_type = 'department' AND mp.department_id = d.id) AS role_count,
       (SELECT COUNT(*) FROM members m
-        WHERE m.department_id = d.id AND m.status = 'active') AS member_count
+        WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScopeCond(scope)}) AS member_count
     FROM church_departments d
     LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
+    WHERE d.regional_church_id IS NULL OR ${statesCond(scope, sql`rc.region_id`)}
     ORDER BY d.active DESC, d.sort_order, d.name`);
 }
 
 /** Active holders of department roles; the card list names a slot's holder from
  *  this list, so a role added to the catalogue needs no new SQL column. */
-async function loadDepartmentLeaders(db: DB): Promise<DepartmentLeaderRow[]> {
+async function loadDepartmentLeaders(db: DB, scope: Scope): Promise<DepartmentLeaderRow[]> {
   return db.all<DepartmentLeaderRow>(sql`
     SELECT mp.department_id AS departmentId, mp.position,
            m.id AS memberId,
@@ -852,18 +847,20 @@ async function loadDepartmentLeaders(db: DB): Promise<DepartmentLeaderRow[]> {
     FROM member_positions mp
     JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'department' AND m.status = 'active'
+      AND ${memberScopeCond(scope)}
     ORDER BY mp.department_id, mp.position`);
 }
 
-organizationRoutes.get("/departments", requirePermission("options.manage"), requireAllStates, async (c) => {
+organizationRoutes.get("/departments", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
-  const departments = await loadAdminDepartments(db);
+  const scope = scopeOf(c);
   return c.html(
     <DepartmentsPage
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      lang={c.get("lang")} departments={departments}
-      positionDefs={await loadPositionDefs(db)} leaders={await loadDepartmentLeaders(db)}
+      lang={c.get("lang")} departments={await loadAdminDepartments(db, scope)}
+      positionDefs={await loadPositionDefs(db)} leaders={await loadDepartmentLeaders(db, scope)}
+      canManage={scope.scopeAll}
     />,
   );
 });
@@ -928,7 +925,7 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   const churchId = asInt(s(body.regional_church_id));
-  const department = (await loadAdminDepartments(db)).find((d) => d.id === id)!;
+  const department = (await loadAdminDepartments(db, scopeOf(c))).find((d) => d.id === id)!;
   const values = {
     name, nameEn, sortOrder, active: active === 1,
     regionalChurchId: churchId ?? "" as const,

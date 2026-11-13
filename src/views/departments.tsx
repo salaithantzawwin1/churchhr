@@ -346,8 +346,10 @@ export function DepartmentsPage(props: Common & {
   departments: AdminDepartmentRow[];
   positionDefs: PositionDefRow[];
   leaders: DepartmentLeaderRow[];
+  /** Departments are church-wide, so only all-state managers may add or edit. */
+  canManage: boolean;
 }) {
-  const { user, perms, flash, lang, departments, positionDefs, leaders } = props;
+  const { user, perms, flash, lang, departments, positionDefs, leaders, canManage } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   // Roles and their holders come from the editable catalogue so a role added on
@@ -367,8 +369,10 @@ export function DepartmentsPage(props: Common & {
         </div>
         <div class="page-head-actions">
           <CardViewToggle lang={lang} viewKey="departments" />
-          <a class="btn js-add-modal" href="/organization/departments/new"
-            data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+          {canManage && (
+            <a class="btn js-add-modal" href="/organization/departments/new"
+              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+          )}
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
         </div>
       </div>
@@ -377,8 +381,10 @@ export function DepartmentsPage(props: Common & {
         <div class="card org-empty">
           <h2>{t("dept.emptyTitle")}</h2>
           <p class="muted">{t("dept.emptyBody")}</p>
-          <a class="btn js-add-modal" href="/organization/departments/new"
-            data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+          {canManage && (
+            <a class="btn js-add-modal" href="/organization/departments/new"
+              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+          )}
         </div>
       ) : (
         <div class="hh-grid" data-view-grid>
@@ -428,8 +434,10 @@ export function DepartmentsPage(props: Common & {
 
               <div class="hh-card-actions">
                 <a class="btn sm secondary" href={`/organization/departments/${d.id}`}>{t("org.viewDepartment")}</a>
-                <a class="btn sm secondary js-edit-modal" href={`/organization/departments/${d.id}/edit`}
-                  data-modal-title={t("dept.editTitle")}>{t("members.edit")}</a>
+                {canManage && (
+                  <a class="btn sm secondary js-edit-modal" href={`/organization/departments/${d.id}/edit`}
+                    data-modal-title={t("dept.editTitle")}>{t("members.edit")}</a>
+                )}
               </div>
             </article>
           ))}

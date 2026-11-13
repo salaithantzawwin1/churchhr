@@ -181,7 +181,7 @@ app.route("/reports", reportsRoutes);
 app.route("/admin/households", householdsRoutes);
 app.route("/admin", adminRoutes);
 
-app.notFound((c) => c.html(<NotFoundPage lang={c.get("lang")} />));
+app.notFound((c) => c.html(<NotFoundPage lang={c.get("lang")} />, 404));
 app.onError((err, c) => {
   console.error("unhandled error:", err);
   const t = getDict(c.get("lang") ?? "en");
