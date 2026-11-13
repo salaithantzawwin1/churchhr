@@ -25,8 +25,34 @@ import {
 import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
 import { AuditLogPage, type AuditRow } from "../views/audit";
 import { loadRegionalChurches, regionalChurchName } from "../org-units";
+import { loadBranding } from "../branding";
+import { BrandingPage } from "../views/branding";
 
 export const adminRoutes = new Hono<AppEnv>();
+
+/** Brand photos use the same browser resizer/cap as member photos. */
+const MAX_BRAND_PHOTO_BYTES = 400 * 1024;
+
+function parseBrandPhoto(body: Record<string, unknown>): { bytes: ArrayBuffer | null; touched: boolean; error: string | null } {
+  if (s(body.photo_remove) === "1") return { bytes: null, touched: true, error: null };
+  const raw = s(body.photo_data);
+  if (!raw) return { bytes: null, touched: false, error: null };
+  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
+  if (!match) return { bytes: null, touched: true, error: "photo-bad" };
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(match[1]!.replace(/\s+/g, ""));
+    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  } catch {
+    return { bytes: null, touched: true, error: "photo-bad" };
+  }
+  if (bytes.length > MAX_BRAND_PHOTO_BYTES) return { bytes: null, touched: true, error: "photo-large" };
+  const webp = bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  if (!webp) return { bytes: null, touched: true, error: "photo-bad" };
+  return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, touched: true, error: null };
+}
 
 /** Maps a dictionary key (e.g. adm.errRoleBad) pushed by validateAssignments to its text. */
 function renderKey(t: (k: string) => string) {
@@ -182,6 +208,38 @@ async function homeCellOptions(db: DB, lang: Lang = "en"): Promise<{ id: number;
 }
 
 // ---------- Users ----------
+
+// ---------- Login branding ----------
+
+adminRoutes.get("/branding", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  return c.html(
+    <BrandingPage
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")} branding={await loadBranding(db)} />,
+  );
+});
+
+adminRoutes.post("/branding", requirePermission("users.manage"), async (c) => {
+  const db = getDb(c.env);
+  const body = await c.req.parseBody();
+  const name = s(body.church_name);
+  if (name.length > 80) return c.redirect("/admin/branding?err=brand-name-long", 303);
+  const photo = parseBrandPhoto(body);
+  if (photo.error) return c.redirect(`/admin/branding?err=brand-${photo.error}`, 303);
+  await db.run(sql`INSERT OR IGNORE INTO app_branding (id, updated_at) VALUES (1, unixepoch())`);
+  await db.run(sql`
+    UPDATE app_branding SET church_name = ${name || null}, updated_at = unixepoch() WHERE id = 1`);
+  if (photo.touched) {
+    await db.run(sql`
+      UPDATE app_branding
+         SET photo = ${photo.bytes}, photo_type = ${photo.bytes ? "image/webp" : null},
+             updated_at = unixepoch()
+       WHERE id = 1`);
+  }
+  return c.redirect("/admin/branding?ok=branding-saved", 303);
+});
 
 adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
   const db = getDb(c.env);

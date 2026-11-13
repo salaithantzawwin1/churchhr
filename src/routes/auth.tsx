@@ -20,6 +20,7 @@ import {
 import { LoginPage, ProfilePage } from "../views/auth";
 import { getDict } from "../i18n";
 import type { Flash } from "../views/layout";
+import { loadBranding } from "../branding";
 
 const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_SECONDS = 600;
@@ -72,7 +73,26 @@ publicAuthRoutes.get("/login", async (c) => {
   if (rawLastUser) {
     try { lastUser = decodeURIComponent(rawLastUser); } catch { lastUser = rawLastUser; }
   }
-  return c.html(<LoginPage lang={lang} flash={flash} username={lastUser} />);
+  const branding = await loadBranding(getDb(c.env));
+  return c.html(<LoginPage lang={lang} flash={flash} username={lastUser} branding={branding} />);
+});
+
+/** Public brand mark: the photo set in Administration → Login branding. */
+publicAuthRoutes.get("/branding/photo", async (c) => {
+  const db = getDb(c.env);
+  const row = (await db.all<{ photo: ArrayBuffer | number[] | null; updatedAt: number }>(sql`
+    SELECT photo, updated_at AS updatedAt FROM app_branding WHERE id = 1 LIMIT 1`))[0];
+  if (!row?.photo) return c.notFound();
+  const bytes = Array.isArray(row.photo) ? Uint8Array.from(row.photo) : new Uint8Array(row.photo);
+  const etag = `W/"brand-${row.updatedAt}-${bytes.byteLength}"`;
+  const headers = {
+    "Content-Type": "image/webp",
+    "Content-Length": String(bytes.byteLength),
+    "Cache-Control": "public, max-age=300",
+    ETag: etag,
+  };
+  if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(bytes, { headers });
 });
 
 publicAuthRoutes.post("/login", async (c) => {
@@ -84,8 +104,9 @@ publicAuthRoutes.post("/login", async (c) => {
   const t = getDict(c.get("lang"));
 
   const remember = String(body.remember ?? "") === "1";
+  const branding = await loadBranding(db);
   const fail = (msg: string, status: 401 | 429 = 401) =>
-    c.html(<LoginPage error={msg} username={username} remember={remember} lang={c.get("lang")} />, status);
+    c.html(<LoginPage error={msg} username={username} remember={remember} lang={c.get("lang")} branding={branding} />, status);
 
   // ---- per-IP sliding-window rate limit (independent of the account checks,
   // so it stops brute-forcing different usernames from one address) ----

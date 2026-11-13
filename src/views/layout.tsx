@@ -46,6 +46,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
     { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
+    { href: "/admin/branding", label: t("nav.branding"), perm: "users.manage" },
     { href: "/admin/audit", label: t("nav.audit"), perm: "audit.view" },
     { href: "/organization/positions", label: t("nav.positions"), perm: "options.manage", section: "structure" },
     { href: "/organization/departments", label: t("nav.departments"), perm: "options.manage", section: "structure" },

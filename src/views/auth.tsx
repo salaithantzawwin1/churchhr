@@ -1,6 +1,7 @@
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import { getDict, type Lang } from "../i18n";
+import { brandMarkSrc, type Branding } from "../branding";
 
 /** Warning shown under a password field while Caps Lock is on (public/app.js). */
 function CapsHint({ label }: { label: string }) {
@@ -26,23 +27,25 @@ function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string;
   );
 }
 
-export function LoginPage({ error, username, lang, flash, remember }: {
+export function LoginPage({ error, username, lang, flash, remember, branding }: {
   error?: string | null;
   username?: string;
   lang?: Lang;
   flash?: Flash;
   remember?: boolean;
+  branding?: Branding | null;
 }) {
   const t = getDict(lang ?? "en");
+  const brandName = branding?.churchName || t("login.brandShort");
   return (
     <Layout title={t("login.title")} lang={lang} flash={null} bodyClass="auth-page" footerNote={t("login.systemNote")}>
       <div class="auth-wrap">
         <section class="auth-card">
           <aside class="auth-aside">
             <div class="auth-brand">
-              <img class="auth-mark" src="/logo.png" alt="" />
+              <img class="auth-mark" src={brandMarkSrc(branding)} alt={brandName} />
               <span class="auth-brand-text">
-                <span class="auth-brand-name">{t("login.brandShort")}</span>
+                <span class="auth-brand-name">{brandName}</span>
                 <span class="auth-brand-sub">{t("login.brandSub")}</span>
               </span>
             </div>

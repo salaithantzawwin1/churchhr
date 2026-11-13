@@ -295,6 +295,15 @@ export const churchDepartments = sqliteTable(
 /** Editable position catalogue. `scope_type` is church, regional_church,
  * home_cell, township (Home Cell supervision) or department. Codes are stable
  * because member_positions stores the code, not the display label. */
+/** Singleton login branding row (0038). */
+export const appBranding = sqliteTable("app_branding", {
+  id: integer("id").primaryKey(),
+  churchName: text("church_name"),
+  photo: blob("photo"),
+  photoType: text("photo_type"),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
+});
+
 export const positionDefs = sqliteTable(
   "position_defs",
   {

@@ -428,6 +428,7 @@ body.auth-page .footer { padding-top: 0; }
 }
 .auth-mark {
   width: 148px; height: 148px; border-radius: 32px; background: #fff; padding: 11px; flex: none;
+  object-fit: contain;
   box-shadow: 0 18px 38px rgba(2, 8, 23, .38), 0 0 0 7px rgba(255,255,255,.09);
 }
 .auth-welcome { position: relative; z-index: 1; margin: auto 0; }
@@ -493,6 +494,9 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
      copy as one block, instead of a left-aligned strip beside the form. */
   .auth-aside { padding: 22px 20px 24px; gap: 16px; min-height: 0; }
   .auth-aside h1 { font-size: 23px; }
+  .auth-main { padding: 24px 22px 26px; }
+  .auth-main h2 { font-size: 22px; }
+  .auth-sub { margin-bottom: 16px; font-size: 13px; }
   .auth-mark { width: 96px; height: 96px; border-radius: 23px; padding: 8px; }
   .auth-brand { flex-direction: column; align-items: center; text-align: center; gap: 9px; }
   .auth-brand-text { align-items: center; gap: 2px; }
@@ -507,6 +511,7 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
 }
 @media (max-width: 420px) {
   .auth-main { padding: 22px 18px; }
+  .auth-main h2 { font-size: 20.5px; }
   .auth-aside { padding: 18px; }
   .auth-mark { width: 88px; height: 88px; border-radius: 21px; padding: 7px; }
   .auth-card { border-radius: var(--radius-lg); }
@@ -2931,6 +2936,15 @@ th { font-size: 13px; }
   .report-form-actions { flex-wrap: wrap; }
   .report-form-actions .btn { flex: 1 1 44%; }
 }
+
+/* ---------- administration: login branding ---------- */
+.brand-form { max-width: 720px; }
+.brand-form h2 { margin: 0 0 3px; }
+.brand-form .form-grid { margin-top: 16px; }
+.brand-photo-field {
+  margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line);
+}
+.brand-form .actions { margin-top: 18px; }
 
 /* ---------- member + admin lists: phone cards ---------- */
 /* Long tables (members, users, roles) become labelled cards on phones so no
