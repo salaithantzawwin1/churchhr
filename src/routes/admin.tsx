@@ -1116,7 +1116,23 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   const positionUsed = current.type === "home_cell"
     ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM member_positions WHERE scope_type = 'home_cell' AND scope_id = ${id}`)
     : [{ n: 0 }];
-  if ((used[0]?.n ?? 0) > 0 || (positionUsed[0]?.n ?? 0) > 0) {
+  // Anything else that still points at this option: child options (a township's
+  // home cells, a home cell's family groups), a manager's home-cell scope and
+  // reports filed against it. Deleting the row underneath them would leave those
+  // records pointing at an id that no longer exists.
+  const childUsed = await db.all<{ n: number }>(
+    sql`SELECT COUNT(*) AS n FROM lookup_options WHERE parent_id = ${id}`,
+  );
+  const userCellUsed = current.type === "home_cell"
+    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM user_home_cell_assignments WHERE home_cell_id = ${id}`)
+    : [{ n: 0 }];
+  const reportUsed = current.type === "home_cell"
+    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM activity_reports WHERE home_cell_id = ${id}`)
+    : current.type === "group"
+      ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM activity_reports WHERE group_id = ${id}`)
+      : [{ n: 0 }];
+  if ((used[0]?.n ?? 0) > 0 || (positionUsed[0]?.n ?? 0) > 0 ||
+      (childUsed[0]?.n ?? 0) > 0 || (userCellUsed[0]?.n ?? 0) > 0 || (reportUsed[0]?.n ?? 0) > 0) {
     await db.update(lookupOptions).set({ active: 0 }).where(eq(lookupOptions.id, id));
     return c.redirect(`${back}&err=${encodeURIComponent("err-used")}`, 302);
   }
@@ -1237,7 +1253,11 @@ async function loadRegionRows(db: DB): Promise<RegionRow[]> {
   const rows = await db.all<{ id: number; name: string; name_en: string | null; code: string | null; used: number }>(sql`
     SELECT r.id, r.name, r.name_en, r.code,
       (SELECT COUNT(*) FROM members m WHERE m.region_id = r.id)
-      + (SELECT COUNT(*) FROM user_state_assignments sa WHERE sa.region_id = r.id) AS used
+      + (SELECT COUNT(*) FROM user_state_assignments sa WHERE sa.region_id = r.id)
+      + (SELECT COUNT(*) FROM regional_churches rc WHERE rc.region_id = r.id)
+      + (SELECT COUNT(*) FROM lookup_options lo WHERE lo.region_id = r.id)
+      + (SELECT COUNT(*) FROM pastors p WHERE p.region_id = r.id)
+      + (SELECT COUNT(*) FROM activity_reports ar WHERE ar.region_id = r.id) AS used
     FROM regions r ORDER BY r.id`);
   return rows.map((r) => ({ id: r.id, name: r.name, name_en: r.name_en ?? "", code: r.code ?? null, used: Number(r.used) }));
 }
@@ -1376,9 +1396,16 @@ adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), asy
   if (!Number.isInteger(id) || id < 1) return c.redirect(`${back}&err=err-notfound`, 302);
   const rows = await db.select().from(regions).where(eq(regions.id, id)).limit(1);
   if (!rows[0]) return c.redirect(`${back}&err=err-notfound`, 302);
-  const usedMembers = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM members WHERE region_id = ${id}`);
-  const usedUsers = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM user_state_assignments WHERE region_id = ${id}`);
-  if ((usedMembers[0]?.n ?? 0) + (usedUsers[0]?.n ?? 0) > 0) {
+  // A state owns members, manager assignments, churches, region-scoped options,
+  // pastors and reports; deleting it while any of those exist would orphan them.
+  const usedRows = await db.all<{ n: number }>(sql`
+    SELECT (SELECT COUNT(*) FROM members WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM user_state_assignments WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM regional_churches WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM lookup_options WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM pastors WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM activity_reports WHERE region_id = ${id}) AS n`);
+  if ((usedRows[0]?.n ?? 0) > 0) {
     return c.redirect(`${back}&err=err-region-used`, 302);
   }
   await db.delete(regions).where(eq(regions.id, id));

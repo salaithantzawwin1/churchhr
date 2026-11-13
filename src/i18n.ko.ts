@@ -58,6 +58,7 @@ export const KO: Record<string, string> = {
   "org.positionHolders": "담당자",
   "org.positionHoldersEmpty": "현재 이 직책을 맡은 사람이 없습니다.",
   "org.positionHoldersHint": "이 직책에 배정된 활동 중인 성도와 목회자입니다.",
+  "org.holderContext": "소속",
   "org.holdersGeneral": "기타",
   "org.holderRemove": "해제",
   "org.holderRemoveConfirm": "이 배정을 해제할까요? 다른 직책은 그대로 유지됩니다.",

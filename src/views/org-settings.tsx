@@ -188,58 +188,84 @@ export function PositionHoldersModal(props: {
 }) {
   const L = props.lang ?? "en";
   const t = getDict(L);
-  const displayName = (row: PositionHolderRow) =>
+  const personName = (row: PositionHolderRow) =>
     L !== "mm" && row.nameEnglish ? row.nameEnglish : (row.nameMyanmar || row.nameEnglish || "—");
-  const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
-  const groups: { label: string; sub: string | null; rows: PositionHolderRow[] }[] = [];
-  for (const row of props.holders) {
-    const church = L !== "mm" && row.churchNameEn ? row.churchNameEn : row.churchName;
-    const label = row.contextName || church || t("org.holdersGeneral");
-    const sub = row.contextName && church ? church : null;
-    const group = groups.find((g) => g.label === label && g.sub === sub);
-    if (group) group.rows.push(row);
-    else groups.push({ label, sub, rows: [row] });
-  }
+  const churchName = (row: PositionHolderRow) =>
+    (L !== "mm" && row.churchNameEn ? row.churchNameEn : row.churchName) ?? "";
+  const initials = (name: string) =>
+    name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
+  const rows = props.holders;
+  const canRemove = Boolean(props.canRemove && props.positionId);
   return (
-    <div class="modal-body position-holders-modal" data-modal-static>
-      <p class="position-holders-role">{props.label}</p>
-      <p class="muted small">{t("org.positionHoldersHint")}</p>
-      {props.holders.length === 0 ? (
+    <div class="position-holders-modal" data-modal-static>
+      <div class="ph-head">
+        <div class="ph-head-text">
+          <h4 class="ph-title">{props.label}</h4>
+          <p class="muted small">{t("org.positionHoldersHint")}</p>
+        </div>
+        <span class="ph-count">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
         <p class="empty-state">{t("org.positionHoldersEmpty")}</p>
-      ) : groups.map((group) => (
-        <section class="position-holder-group">
-          <h4>
-            {group.label}
-            {group.sub && <span class="muted small"> · {group.sub}</span>}
-          </h4>
-          <ul class="position-holder-list">
-            {group.rows.map((row) => {
-              const name = displayName(row);
-              return (
-                <li>
-                  <span class="position-holder-avatar" aria-hidden="true">{initials(name)}</span>
-                  <span class="position-holder-text">
-                    <a href={row.kind === "pastor" ? `/pastors/${row.id}` : `/members/${row.id}`}>{name}</a>
-                    <span class="small muted">
-                      {row.kind === "pastor" ? t("nav.pastors") : t("nav.members")}
-                    </span>
-                  </span>
-                  {props.canRemove && props.positionId && (
-                    <form method="post" class="position-holder-remove"
-                      action={`/organization/positions/${props.positionId}/holders/remove`}
-                      data-confirm={t("org.holderRemoveConfirm")}
-                      data-confirm-title={t("org.holderRemove")}
-                      data-confirm-yes={t("org.holderRemove")}>
-                      <input type="hidden" name="assignment_id" value={String(row.assignmentId)} />
-                      <button class="btn sm outline-danger" type="submit">{t("org.holderRemove")}</button>
-                    </form>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+      ) : (
+        <>
+          {rows.length > 5 && (
+            <input class="ph-search" type="search" data-filter-list=".ph-tbl tbody"
+              placeholder={t("members.search")} aria-label={t("members.search")} enterkeyhint="search" />
+          )}
+          <div class="tbl-wrap ph-wrap">
+            <table class="list-tbl ph-tbl">
+              <thead>
+                <tr>
+                  <th>{t("members.thName")}</th>
+                  <th class="ph-col">{t("org.church")}</th>
+                  <th class="ph-col">{t("org.holderContext")}</th>
+                  {canRemove && <th aria-label={t("org.holderRemove")} />}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const person = personName(row);
+                  const church = churchName(row);
+                  return (
+                    <tr data-name={`${person} ${church} ${row.contextName ?? ""}`.toLowerCase()}>
+                      <td>
+                        <span class="ph-person">
+                          <span class="ph-avatar" aria-hidden="true">{initials(person)}</span>
+                          <span class="ph-person-text">
+                            <a href={row.kind === "pastor" ? `/pastors/${row.id}` : `/members/${row.id}`}>{person}</a>
+                            <span class="small muted">
+                              {row.kind === "pastor" ? t("nav.pastors") : t("nav.members")}
+                            </span>
+                            {/* On a phone the two columns fold under the name. */}
+                            <span class="small muted ph-meta">
+                              {[church, row.contextName].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                        </span>
+                      </td>
+                      <td class="ph-col">{church || <span class="muted">—</span>}</td>
+                      <td class="ph-col">{row.contextName || <span class="muted">—</span>}</td>
+                      {canRemove && (
+                        <td class="row-actions-cell">
+                          <form method="post" class="position-holder-remove"
+                            action={`/organization/positions/${props.positionId}/holders/remove`}
+                            data-confirm={t("org.holderRemoveConfirm")}
+                            data-confirm-title={t("org.holderRemove")}
+                            data-confirm-yes={t("org.holderRemove")}>
+                            <input type="hidden" name="assignment_id" value={String(row.assignmentId)} />
+                            <button class="btn sm outline-danger" type="submit">{t("org.holderRemove")}</button>
+                          </form>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -360,7 +386,7 @@ export function PositionsPage(props: Common & {
                   class="btn sm secondary js-edit-modal"
                   href={`/organization/positions/${def.id}/holders`}
                   data-modal-title={t("org.positionHolders")}
-                  data-modal-size="sm"
+                  data-modal-size="md"
                 >{t("org.viewPosition")}</a>
                 <a
                   class="btn sm secondary js-edit-modal"

@@ -1184,6 +1184,7 @@
   var pendingForm = null;
 
   function openModal(title, size) {
+    closeDatePicker();
     lastFocus = document.activeElement;
     titleEl.textContent = title || "";
     card.classList.toggle("sm", size === "sm");
@@ -1192,6 +1193,7 @@
     document.body.style.overflow = "hidden";
   }
   function closeModal() {
+    closeDatePicker();
     modal.hidden = true;
     bodyEl.innerHTML = "";
     pendingForm = null;
@@ -1249,6 +1251,18 @@
   // mounted per field and shown under it on focus. The native input stays
   // visible and in the form, so its yyyy-mm-dd value, required flag, min/max
   // limits, change events and no-JS submission behave exactly as before.
+  // One calendar popover at a time for the whole page: the popover lives on
+  // <body>, so keeping this state inside initDatePickers() (called again for
+  // every modal) left a calendar floating over the page after the dialog it
+  // belonged to closed.
+  var dpPop = null;
+  var dpInput = null;
+  function closeDatePicker() {
+    if (dpPop) dpPop.hidden = true;
+    dpPop = null;
+    dpInput = null;
+  }
+
   function initDatePickers(root) {
     if (typeof window.Datepicker !== "function") return;
     function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -1263,24 +1277,16 @@
       var now = new Date();
       return new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
     }
-    var openPop = null;
-    var openInput = null;
-
-    function close() {
-      if (openPop) openPop.hidden = true;
-      openPop = null;
-      openInput = null;
-    }
     function place() {
-      if (!openPop || !openInput) return;
-      var rect = openInput.getBoundingClientRect();
-      var height = openPop.offsetHeight;
-      var left = Math.max(8, Math.min(rect.left, window.innerWidth - openPop.offsetWidth - 8));
+      if (!dpPop || !dpInput) return;
+      var rect = dpInput.getBoundingClientRect();
+      var height = dpPop.offsetHeight;
+      var left = Math.max(8, Math.min(rect.left, window.innerWidth - dpPop.offsetWidth - 8));
       var top = rect.bottom + 6;
       // Flip above the field when there is no room below it.
       if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
-      openPop.style.left = left + "px";
-      openPop.style.top = top + "px";
+      dpPop.style.left = left + "px";
+      dpPop.style.top = top + "px";
     }
     function setValue(input, date) {
       input.value = date ? iso(date) : "";
@@ -1298,12 +1304,15 @@
     if (!initDatePickers.bound) {
       initDatePickers.bound = true;
       document.addEventListener("click", function (e) {
-        if (openPop && !openPop.contains(e.target) && e.target !== openInput) close();
+        if (dpPop && !dpPop.contains(e.target) && e.target !== dpInput) closeDatePicker();
       });
       document.addEventListener("keydown", function (e) {
-        if (e.key === "Escape" && openPop) close();
+        if (e.key === "Escape" && dpPop) closeDatePicker();
       });
       window.addEventListener("resize", place);
+      // The popover is placed against the viewport, so keep it attached to its
+      // field while the page (or a dialog body) scrolls under it.
+      window.addEventListener("scroll", function () { if (dpPop) place(); }, true);
     }
 
     // Text date fields carry data-datepicker: they keep the same ISO value the
@@ -1329,10 +1338,10 @@
         var date = e.detail && e.detail.date;
         if (!date) return;
         setValue(input, date);
-        close();
+        closeDatePicker();
       });
 
-      input.addEventListener("focus", function () {
+      function show() {
         dp.setOptions({
           maxDate: parseValue(input.getAttribute("max")),
           minDate: parseValue(input.getAttribute("min")),
@@ -1342,14 +1351,18 @@
         else dp.setDate({ clear: true, render: true, silent: true });
         // Set the open state after setDate: rendering the calendar can fire its
         // own changeDate, and closing must not leave a visible popover behind.
-        if (openPop && openPop !== pop) openPop.hidden = true;
-        openPop = pop;
-        openInput = input;
+        if (dpPop && dpPop !== pop) dpPop.hidden = true;
+        dpPop = pop;
+        dpInput = input;
         pop.hidden = false;
         place();
-      });
+      }
+      input.addEventListener("focus", show);
+      // Picking a date closes the calendar but leaves the field focused, so a
+      // second click fires no focus event; open it again from the click too.
+      input.addEventListener("click", function () { if (dpPop !== pop) show(); });
       input.addEventListener("input", function () {
-        if (openPop !== pop) return;
+        if (dpPop !== pop) return;
         var current = parseValue(input.value);
         if (current) dp.setDate(current, { render: true, silent: true });
       });

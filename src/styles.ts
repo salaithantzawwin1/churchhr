@@ -1761,29 +1761,54 @@ td.empty-state .small { margin-top: 4px; }
 .regional-card-head p { margin: 0; }
 
 .role-card-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.position-holders-modal .empty-state { margin: 12px 0 0; text-align: center; }
-.position-holders-role { margin: 0 0 2px; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
-.position-holder-group { margin-top: 14px; }
-.position-holder-group:first-of-type { margin-top: 10px; }
-.position-holder-group h4 {
-  margin: 0 0 6px; font-size: 11.5px; font-weight: 700;
-  letter-spacing: .035em; text-transform: uppercase; color: var(--muted);
+.position-holders-modal { display: flex; flex-direction: column; gap: 12px; }
+/* "View" on a role card: same reading order as the department page — a short
+   head, then one labelled table of the people holding the role. */
+.ph-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ph-head-text { min-width: 0; }
+.ph-title { margin: 0 0 3px; font-size: 16px; overflow-wrap: anywhere; }
+.ph-count {
+  flex: none; padding: 1px 10px; border-radius: 999px; background: var(--chip-bg);
+  color: var(--muted); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.position-holder-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.position-holder-list li {
-  display: flex; align-items: center; gap: 10px; padding: 9px 11px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-3);
+.ph-search { width: 100%; height: 38px; }
+.ph-wrap { border: 1px solid var(--hairline); border-radius: var(--radius); background: var(--card); }
+.ph-tbl { width: 100%; min-width: 0; }
+.ph-tbl th, .ph-tbl td { padding: 9px 10px; font-size: 13px; vertical-align: middle; }
+.ph-tbl th {
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
 }
-.position-holder-avatar {
-  width: 32px; height: 32px; flex: none; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--chip-brand-bg); color: var(--link); font-size: 11.5px; font-weight: 700;
+.ph-tbl td { border-top: 1px solid var(--hairline); }
+.ph-tbl tbody tr:first-child td { border-top: 0; }
+.ph-person { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.ph-avatar {
+  display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px;
+  border-radius: 50%; background: var(--chip-brand-bg); color: var(--brand);
+  font-size: 12px; font-weight: 700;
 }
-.position-holder-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.4; }
-.position-holder-remove { margin: 0 0 0 auto; flex: none; }
-.position-holder-remove .btn { min-height: 30px; padding: 3px 9px; }
-.position-holder-text a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.position-holder-text a:hover { color: var(--link); }
+.ph-person-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.ph-person-text a {
+  color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere;
+}
+.ph-person-text a:hover { color: var(--link); text-decoration: underline; }
+.ph-tbl .row-actions-cell { width: 1%; white-space: nowrap; text-align: right; }
+/* The members-table phone rule forces 760px; this dialog-sized table must fit
+   its column instead of scrolling sideways. */
+table.list-tbl.ph-tbl { min-width: 0; }
+.ph-tbl td:not(.empty-state) { white-space: normal; }
+.ph-meta { display: none; }
+/* The dialog can be narrower than the three columns; fold church and context
+   under the name instead of making the reader swipe a table sideways. */
+@media (max-width: 640px) {
+  .ph-tbl .ph-col { display: none; }
+  .ph-meta { display: block; }
+  .ph-tbl th, .ph-tbl td { padding: 8px; }
+}
+
+.position-holder-remove { margin: 0; display: inline-flex; }
+.position-holder-remove .btn { min-height: 30px; padding: 3px 10px; }
+.position-holders-modal .empty-state { margin: 6px 0 0; text-align: center; }
 .role-card-actions .btn { white-space: nowrap; }
 
 /* Modal sheets for the settings screens: body copy between forms, a quiet
