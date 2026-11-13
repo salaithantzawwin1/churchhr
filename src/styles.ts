@@ -887,6 +887,15 @@ th.bar-col { width: 42%; }
   }
   .filter-box > summary::-webkit-details-marker { display: none; }
   .filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
+  /* A closed panel that still narrows the list shows what is applied, so the
+     badge alone is not the only clue. */
+  .filter-box.has-filters > summary { border-color: var(--brand); }
+  .filter-peek {
+    display: none; margin-left: auto; min-width: 0; max-width: 58%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--muted); font-size: 12.5px; font-weight: 500;
+  }
+  .filter-box:not([open]) > summary .filter-peek { display: block; }
   .filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
   .filter-box[open] > summary .chev { transform: rotate(180deg); }
   .filter-box > form.filters { border-top-left-radius: 0; border-top-right-radius: 0; }

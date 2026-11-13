@@ -194,10 +194,10 @@ export function HouseholdsListPage(props: Common & {
         </div>
       </div>
 
-      <details class="filter-box filter-toolbar-box" open>
+      <details class={chips.length > 0 ? "filter-box filter-toolbar-box has-filters" : "filter-box filter-toolbar-box"} open>
         <summary>
           <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
-          <span class="chev" aria-hidden="true">▾</span>
+              {chips.length > 0 && (                <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>                  {chips.map((c) => c.label).join(" · ")}                </span>              )}          <span class="chev" aria-hidden="true">▾</span>
         </summary>
         <form class="filter-toolbar" method="get" action="/admin/households" data-auto-submit="1">
           <input type="search" name="q" value={q} placeholder={t("hh.searchPlaceholder")}

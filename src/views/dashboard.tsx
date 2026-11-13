@@ -112,9 +112,14 @@ export function DashboardPage(props: {
           <p class="page-sub">{t("dash.overview")}{data.scopeAll ? "" : ` · ${scopeLabel}`}</p>
         </div>
 
-        <details class="filter-box filter-toolbar-box" open>
+        <details class={chips.length > 0 ? "filter-box filter-toolbar-box has-filters" : "filter-box filter-toolbar-box"} open>
           <summary>
             <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+            {chips.length > 0 && (
+              <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>
+                {chips.map((c) => c.label).join(" · ")}
+              </span>
+            )}
             <span class="chev" aria-hidden="true">▾</span>
           </summary>
           <form class="filter-toolbar" method="get" action="/" data-auto-submit="1">
