@@ -129,8 +129,11 @@ publicAuthRoutes.post("/login", async (c) => {
   const ok = password.length > 0 && (await verifyPassword(password, user.passwordHash));
   if (!ok) {
     await recordAttempt(db, ip, now);
-    const attempts = user.failedAttempts + 1;
-    const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS ? now + LOCK_SECONDS : user.lockedUntil;
+    // A lockout that has already run out starts a fresh count, otherwise the
+    // next single typo would immediately lock the account for another window.
+    const expiredLock = user.lockedUntil > 0 && user.lockedUntil <= now;
+    const attempts = (expiredLock ? 0 : user.failedAttempts) + 1;
+    const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS ? now + LOCK_SECONDS : expiredLock ? 0 : user.lockedUntil;
     await db
       .update(users)
       .set({ failedAttempts: attempts, lockedUntil })

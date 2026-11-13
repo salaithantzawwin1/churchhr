@@ -89,6 +89,7 @@ export const KO: Record<string, string> = {
   "flash.bulkNoSelection": "선택한 성도가 없습니다.",
   "flash.bulkNoAction": "선택한 작업이 없습니다.",
   "flash.bulkBadDepartment": "선택한 부서가 없거나 비활성 상태입니다.",
+  "flash.bulkBadGroup": "선택한 그룹이 없거나 비활성 상태입니다.",
   "bulk.statusActive": "상태를 활성으로 설정",
   "bulk.statusInactive": "상태를 비활성으로 설정",
   "bulk.assignGroupOpt": "— 그룹 지정 (선택) —",

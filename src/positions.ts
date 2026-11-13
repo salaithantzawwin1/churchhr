@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { memberPositions, members, pastors } from "./db/schema";
 
@@ -209,8 +209,11 @@ export async function positionTaken(
     eq(memberPositions.position, position),
     eq(memberPositions.slotUnique, 1),
   ];
-  if (opts.exceptMemberId) conditions.push(ne(memberPositions.memberId, opts.exceptMemberId));
-  if (opts.exceptPastorId) conditions.push(ne(memberPositions.pastorId, opts.exceptPastorId));
+  // Null-safe exclusion: a pastor's row has member_id NULL and a member's row
+  // has pastor_id NULL, so `<>` would silently drop the other kind of holder
+  // and let a second person take the same single-holder slot.
+  if (opts.exceptMemberId) conditions.push(sql`member_positions.member_id IS NOT ${opts.exceptMemberId}`);
+  if (opts.exceptPastorId) conditions.push(sql`member_positions.pastor_id IS NOT ${opts.exceptPastorId}`);
   if (scopeType === "home_cell" || scopeType === "township") {
     if (!opts.homeCellId) return false;
     conditions.push(eq(memberPositions.scopeId, opts.homeCellId));

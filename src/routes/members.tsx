@@ -1537,6 +1537,13 @@ membersRoutes.post("/bulk", requirePermission("members.update"), async (c) => {
       return c.redirect("/members?err=" + encodeURIComponent("bulk.badDepartment"), 302);
     }
   }
+  if (groupId) {
+    // The id must be a managed Group option, not any other option's id.
+    const allOptions = await loadAllOptions(db);
+    if (!allOptions.some((o) => o.id === groupId && o.type === "group")) {
+      return c.redirect("/members?err=" + encodeURIComponent("bulk.badGroup"), 302);
+    }
+  }
   const canDeleteRows = c.get("perms").has("members.delete");
 
   // Restrict to rows visible inside the caller's state scope.
@@ -1617,6 +1624,23 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
     .update(members)
     .set({ ...toDrizzleValues(data), updatedBy: c.get("user").id, updatedAt: Math.floor(Date.now() / 1000) } as typeof members.$inferInsert)
     .where(eq(members.id, id));
+  // Roles were granted inside one state, so they cannot follow a member to
+  // another state: drop the ones still tied to the state they left behind.
+  if ((existing.region_id ?? null) !== (data.region_id ?? null)) {
+    await db.run(sql`
+      DELETE FROM member_positions
+       WHERE member_id = ${id}
+         AND (
+           (scope_type = 'region' AND region_id = ${existing.region_id})
+           OR (scope_type = 'cluster' AND supervision_cluster_id IN (
+                SELECT id FROM supervision_clusters WHERE region_id = ${existing.region_id}))
+           OR (scope_type = 'church' AND regional_church_id IN (
+                SELECT id FROM regional_churches WHERE region_id = ${existing.region_id}))
+           OR (scope_type IN ('home_cell', 'township') AND scope_id IN (
+                SELECT id FROM lookup_options
+                 WHERE type IN ('home_cell', 'township') AND region_id = ${existing.region_id}))
+         )`);
+  }
   // A leadership row is tied to the member's current Home Cell. Moving the
   // member to another cell must not leave a leader assigned to the old cell.
   if ((existing.home_cell_id ?? null) !== (data.home_cell_id ?? null)) {

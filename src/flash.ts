@@ -106,6 +106,7 @@ const FLASH_KEYS: Record<string, string> = {
   "bulk.noSelection": "flash.bulkNoSelection",
   "bulk.noAction": "flash.bulkNoAction",
   "bulk.badDepartment": "flash.bulkBadDepartment",
+  "bulk.badGroup": "flash.bulkBadGroup",
 };
 
 /** Message for a flash/err code, or the code itself when unknown. */

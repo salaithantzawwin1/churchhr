@@ -27,7 +27,10 @@ export function parseCsv(input: string): string[][] {
 }
 
 function esc(value: string | number | null | undefined): string {
-  const v = value === null || value === undefined ? "" : String(value);
+  let v = value === null || value === undefined ? "" : String(value);
+  // Spreadsheet formula injection: Excel and Sheets execute a cell that starts
+  // with = + - @ (or a control character), so force such values to plain text.
+  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
   return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
