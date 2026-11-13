@@ -396,40 +396,60 @@ body.auth-page .footer { padding-top: 0; }
 /* Brand panel: compact logo row, one short welcome line and a quiet footer.
    No feature list, so nothing has to wrap inside the narrow column. */
 .auth-aside {
-  position: relative; overflow: hidden; color: #fff; padding: 34px 32px;
-  display: flex; flex-direction: column; justify-content: space-between; gap: 24px; text-align: left;
-  background: linear-gradient(155deg, var(--brand) 0%, #163a66 62%, #0d2544 100%);
+  position: relative; overflow: hidden; color: #fff; padding: 36px 34px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 26px; text-align: left;
+  min-height: 470px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(96, 165, 250, .38), transparent 34%),
+    linear-gradient(160deg, #1d4ed8 0%, #143d70 46%, #0a1f3d 100%);
 }
 .auth-aside::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(circle at 82% 12%, rgba(255,255,255,.12), transparent 42%),
-    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px) 0 0 / 100% 46px;
+    radial-gradient(circle at 82% 8%, rgba(255,255,255,.14), transparent 40%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 1px, transparent 1px 22px),
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 100% 52px;
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.35) 70%, transparent 100%);
 }
 .auth-aside::after {
-  content: ""; position: absolute; right: -90px; bottom: -110px; width: 280px; height: 280px;
-  border-radius: 50%; background: rgba(255,255,255,.06); pointer-events: none;
+  content: ""; position: absolute; right: -110px; bottom: -130px; width: 320px; height: 320px;
+  border-radius: 50%; background: rgba(255,255,255,.055); pointer-events: none;
+  box-shadow: 0 0 0 42px rgba(255,255,255,.022), 0 0 0 92px rgba(255,255,255,.014);
 }
-.auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 15px; min-width: 0; }
+.auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 16px; min-width: 0; }
+.auth-brand-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .auth-brand-name {
-  font-size: 12px; font-weight: 600; letter-spacing: .04em; line-height: 1.4;
-  color: rgba(255,255,255,.9); text-transform: uppercase;
+  font-size: 15px; font-weight: 700; letter-spacing: -.005em; line-height: 1.35;
+  color: #fff;
+}
+.auth-brand-sub {
+  color: rgba(219, 234, 254, .78); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .11em; line-height: 1.4; text-transform: uppercase;
 }
 .auth-mark {
-  width: 96px; height: 96px; border-radius: 22px; background: #fff; padding: 8px; flex: none;
-  box-shadow: 0 10px 26px rgba(0,0,0,.24);
+  width: 112px; height: 112px; border-radius: 26px; background: #fff; padding: 9px; flex: none;
+  box-shadow: 0 18px 38px rgba(2, 8, 23, .38), 0 0 0 7px rgba(255,255,255,.09);
 }
 .auth-welcome { position: relative; z-index: 1; margin: auto 0; }
-.auth-aside h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.015em; }
-.auth-lead { margin: 10px 0 0; max-width: 300px; color: rgba(255,255,255,.78); font-size: 14px; line-height: 1.65; }
+.auth-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  color: rgba(191, 219, 254, .92); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+}
+.auth-eyebrow::before {
+  content: ""; width: 22px; height: 2px; border-radius: 2px; background: #93c5fd;
+}
+.auth-aside h1 { margin: 0; font-size: 32px; line-height: 1.2; letter-spacing: -.02em; }
+.auth-lead { margin: 12px 0 0; max-width: 310px; color: rgba(226, 239, 255, .8); font-size: 14.5px; line-height: 1.7; }
 .auth-aside-foot {
   position: relative; z-index: 1; margin: 0; padding-top: 16px;
-  border-top: 1px solid rgba(255,255,255,.14);
-  color: rgba(255,255,255,.62); font-size: 11.5px; letter-spacing: .04em;
+  border-top: 1px solid rgba(255,255,255,.16);
+  color: rgba(219, 234, 254, .62); font-size: 11.5px; letter-spacing: .05em;
 }
 /* Myanmar glyphs need extra leading in the brand column. */
 html[lang="my"] .auth-aside h1 { line-height: 1.7; }
 html[lang="my"] .auth-lead { line-height: 1.9; }
+html[lang="my"] .auth-brand-name { line-height: 1.6; }
 .auth-main { padding: 42px 40px 36px; display: flex; flex-direction: column; justify-content: center; }
 .auth-main h2 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.015em; }
 .auth-sub { margin: 0 0 20px; line-height: 1.5; }
@@ -469,18 +489,20 @@ html[lang="my"] .auth-lead { line-height: 1.9; }
 @media (max-width: 820px) {
   body.auth-page .container { padding: 16px 12px; }
   .auth-card { grid-template-columns: 1fr; }
-  .auth-aside { padding: 22px; gap: 14px; }
-  .auth-aside h1 { font-size: 22px; }
-  .auth-mark { width: 64px; height: 64px; border-radius: 16px; padding: 6px; }
-  .auth-aside-foot { display: none; }
+  .auth-aside { padding: 24px 22px; gap: 18px; min-height: 0; }
+  .auth-aside h1 { font-size: 24px; }
+  .auth-mark { width: 78px; height: 78px; border-radius: 19px; padding: 7px; }
   .auth-brand-name { display: none; }
+  .auth-brand-sub { font-size: 10px; }
+  .auth-eyebrow { margin-bottom: 8px; }
+  .auth-aside-foot { display: none; }
   .auth-lead { max-width: none; margin-top: 6px; font-size: 13px; }
   .auth-main { padding: 26px 22px; }
 }
 @media (max-width: 420px) {
   .auth-main { padding: 22px 18px; }
   .auth-aside { padding: 18px; }
-  .auth-mark { width: 60px; height: 60px; border-radius: 15px; padding: 6px; }
+  .auth-mark { width: 72px; height: 72px; border-radius: 18px; padding: 6px; }
   .auth-card { border-radius: var(--radius-lg); }
 }
 /* ---------- dashboard / KPI stat cards ---------- */

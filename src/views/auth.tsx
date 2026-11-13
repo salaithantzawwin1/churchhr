@@ -41,9 +41,13 @@ export function LoginPage({ error, username, lang, flash, remember }: {
           <aside class="auth-aside">
             <div class="auth-brand">
               <img class="auth-mark" src="/logo.png" alt="" />
-              <span class="auth-brand-name">{t("login.systemNote")}</span>
+              <span class="auth-brand-text">
+                <span class="auth-brand-name">{t("login.brandShort")}</span>
+                <span class="auth-brand-sub">{t("login.brandSub")}</span>
+              </span>
             </div>
             <div class="auth-welcome">
+              <span class="auth-eyebrow">{t("login.eyebrow")}</span>
               <h1>{t("login.welcome")}</h1>
               <p class="auth-lead">{t("login.asideLead")}</p>
             </div>
