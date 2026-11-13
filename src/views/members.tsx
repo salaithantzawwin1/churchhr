@@ -259,7 +259,10 @@ export function MembersListPage(props: ListProps) {
         </select>
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
-        {filtered && <a class="filter-clear" href="/members">{t("members.clear")}</a>}
+        {/* Always rendered so the grid keeps its shape: hidden (not removed)
+            when nothing is filtered, which also keeps it out of the tab order. */}
+        <a class={filtered ? "filter-clear" : "filter-clear is-placeholder"} href="/members"
+          aria-hidden={filtered ? undefined : "true"}>{t("members.clear")}</a>
       </form>
       </details>
 
