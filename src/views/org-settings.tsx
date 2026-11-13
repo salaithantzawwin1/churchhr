@@ -168,6 +168,7 @@ export function PositionModal(props: {
 }
 
 export type PositionHolderRow = {
+  assignmentId: number;
   id: number;
   kind: "member" | "pastor";
   nameMyanmar: string | null;
@@ -181,6 +182,8 @@ export type PositionHolderRow = {
 export function PositionHoldersModal(props: {
   label: string;
   holders: PositionHolderRow[];
+  positionId?: number;
+  canRemove?: boolean;
   lang?: Lang;
 }) {
   const L = props.lang ?? "en";
@@ -188,33 +191,55 @@ export function PositionHoldersModal(props: {
   const displayName = (row: PositionHolderRow) =>
     L !== "mm" && row.nameEnglish ? row.nameEnglish : (row.nameMyanmar || row.nameEnglish || "—");
   const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase();
+  const groups: { label: string; sub: string | null; rows: PositionHolderRow[] }[] = [];
+  for (const row of props.holders) {
+    const church = L !== "mm" && row.churchNameEn ? row.churchNameEn : row.churchName;
+    const label = row.contextName || church || t("org.holdersGeneral");
+    const sub = row.contextName && church ? church : null;
+    const group = groups.find((g) => g.label === label && g.sub === sub);
+    if (group) group.rows.push(row);
+    else groups.push({ label, sub, rows: [row] });
+  }
   return (
     <div class="modal-body position-holders-modal" data-modal-static>
       <p class="position-holders-role">{props.label}</p>
       <p class="muted small">{t("org.positionHoldersHint")}</p>
       {props.holders.length === 0 ? (
         <p class="empty-state">{t("org.positionHoldersEmpty")}</p>
-      ) : (
-        <ul class="position-holder-list">
-          {props.holders.map((row) => {
-            const name = displayName(row);
-            const church = L !== "mm" && row.churchNameEn ? row.churchNameEn : row.churchName;
-            const context = row.kind === "pastor" || !row.contextName ? church : row.contextName;
-            return (
-              <li>
-                <span class="position-holder-avatar" aria-hidden="true">{initials(name)}</span>
-                <span class="position-holder-text">
-                  <a href={row.kind === "pastor" ? `/pastors/${row.id}` : `/members/${row.id}`}>{name}</a>
-                  <span class="small muted">
-                    {row.kind === "pastor" ? t("nav.pastors") : t("nav.members")}
-                    {context ? ` · ${context}` : ""}
+      ) : groups.map((group) => (
+        <section class="position-holder-group">
+          <h4>
+            {group.label}
+            {group.sub && <span class="muted small"> · {group.sub}</span>}
+          </h4>
+          <ul class="position-holder-list">
+            {group.rows.map((row) => {
+              const name = displayName(row);
+              return (
+                <li>
+                  <span class="position-holder-avatar" aria-hidden="true">{initials(name)}</span>
+                  <span class="position-holder-text">
+                    <a href={row.kind === "pastor" ? `/pastors/${row.id}` : `/members/${row.id}`}>{name}</a>
+                    <span class="small muted">
+                      {row.kind === "pastor" ? t("nav.pastors") : t("nav.members")}
+                    </span>
                   </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  {props.canRemove && props.positionId && (
+                    <form method="post" class="position-holder-remove"
+                      action={`/organization/positions/${props.positionId}/holders/remove`}
+                      data-confirm={t("org.holderRemoveConfirm")}
+                      data-confirm-title={t("org.holderRemove")}
+                      data-confirm-yes={t("org.holderRemove")}>
+                      <input type="hidden" name="assignment_id" value={String(row.assignmentId)} />
+                      <button class="btn sm outline-danger" type="submit">{t("org.holderRemove")}</button>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

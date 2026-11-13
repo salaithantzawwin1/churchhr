@@ -894,7 +894,7 @@ organizationRoutes.get("/positions/:id/holders", requirePermission("options.mana
   if (!def) return c.redirect("/organization/positions?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect(`/organization/positions?scope=${def.scopeType}`, 303);
   const members = await db.all<PositionHolderRow>(sql`
-    SELECT 'member' AS kind, m.id, m.name_myanmar AS nameMyanmar, m.name_english AS nameEnglish,
+    SELECT mp.id AS assignmentId, 'member' AS kind, m.id, m.name_myanmar AS nameMyanmar, m.name_english AS nameEnglish,
            rc.name AS churchName, rc.name_en AS churchNameEn,
            COALESCE(d.name, hc.label) AS contextName
       FROM member_positions mp
@@ -904,7 +904,7 @@ organizationRoutes.get("/positions/:id/holders", requirePermission("options.mana
       LEFT JOIN lookup_options hc ON hc.id = mp.scope_id AND hc.type = 'home_cell'
      WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND m.status = 'active'
     UNION ALL
-    SELECT 'pastor' AS kind, p.id, p.name AS nameMyanmar, p.name_en AS nameEnglish,
+    SELECT mp.id AS assignmentId, 'pastor' AS kind, p.id, p.name AS nameMyanmar, p.name_en AS nameEnglish,
            rc.name AS churchName, rc.name_en AS churchNameEn,
            NULL AS contextName
       FROM member_positions mp
@@ -913,8 +913,42 @@ organizationRoutes.get("/positions/:id/holders", requirePermission("options.mana
      WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND p.active = 1
     ORDER BY nameMyanmar`);
   return c.html(
-    <PositionHoldersModal label={def.nameEnglish || def.nameMyanmar} holders={members} lang={c.get("lang")} />,
+    <PositionHoldersModal label={def.nameEnglish || def.nameMyanmar} holders={members}
+      positionId={def.id} canRemove={c.get("perms").has("members.update")} lang={c.get("lang")} />,
   );
+});
+
+organizationRoutes.post("/positions/:id/holders/remove", requirePermission("members.update"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
+  const id = intParam(c.req.param("id"));
+  const def = id ? (await adminPositionDefs(db)).find((d) => d.id === id) : undefined;
+  if (!def) return c.redirect("/organization/positions?err=err-notfound", 303);
+  const back = `/organization/positions?scope=${def.scopeType}`;
+  const body = await c.req.parseBody();
+  const assignmentId = intParam(s(body.assignment_id));
+  if (!assignmentId) return c.redirect(`${back}&err=err-notfound`, 303);
+  const row = (await db.all<{ memberId: number | null; pastorId: number | null }>(sql`
+    SELECT member_id AS memberId, pastor_id AS pastorId FROM member_positions
+     WHERE id = ${assignmentId} AND position = ${def.code} AND scope_type = ${def.scopeType} LIMIT 1`))[0];
+  if (!row) return c.redirect(`${back}&err=err-notfound`, 303);
+  await db.run(sql`DELETE FROM member_positions WHERE id = ${assignmentId}`);
+  const actorId = c.get("user").id;
+  const now = Math.floor(Date.now() / 1000);
+  if (row.memberId != null) {
+    await db.update(members).set({ updatedBy: actorId, updatedAt: now })
+      .where(eq(members.id, row.memberId));
+    await db.insert(memberHistory).values({
+      memberId: row.memberId, actorId, action: "position",
+      snapshotJson: JSON.stringify({ position: null, removed: def.code, scope_type: def.scopeType }),
+    });
+  }
+  await recordPositionHistory(db, {
+    entity: "assignment", action: "updated", actorId,
+    memberId: row.memberId ?? undefined, scopeType: def.scopeType,
+    code: def.code, positionDefId: def.id,
+    summary: positionDefLabel(def, c.get("lang")),
+  });
+  return c.redirect(`${back}&ok=position-holder-removed`, 303);
 });
 
 organizationRoutes.post("/positions", requirePermission("options.manage"), requireAllStates, async (c) => {

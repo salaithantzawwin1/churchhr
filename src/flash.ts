@@ -31,6 +31,7 @@ const FLASH_KEYS: Record<string, string> = {
   "position-updated": "flash.positionUpdated",
   "position-deleted": "flash.positionDeleted",
   "position-in-use": "flash.positionInUse",
+  "position-holder-removed": "flash.positionHolderRemoved",
   "position-name-mm": "flash.positionNameMmRequired",
   "position-name-en": "flash.positionNameEnRequired",
   "position-name-long": "flash.positionNameLong",

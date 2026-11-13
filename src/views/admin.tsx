@@ -185,7 +185,7 @@ export function AdminUsersPage(props: UsersProps) {
         </div>
       </div>
 
-      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
+      <p class="scroll-hint admin-scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
         <table class="admin-tbl">
           <thead>
@@ -194,27 +194,27 @@ export function AdminUsersPage(props: UsersProps) {
           <tbody>
             {users.map((u) => (
               <tr>
-                <td class="muted">{u.id}</td>
-                <td>
+                <td class="muted" data-label="ID">{u.id}</td>
+                <td data-label={t("profile.username")}>
                   {u.username}
                   {u.id === user.id && (
                     <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
                   )}
                 </td>
-                <td>{localizedRoleNames(u.role_names, lang) || "—"}</td>
-                <td>
+                <td data-label={t("nav.roles")}>{localizedRoleNames(u.role_names, lang) || "—"}</td>
+                <td data-label={t("nav.language")}>
                   {u.language
                     ? <span class="badge">{u.language.toUpperCase()}</span>
                     : <span class="muted">—</span>}
                 </td>
-                <td class="small">{stateSummary(u, regions, t("adm.allStates"))}</td>
-                <td>
+                <td class="small" data-label={t("adm.stateScope")}>{stateSummary(u, regions, t("adm.allStates"))}</td>
+                <td data-label={t("members.status")}>
                   {u.active === 1
                     ? <span class="badge active">{t("adm.active")}</span>
                     : <span class="badge inactive">{t("adm.off")}</span>}
                   {u.must_change_password === 1 && <span class="badge moved" style="margin-left:4px">{t("adm.pwChange")}</span>}
                 </td>
-                <td class="row-actions-cell">
+                <td class="row-actions-cell" data-label="">
                   <div class="row-icon-actions">
                     {u.id !== user.id
                       ? <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
@@ -402,7 +402,7 @@ export function AdminRolesPage(props: RolesProps) {
           </a>
         </div>
       </div>
-      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
+      <p class="scroll-hint admin-scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
         <table class="admin-tbl">
           <thead>
@@ -411,23 +411,23 @@ export function AdminRolesPage(props: RolesProps) {
           <tbody>
             {roles.map((r) => (
               <tr>
-                <td class="muted">{r.id}</td>
-                <td>
+                <td class="muted" data-label="ID">{r.id}</td>
+                <td data-label={t("adm.roleName")}>
                   {roleName(r, t)}
                   {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
                 </td>
-                <td class="small muted">{roleDescription(r, t)}</td>
-                <td class="small">
+                <td class="small muted" data-label={t("adm.desc")}>{roleDescription(r, t)}</td>
+                <td class="small" data-label={t("adm.permissions")}>
                   {r.permissions.length === 0
                     ? <span class="muted">—</span>
                     : r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
                 </td>
-                <td>
+                <td data-label={t("members.status")}>
                   {r.is_system === 1
                     ? <span class="badge active">system</span>
                     : <span class="badge inactive">—</span>}
                 </td>
-                <td class="row-actions-cell">
+                <td class="row-actions-cell" data-label="">
                   <div class="row-icon-actions">
                     <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/roles/${r.id}/edit`}
                        data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md"
@@ -928,7 +928,7 @@ export function AdminOptionsPage(props: OptionsProps) {
   // Actions sit in the last column, which is off-screen on phones until the
   // table is swiped; the hint matches the member list's scroll affordance.
   const scrollHint = (
-    <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
+    <p class="scroll-hint admin-scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
   );
   return (
     <Layout title={t("adm.optionsTitle")} lang={lang} user={user} perms={perms} active="/admin/options" flash={flash ?? null}>

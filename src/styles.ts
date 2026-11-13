@@ -1659,7 +1659,13 @@ td.empty-state .small { margin-top: 4px; }
 .role-card-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .position-holders-modal .empty-state { margin: 12px 0 0; text-align: center; }
 .position-holders-role { margin: 0 0 2px; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
-.position-holder-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.position-holder-group { margin-top: 14px; }
+.position-holder-group:first-of-type { margin-top: 10px; }
+.position-holder-group h4 {
+  margin: 0 0 6px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .035em; text-transform: uppercase; color: var(--muted);
+}
+.position-holder-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .position-holder-list li {
   display: flex; align-items: center; gap: 10px; padding: 9px 11px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface-3);
@@ -1669,7 +1675,9 @@ td.empty-state .small { margin-top: 4px; }
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--chip-brand-bg); color: var(--link); font-size: 11.5px; font-weight: 700;
 }
-.position-holder-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.4; }
+.position-holder-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.4; }
+.position-holder-remove { margin: 0 0 0 auto; flex: none; }
+.position-holder-remove .btn { min-height: 30px; padding: 3px 9px; }
 .position-holder-text a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .position-holder-text a:hover { color: var(--link); }
 .role-card-actions .btn { white-space: nowrap; }
@@ -2894,6 +2902,62 @@ th { font-size: 13px; }
 @media (max-width: 640px) {
   .report-form-actions { flex-wrap: wrap; }
   .report-form-actions .btn { flex: 1 1 44%; }
+}
+
+/* ---------- member + admin lists: phone cards ---------- */
+/* Long tables (members, users, roles) become labelled cards on phones so no
+   list depends on a horizontal swipe. Column labels come from data-label. */
+@media (max-width: 640px) {
+  .members-scroll-hint, .admin-scroll-hint { display: none; }
+  table.members-tbl, table.admin-tbl {
+    display: block; min-width: 0; border: 0; background: transparent;
+  }
+  .members-tbl thead, .admin-tbl thead { display: none; }
+  .members-tbl tbody, .admin-tbl tbody { display: grid; gap: 10px; }
+  .members-tbl tbody tr, .admin-tbl tbody tr {
+    position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px 12px; padding: 12px 13px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px;
+  }
+  .members-tbl tbody td, .admin-tbl tbody td {
+    display: block; padding: 0; border: 0; white-space: normal;
+    min-width: 0; max-width: none; overflow: visible; text-overflow: clip;
+    font-size: 13px; overflow-wrap: anywhere;
+  }
+  .members-tbl tbody td::before, .admin-tbl tbody td::before {
+    content: attr(data-label); display: block; margin-bottom: 1px;
+    color: var(--muted); font-size: 10px; font-weight: 700;
+    letter-spacing: .035em; text-transform: uppercase;
+  }
+  .members-tbl td[data-col="name"] {
+    position: static; left: auto; z-index: auto; background: transparent; box-shadow: none;
+    grid-column: 1 / -1; max-width: none; overflow: visible;
+    padding: 0 28px 8px 0; margin-bottom: 2px;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 15.5px; white-space: normal;
+  }
+  .members-tbl td[data-col="name"]::before { display: none; }
+  .members-tbl tbody td:first-child {
+    position: absolute; top: 11px; left: auto; right: 12px; width: 24px !important;
+    height: 24px; padding: 0; z-index: 1;
+  }
+  .members-tbl tbody td:first-child::before { display: none; }
+  .members-tbl tbody td[data-col="role"] { grid-column: 1 / -1; }
+  .members-tbl .member-role-inline { display: none; }
+  .members-tbl tbody td.row-actions-cell,
+  .admin-tbl tbody td.row-actions-cell {
+    grid-column: 1 / -1; display: flex; justify-content: flex-end;
+    position: static; z-index: auto; background: transparent; box-shadow: none;
+    padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--hairline);
+  }
+  .members-tbl tbody td.row-actions-cell::before,
+  .admin-tbl tbody td.row-actions-cell::before { display: none; }
+  .members-tbl tbody td.empty-state, .admin-tbl tbody td.empty-state {
+    grid-column: 1 / -1; display: block; padding: 12px 0; text-align: center;
+  }
+  .members-tbl tbody td.empty-state::before,
+  .admin-tbl tbody td.empty-state::before { display: none; }
+  .admin-tbl .row-icon-actions { margin-left: auto; }
 }
 
 `; // end of stylesheet

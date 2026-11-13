@@ -128,6 +128,7 @@ export function MembersListPage(props: ListProps) {
   const canExport = perms.has("members.export");
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
+  const colLabel = (key: string) => cols.find((c) => c.key === key)?.label ?? "";
   const roleLabels = (csv: string | null | undefined) =>
     positionDefs ? positionLabelsForCsv(positionDefs, csv, L) : positionLabels(csv, L);
   const roleBadges = (csv: string | null | undefined) => roleLabels(csv).map((label) => (
@@ -299,7 +300,7 @@ export function MembersListPage(props: ListProps) {
         </form>
       )}
 
-      <p class="scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
+      <p class="scroll-hint members-scroll-hint" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
       <div class="tbl-wrap">
         <table class="list-tbl members-tbl">
           <thead>
@@ -346,7 +347,7 @@ export function MembersListPage(props: ListProps) {
             {rows.map((m) => (
               <tr>
                 <td style="width:28px"><input type="checkbox" class="bulk-check" form="bulk-form" value={String(m.id)} aria-label={m.name_myanmar || m.name_english || `#${m.id}`} /></td>
-                <td data-col="id">{m.member_code ?? `#${m.id}`}</td>
+                <td data-col="id" data-label={colLabel("id")}>{m.member_code ?? `#${m.id}`}</td>
                 <td data-col="name">
                   {m.has_photo ? (
                     <img class="list-avatar" src={`/members/${m.id}/photo?v=${m.updated_at ?? ""}`} alt="" width="28" height="28" loading="lazy" />
@@ -365,14 +366,14 @@ export function MembersListPage(props: ListProps) {
                     </span>
                   )}
                 </td>
-                <td data-col="gender">{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
-                <td data-col="age">{ageFromDate(m.date_of_birth) ?? ""}</td>
-                <td data-col="phone">{m.phone ?? ""}</td>
-                <td data-col="state">{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
-                <td data-col="township">{m.township ?? ""}</td>
-                <td data-col="marital">{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
-                <td data-col="homeCell">{m.home_cell ?? ""}</td>
-                <td data-col="role" class="position-cell">
+                <td data-col="gender" data-label={colLabel("gender")}>{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
+                <td data-col="age" data-label={colLabel("age")}>{ageFromDate(m.date_of_birth) ?? ""}</td>
+                <td data-col="phone" data-label={colLabel("phone")}>{m.phone ?? ""}</td>
+                <td data-col="state" data-label={colLabel("state")}>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
+                <td data-col="township" data-label={colLabel("township")}>{m.township ?? ""}</td>
+                <td data-col="marital" data-label={colLabel("marital")}>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
+                <td data-col="homeCell" data-label={colLabel("homeCell")}>{m.home_cell ?? ""}</td>
+                <td data-col="role" class="position-cell" data-label={colLabel("role")}>
                   {m.positions ? roleBadges(m.positions) : <span class="muted small">—</span>}
                   {canUpdate && (
                     <a
@@ -383,12 +384,12 @@ export function MembersListPage(props: ListProps) {
                     >{m.positions ? t("org.change") : t("org.assign")}</a>
                   )}
                 </td>
-                <td data-col="group">{m.group_label ?? ""}</td>
-                <td data-col="familyGroup">{optionLabel(m.family_group_code, m.family_group)}</td>
-                <td data-col="fellowship">{m.fellowship ?? ""}</td>
-                <td data-col="sector">{m.sector ?? ""}</td>
-                <td data-col="status"><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
-                <td class="row-actions-cell">
+                <td data-col="group" data-label={colLabel("group")}>{m.group_label ?? ""}</td>
+                <td data-col="familyGroup" data-label={colLabel("familyGroup")}>{optionLabel(m.family_group_code, m.family_group)}</td>
+                <td data-col="fellowship" data-label={colLabel("fellowship")}>{m.fellowship ?? ""}</td>
+                <td data-col="sector" data-label={colLabel("sector")}>{m.sector ?? ""}</td>
+                <td data-col="status" data-label={colLabel("status")}><span class={`badge ${m.status}`}>{S[m.status] ?? m.status}</span></td>
+                <td class="row-actions-cell" data-label="">
                   <div class="row-icon-actions">
                     {perms.has("members.update") && (
                       <a class="btn sm secondary icon-btn js-edit-modal" href={`/members/${m.id}/edit`}
