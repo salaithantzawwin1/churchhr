@@ -5,7 +5,7 @@ import { positionLabel as fallbackPositionLabel } from "./positions";
 /** Positions that can be configured from the Organization settings screens. */
 export const CONFIGURABLE_POSITION_SCOPES = [
   "church",
-  "regional_church",
+  "region",
   "cluster",
   "home_cell",
   "township",
@@ -25,6 +25,10 @@ export type PositionDefRow = {
   parentCode: string | null;
   active: number;
   sortOrder: number;
+  /** Several people may hold this role in one scope. */
+  allowMultiple: number;
+  /** Holders required before this role is a vacancy. */
+  minHolders: number;
   usageCount?: number;
   /** Churches that may use this position; an empty list means every church. */
   regionalChurchIds?: number[];
@@ -34,7 +38,7 @@ export type PositionDefRow = {
 
 const SCOPE_LABEL_FALLBACK: Record<ConfigurablePositionScope, string> = {
   church: "Church",
-  regional_church: "Regional Church",
+  region: "State / Region",
   cluster: "Supervision Cluster",
   home_cell: "Home Cell",
   township: "Township Supervision",
@@ -100,6 +104,7 @@ export async function loadPositionDefs(db: DB): Promise<PositionDefRow[]> {
            pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
            pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
            pd.active, pd.sort_order AS sortOrder,
+           pd.allow_multiple AS allowMultiple, pd.min_holders AS minHolders,
            GROUP_CONCAT(DISTINCT pdc.regional_church_id) AS church_ids
     FROM position_defs pd
     LEFT JOIN position_def_churches pdc ON pdc.position_def_id = pd.id

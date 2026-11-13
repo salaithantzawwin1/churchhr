@@ -675,8 +675,8 @@ export type PositionFormAssignments = {
   township: string;
   cluster: string;
   clusterId: number | null;
-  regionalChurch: string;
-  regionalChurchId: number | null;
+  region: string;
+  regionId: number | null;
   department: string;
   departmentId: number | null;
   memberDepartmentId: number | null;
@@ -692,6 +692,7 @@ export type PositionMember = {
   townshipId?: number | null;
   townshipName?: string | null;
   regionalChurchId?: number | null;
+  regionName?: string | null;
   departmentId?: number | null;
 };
 
@@ -744,18 +745,19 @@ export function MemberPositionForm(props: PositionFormProps) {
   const homeDefs = defsForScope(positionDefs, "home_cell");
   const townshipDefs = defsForScope(positionDefs, "township");
   const clusterDefs = defsForScope(positionDefs, "cluster");
-  const regionalDefs = defsForScope(positionDefs, "regional_church");
+  // Regional Pastor is assigned from the pastor directory, not from a member
+  // record. Members may still serve as Regional Secretary or Treasurer.
+  const regionalDefs = defsForScope(positionDefs, "region").filter((d) => d.code !== "regional_pastor");
   const departmentDefs = defsForScope(positionDefs, "department");
   const churchDefs = defsForScope(positionDefs, "church");
   const label = (code: string) => positionLabelForCode(positionDefs, code, L);
-  const regionalId = assignments.regionalChurchId ?? member.regionalChurchId ?? null;
   const churchId = assignments.churchId ?? member.regionalChurchId ?? null;
   const orderedChurches = [...regionalChurches].sort((a, b) => (b.isMain ?? 0) - (a.isMain ?? 0));
   const currentRoles = [
     memberDepartment && `${departmentName(memberDepartment, L)}`,
     assignments.homeCell && label(assignments.homeCell),
     assignments.township && `${label(assignments.township)} · ${member.townshipName ?? t("org.supervision")}`,
-    assignments.regionalChurch && label(assignments.regionalChurch),
+    assignments.region && `${label(assignments.region)} · ${member.regionName ?? ""}`.trim(),
     assignments.department && department && label(assignments.department),
     assignments.church && label(assignments.church),
   ].filter(Boolean) as string[];
@@ -763,7 +765,7 @@ export function MemberPositionForm(props: PositionFormProps) {
   const tabs = [
     { key: "home", label: t("org.tabHomeCell"), available: true },
     { key: "supervision", label: t("org.tabSupervision"), available: Boolean(member.townshipId || clusters.length > 0 || assignments.cluster) },
-    { key: "regional", label: t("org.tabRegional"), available: regionalDefs.length > 0 || regionalChurches.length > 0 },
+    { key: "regional", label: t("org.tabRegional"), available: regionalDefs.length > 0 },
     { key: "department", label: t("org.tabDepartment"), available: departmentDefs.length > 0 || departments.length > 0 },
     { key: "church", label: t("org.tabChurch"), available: churchDefs.length > 0 },
   ].filter((x) => x.available);
@@ -902,29 +904,21 @@ export function MemberPositionForm(props: PositionFormProps) {
               <span class="position-step" aria-hidden="true">3</span>
               <div><h3>{t("org.regionalSection")}</h3></div>
             </div>
-            {regionalDefs.length === 0 || regionalChurches.length === 0 ? (
+            {regionalDefs.length === 0 ? (
               <>
-                <p class="hint">{regionalChurches.length === 0 ? t("org.noRegional") : t("org.noPositions")}</p>
-                {managePositions("regional_church")}
+                <p class="hint">{t("org.noPositions")}</p>
+                {managePositions("region")}
                 {canManageRegional && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
               </>
             ) : (
               <div class="form-grid">
-                <label class="field">
-                  <span class="lbl">{t("org.regionalChurch")}</span>
-                  <select name="regional_church_id">
-                    <option value="">{t("org.noRegionalChurch")}</option>
-                    {regionalChurches.map((r) => (
-                      <option value={String(r.id)} selected={regionalId === r.id}>
-                        {regionalChurchName(r, L)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <p class="position-scope">
+                  {t("org.tabRegional")}: <strong>{member.regionName ?? `#${assignments.regionId}`}</strong>
+                </p>
                 <label class="field">
                   <span class="lbl">{t("org.position")}</span>
-                  <select name="regional_church_position">
-                    {positionOptions(regionalDefs, assignments.regionalChurch)}
+                  <select name="region_position">
+                    {positionOptions(regionalDefs, assignments.region)}
                   </select>
                 </label>
               </div>

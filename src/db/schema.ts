@@ -292,8 +292,8 @@ export const churchDepartments = sqliteTable(
   (t) => ({ churchIdx: index("church_departments_church_idx").on(t.regionalChurchId) }),
 );
 
-/** Editable position catalogue. `scope_type` is church, regional_church,
- * home_cell, township (Home Cell supervision) or department. Codes are stable
+/** Editable position catalogue. `scope_type` is church, region, home_cell,
+ * township (Home Cell supervision), cluster or department. Codes are stable
  * because member_positions stores the code, not the display label. */
 /** Singleton login branding row (0038). */
 export const appBranding = sqliteTable("app_branding", {
@@ -315,6 +315,10 @@ export const positionDefs = sqliteTable(
     nameKorean: text("name_korean"),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** Several people may hold this role in the same scope. */
+    allowMultiple: integer("allow_multiple").notNull().default(0),
+    /** Holders required before the role is considered vacant. */
+    minHolders: integer("min_holders").notNull().default(1),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },
@@ -439,7 +443,13 @@ export const memberPositions = sqliteTable(
     scopeId: integer("scope_id").references(() => lookupOptions.id),
     departmentId: integer("department_id").references(() => churchDepartments.id),
     regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
+    /** State/Region scope for Regional Pastor, Secretary and Treasurer. */
+    regionId: integer("region_id").references(() => regions.id),
     supervisionClusterId: integer("supervision_cluster_id").references(() => supervisionClusters.id),
+    /** Lower number is the higher priority; equal values share a tier. */
+    priority: integer("priority").notNull().default(1),
+    /** 1 keeps the database slot guard; 0 allows several holders. */
+    slotUnique: integer("slot_unique").notNull().default(1),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
@@ -448,8 +458,9 @@ export const memberPositions = sqliteTable(
     memberIdx: index("member_positions_member_idx").on(t.memberId),
     pastorIdx: index("member_positions_pastor_idx").on(t.pastorId),
     scopeIdx: index("member_positions_scope_idx").on(t.scopeType, t.scopeId),
+    regionIdx: index("member_positions_region_idx").on(t.regionId),
     supervisionClusterIdx: index("member_positions_supervision_cluster_idx").on(t.supervisionClusterId),
-    memberScopeUq: uniqueIndex("member_positions_member_scope_uq").on(t.memberId, t.scopeType),
+    memberScopeUq: uniqueIndex("member_positions_member_scope_uq").on(t.memberId, t.scopeType, t.regionId),
   }),
 );
 

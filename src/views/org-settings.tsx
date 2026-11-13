@@ -23,7 +23,7 @@ function ChurchGlyph() {
 
 const SCOPE_KEYS: Record<ConfigurablePositionScope, string> = {
   church: "org.scopeChurch",
-  regional_church: "org.scopeRegional",
+  region: "org.scopeRegional",
   cluster: "org.scopeCluster",
   home_cell: "org.scopeHomeCell",
   township: "org.scopeSupervision",
@@ -606,6 +606,7 @@ export function RegionalChurchesPage(props: Common & {
           <div class="hh-card-title">
             <span class="hh-card-name" title={L !== "mm" && church.nameEn ? church.nameEn : church.name}>
               {L !== "mm" && church.nameEn ? church.nameEn : church.name}
+              {church.isMain === 1 && <span class="badge position"> {t("org.mainChurch")}</span>}
             </span>
             <span class="hh-card-meta">
               <span class="muted small">
@@ -660,10 +661,10 @@ export function RegionalChurchesPage(props: Common & {
   };
 
   return (
-    <Layout title={t("org.regionalTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
+    <Layout title={t("org.churchesTitle")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("org.regionalTitle")}<span class="count-pill">{visible.length}</span></h1>
+          <h1>{t("org.churchesTitle")}<span class="count-pill">{visible.length}</span></h1>
           <p class="page-sub">{t("org.regionalIntro")}</p>
         </div>
         <div class="page-head-actions">
@@ -712,33 +713,31 @@ export function RegionalChurchesPage(props: Common & {
         </div>
       ) : (
         <>
-          {visibleMain.length > 0 && (
-            <section class="org-departments">
-              <div class="org-section-head">
-                <div>
-                  <h2>{t("org.mainChurch")}</h2>
-                  <p class="muted small">{t("org.mainChurchHint")}</p>
+          {(() => {
+            const groups = new Map<number, { name: string; churches: RegionalChurchRow[] }>();
+            for (const church of visible) {
+              let group = groups.get(church.regionId);
+              if (!group) {
+                group = {
+                  name: L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName,
+                  churches: [],
+                };
+                groups.set(church.regionId, group);
+              }
+              group.churches.push(church);
+            }
+            return [...groups.entries()].map(([regionId, group]) => (
+              <section class="org-departments">
+                <div class="org-section-head">
+                  <div>
+                    <h2>{group.name}</h2>
+                    <p class="muted small">{group.churches.length} {t("org.churchesShort")}</p>
+                  </div>
                 </div>
-              </div>
-              <div class="hh-grid" data-view-grid>{visibleMain.map(renderChurchCard)}</div>
-            </section>
-          )}
-
-          <section class="org-departments">
-            <div class="org-section-head">
-              <div>
-                <h2>{t("org.regionalOnlyTitle")}</h2>
-                <p class="muted small">{t("org.regionalOnlyIntro")}</p>
-              </div>
-            </div>
-            {visibleRegional.length === 0 ? (
-              <div class="card org-empty org-empty-small">
-                <p class="muted">{t("org.noRegionalChurch")}</p>
-              </div>
-            ) : (
-              <div class="hh-grid" data-view-grid>{visibleRegional.map(renderChurchCard)}</div>
-            )}
-          </section>
+                <div class="hh-grid" data-view-grid>{group.churches.map(renderChurchCard)}</div>
+              </section>
+            ));
+          })()}
         </>
       )}
     </Layout>

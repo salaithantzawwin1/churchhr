@@ -1,6 +1,13 @@
 import { getDict, type Lang } from "../i18n";
 import { positionDefLabel, type PositionDefRow } from "../position-catalog";
 
+export type ChurchHolder = {
+  assignmentId: number;
+  personId: number;
+  name: string;
+  priority: number;
+};
+
 export type AssignCandidate = {
   id: number;
   name: string;
@@ -27,6 +34,10 @@ export function AssignLeaderModal(props: {
   pastorDirectory?: boolean;
   /** Current holder when they appear in this list, so their row starts checked. */
   currentId: number | null;
+  /** All active holders of a multi-holder role. */
+  holders?: ChurchHolder[];
+  /** Several people may hold this role. */
+  allowMultiple?: boolean;
   /** The slot is filled, even when the holder is not in this list. */
   hasHolder?: boolean;
   /** Name of the current holder (shown even when they are not a candidate here). */
@@ -40,6 +51,7 @@ export function AssignLeaderModal(props: {
   const {
     lang, tab, churchId, churchName, def, candidates,
     personField = "member_id", pastorDirectory, currentId, hasHolder, currentName, currentHref, labels, error,
+    holders = [], allowMultiple,
   } = props;
   const t = getDict(lang);
   const label = positionDefLabel(def, lang);
@@ -87,6 +99,24 @@ export function AssignLeaderModal(props: {
         </div>
       </div>
 
+      {allowMultiple && holders.length > 0 && (
+        <div class="region-holder-list">
+          <h4>{t("org.regionCurrentTeam")}</h4>
+          {holders.map((holder) => (
+            <div class="region-holder-row">
+              <span class="badge position">{t("org.priority")} {holder.priority}</span>
+              <strong>{holder.name}</strong>
+              <form method="post" action="/organization/assign/remove" data-confirm={t("org.removeHolderConfirm")}>
+                <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="church" value={String(churchId)} />
+                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+              </form>
+            </div>
+          ))}
+        </div>
+      )}
+
       <label class="field assign-search">
         <span class="lbl">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
         <input type="search" data-filter-list=".assign-list"
@@ -118,13 +148,21 @@ export function AssignLeaderModal(props: {
 
       {/* Shown even when the holder is not in this list, so any filled slot can
           be cleared from the same dialog. */}
-      {(hasHolder ?? currentId != null) && (
+      {!allowMultiple && (hasHolder ?? currentId != null) && (
         <div class="assign-list assign-list-clear">
           <label class="assign-row">
             <input type="radio" name={personField} value="" />
             <span class="assign-name muted">{t("org.assignClear")}</span>
           </label>
         </div>
+      )}
+
+      {allowMultiple && (
+        <label class="field">
+          <span class="lbl">{t("org.priority")}</span>
+          <input type="number" name="priority" min="1" max="99" value="1" />
+          <span class="hint">{t("org.priorityHint")}</span>
+        </label>
       )}
 
       <p class="assign-warn" data-assign-warn hidden></p>

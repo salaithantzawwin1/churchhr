@@ -2,7 +2,15 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "./db/client";
 import { memberPositions, members, pastors } from "./db/schema";
 
-export type PositionScope = "home_cell" | "department" | "church" | "regional_church" | "township" | "cluster";
+export type PositionScope =
+  | "home_cell"
+  | "department"
+  | "church"
+  | "region"
+  /** Legacy rows only; 0040 moves live regional roles to `region`. */
+  | "regional_church"
+  | "township"
+  | "cluster";
 
 export type PositionDef = {
   value: string;
@@ -27,6 +35,9 @@ export const POSITIONS: PositionDef[] = [
   { value: "church_assistant_pastor", scope: "church", mm: "ဒုတိယသင်းအုပ်ဆရာ", en: "Assistant Pastor", kr: "부목사" },
   { value: "church_secretary", scope: "church", mm: "အသင်းအတွင်းရေးမှူး", en: "Church Secretary", kr: "교회 서기" },
   { value: "church_treasurer", scope: "church", mm: "အသင်းဘဏ္ဍာရေးမှူး", en: "Church Treasurer", kr: "교회 회계" },
+  { value: "regional_pastor", scope: "region", mm: "ဒေသ အသင်းအုပ်ဆရာ", en: "Regional Pastor", kr: "지역 목사" },
+  { value: "regional_secretary", scope: "region", mm: "ဒေသ အတွင်းရေးမှူး", en: "Regional Secretary", kr: "지역 서기" },
+  { value: "regional_treasurer", scope: "region", mm: "ဒေသ ဘဏ္ဍာရေးမှူး", en: "Regional Treasurer", kr: "지역 회계" },
   { value: "cluster_supervisor", scope: "cluster", mm: "ကြီးကြပ်မှူး", en: "Supervisor", kr: "감독" },
   { value: "cluster_assistant_supervisor", scope: "cluster", mm: "ဒုတိယ ကြီးကြပ်မှူး", en: "Assistant Supervisor", kr: "부감독" },
 ];
@@ -73,7 +84,9 @@ export type MemberPositionRow = {
   scopeId: number | null;
   departmentId: number | null;
   regionalChurchId: number | null;
+  regionId: number | null;
   supervisionClusterId: number | null;
+  priority: number;
 };
 
 /** All positions for a member (at most one per scope, enforced by schema). */
@@ -87,7 +100,9 @@ export async function getMemberPositions(db: DB, memberId: number): Promise<Memb
       scopeId: memberPositions.scopeId,
       departmentId: memberPositions.departmentId,
       regionalChurchId: memberPositions.regionalChurchId,
+      regionId: memberPositions.regionId,
       supervisionClusterId: memberPositions.supervisionClusterId,
+      priority: memberPositions.priority,
     })
     .from(memberPositions)
     .where(eq(memberPositions.memberId, memberId))) as MemberPositionRow[];
@@ -105,10 +120,16 @@ export type PositionAssignment = {
   homeCellId?: number | null;
   /** Department id. */
   departmentId?: number | null;
-  /** Regional Church id. */
+  /** Regional Church id (church scope). */
   regionalChurchId?: number | null;
+  /** State/Region id (region scope). */
+  regionId?: number | null;
   /** Supervision cluster id. */
   supervisionClusterId?: number | null;
+  /** Lower number is the higher priority; equal values share a tier. */
+  priority?: number | null;
+  /** 1 for a single holder, 0 for a multi-holder role. */
+  slotUnique?: number | null;
 };
 
 /** Replace every position for a member with the supplied valid assignments.
@@ -129,10 +150,11 @@ export async function setMemberPositions(
     scopeType: a.scopeType,
     scopeId: a.scopeType === "home_cell" || a.scopeType === "township" ? a.homeCellId ?? null : null,
     departmentId: a.scopeType === "department" ? a.departmentId ?? null : null,
-    regionalChurchId: a.scopeType === "regional_church" || a.scopeType === "church"
-      ? a.regionalChurchId ?? null
-      : null,
+    regionalChurchId: a.scopeType === "church" ? a.regionalChurchId ?? null : null,
+    regionId: a.scopeType === "region" ? a.regionId ?? null : null,
     supervisionClusterId: a.scopeType === "cluster" ? a.supervisionClusterId ?? null : null,
+    priority: Math.min(99, Math.max(1, a.priority ?? 1)),
+    slotUnique: a.slotUnique ?? 1,
     createdBy: actorId,
     createdAt: now,
     updatedAt: now,
@@ -164,7 +186,8 @@ export async function setHomeCellPosition(
   });
 }
 
-/** Is this slot already held by a different member? */
+/** Is this slot already held by a different person? Multi-holder roles set
+ * allowMultiple so the caller never has to guess from a position code. */
 export async function positionTaken(
   db: DB,
   scopeType: PositionScope,
@@ -173,15 +196,21 @@ export async function positionTaken(
     homeCellId?: number | null;
     departmentId?: number | null;
     regionalChurchId?: number | null;
+    regionId?: number | null;
     supervisionClusterId?: number | null;
-    exceptMemberId: number;
+    exceptMemberId?: number | null;
+    exceptPastorId?: number | null;
+    allowMultiple?: boolean;
   },
 ): Promise<boolean> {
+  if (opts.allowMultiple) return false;
   const conditions = [
     eq(memberPositions.scopeType, scopeType),
     eq(memberPositions.position, position),
-    ne(memberPositions.memberId, opts.exceptMemberId),
+    eq(memberPositions.slotUnique, 1),
   ];
+  if (opts.exceptMemberId) conditions.push(ne(memberPositions.memberId, opts.exceptMemberId));
+  if (opts.exceptPastorId) conditions.push(ne(memberPositions.pastorId, opts.exceptPastorId));
   if (scopeType === "home_cell" || scopeType === "township") {
     if (!opts.homeCellId) return false;
     conditions.push(eq(memberPositions.scopeId, opts.homeCellId));
@@ -193,6 +222,10 @@ export async function positionTaken(
   if (scopeType === "regional_church" || scopeType === "church") {
     if (!opts.regionalChurchId) return false;
     conditions.push(eq(memberPositions.regionalChurchId, opts.regionalChurchId));
+  }
+  if (scopeType === "region") {
+    if (!opts.regionId) return false;
+    conditions.push(eq(memberPositions.regionId, opts.regionId));
   }
   if (scopeType === "cluster") {
     if (!opts.supervisionClusterId) return false;

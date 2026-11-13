@@ -1543,6 +1543,25 @@ td.empty-state .small { margin-top: 4px; }
   margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
 }
 .org-region-group-head h3 { margin: 0; font-size: 16px; }
+.org-region-team { margin-bottom: 12px; }
+.org-region-team-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.org-region-role {
+  display: flex; flex-direction: column; gap: 6px; min-width: 190px; flex: 1 1 220px;
+  padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card);
+}
+.org-region-role.org-vacant { background: var(--chip-muted-bg, transparent); }
+.org-region-holders { display: grid; gap: 6px; }
+.org-region-holder { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
+.org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
+.org-node-extra-person { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.region-holder-list { display: grid; gap: 7px; margin: 12px 0; }
+.region-holder-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+}
+.region-holder-row form { margin: 0 0 0 auto; }
 .org-dept-card { gap: 10px; }
 .org-dept-card .org-card-head h3 { margin: 0; }
 /* Position assignment modal: a compact identity summary followed by three

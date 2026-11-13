@@ -7,7 +7,7 @@ type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lan
 
 const SCOPE_KEYS: Record<VacancyScope, string> = {
   church: "org.scopeChurch",
-  regional_church: "org.scopeRegional",
+  region: "org.scopeRegional",
   cluster: "org.scopeCluster",
   home_cell: "org.scopeHomeCell",
   township: "org.scopeSupervision",
@@ -16,7 +16,7 @@ const SCOPE_KEYS: Record<VacancyScope, string> = {
 
 const SCOPE_SHORT: Record<VacancyScope, string> = {
   church: "vacancy.scopeChurch",
-  regional_church: "vacancy.scopeRegional",
+  region: "vacancy.scopeRegional",
   cluster: "vacancy.scopeCluster",
   home_cell: "vacancy.scopeHomeCell",
   township: "vacancy.scopeSupervision",

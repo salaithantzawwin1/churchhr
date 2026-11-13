@@ -11,6 +11,7 @@ import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepar
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, PositionHoldersModal, RegionalChurchModal, type ListStatus, type PositionHolderRow, type RegionalValues } from "../views/org-settings";
 import { AssignLeaderModal } from "../views/org-assign";
+import { RegionPastorModal, type RegionCandidate, type RegionHolder } from "../views/org-region-assign";
 import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
@@ -92,6 +93,13 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const regionalChurches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const clusters = await loadSupervisionClusters(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const positionDefs = await loadPositionDefs(db);
+  const regions = await db.all<{ id: number; name: string; nameEn: string | null }>(sql`
+    SELECT r.id, r.name, r.name_en AS nameEn
+    FROM regions r
+    WHERE ${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
+      ? sql`1=0`
+      : sql`r.id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`}
+    ORDER BY r.name`);
 
   const departments = await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
@@ -107,7 +115,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
-           mp.supervision_cluster_id,
+           mp.region_id, mp.priority, mp.supervision_cluster_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english,
                     NULLIF(p.name, ''), p.name_en) AS member_name,
@@ -125,8 +133,8 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
        OR (mp.pastor_id IS NOT NULL AND p.active = 1)
     UNION ALL
     SELECT 'cluster_pastor' AS position, 'cluster' AS scope_type, NULL AS scope_id,
-           NULL AS department_id, NULL AS regional_church_id,
-           cp.cluster_id AS supervision_cluster_id,
+           NULL AS department_id, NULL AS regional_church_id, NULL AS region_id,
+           1 AS priority, cp.cluster_id AS supervision_cluster_id,
            NULL AS member_id,
            COALESCE(NULLIF(p.name, ''), p.name_en) AS member_name,
            (p.photo IS NOT NULL) AS has_photo,
@@ -151,7 +159,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells}
       departments={departments} leaders={leaders}
-      regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs}
+      regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs} regions={regions}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageStructure={c.get("perms").has("options.manage")}
       canManageClusters={c.get("perms").has("options.manage")}
@@ -263,19 +271,21 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const pastorSlot = isPastorSlot(def);
   // A pastor post may still be held by an older member assignment, so both kinds
   // of holder are resolved; either one can be cleared from this dialog.
-  const holders = await db.all<{ person_type: string; person_id: number; name: string | null }>(sql`
-    SELECT 'pastor' AS person_type, mp.pastor_id AS person_id,
-           COALESCE(NULLIF(p.name, ''), p.name_en) AS name
+  const holders = await db.all<{
+    assignment_id: number; person_type: string; person_id: number; name: string | null; priority: number;
+  }>(sql`
+    SELECT mp.id AS assignment_id, 'pastor' AS person_type, mp.pastor_id AS person_id,
+           COALESCE(NULLIF(p.name, ''), p.name_en) AS name, mp.priority
     FROM member_positions mp JOIN pastors p ON p.id = mp.pastor_id
     WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
       AND mp.regional_church_id = ${church.id} AND mp.pastor_id IS NOT NULL
     UNION ALL
-    SELECT 'member' AS person_type, mp.member_id AS person_id,
-           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name
+    SELECT mp.id AS assignment_id, 'member' AS person_type, mp.member_id AS person_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name, mp.priority
     FROM member_positions mp JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
       AND mp.regional_church_id = ${church.id} AND mp.member_id IS NOT NULL
-    LIMIT 1`);
+    ORDER BY priority, name`);
   const holder = holders[0] ?? null;
   const holderIsPastor = holder?.person_type === "pastor";
   const canSeePastorProfile = c.get("perms").has("options.manage");
@@ -301,6 +311,13 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
       hasHolder={Boolean(holder)}
       currentName={holder?.name ?? null}
       currentHref={currentHref}
+      holders={holders.map((row) => ({
+        assignmentId: row.assignment_id,
+        personId: row.person_id,
+        name: row.name ?? "—",
+        priority: row.priority,
+      }))}
+      allowMultiple={def.allowMultiple === 1}
       labels={churchPositionLabels(await loadPositionDefs(db), c.get("lang"))}
     />,
   );
@@ -352,12 +369,17 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
   }
 
   const now = Math.floor(Date.now() / 1000);
-  // One holder per slot, and at most one church position per person.
-  await db.delete(memberPositions).where(and(
-    eq(memberPositions.scopeType, "church"),
-    eq(memberPositions.position, def.code),
-    eq(memberPositions.regionalChurchId, church.id),
-  ));
+  const allowMultiple = def.allowMultiple === 1;
+  const priority = Math.min(99, Math.max(1, intParam(s(body.priority)) ?? 1));
+  // A single-holder slot is replaced. A multi-holder slot keeps its other
+  // holders; only this person's existing church post is moved/updated.
+  if (!allowMultiple) {
+    await db.delete(memberPositions).where(and(
+      eq(memberPositions.scopeType, "church"),
+      eq(memberPositions.position, def.code),
+      eq(memberPositions.regionalChurchId, church.id),
+    ));
+  }
   if (pastorTarget) {
     await db.delete(memberPositions).where(and(
       eq(memberPositions.scopeType, "church"),
@@ -372,6 +394,8 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
       departmentId: null,
       regionalChurchId: church.id,
       supervisionClusterId: null,
+      priority,
+      slotUnique: allowMultiple ? 0 : 1,
       createdBy: c.get("user").id,
       createdAt: now,
       updatedAt: now,
@@ -389,12 +413,185 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
       departmentId: null,
       regionalChurchId: church.id,
       supervisionClusterId: null,
+      priority,
+      slotUnique: allowMultiple ? 0 : 1,
       createdBy: c.get("user").id,
       createdAt: now,
       updatedAt: now,
     });
   }
   return modal ? c.json({ ok: true, redirect: done }) : c.redirect(done, 303);
+});
+
+organizationRoutes.post("/assign/remove", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const assignmentId = intParam(s(body.assignment_id));
+  const churchId = intParam(s(body.church));
+  const tab = assignTab(body.tab);
+  const back = assignLanding(tab, churchId);
+  if (!assignmentId) return c.redirect(back, 303);
+
+  const row = (await db.all<{ id: number; position: string; regionalChurchId: number | null }>(sql`
+    SELECT mp.id, mp.position, mp.regional_church_id AS regionalChurchId
+    FROM member_positions mp
+    JOIN regional_churches rc ON rc.id = mp.regional_church_id
+    WHERE mp.id = ${assignmentId} AND mp.scope_type = 'church'
+      AND ${scope.scopeAll ? sql`1=1` : scope.stateIds.length === 0
+        ? sql`1=0`
+        : sql`rc.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`}`))[0];
+  if (!row) return c.redirect(back, 303);
+  await db.run(sql`DELETE FROM member_positions WHERE id = ${assignmentId}`);
+  await recordPositionHistory(db, {
+    entity: "assignment", action: "updated", actorId: c.get("user").id,
+    scopeType: "church", code: row.position,
+  });
+  return c.redirect(`${back}&ok=position-holder-removed`, 303);
+});
+
+// ---------- Region leadership ----------
+
+/** Pastors of one region, offered to the Regional Pastor team editor. */
+async function regionPastorCandidates(db: DB, regionId: number, q: string) {
+  const like = `%${q}%`;
+  return db.all<RegionCandidate>(sql`
+    SELECT p.id,
+           COALESCE(NULLIF(p.name, ''), p.name_en, '#') AS name,
+           rc.name AS churchName,
+           (SELECT mp.position FROM member_positions mp
+             WHERE mp.pastor_id = p.id AND mp.scope_type = 'region'
+             ORDER BY mp.priority LIMIT 1) AS regionPosition,
+           (SELECT r.name FROM member_positions mp
+              JOIN regions r ON r.id = mp.region_id
+             WHERE mp.pastor_id = p.id AND mp.scope_type = 'region'
+             ORDER BY mp.priority LIMIT 1) AS regionName
+    FROM pastors p
+    LEFT JOIN regional_churches rc ON rc.id = p.regional_church_id
+    WHERE p.active = 1 AND p.region_id = ${regionId}
+      ${q ? sql`AND (p.name LIKE ${like} OR p.name_en LIKE ${like})` : sql``}
+    ORDER BY p.sort_order, name LIMIT 300`);
+}
+
+async function regionHolders(db: DB, regionId: number, position: string): Promise<RegionHolder[]> {
+  return db.all<RegionHolder>(sql`
+    SELECT mp.id AS assignmentId, mp.pastor_id AS pastorId,
+           COALESCE(NULLIF(p.name, ''), p.name_en, '#') AS name, mp.priority
+    FROM member_positions mp
+    JOIN pastors p ON p.id = mp.pastor_id
+    WHERE mp.scope_type = 'region' AND mp.region_id = ${regionId}
+      AND mp.position = ${position} AND p.active = 1
+    ORDER BY mp.priority, name`);
+}
+
+organizationRoutes.get("/region-assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const regionId = intParam(c.req.query("region"));
+  const code = s(c.req.query("position"));
+  const q = listQuery(c.req.query("q"));
+  if (!modalRequest(c)) return c.redirect("/organization?tab=regional", 303);
+  if (!regionId || !regionInScope(scope, regionId)) return c.html(<p class="muted">Not found</p>, 404);
+
+  const region = (await db.all<{ id: number; name: string }>(
+    sql`SELECT id, name FROM regions WHERE id = ${regionId} LIMIT 1`,
+  ))[0];
+  const def = (await loadPositionDefs(db))
+    .find((d) => d.scopeType === "region" && d.code === code && d.active === 1) ?? null;
+  if (!region || !def || !def.allowMultiple) return c.html(<p class="muted">Not found</p>, 404);
+
+  return c.html(
+    <RegionPastorModal
+      lang={c.get("lang")}
+      regionId={region.id}
+      regionName={region.name}
+      def={def}
+      candidates={await regionPastorCandidates(db, region.id, q)}
+      holders={await regionHolders(db, region.id, def.code)}
+    />,
+  );
+});
+
+organizationRoutes.post("/region-assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const regionId = intParam(s(body.region));
+  const code = s(body.position);
+  const pastorId = intParam(s(body.pastor_id));
+  const priority = Math.min(99, Math.max(1, intParam(s(body.priority)) ?? 1));
+  const back = regionId ? `/organization?tab=regional&region=${regionId}` : "/organization?tab=regional";
+  const modal = modalRequest(c);
+  if (!regionId || !regionInScope(scope, regionId) || !pastorId) {
+    return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+  }
+
+  const def = (await loadPositionDefs(db))
+    .find((d) => d.scopeType === "region" && d.code === code && d.active === 1) ?? null;
+  if (!def || !def.allowMultiple) {
+    return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+  }
+  const pastor = (await db.all<{ id: number }>(sql`
+    SELECT id FROM pastors WHERE id = ${pastorId} AND active = 1
+      AND region_id = ${regionId} LIMIT 1`))[0];
+  if (!pastor) return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+
+  const now = Math.floor(Date.now() / 1000);
+  // One regional post per person in this region; adding a second priority row
+  // would just make the same person appear twice.
+  const existing = (await db.all<{ id: number }>(sql`
+    SELECT id FROM member_positions
+     WHERE pastor_id = ${pastor.id} AND scope_type = 'region'
+       AND region_id = ${regionId} LIMIT 1`))[0];
+  if (!existing) {
+    await db.insert(memberPositions).values({
+      memberId: null,
+      pastorId: pastor.id,
+      position: def.code,
+      scopeType: "region",
+      scopeId: null,
+      departmentId: null,
+      regionalChurchId: null,
+      regionId,
+      supervisionClusterId: null,
+      priority,
+      slotUnique: 0,
+      createdBy: c.get("user").id,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await recordPositionHistory(db, {
+      entity: "assignment", action: "assigned", actorId: c.get("user").id,
+      scopeType: "region", code: def.code, positionDefId: def.id,
+      summary: `${positionDefLabel(def, c.get("lang"))} · ${(await db.all<{ name: string }>(sql`SELECT name FROM regions WHERE id = ${regionId}`))[0]?.name ?? ""}`,
+    });
+  }
+  const done = `${back}&ok=church-leader-saved`;
+  return modal ? c.json({ ok: true, redirect: done }) : c.redirect(done, 303);
+});
+
+organizationRoutes.post("/region-assign/remove", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const assignmentId = intParam(s(body.assignment_id));
+  const regionId = intParam(s(body.region));
+  const back = regionId ? `/organization?tab=regional&region=${regionId}` : "/organization?tab=regional";
+  if (!assignmentId || !regionId || !regionInScope(scope, regionId)) return c.redirect(back, 303);
+
+  const row = (await db.all<{ id: number; position: string; pastorId: number | null; pastorName: string | null }>(sql`
+    SELECT mp.id, mp.position, mp.pastor_id AS pastorId,
+           COALESCE(NULLIF(p.name, ''), p.name_en) AS pastorName
+    FROM member_positions mp LEFT JOIN pastors p ON p.id = mp.pastor_id
+    WHERE mp.id = ${assignmentId} AND mp.scope_type = 'region' AND mp.region_id = ${regionId}`))[0];
+  if (!row) return c.redirect(back, 303);
+  await db.run(sql`DELETE FROM member_positions WHERE id = ${assignmentId}`);
+  await recordPositionHistory(db, {
+    entity: "assignment", action: "updated", actorId: c.get("user").id,
+    scopeType: "region", code: row.position,
+    summary: row.pastorName,
+  });
+  return c.redirect(`${back}&ok=position-holder-removed`, 303);
 });
 
 // ---------- Department detail ----------
@@ -439,7 +636,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
-           mp.supervision_cluster_id,
+           mp.region_id, mp.priority, mp.supervision_cluster_id,
            m.id AS member_id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS member_name,
            (m.photo IS NOT NULL) AS has_photo, m.updated_at
@@ -738,6 +935,7 @@ async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
            pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
            pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
            pd.active, pd.sort_order AS sortOrder,
+           pd.allow_multiple AS allowMultiple, pd.min_holders AS minHolders,
            GROUP_CONCAT(DISTINCT pdc.regional_church_id) AS church_ids,
            (SELECT COUNT(*) FROM member_positions mp
              LEFT JOIN members m ON m.id = mp.member_id
@@ -896,20 +1094,22 @@ organizationRoutes.get("/positions/:id/holders", requirePermission("options.mana
   const members = await db.all<PositionHolderRow>(sql`
     SELECT mp.id AS assignmentId, 'member' AS kind, m.id, m.name_myanmar AS nameMyanmar, m.name_english AS nameEnglish,
            rc.name AS churchName, rc.name_en AS churchNameEn,
-           COALESCE(d.name, hc.label) AS contextName
+           COALESCE(d.name, hc.label, rg.name) AS contextName
       FROM member_positions mp
       JOIN members m ON m.id = mp.member_id
       LEFT JOIN regional_churches rc ON rc.id = mp.regional_church_id
+      LEFT JOIN regions rg ON rg.id = mp.region_id
       LEFT JOIN church_departments d ON d.id = mp.department_id
       LEFT JOIN lookup_options hc ON hc.id = mp.scope_id AND hc.type = 'home_cell'
      WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND m.status = 'active'
     UNION ALL
     SELECT mp.id AS assignmentId, 'pastor' AS kind, p.id, p.name AS nameMyanmar, p.name_en AS nameEnglish,
            rc.name AS churchName, rc.name_en AS churchNameEn,
-           NULL AS contextName
+           rg.name AS contextName
       FROM member_positions mp
       JOIN pastors p ON p.id = mp.pastor_id
       LEFT JOIN regional_churches rc ON rc.id = mp.regional_church_id
+      LEFT JOIN regions rg ON rg.id = mp.region_id
      WHERE mp.position = ${def.code} AND mp.scope_type = ${def.scopeType} AND p.active = 1
     ORDER BY nameMyanmar`);
   return c.html(
@@ -1159,7 +1359,7 @@ organizationRoutes.get("/vacancies.csv", requirePermission("members.view"), asyn
   });
   const scopeLabels: Record<VacancyScope, string> = {
     church: t("vacancy.scopeChurch"),
-    regional_church: t("vacancy.scopeRegional"),
+    region: t("vacancy.scopeRegional"),
     cluster: t("vacancy.scopeCluster"),
     home_cell: t("vacancy.scopeHomeCell"),
     township: t("vacancy.scopeSupervision"),

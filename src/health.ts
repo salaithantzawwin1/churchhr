@@ -36,7 +36,7 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
     await env.DB.prepare("SELECT department_id FROM members LIMIT 1").all();
     await env.DB.prepare("SELECT scope_type, code FROM position_defs LIMIT 1").all();
     await env.DB.prepare("SELECT name, region_id FROM regional_churches LIMIT 1").all();
-    await env.DB.prepare("SELECT regional_church_id FROM member_positions LIMIT 1").all();
+    await env.DB.prepare("SELECT regional_church_id, region_id, priority FROM member_positions LIMIT 1").all();
     await env.DB.prepare("SELECT regional_church_id FROM lookup_options LIMIT 1").all();
     await env.DB.prepare("SELECT entity, action, actor_id FROM position_history LIMIT 1").all();
     await env.DB.prepare("SELECT name, region_id FROM supervision_clusters LIMIT 1").all();

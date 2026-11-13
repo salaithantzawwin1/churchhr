@@ -7,7 +7,7 @@ type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lan
 
 const SCOPE_KEYS: Record<string, string> = {
   church: "org.scopeChurch",
-  regional_church: "org.scopeRegional",
+  region: "org.scopeRegional",
   cluster: "org.scopeCluster",
   home_cell: "org.scopeHomeCell",
   township: "org.scopeSupervision",

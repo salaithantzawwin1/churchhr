@@ -8,7 +8,7 @@ export type VacancyScope = ConfigurablePositionScope;
 /** Order structures appear in on the report and in the CSV export. */
 export const VACANCY_SCOPES: VacancyScope[] = [
   "church",
-  "regional_church",
+  "region",
   "cluster",
   "home_cell",
   "township",
@@ -70,13 +70,14 @@ function positionKey(row: {
   scope_id: number | null;
   department_id: number | null;
   regional_church_id: number | null;
+  region_id: number | null;
   supervision_cluster_id: number | null;
 }): string {
   switch (row.scope_type) {
     case "church":
       return assignedKey("church", row.position, row.regional_church_id);
-    case "regional_church":
-      return assignedKey("regional_church", row.position, row.regional_church_id);
+    case "region":
+      return assignedKey("region", row.position, row.region_id);
     case "department":
       return assignedKey("department", row.position, row.department_id);
     case "cluster":
@@ -104,39 +105,51 @@ export async function loadVacancyReport(
   const defs = await loadPositionDefs(db);
   const defsByScope: Record<VacancyScope, PositionDefRow[]> = {
     church: defsForScope(defs, "church"),
-    regional_church: defsForScope(defs, "regional_church"),
+    region: defsForScope(defs, "region"),
     cluster: defsForScope(defs, "cluster"),
     home_cell: defsForScope(defs, "home_cell"),
     township: defsForScope(defs, "township"),
     department: defsForScope(defs, "department"),
   };
 
-  const held = new Set<string>();
+  const held = new Map<string, number>();
   const heldRows = await db.all<{
     position: string;
     scope_type: string;
     scope_id: number | null;
     department_id: number | null;
     regional_church_id: number | null;
+    region_id: number | null;
     supervision_cluster_id: number | null;
   }>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
-           mp.supervision_cluster_id
+           mp.region_id, mp.supervision_cluster_id
     FROM member_positions mp
     LEFT JOIN members m ON m.id = mp.member_id
     LEFT JOIN pastors p ON p.id = mp.pastor_id
     WHERE (mp.member_id IS NOT NULL AND m.status = 'active')
        OR (mp.pastor_id IS NOT NULL AND p.active = 1)`);
-  for (const row of heldRows) held.add(positionKey(row));
+  for (const row of heldRows) {
+    const key = positionKey(row);
+    held.set(key, (held.get(key) ?? 0) + 1);
+  }
 
-  const regionalRows = await db.all<StructureRow>(sql`
+  const regionRows = await db.all<StructureRow>(sql`
+    SELECT r.id, r.name, r.name_en AS nameEn,
+           r.name AS stateName, r.name_en AS stateNameEn,
+           NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
+    FROM regions r
+    WHERE ${stateFilter(scope, "r.id")}
+    ORDER BY r.name`);
+
+  const churchRows = await db.all<StructureRow>(sql`
     SELECT rc.id, rc.name, rc.name_en AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
     FROM regional_churches rc
     JOIN regions r ON r.id = rc.region_id
     WHERE rc.active = 1 AND ${stateFilter(scope, "rc.region_id")}
-    ORDER BY rc.sort_order, rc.name`);
+    ORDER BY r.name, rc.sort_order, rc.name`);
 
   const homeCellRows = await db.all<StructureRow>(sql`
     SELECT hc.id, hc.label AS name, NULL AS nameEn,
@@ -187,7 +200,7 @@ export async function loadVacancyReport(
     scopeType: VacancyScope, id: number | null, row: StructureRow | null,
   ): PositionDefRow[] => {
     const all = defsByScope[scopeType];
-    if (scopeType === "church" || scopeType === "regional_church") return defsForChurch(all, id);
+    if (scopeType === "church") return defsForChurch(all, id);
     if (scopeType === "home_cell") return defsForChurch(all, row?.regionalChurchId ?? null);
     return all;
   };
@@ -196,10 +209,18 @@ export async function loadVacancyReport(
   const push = (scopeType: VacancyScope, id: number | null, row: StructureRow | null, displayName: string) => {
     const roleDefs = defsForStructure(scopeType, id, row);
     if (roleDefs.length === 0) return;
-    const filledDefs = roleDefs.filter((def) => held.has(assignedKey(scopeType, def.code, id)));
-    const vacancies = roleDefs
-      .filter((def) => !held.has(assignedKey(scopeType, def.code, id)))
-      .map((def) => ({ code: def.code, name: positionDefLabel(def, lang) }));
+    let slots = 0;
+    let filled = 0;
+    const vacancies: VacancyItem[] = [];
+    for (const def of roleDefs) {
+      const count = held.get(assignedKey(scopeType, def.code, id)) ?? 0;
+      const required = Math.max(0, def.minHolders ?? 1);
+      slots += required;
+      filled += Math.min(count, required);
+      if (count < required) {
+        vacancies.push({ code: def.code, name: positionDefLabel(def, lang) });
+      }
+    }
     if (vacancies.length === 0) return;
     structures.push({
       scope: scopeType,
@@ -208,16 +229,14 @@ export async function loadVacancyReport(
       stateName: row ? stateOf(row) : null,
       townshipName: row?.townshipName ?? null,
       regionalChurchName: row ? localized(row.regionalName ?? "", row.regionalNameEn) || null : null,
-      slots: roleDefs.length,
-      filled: filledDefs.length,
+      slots,
+      filled,
       vacancies,
     });
   };
 
-  for (const row of regionalRows) {
-    push("church", row.id, row, localized(row.name, row.nameEn));
-    push("regional_church", row.id, row, localized(row.name, row.nameEn));
-  }
+  for (const row of regionRows) push("region", row.id, row, localized(row.name, row.nameEn));
+  for (const row of churchRows) push("church", row.id, row, localized(row.name, row.nameEn));
   for (const row of clusterRows) push("cluster", row.id, row, localized(row.name, row.nameEn));
   for (const row of homeCellRows) push("home_cell", row.id, row, row.name);
   for (const row of townshipRows) push("township", row.id, row, row.name);

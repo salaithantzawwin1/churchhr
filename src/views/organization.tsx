@@ -31,12 +31,16 @@ export type OrgDepartment = {
   church_ids?: string | null;
 };
 
+export type OrgRegion = { id: number; name: string; nameEn: string | null };
+
 export type OrgLeader = {
   position: string;
   scope_type: string;
   scope_id: number | null;
   department_id: number | null;
   regional_church_id: number | null;
+  region_id: number | null;
+  priority: number;
   supervision_cluster_id: number | null;
   member_id: number | null;
   member_name: string | null;
@@ -170,15 +174,25 @@ function LeaderLink(props: { leader: OrgLeader | null; empty: string; photoPrevi
 
 function leaderFor(
   leaders: OrgLeader[], scopeType: string, position: string,
-  opts: { scopeId?: number | null; departmentId?: number | null; regionalChurchId?: number | null; supervisionClusterId?: number | null } = {},
+  opts: { scopeId?: number | null; departmentId?: number | null; regionalChurchId?: number | null; regionId?: number | null; supervisionClusterId?: number | null } = {},
 ): OrgLeader | null {
-  return leaders.find((l) =>
-    l.scope_type === scopeType && l.position === position &&
-    (opts.scopeId === undefined || l.scope_id === opts.scopeId) &&
-    (opts.departmentId === undefined || l.department_id === opts.departmentId) &&
-    (opts.regionalChurchId === undefined || l.regional_church_id === opts.regionalChurchId) &&
-    (opts.supervisionClusterId === undefined || l.supervision_cluster_id === opts.supervisionClusterId)
-  ) ?? null;
+  return leadersFor(leaders, scopeType, position, opts)[0] ?? null;
+}
+
+function leadersFor(
+  leaders: OrgLeader[], scopeType: string, position: string,
+  opts: { scopeId?: number | null; departmentId?: number | null; regionalChurchId?: number | null; regionId?: number | null; supervisionClusterId?: number | null } = {},
+): OrgLeader[] {
+  return leaders
+    .filter((l) =>
+      l.scope_type === scopeType && l.position === position &&
+      (opts.scopeId === undefined || l.scope_id === opts.scopeId) &&
+      (opts.departmentId === undefined || l.department_id === opts.departmentId) &&
+      (opts.regionalChurchId === undefined || l.regional_church_id === opts.regionalChurchId) &&
+      (opts.regionId === undefined || l.region_id === opts.regionId) &&
+      (opts.supervisionClusterId === undefined || l.supervision_cluster_id === opts.supervisionClusterId)
+    )
+    .sort((a, b) => a.priority - b.priority || (a.member_name ?? "").localeCompare(b.member_name ?? ""));
 }
 
 /**
@@ -225,6 +239,7 @@ export function OrganizationPage(props: Common & {
   departments: OrgDepartment[];
   leaders: OrgLeader[];
   regionalChurches: RegionalChurchRow[];
+  regions: OrgRegion[];
   clusters: SupervisionClusterRow[];
   positionDefs: PositionDefRow[];
   canManageDepartments: boolean;
@@ -239,7 +254,7 @@ export function OrganizationPage(props: Common & {
 }) {
   const {
     user, perms, flash, lang, tab, cells, departments, leaders,
-    regionalChurches, clusters, positionDefs, canManageDepartments, canManageStructure,
+    regionalChurches, regions, clusters, positionDefs, canManageDepartments, canManageStructure,
     canManageClusters, canManagePositions, unassignedMembers, selectedChurchId, region,
   } = props;
   const L = lang ?? "en";
@@ -286,6 +301,17 @@ export function OrganizationPage(props: Common & {
     }
     return [...groups.values()];
   })();
+  // Regional oversight is region-wide: every church in the region, including
+  // the Main Church, sits under the same Regional Pastor team. Churches are
+  // listed once per region, not once per pastor.
+  const regionGroups = (region == null ? regions : regions.filter((r) => r.id === region))
+    .map((r) => ({
+      id: r.id,
+      name: L !== "mm" && r.nameEn ? r.nameEn : r.name,
+      churches: regionalChurches.filter((c) => c.regionId === r.id),
+      hasTeam: leaders.some((l) => l.scope_type === "region" && l.region_id === r.id),
+    }))
+    .filter((r) => r.churches.length > 0 || r.hasTeam);
   const members = cells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
@@ -306,7 +332,7 @@ export function OrganizationPage(props: Common & {
       leaderFor(leaders, "church", p.code, { regionalChurchId: selectedChurch.id })).length
     : 0;
   const cellRows = positionRows(churchDefs, "home_cell", L);
-  const regionalRows = positionRows(positionDefs, "regional_church", L);
+  const regionalRows = positionRows(positionDefs, "region", L);
   const deptRows = positionRows(positionDefs, "department", L);
 
   const departmentRole = (departmentId: number, position: string) =>
@@ -317,8 +343,8 @@ export function OrganizationPage(props: Common & {
     townshipId == null ? null : leaderFor(leaders, "township", position, { scopeId: townshipId });
   const clusterRole = (clusterId: number | null, position: string) =>
     clusterId == null ? null : leaderFor(leaders, "cluster", position, { supervisionClusterId: clusterId });
-  const regionalRole = (churchId: number, position: string) =>
-    leaderFor(leaders, "regional_church", position, { regionalChurchId: churchId });
+  const regionalTeam = (regionId: number, position: string) =>
+    leadersFor(leaders, "region", position, { regionId });
 
   const cellRoles = (cell: OrgCell, variant: "card" | "row") => {
     const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
@@ -472,6 +498,8 @@ export function OrganizationPage(props: Common & {
   const renderChurchChart = (church: RegionalChurchRow, tab: "church" | "main") => {
     const role = (position: string) =>
       leaderFor(leaders, "church", position, { regionalChurchId: church.id });
+    const roleTeam = (position: string) =>
+      leadersFor(leaders, "church", position, { regionalChurchId: church.id });
     // Each chart needs the roles of the church it draws: the Main Church tab has
     // no selected regional church, and a position filed under one church must not
     // surface (or vanish) because another church happens to be selected.
@@ -514,6 +542,17 @@ export function OrganizationPage(props: Common & {
       return (
         <div class="org-branch">
           {node(def, role(def.code), isLead ? "lg" : "md", isLead)}
+          {def.allowMultiple === 1 && roleTeam(def.code).slice(1).length > 0 && (
+            <div class="org-node-extra">
+              {roleTeam(def.code).slice(1).map((person) => (
+                <div class="org-node-extra-person">
+                  <LeaderAvatar leader={person} size="sm" />
+                  <LeaderLink leader={person} empty={t("org.vacant")} />
+                  <span class="muted small">{t("org.priority")} {person.priority}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {children.length > 0 && (
             <div class="org-branch-kids">{children.map((child) => branch(child))}</div>
           )}
@@ -927,8 +966,10 @@ export function OrganizationPage(props: Common & {
               <input type="hidden" name="tab" value="regional" />
               <select name="region" aria-label={t("detail.state")}>
                 <option value="" selected={region == null}>{t("org.allStates")}</option>
-                {regionalStateOptions.map((r) => (
-                  <option value={String(r.id)} selected={region === r.id}>{r.name}</option>
+                {regions.map((r) => (
+                  <option value={String(r.id)} selected={region === r.id}>
+                    {L !== "mm" && r.nameEn ? r.nameEn : r.name}
+                  </option>
                 ))}
               </select>
               <div class="actions">
@@ -936,97 +977,116 @@ export function OrganizationPage(props: Common & {
               </div>
             </form>
 
-            {regionalOnly.length === 0 ? (
+            {regionGroups.length === 0 ? (
               <div class="card org-empty org-empty-small">
                 <p class="muted">{t("org.noRegional")}</p>
-                {region != null ? (
-                  <p class="small"><a href="/organization?tab=regional">{t("members.clearFilters")}</a></p>
-                ) : canManageStructure && (
-                  <a class="btn secondary sm" href="/organization/regional-churches">{t("org.addRegional")}</a>
-                )}
               </div>
             ) : (
               <div class="org-region-groups">
-                {regionalStates.map((state) => (
+                {regionGroups.map((group) => (
                   <section class="org-region-group">
                     <div class="org-region-group-head">
-                      <h3>{state.name}</h3>
-                      <span class="muted small">{state.churches.length} {t("org.churchesShort")}</span>
+                      <h3>{group.name}</h3>
+                      <span class="muted small">{group.churches.length} {t("org.churchesShort")}</span>
                     </div>
-                    <div class="org-grid org-dept-grid">
-                {state.churches.map((church) => {
-                  const churchCells = cells.filter((c) => c.regional_church_id === church.id);
-                  const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
-                  const lead = regionalRows.lead ? regionalRole(church.id, regionalRows.lead.code) : null;
-                  return (
-                    <article class="card org-dept-card org-regional-card">
-                      <div class="org-dept-head">
-                        <LeaderAvatar leader={lead} size="md" />
-                        <div class="org-dept-title">
-                          <h3>{regionalChurchName(church, L)}</h3>
-                          <span class="muted small">
-                            {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
-                          </span>
+
+                    <article class="card org-region-team">
+                      <div class="org-section-head">
+                        <div>
+                          <h4>{t("org.regionTeam")}</h4>
+                          <p class="muted small">{t("org.regionTeamHint")}</p>
                         </div>
                       </div>
-                      {regionalRows.lead && (
-                        <div class="org-dept-lead">
-                          <span class="org-node-role">{positionDefLabel(regionalRows.lead, L)}</span>
-                          <LeaderLink leader={lead} empty={t("org.vacant")} />
-                        </div>
-                      )}
-                      <div class="org-mini-list">
-                        {regionalRows.rest.map((p) => {
-                          const member = regionalRole(church.id, p.code);
-                          return (
-                            <div class={`org-mini${member ? "" : " org-vacant"}`}>
-                              <LeaderAvatar leader={member} size="sm" />
-                              <div>
-                                <span class="org-mini-role">{positionDefLabel(p, L)}</span>
-                                <LeaderLink leader={member} empty={t("org.vacant")} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {churchCells.length === 0 ? (
-                        <p class="muted small org-regional-empty">{t("org.regionalNoCells")}</p>
+                      {regionalRows.all.length === 0 ? (
+                        <p class="muted small">{t("org.noPositions")}</p>
                       ) : (
-                        <div class="org-regional-groups">
-                          {groupByTownship(churchCells, t("org.townshipUnassigned")).map((town) => (
-                            <div class="org-regional-township">
-                              <div class="org-regional-township-head">
-                                <span class="org-township-name">{town.name}</span>
-                                <span class="muted small">{town.cells.length} {t("org.cells")}</span>
-                              </div>
-                              {townshipSupervision(town)}
-                              <div class="org-regional-cells">
-                                {town.cells.map((cell) => (
-                                  <div class="org-regional-cell">
-                                    <a href={cellHref(cell.id)}>{cell.label}</a>
-                                    {cellRows.lead && (
-                                      <span class="org-regional-cell-lead">
-                                        <LeaderLink leader={homeRole(cell.id, cellRows.lead.code)} empty={t("org.noLeader")} />
-                                      </span>
-                                    )}
-                                    <span class="muted small">
-                                      {cell.member_count} {t("org.membersShort")}
-                                    </span>
+                        <div class="org-region-team-grid">
+                          {regionalRows.all.map((def) => {
+                            const team = regionalTeam(group.id, def.code);
+                            const isLead = def.code === regionalRows.lead?.code;
+                            return (
+                              <div class={`org-region-role${team.length ? "" : " org-vacant"}`}>
+                                <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                                {team.length === 0 ? (
+                                  <span class="muted small">{t("org.vacant")}</span>
+                                ) : (
+                                  <div class="org-region-holders">
+                                    {team.map((person) => (
+                                      <div class="org-region-holder">
+                                        <LeaderAvatar leader={person} size="sm" />
+                                        <div>
+                                          <LeaderLink leader={person} empty={t("org.vacant")} />
+                                          {def.allowMultiple === 1 && (
+                                            <span class="muted small"> · {t("org.priority")} {person.priority}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
+                                {isLead && canEdit && def.allowMultiple === 1 && (
+                                  <a class="btn sm secondary" href={`/organization/region-assign?region=${group.id}&position=${def.code}`}
+                                    data-modal-title={`${t("org.addHolder")} · ${positionDefLabel(def, L)}`} data-modal-size="md">
+                                    + {t("org.addHolder")}
+                                  </a>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                      )}
-                      {canManageStructure && (
-                        <a class="org-card-link" href="/organization/regional-churches">
-                          {t("org.editStructure")} <span aria-hidden="true">→</span>
-                        </a>
                       )}
                     </article>
-                  );
-                })}
+
+                    <div class="org-grid org-dept-grid">
+                      {group.churches.map((church) => {
+                        const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+                        const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
+                        const senior = leaderFor(leaders, "church", "church_senior_pastor", { regionalChurchId: church.id });
+                        const assistantDef = positionDefs.find((d) => d.scopeType === "church" && d.code === "church_assistant_pastor");
+                        const assistants = assistantDef
+                          ? leadersFor(leaders, "church", assistantDef.code, { regionalChurchId: church.id })
+                          : [];
+                        return (
+                          <article class="card org-dept-card org-regional-card">
+                            <div class="org-dept-head">
+                              <LeaderAvatar leader={senior} size="md" />
+                              <div class="org-dept-title">
+                                <h3>
+                                  {regionalChurchName(church, L)}
+                                  {church.isMain === 1 && <span class="badge position"> {t("org.mainChurch")}</span>}
+                                </h3>
+                                <span class="muted small">
+                                  {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
+                                </span>
+                              </div>
+                            </div>
+                            <div class="org-dept-lead">
+                              <span class="org-node-role">{t("org.seniorPastor")}</span>
+                              <LeaderLink leader={senior} empty={t("org.vacant")} />
+                            </div>
+                            <div class="org-mini-list">
+                              <div class={`org-mini${assistants.length ? "" : " org-vacant"}`}>
+                                <span class="org-mini-role">{assistantDef ? positionDefLabel(assistantDef, L) : t("org.otherPastors")}</span>
+                                {assistants.length === 0 ? (
+                                  <span class="muted small">{t("org.none")}</span>
+                                ) : (
+                                  assistants.map((person) => (
+                                    <span class="org-mini-person">
+                                      <LeaderAvatar leader={person} size="sm" />
+                                      <LeaderLink leader={person} empty={t("org.vacant")} />
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <a class="org-card-link" href={`/organization?tab=church&church=${church.id}`}>
+                                {t("org.churchLeadership")} <span aria-hidden="true">→</span>
+                              </a>
+                            )}
+                          </article>
+                        );
+                      })}
                     </div>
                   </section>
                 ))}

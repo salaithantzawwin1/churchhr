@@ -1183,6 +1183,7 @@ type PositionMemberState = {
   townshipName: string | null;
   regionalChurchId: number | null;
   departmentId: number | null;
+  regionName: string;
 };
 
 async function positionFormState(db: DB, memberId: number, row: MemberDetail & { region_id: number }) {
@@ -1190,7 +1191,7 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
   const home = current.find((p) => p.scopeType === "home_cell");
   const department = current.find((p) => p.scopeType === "department");
   const church = current.find((p) => p.scopeType === "church");
-  const regional = current.find((p) => p.scopeType === "regional_church");
+  const regional = current.find((p) => p.scopeType === "region");
   const township = current.find((p) => p.scopeType === "township");
   const cluster = current.find((p) => p.scopeType === "cluster");
   const townshipId = row.home_cell_township_id ?? null;
@@ -1204,6 +1205,7 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       townshipName: row.home_cell_township ?? null,
       regionalChurchId: row.home_cell_regional_church_id ?? null,
       departmentId: row.department_id ?? null,
+      regionName: row.state_name,
     } as PositionMemberState,
     assignments: {
       homeCell: home?.position ?? "",
@@ -1212,8 +1214,8 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       memberDepartmentId: row.department_id ?? null,
       church: church?.position ?? "",
       churchId: church?.regionalChurchId ?? row.home_cell_regional_church_id ?? null,
-      regionalChurch: regional?.position ?? "",
-      regionalChurchId: regional?.regionalChurchId ?? null,
+      region: regional?.position ?? "",
+      regionId: regional?.regionId ?? row.region_id,
       township: township?.position ?? "",
       cluster: cluster?.position ?? "",
       clusterId: cluster?.supervisionClusterId ?? null,
@@ -1278,9 +1280,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
   const clusterPosition = s(body.cluster_position);
   const clusterRaw = s(body.supervision_cluster_id);
   const clusterId = clusterRaw && /^\d+$/.test(clusterRaw) ? Number(clusterRaw) : null;
-  const regionalPosition = s(body.regional_church_position);
-  const regionalRaw = s(body.regional_church_id);
-  const regionalChurchId = regionalRaw && /^\d+$/.test(regionalRaw) ? Number(regionalRaw) : null;
+  const regionPosition = s(body.region_position);
   const departmentPosition = s(body.department_position);
   const churchPosition = s(body.church_position);
   const churchRaw = s(body.church_id);
@@ -1294,8 +1294,8 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     township: townshipPosition,
     cluster: clusterPosition,
     clusterId: clusterId ?? null,
-    regionalChurch: regionalPosition,
-    regionalChurchId: regionalChurchId ?? row.home_cell_regional_church_id ?? null,
+    region: regionPosition,
+    regionId: row.region_id,
     department: departmentPosition,
     departmentId: departmentId ?? null,
     memberDepartmentId,
@@ -1309,6 +1309,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     townshipName: row.home_cell_township ?? null,
     regionalChurchId: row.home_cell_regional_church_id ?? null,
     departmentId: row.department_id ?? null,
+    regionName: row.state_name,
   };
   const renderError = (message: string) => c.html(
     <MemberPositionForm
@@ -1340,11 +1341,11 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       return renderError(t("flash.positionClusterRequired"));
     }
   }
-  if (regionalPosition) {
-    if (!validFor(regionalPosition, "regional_church")) return renderError(t("flash.positionInvalid"));
-    if (!regionalChurchId || !regionalChurches.some((r) => r.id === regionalChurchId)) {
-      return renderError(t("flash.positionRegionalRequired"));
-    }
+  const regionDef = regionPosition
+    ? defs.find((d) => d.scopeType === "region" && d.code === regionPosition && d.active === 1)
+    : undefined;
+  if (regionPosition) {
+    if (!regionDef || regionDef.code === "regional_pastor") return renderError(t("flash.positionInvalid"));
   }
   if (departmentPosition && !validFor(departmentPosition, "department")) {
     return renderError(t("flash.positionInvalid"));
@@ -1381,11 +1382,16 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
     }
     assignments.push({ scopeType: "cluster", position: clusterPosition, supervisionClusterId: clusterId });
   }
-  if (regionalPosition && regionalChurchId) {
-    if (await positionTaken(db, "regional_church", regionalPosition, { regionalChurchId, exceptMemberId: id })) {
+  if (regionPosition && regionDef) {
+    if (await positionTaken(db, "region", regionPosition, {
+      regionId: row.region_id, exceptMemberId: id, allowMultiple: regionDef.allowMultiple === 1,
+    })) {
       return renderError(t("flash.positionTaken"));
     }
-    assignments.push({ scopeType: "regional_church", position: regionalPosition, regionalChurchId });
+    assignments.push({
+      scopeType: "region", position: regionPosition, regionId: row.region_id,
+      slotUnique: regionDef.allowMultiple === 1 ? 0 : 1,
+    });
   }
   if (departmentPosition && departmentId) {
     if (await positionTaken(db, "department", departmentPosition, { departmentId, exceptMemberId: id })) {
@@ -1435,10 +1441,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
         const cluster = clusters.find((r) => r.id === a.supervisionClusterId);
         return `${roleLabel(a.position, "cluster")} · ${cluster?.nameEn || cluster?.name || ""}`;
       }
-      case "regional_church": {
-        const church = regionalChurches.find((r) => r.id === a.regionalChurchId);
-        return `${roleLabel(a.position, "regional_church")} · ${church?.nameEn || church?.name || ""}`;
-      }
+      case "region": return `${roleLabel(a.position, "region")} · ${row.state_name}`;
       case "department": {
         const department = departments.find((d) => d.id === a.departmentId);
         return `${roleLabel(a.position, "department")} · ${department?.name ?? ""}`;
