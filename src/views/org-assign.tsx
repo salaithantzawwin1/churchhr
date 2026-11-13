@@ -68,10 +68,6 @@ export function AssignLeaderModal(props: {
 
   return (
     <>
-      <form method="post" action="/organization/assign" data-modal-ajax>
-      <input type="hidden" name="tab" value={tab} />
-      <input type="hidden" name="church" value={String(churchId)} />
-      <input type="hidden" name="position" value={def.code} />
       {error && <p class="flash err modal-error">{error}</p>}
       <div class="position-hero">
         <span class="position-avatar" aria-hidden="true">{churchName.trim().charAt(0) || "?"}</span>
@@ -100,6 +96,9 @@ export function AssignLeaderModal(props: {
         </div>
       </div>
 
+      {/* Every holder keeps its own delete form, so this list sits outside the
+          assignment form below: nested forms would close it early and orphan
+          the Save button and the candidate radios. */}
       {allowMultiple && holders.length > 0 && (
         <div class="region-holder-list">
           <h4>{t("org.regionCurrentTeam")}</h4>
@@ -107,86 +106,78 @@ export function AssignLeaderModal(props: {
             <div class="region-holder-row">
               <span class="badge position">{t("org.priority")} {holder.priority}</span>
               <strong>{holder.name}</strong>
-              {/* Each delete lives in its own form after this one: a form nested
-                  here would close this form early and orphan Save. */}
-              <button class="btn sm outline-danger" type="submit"
-                form={`remove-holder-${holder.assignmentId}`}>{t("members.delete")}</button>
+              <form method="post" action="/organization/assign/remove"
+                data-confirm={t("org.removeHolderConfirm")}>
+                <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="church" value={String(churchId)} />
+                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+              </form>
             </div>
           ))}
         </div>
       )}
 
-      <label class="field assign-search">
-        <span class="lbl">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
-        <input type="search" data-filter-list=".assign-list"
-          placeholder={pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")} autocomplete="off" />
-      </label>
+      <form method="post" action="/organization/assign" data-modal-ajax>
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="church" value={String(churchId)} />
+        <input type="hidden" name="position" value={def.code} />
 
-      {pastorDirectory && <p class="assign-hint">{t("org.assignPastorHint")}</p>}
-
-      {candidates.length === 0 ? (
-        <p class="assign-empty">{t("org.assignEmpty")}</p>
-      ) : (
-        <div class="assign-list">
-          {candidates.map((m) => {
-            const warning = replaceWarning(m);
-            return (
-              <label class={`assign-row${m.id === currentId ? " is-current" : ""}`} data-name={`${m.name} ${m.home_cell ?? ""}`}>
-                <input type="radio" name={personField} value={String(m.id)} checked={m.id === currentId}
-                  data-warn={warning || undefined} />
-                <span class="assign-text">
-                  <span class="assign-name">{m.name}</span>
-                  {warning && <span class="assign-row-note">{warning}</span>}
-                </span>
-                {m.home_cell && <span class="assign-meta">{m.home_cell}</span>}
-              </label>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Shown even when the holder is not in this list, so any filled slot can
-          be cleared from the same dialog. */}
-      {!allowMultiple && (hasHolder ?? currentId != null) && (
-        <div class="assign-list assign-list-clear">
-          <label class="assign-row">
-            <input type="radio" name={personField} value="" />
-            <span class="assign-name muted">{t("org.assignClear")}</span>
-          </label>
-        </div>
-      )}
-
-      {allowMultiple && (
-        <label class="field">
-          <span class="lbl">{t("org.priority")}</span>
-          <input type="number" name="priority" min="1" max="99" value="1" />
-          <span class="hint">{t("org.priorityHint")}</span>
+        <label class="field assign-search">
+          <span class="lbl">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
+          <input type="search" data-filter-list=".assign-list"
+            placeholder={pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")} autocomplete="off" />
         </label>
-      )}
 
-      <p class="assign-warn" data-assign-warn hidden></p>
+        {pastorDirectory && <p class="assign-hint">{t("org.assignPastorHint")}</p>}
 
-      <div class="actions">
-        <button class="btn" type="submit">{t("form.save")}</button>
-        <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
-      </div>
+        {candidates.length === 0 ? (
+          <p class="assign-empty">{t("org.assignEmpty")}</p>
+        ) : (
+          <div class="assign-list">
+            {candidates.map((m) => {
+              const warning = replaceWarning(m);
+              return (
+                <label class={`assign-row${m.id === currentId ? " is-current" : ""}`} data-name={`${m.name} ${m.home_cell ?? ""}`}>
+                  <input type="radio" name={personField} value={String(m.id)} checked={m.id === currentId}
+                    data-warn={warning || undefined} />
+                  <span class="assign-text">
+                    <span class="assign-name">{m.name}</span>
+                    {warning && <span class="assign-row-note">{warning}</span>}
+                  </span>
+                  {m.home_cell && <span class="assign-meta">{m.home_cell}</span>}
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Shown even when the holder is not in this list, so any filled slot can
+            be cleared from the same dialog. */}
+        {!allowMultiple && (hasHolder ?? currentId != null) && (
+          <div class="assign-list assign-list-clear">
+            <label class="assign-row">
+              <input type="radio" name={personField} value="" />
+              <span class="assign-name muted">{t("org.assignClear")}</span>
+            </label>
+          </div>
+        )}
+
+        {allowMultiple && (
+          <label class="field">
+            <span class="lbl">{t("org.priority")}</span>
+            <input type="number" name="priority" min="1" max="99" value="1" />
+            <span class="hint">{t("org.priorityHint")}</span>
+          </label>
+        )}
+
+        <p class="assign-warn" data-assign-warn hidden></p>
+
+        <div class="actions">
+          <button class="btn" type="submit">{t("form.save")}</button>
+          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+        </div>
       </form>
-
-      {/* Removal forms stay outside the assignment form, so nothing is nested;
-          each holder's Delete button submits the form named by its id. */}
-      {allowMultiple && holders.map((holder) => (
-        <form
-          id={`remove-holder-${holder.assignmentId}`}
-          method="post"
-          action="/organization/assign/remove"
-          data-confirm={t("org.removeHolderConfirm")}
-          hidden
-        >
-          <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
-          <input type="hidden" name="tab" value={tab} />
-          <input type="hidden" name="church" value={String(churchId)} />
-        </form>
-      ))}
     </>
   );
 }

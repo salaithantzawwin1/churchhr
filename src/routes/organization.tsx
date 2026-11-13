@@ -17,14 +17,14 @@ import { PositionHistoryPage } from "../views/position-history";
 import { VacancyReportPage } from "../views/vacancies";
 import { VACANCY_SCOPES, loadVacancyReport, type VacancyScope } from "../vacancies";
 import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "../position-history";
-import { loadPositionDefs, codeFromEnglishName, defsForScope, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
+import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isConfigurableScope, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
 import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues } from "../pastor-history";
 import { positionTaken } from "../positions";
 import { buildCsv } from "../csv";
-import { getDict } from "../i18n";
+import { getDict, type Lang } from "../i18n";
 import { asInt, intParam, s, todayInYangon } from "../util";
 
 export const organizationRoutes = new Hono<AppEnv>();
@@ -264,7 +264,11 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
   const def = (await loadPositionDefs(db)).find((d) => d.scopeType === "church" && d.code === code) ?? null;
-  if (!church || !def) return c.html(<p class="muted">Not found</p>, 404);
+  // A role ticked for specific churches is only offered there; the chart hides
+  // it elsewhere, so the dialog must refuse it too.
+  if (!church || !def || defsForChurch([def], church.id).length === 0) {
+    return c.html(<p class="muted">Not found</p>, 404);
+  }
 
   // A member holder may live in another church's Home Cell and a pastor has no
   // member row at all, so the current name is resolved here for both cases.
@@ -341,7 +345,7 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
   const def = (await loadPositionDefs(db))
     .find((d) => d.scopeType === "church" && d.code === code && d.active === 1) ?? null;
-  if (!church || !def) {
+  if (!church || !def || defsForChurch([def], church.id).length === 0) {
     return modal ? c.json({ ok: false, redirect: landing }) : c.redirect(landing, 303);
   }
 
@@ -484,6 +488,25 @@ async function regionHolders(db: DB, regionId: number, position: string): Promis
     ORDER BY mp.priority, name`);
 }
 
+/** Region team dialog, shared by the opener and a rejected save. */
+async function regionAssignModal(
+  db: DB,
+  lang: Lang,
+  args: { regionId: number; regionName: string; def: PositionDefRow; q?: string; error?: string | null },
+) {
+  return (
+    <RegionPastorModal
+      lang={lang}
+      regionId={args.regionId}
+      regionName={args.regionName}
+      def={args.def}
+      candidates={await regionPastorCandidates(db, args.regionId, args.q ?? "")}
+      holders={await regionHolders(db, args.regionId, args.def.code)}
+      error={args.error ?? null}
+    />
+  );
+}
+
 organizationRoutes.get("/region-assign", requirePermission("members.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -501,14 +524,9 @@ organizationRoutes.get("/region-assign", requirePermission("members.update"), as
   if (!region || !def || !def.allowMultiple) return c.html(<p class="muted">Not found</p>, 404);
 
   return c.html(
-    <RegionPastorModal
-      lang={c.get("lang")}
-      regionId={region.id}
-      regionName={region.name}
-      def={def}
-      candidates={await regionPastorCandidates(db, region.id, q)}
-      holders={await regionHolders(db, region.id, def.code)}
-    />,
+    await regionAssignModal(db, c.get("lang"), {
+      regionId: region.id, regionName: region.name, def, q,
+    }),
   );
 });
 
@@ -551,15 +569,10 @@ organizationRoutes.post("/region-assign", requirePermission("members.update"), a
   if (existing && existing.position !== def.code) {
     if (!modal) return c.redirect(`${back}&err=region-position-conflict`, 303);
     return c.html(
-      <RegionPastorModal
-        lang={c.get("lang")}
-        regionId={regionId}
-        regionName={regionName}
-        def={def}
-        candidates={await regionPastorCandidates(db, regionId, "")}
-        holders={await regionHolders(db, regionId, def.code)}
-        error={flashText("region-position-conflict", c.get("lang"))}
-      />,
+      await regionAssignModal(db, c.get("lang"), {
+        regionId, regionName, def,
+        error: flashText("region-position-conflict", c.get("lang")),
+      }),
       422,
     );
   }
@@ -568,10 +581,6 @@ organizationRoutes.post("/region-assign", requirePermission("members.update"), a
       UPDATE member_positions
          SET priority = ${priority}, updated_at = ${now}
        WHERE id = ${existing.id}`);
-    await recordPositionHistory(db, {
-      entity: "assignment", action: "updated", actorId: c.get("user").id,
-      scopeType: "region", code: def.code, positionDefId: def.id, summary,
-    });
   } else {
     await db.insert(memberPositions).values({
       memberId: null,
@@ -589,12 +598,12 @@ organizationRoutes.post("/region-assign", requirePermission("members.update"), a
       createdAt: now,
       updatedAt: now,
     });
-    await recordPositionHistory(db, {
-      entity: "assignment", action: "assigned", actorId: c.get("user").id,
-      scopeType: "region", code: def.code, positionDefId: def.id,
-      summary,
-    });
   }
+  await recordPositionHistory(db, {
+    entity: "assignment", action: existing ? "updated" : "assigned",
+    actorId: c.get("user").id,
+    scopeType: "region", code: def.code, positionDefId: def.id, summary,
+  });
   const done = `${back}&ok=church-leader-saved`;
   return modal ? c.json({ ok: true, redirect: done }) : c.redirect(done, 303);
 });
@@ -650,9 +659,13 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
   if (!id) return c.notFound();
+  if (!scope.scopeAll && scope.stateIds.length === 0) return c.notFound();
   // State-scoped managers only see members inside their assigned states, so the
   // count and the table below always agree with the rest of the member list.
   const memberScope = memberScopeCond(scope);
+  const departmentStateScope = scope.scopeAll
+    ? sql`1=1`
+    : sql`rc.region_id IN (${sql.join(scope.stateIds.map((stateId) => sql`${stateId}`), sql`, `)})`;
   const positionDefs = await loadPositionDefs(db);
   const department = (await db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
@@ -661,7 +674,11 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
         WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScope}) AS member_count
     FROM church_departments d
     LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
-    WHERE d.id = ${id} LIMIT 1`))[0];
+    WHERE d.id = ${id}
+      -- A department filed under a church belongs to that church's state; a
+      -- shared department (no church) stays visible with its members scoped.
+      AND (d.regional_church_id IS NULL OR ${departmentStateScope})
+    LIMIT 1`))[0];
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
@@ -672,6 +689,7 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
     FROM member_positions mp
     JOIN members m ON m.id = mp.member_id
     WHERE mp.scope_type = 'department' AND mp.department_id = ${id} AND m.status = 'active'
+      AND ${memberScope}
     ORDER BY mp.position`);
   // Filters are additive and only narrow the members table; the department's
   // total count above stays as the unfiltered reference.
@@ -928,12 +946,18 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   if (!await validPositionChurch(db, churchId)) return await fail("err-notfound");
 
   if (current.active === 1 && active === 0) {
+    // A role left behind by a deactivated member shows as vacant everywhere, so
+    // only live members and holders keep a department from being switched off.
     const assigned = await db.all<{ n: number }>(sql`
       SELECT
-        (SELECT COUNT(*) FROM member_positions
-          WHERE scope_type = 'department' AND department_id = ${id}) +
+        (SELECT COUNT(*) FROM member_positions mp
+           LEFT JOIN members m ON m.id = mp.member_id
+           LEFT JOIN pastors p ON p.id = mp.pastor_id
+          WHERE mp.scope_type = 'department' AND mp.department_id = ${id}
+            AND ((mp.member_id IS NOT NULL AND m.status = 'active')
+              OR (mp.pastor_id IS NOT NULL AND p.active = 1))) +
         (SELECT COUNT(*) FROM members
-          WHERE department_id = ${id}) AS n`);
+          WHERE department_id = ${id} AND status = 'active') AS n`);
     if ((assigned[0]?.n ?? 0) > 0) {
       return await fail("department-in-use");
     }
@@ -1604,16 +1628,20 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
       -- must block the change instead of failing the foreign key on delete.
       (SELECT COUNT(*) FROM pastors WHERE regional_church_id = ${id}) AS n`);
   const used = attached[0]?.n ?? 0;
-  if (regionId !== current.regionId && used > 0) return await fail("regional-state-locked");
+  const stateChanged = regionId !== current.regionId;
+  if (stateChanged && used > 0) return await fail("regional-state-locked");
   if (current.active === 1 && active === 0 && used > 0) return await fail("regional-in-use");
+  // The checkbox list was drawn for the old state, so a state change drops those
+  // ticks: a church with attachments cannot change state anyway (used > 0).
+  const cellIds = stateChanged ? [] : selectedCellIds;
   // Any Home Cell of this state may be picked: one that still sits under a
   // sibling church is moved here by the save below, not rejected.
-  if (cellsPresent && selectedCellIds.length > 0) {
+  if (cellsPresent && cellIds.length > 0) {
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${regionId}
-        AND id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
-    if ((valid[0]?.n ?? 0) !== selectedCellIds.length) {
+        AND id IN (${sql.join(cellIds.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== cellIds.length) {
       return await fail(null, "regional-cell-invalid");
     }
   }
@@ -1622,12 +1650,13 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
        SET name = ${name}, name_en = ${nameEn || null}, region_id = ${regionId},
            active = ${active}, sort_order = ${sortOrder}
      WHERE id = ${id}`);
-  if (cellsPresent) {
+    if (cellsPresent) {
     await db.run(sql`UPDATE lookup_options SET regional_church_id = NULL WHERE regional_church_id = ${id}`);
-    if (selectedCellIds.length > 0) {
+    if (cellIds.length > 0) {
       await db.run(sql`
         UPDATE lookup_options SET regional_church_id = ${id}
-        WHERE id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
+        WHERE id IN (${sql.join(cellIds.map((v) => sql`${v}`), sql`, `)})
+      `);
     }
   }
   const landing = "/organization/regional-churches?ok=regional-updated";
@@ -2230,14 +2259,18 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
       (SELECT COUNT(*) FROM member_positions WHERE supervision_cluster_id = ${id}) +
       (SELECT COUNT(*) FROM cluster_pastor_assignments WHERE cluster_id = ${id}) AS n`);
   const used = attached[0]?.n ?? 0;
-  if (regionId !== current.regionId && used > 0) return await fail("cluster-state-locked");
+  const stateChanged = regionId !== current.regionId;
+  if (stateChanged && used > 0) return await fail("cluster-state-locked");
   if (current.active === 1 && active === 0 && used > 0) return await fail("cluster-in-use");
-  if (cellsPresent && selectedCellIds.length > 0) {
+  // The checkbox list was drawn for the old state, so a state change drops those
+  // ticks: a cluster with attachments cannot change state anyway (used > 0).
+  const cellIds = stateChanged ? [] : selectedCellIds;
+  if (cellsPresent && cellIds.length > 0) {
     const valid = await db.all<{ n: number }>(sql`
       SELECT COUNT(*) AS n FROM lookup_options
       WHERE type = 'home_cell' AND region_id = ${regionId}
-        AND id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
-    if ((valid[0]?.n ?? 0) !== selectedCellIds.length) {
+        AND id IN (${sql.join(cellIds.map((v) => sql`${v}`), sql`, `)})`);
+    if ((valid[0]?.n ?? 0) !== cellIds.length) {
       return await fail(null, "cluster-cell-invalid");
     }
   }
@@ -2255,12 +2288,13 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   } else {
     await db.run(sql`DELETE FROM cluster_pastor_assignments WHERE cluster_id = ${id}`);
   }
-  if (cellsPresent) {
+    if (cellsPresent) {
     await db.run(sql`UPDATE lookup_options SET supervision_cluster_id = NULL WHERE supervision_cluster_id = ${id}`);
-    if (selectedCellIds.length > 0) {
+    if (cellIds.length > 0) {
       await db.run(sql`
         UPDATE lookup_options SET supervision_cluster_id = ${id}
-        WHERE id IN (${sql.join(selectedCellIds.map((v) => sql`${v}`), sql`, `)})`);
+        WHERE id IN (${sql.join(cellIds.map((v) => sql`${v}`), sql`, `)})
+      `);
     }
   }
   const landing = "/organization/clusters?ok=cluster-updated";
