@@ -494,9 +494,22 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
      copy as one block, instead of a left-aligned strip beside the form. */
   .auth-aside { padding: 22px 20px 24px; gap: 16px; min-height: 0; }
   .auth-aside h1 { font-size: 23px; }
-  .auth-main { padding: 24px 22px 26px; }
+  .auth-main { padding: 22px 20px 24px; }
   .auth-main h2 { font-size: 22px; }
   .auth-sub { margin-bottom: 16px; font-size: 13px; }
+  /* Touch-friendly fields: 46px tall and 16px text also stops iOS from
+     zooming the page when the username field receives focus. */
+  .auth-main input[type=text], .auth-main input[type=password] {
+    height: 46px; padding: 0 12px; font-size: 16px;
+  }
+  .auth-main .pw-wrap input { padding-right: 46px; }
+  .auth-main label.field span.lbl,
+  .auth-main .field > label.lbl { margin-bottom: 6px; font-size: 12.5px; }
+  .auth-main form .field { margin-top: 14px; }
+  .auth-main .auth-remember { margin-top: 16px; }
+  .auth-main .actions { margin-top: 16px; }
+  .auth-main .actions .btn { min-height: 48px; font-size: 15px; }
+  .auth-secure { margin-top: 16px; }
   .auth-mark { width: 96px; height: 96px; border-radius: 23px; padding: 8px; }
   .auth-brand { flex-direction: column; align-items: center; text-align: center; gap: 9px; }
   .auth-brand-text { align-items: center; gap: 2px; }
@@ -507,10 +520,9 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
   .auth-eyebrow::after { content: ""; width: 22px; height: 2px; border-radius: 2px; background: #93c5fd; }
   .auth-aside-foot { display: none; }
   .auth-lead { max-width: 300px; margin: 7px auto 0; font-size: 13px; }
-  .auth-main { padding: 26px 22px; }
 }
 @media (max-width: 420px) {
-  .auth-main { padding: 22px 18px; }
+  .auth-main { padding: 20px 18px 22px; }
   .auth-main h2 { font-size: 20.5px; }
   .auth-aside { padding: 18px; }
   .auth-mark { width: 88px; height: 88px; border-radius: 21px; padding: 7px; }
