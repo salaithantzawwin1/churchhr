@@ -38,8 +38,8 @@ type PositionValues = {
   active: boolean;
   /** Code of the position this one reports to ("" = top level). */
   parentCode: string | null;
-  /** Church this position belongs to ("" = every church in its state). */
-  regionalChurchId: number | "";
+  /** Churches this position is limited to (empty = every church in its state). */
+  regionalChurchIds: number[];
 };
 
 function positionValues(def?: PositionDefRow): PositionValues {
@@ -50,7 +50,7 @@ function positionValues(def?: PositionDefRow): PositionValues {
     sortOrder: def?.sortOrder ?? 0,
     active: def ? def.active === 1 : true,
     parentCode: def?.parentCode ?? null,
-    regionalChurchId: def?.regionalChurchId ?? "",
+    regionalChurchIds: def?.regionalChurchIds ?? [],
   };
 }
 
@@ -93,16 +93,23 @@ function PositionFields(props: {
         </select>
         <span class="field-hint">{t("org.positionParentHint")}</span>
       </label>
-      <label class="field">
+      <div class="field span-2 position-church-field">
         <span class="lbl">{t("org.positionChurch")}</span>
-        <select name="regional_church_id">
-          <option value="" selected={values.regionalChurchId === ""}>{t("org.positionChurchAll")}</option>
-          {churches.map((church) => (
-            <option value={String(church.id)} selected={values.regionalChurchId === church.id}>{church.name}</option>
-          ))}
-        </select>
+        {churches.length === 0 ? (
+          <p class="muted small">{t("org.positionChurchAll")}</p>
+        ) : (
+          <div class="check-grid position-church-grid">
+            {churches.map((church) => (
+              <label class="check-chip">
+                <input type="checkbox" name="church_ids" value={String(church.id)}
+                  checked={values.regionalChurchIds.includes(church.id)} />
+                <span>{church.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
         <span class="field-hint">{t("org.positionChurchHint")}</span>
-      </label>
+      </div>
       {editing && (
         <label class="dept-active">
           <input type="checkbox" name="active" value="1" checked={values.active} />
@@ -264,11 +271,10 @@ export function PositionsPage(props: Common & {
                   <p class="role-card-meta">
                     <code>{def.code}</code>
                     <span class="role-chip">{def.usageCount ?? 0} {t("org.positionUsage")}</span>
-                    {def.regionalChurchId != null && (
-                      <span class="role-chip church">
-                        {L !== "mm" && def.churchNameEn ? def.churchNameEn : def.churchName}
-                      </span>
-                    )}
+                    {(def.regionalChurchIds ?? []).map((id) => {
+                      const church = (props.churches ?? []).find((c) => c.id === id);
+                      return church ? <span class="role-chip church">{church.name}</span> : null;
+                    })}
                   </p>
                 </div>
               </header>

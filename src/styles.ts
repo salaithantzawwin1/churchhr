@@ -2243,6 +2243,18 @@ td.empty-state .small { margin-top: 4px; }
 .dept-members-foot { margin: 10px 0 0; font-size: 12.5px; }
 .dept-members-foot a { color: var(--link); text-decoration: none; font-weight: 600; }
 .dept-members-foot a:hover { text-decoration: underline; }
+.dept-card-church {
+  display: inline-flex; align-items: center; padding: 1px 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 11.5px; line-height: 1.7;
+}
+/* Position editor church checkboxes: one chip per church, no dropdown. */
+.position-church-field { min-width: 0; }
+.position-church-field > .lbl {
+  display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600;
+}
+.position-church-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.position-church-grid .check-chip { padding: 6px 10px; font-size: 13px; }
 /* Department editor: names first, then a short order/status row, so the dialog
    reads top-down instead of scattering one small number field into the grid. */
 .dept-form { gap: 16px; }

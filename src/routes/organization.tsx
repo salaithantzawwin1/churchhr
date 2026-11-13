@@ -94,7 +94,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const positionDefs = await loadPositionDefs(db);
 
   const departments = await db.all<OrgDepartment>(sql`
-    SELECT d.id, d.name, d.name_en, d.sort_order,
+    SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
       (SELECT COUNT(*) FROM members m
         WHERE m.department_id = d.id AND m.status = 'active') AS member_count,
       (SELECT GROUP_CONCAT(DISTINCT hc.regional_church_id)
@@ -400,8 +400,11 @@ organizationRoutes.post("/assign", requirePermission("members.update"), async (c
 // ---------- Department detail ----------
 
 organizationRoutes.get("/departments/new", requirePermission("options.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
   if (!modalRequest(c)) return c.redirect("/organization/departments", 303);
-  return c.html(<DepartmentModal lang={c.get("lang")} />);
+  return c.html(
+    <DepartmentModal lang={c.get("lang")} churches={await positionChurchOptions(db, c.get("lang"))} />,
+  );
 });
 
 organizationRoutes.get("/departments/:id/edit", requirePermission("options.manage"), requireAllStates, async (c) => {
@@ -410,7 +413,10 @@ organizationRoutes.get("/departments/:id/edit", requirePermission("options.manag
   const department = id ? (await loadAdminDepartments(db)).find((d) => d.id === id) : undefined;
   if (!department) return c.redirect("/organization/departments?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect("/organization/departments", 303);
-  return c.html(<DepartmentModal department={department} lang={c.get("lang")} />);
+  return c.html(
+    <DepartmentModal department={department} lang={c.get("lang")}
+      churches={await positionChurchOptions(db, c.get("lang"))} />,
+  );
 });
 
 organizationRoutes.get("/departments/:id", requirePermission("members.view"), async (c) => {
@@ -423,10 +429,13 @@ organizationRoutes.get("/departments/:id", requirePermission("members.view"), as
   const memberScope = memberScopeCond(scope);
   const positionDefs = await loadPositionDefs(db);
   const department = (await db.all<OrgDepartment>(sql`
-    SELECT d.id, d.name, d.name_en, d.sort_order,
+    SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
+      rc.name AS church_name, rc.name_en AS church_name_en,
       (SELECT COUNT(*) FROM members m
         WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScope}) AS member_count
-    FROM church_departments d WHERE d.id = ${id} LIMIT 1`))[0];
+    FROM church_departments d
+    LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
+    WHERE d.id = ${id} LIMIT 1`))[0];
   if (!department) return c.notFound();
   const leaders = await db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
@@ -578,11 +587,14 @@ organizationRoutes.post("/departments/:id/members/:memberId/position", requirePe
 async function loadAdminDepartments(db: ReturnType<typeof getDb>): Promise<AdminDepartmentRow[]> {
   return db.all<AdminDepartmentRow>(sql`
     SELECT d.id, d.name, d.name_en AS nameEn, d.active, d.sort_order AS sortOrder,
+      d.regional_church_id AS regionalChurchId,
+      rc.name AS church_name, rc.name_en AS church_name_en,
       (SELECT COUNT(*) FROM member_positions mp
         WHERE mp.scope_type = 'department' AND mp.department_id = d.id) AS role_count,
       (SELECT COUNT(*) FROM members m
         WHERE m.department_id = d.id AND m.status = 'active') AS member_count
     FROM church_departments d
+    LEFT JOIN regional_churches rc ON rc.id = d.regional_church_id
     ORDER BY d.active DESC, d.sort_order, d.name`);
 }
 
@@ -630,19 +642,25 @@ organizationRoutes.post("/departments", requirePermission("options.manage"), req
   const name = s(body.name);
   const nameEn = s(body.name_en);
   const sortOrder = departmentSortOrder(s(body.sort_order));
-  const values = { name, nameEn, sortOrder, active: true };
+  const churchId = asInt(s(body.regional_church_id));
+  const values = { name, nameEn, sortOrder, active: true, regionalChurchId: churchId ?? "" as const };
   const modal = modalRequest(c);
+  const churches = await positionChurchOptions(db, c.get("lang"));
   const fail = async (code: string) => modal
-    ? c.html(<DepartmentModal values={values} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />, 422)
+    ? c.html(<DepartmentModal values={values} churches={churches} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />, 422)
     : c.redirect(`/organization/departments?err=${code}`, 303);
   const invalid = departmentNameError(name, nameEn);
   if (invalid) return await fail(invalid);
+  if (!await validPositionChurch(db, churchId)) return await fail("err-notfound");
   try {
     const duplicate = await db.all<{ id: number }>(sql`
-      SELECT id FROM church_departments WHERE lower(name) = lower(${name}) LIMIT 1`);
+      SELECT id FROM church_departments
+       WHERE lower(name) = lower(${name}) AND COALESCE(regional_church_id, 0) = ${churchId ?? 0}
+       LIMIT 1`);
     if (duplicate.length > 0) return await fail("department-name-taken");
     await db.insert(churchDepartments).values({
       name, nameEn: nameEn || null, active: 1, sortOrder,
+      regionalChurchId: churchId,
     });
   } catch {
     return await fail("department-name-taken");
@@ -665,17 +683,23 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   const nameEn = s(body.name_en);
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
+  const churchId = asInt(s(body.regional_church_id));
   const department = (await loadAdminDepartments(db)).find((d) => d.id === id)!;
-  const values = { name, nameEn, sortOrder, active: active === 1 };
+  const values = {
+    name, nameEn, sortOrder, active: active === 1,
+    regionalChurchId: churchId ?? "" as const,
+  };
   const modal = modalRequest(c);
+  const churches = await positionChurchOptions(db, c.get("lang"));
   const fail = async (code: string) => modal
     ? c.html(
-      <DepartmentModal department={department} values={values} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />,
+      <DepartmentModal department={department} values={values} churches={churches} error={flashText(code, c.get("lang"))} lang={c.get("lang")} />,
       422,
     )
     : c.redirect(`/organization/departments?err=${code}`, 303);
   const invalid = departmentNameError(name, nameEn);
   if (invalid) return await fail(invalid);
+  if (!await validPositionChurch(db, churchId)) return await fail("err-notfound");
 
   if (current.active === 1 && active === 0) {
     const assigned = await db.all<{ n: number }>(sql`
@@ -692,10 +716,12 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
   try {
     const duplicate = await db.all<{ id: number }>(sql`
       SELECT id FROM church_departments
-       WHERE lower(name) = lower(${name}) AND id <> ${id} LIMIT 1`);
+       WHERE lower(name) = lower(${name}) AND id <> ${id}
+         AND COALESCE(regional_church_id, 0) = ${churchId ?? 0} LIMIT 1`);
     if (duplicate.length > 0) return await fail("department-name-taken");
     await db.update(churchDepartments).set({
       name, nameEn: nameEn || null, active, sortOrder,
+      regionalChurchId: churchId,
     }).where(eq(churchDepartments.id, id));
   } catch {
     return await fail("department-name-taken");
@@ -707,13 +733,12 @@ organizationRoutes.post("/departments/:id", requirePermission("options.manage"),
 // ---------- Editable position catalogue ----------
 
 async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
-  return db.all<PositionDefRow>(sql`
+  const rows = await db.all<PositionDefRow & { church_ids: string | null }>(sql`
     SELECT pd.id, pd.scope_type AS scopeType, pd.code,
            pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
            pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
            pd.active, pd.sort_order AS sortOrder,
-           pd.regional_church_id AS regionalChurchId,
-           rc.name AS churchName, rc.name_en AS churchNameEn,
+           GROUP_CONCAT(DISTINCT pdc.regional_church_id) AS church_ids,
            (SELECT COUNT(*) FROM member_positions mp
              LEFT JOIN members m ON m.id = mp.member_id
              LEFT JOIN pastors p ON p.id = mp.pastor_id
@@ -721,8 +746,16 @@ async function adminPositionDefs(db: DB): Promise<PositionDefRow[]> {
                AND ((mp.member_id IS NOT NULL AND m.status = 'active')
                  OR (mp.pastor_id IS NOT NULL AND p.active = 1))) AS usageCount
     FROM position_defs pd
-    LEFT JOIN regional_churches rc ON rc.id = pd.regional_church_id
+    LEFT JOIN position_def_churches pdc ON pdc.position_def_id = pd.id
+    GROUP BY pd.id
     ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+  return rows.map((row) => ({
+    ...row,
+    regionalChurchIds: (row.church_ids ?? "")
+      .split(",")
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  }));
 }
 
 /** How many live people hold a catalogue role. A row left behind by a
@@ -745,12 +778,29 @@ async function positionChurchOptions(db: DB, lang: string): Promise<{ id: number
   return rows.map((r) => ({ id: r.id, name: regionalChurchName(r, lang) }));
 }
 
-/** The church a position is filed under, or null for every church. */
+/** A church ticked in a position form must still exist. */
 async function validPositionChurch(db: DB, churchId: number | null): Promise<boolean> {
   if (churchId == null) return true;
   const rows = await db.all<{ id: number }>(sql`
     SELECT id FROM regional_churches WHERE id = ${churchId} LIMIT 1`);
   return rows.length > 0;
+}
+
+/** Checkbox group -> unique, positive church ids. */
+function formChurchIds(raw: unknown): number[] {
+  const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+  return [...new Set(list
+    .map((value) => asInt(s(value)))
+    .filter((id): id is number => id != null && id > 0))];
+}
+
+async function replacePositionChurches(db: DB, positionDefId: number, churchIds: number[]): Promise<void> {
+  await db.run(sql`DELETE FROM position_def_churches WHERE position_def_id = ${positionDefId}`);
+  for (const churchId of churchIds) {
+    await db.run(sql`
+      INSERT OR IGNORE INTO position_def_churches (position_def_id, regional_church_id)
+      VALUES (${positionDefId}, ${churchId})`);
+  }
 }
 
 /** Parent choices for the position form: same scope, never the position itself. */
@@ -847,21 +897,26 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   const nameKr = s(body.name_korean).slice(0, 100);
   const sortOrder = departmentSortOrder(s(body.sort_order));
   const parentCode = s(body.parent_code) || null;
-  const churchId = asInt(s(body.regional_church_id));
+  // Repeated checkbox keys only survive with `all`, which wraps every field in an array.
+  const allBody = await c.req.parseBody({ all: true });
+  const churchIds = formChurchIds(allBody.church_ids);
   const values = {
     nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr, sortOrder, active: true, parentCode,
-    regionalChurchId: churchId ?? "" as const,
+    regionalChurchIds: churchIds,
   };
   // A modal submit gets the form back with the error instead of a redirect, so
   // the dialog stays open and keeps what was typed.
   const modal = modalRequest(c);
-  const fail = (err: string) => modal
-    ? c.html(<PositionModal scope={scope} values={values} churches={[]} error={flashText(err, c.get("lang"))} lang={c.get("lang")} />, 422)
+  const churchOptions = await positionChurchOptions(db, c.get("lang"));
+  const fail = async (err: string) => modal
+    ? c.html(<PositionModal scope={scope} values={values} churches={churchOptions} error={flashText(err, c.get("lang"))} lang={c.get("lang")} />, 422)
     : c.redirect(`${back}&err=${err}`, 303);
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return fail(invalid);
   if (!nameEn) return fail("position-name-en");
-  if (!await validPositionChurch(db, churchId)) return fail("position-church-invalid");
+  for (const churchId of churchIds) {
+    if (!await validPositionChurch(db, churchId)) return fail("position-church-invalid");
+  }
   if (parentCode) {
     const exists = (await adminPositionDefs(db)).some((d) => d.scopeType === scope && d.code === parentCode);
     if (!exists) return fail("position-parent-invalid");
@@ -877,13 +932,14 @@ organizationRoutes.post("/positions", requirePermission("options.manage"), requi
   }
   try {
     await db.run(sql`
-      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order, parent_code, regional_church_id)
-      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder}, ${parentCode}, ${churchId})`);
+      INSERT INTO position_defs (scope_type, code, name_myanmar, name_english, name_korean, active, sort_order, parent_code)
+      VALUES (${scope}, ${code}, ${nameMm}, ${nameEn || null}, ${nameKr || null}, 1, ${sortOrder}, ${parentCode})`);
   } catch {
     return fail("position-code-taken");
   }
   const created = (await db.all<{ id: number }>(sql`
     SELECT id FROM position_defs WHERE scope_type = ${scope} AND code = ${code} LIMIT 1`))[0];
+  if (created) await replacePositionChurches(db, created.id, churchIds);
   await recordPositionHistory(db, {
     entity: "def", action: "created", actorId: c.get("user").id,
     scopeType: scope, code, positionDefId: created?.id ?? null,
@@ -897,11 +953,7 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   const db = getDb(c.env);
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/positions?err=err-notfound", 303);
-  const current = (await db.all<PositionDefRow>(sql`
-    SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
-           name_english AS nameEnglish, name_korean AS nameKorean, active,
-           sort_order AS sortOrder, regional_church_id AS regionalChurchId
-    FROM position_defs WHERE id = ${id} LIMIT 1`))[0];
+  const current = (await adminPositionDefs(db)).find((def) => def.id === id);
   if (!current) return c.redirect("/organization/positions?err=err-notfound", 303);
   const back = `/organization/positions?scope=${current.scopeType}`;
   const body = await c.req.parseBody();
@@ -911,25 +963,29 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
   const active = s(body.active) === "1" ? 1 : 0;
   const sortOrder = departmentSortOrder(s(body.sort_order), current.sortOrder);
   const parentCode = s(body.parent_code) || null;
-  const churchId = asInt(s(body.regional_church_id));
+  // Repeated checkbox keys only survive with `all`, which wraps every field in an array.
+  const allBody = await c.req.parseBody({ all: true });
+  const churchIds = formChurchIds(allBody.church_ids);
   const values = {
     nameMyanmar: nameMm, nameEnglish: nameEn, nameKorean: nameKr,
-    sortOrder, active: active === 1, parentCode, regionalChurchId: churchId ?? "" as const,
+    sortOrder, active: active === 1, parentCode, regionalChurchIds: churchIds,
   };
   const modal = modalRequest(c);
+  const churchOptions = await positionChurchOptions(db, c.get("lang"));
   const fail = async (err: string) => {
     if (!modal) return c.redirect(`${back}&err=${err}`, 303);
-    const def = (await adminPositionDefs(db)).find((d) => d.id === id);
     return c.html(
-      <PositionModal scope={current.scopeType} def={def} values={values}
-        churches={await positionChurchOptions(db, c.get("lang"))}
+      <PositionModal scope={current.scopeType} def={current} values={values}
+        churches={churchOptions}
         error={flashText(err, c.get("lang"))} lang={c.get("lang")} />,
       422,
     );
   };
   const invalid = positionNameError(nameMm, nameEn);
   if (invalid) return await fail(invalid);
-  if (!await validPositionChurch(db, churchId)) return await fail("position-church-invalid");
+  for (const churchId of churchIds) {
+    if (!await validPositionChurch(db, churchId)) return await fail("position-church-invalid");
+  }
   if (parentCode) {
     const defs = await adminPositionDefs(db);
     if (!defs.some((d) => d.scopeType === current.scopeType && d.code === parentCode)) {
@@ -946,8 +1002,9 @@ organizationRoutes.post("/positions/:id", requirePermission("options.manage"), r
     UPDATE position_defs
        SET name_myanmar = ${nameMm}, name_english = ${nameEn || null}, name_korean = ${nameKr || null},
            active = ${active}, sort_order = ${sortOrder}, parent_code = ${parentCode},
-           regional_church_id = ${churchId}, updated_at = unixepoch()
+           updated_at = unixepoch()
      WHERE id = ${id}`);
+  await replacePositionChurches(db, id, churchIds);
   const changes = diffPositionDefs(current, {
     nameMyanmar: nameMm, nameEnglish: nameEn || null, nameKorean: nameKr || null, active, sortOrder,
   });
@@ -974,6 +1031,7 @@ organizationRoutes.post("/positions/:id/delete", requirePermission("options.mana
   if ((await activeHolderCount(db, current.code, current.scopeType)) > 0) {
     return c.redirect(`${back}&err=position-in-use`, 303);
   }
+  await db.run(sql`DELETE FROM position_def_churches WHERE position_def_id = ${id}`);
   await db.run(sql`DELETE FROM position_defs WHERE id = ${id}`);
   // Children of a removed position become top level instead of vanishing.
   await db.run(sql`

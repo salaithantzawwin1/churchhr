@@ -26,10 +26,10 @@ export type PositionDefRow = {
   active: number;
   sortOrder: number;
   usageCount?: number;
-  /** Set when the position exists only in this church (0034); null = all churches. */
-  regionalChurchId?: number | null;
-  churchName?: string | null;
-  churchNameEn?: string | null;
+  /** Churches that may use this position; an empty list means every church. */
+  regionalChurchIds?: number[];
+  /** Localized church names for the list badge. */
+  churchNames?: string[];
 };
 
 const SCOPE_LABEL_FALLBACK: Record<ConfigurablePositionScope, string> = {
@@ -95,22 +95,35 @@ export function isDefinedForScope(
 }
 
 export async function loadPositionDefs(db: DB): Promise<PositionDefRow[]> {
-  return db.all<PositionDefRow>(sql`
-    SELECT id, scope_type AS scopeType, code, name_myanmar AS nameMyanmar,
-           name_english AS nameEnglish, name_korean AS nameKorean,
-           parent_code AS parentCode, active, sort_order AS sortOrder,
-           regional_church_id AS regionalChurchId
-    FROM position_defs
-    ORDER BY scope_type, sort_order, id`);
+  const rows = await db.all<PositionDefRow & { church_ids: string | null }>(sql`
+    SELECT pd.id, pd.scope_type AS scopeType, pd.code,
+           pd.name_myanmar AS nameMyanmar, pd.name_english AS nameEnglish,
+           pd.name_korean AS nameKorean, pd.parent_code AS parentCode,
+           pd.active, pd.sort_order AS sortOrder,
+           GROUP_CONCAT(DISTINCT pdc.regional_church_id) AS church_ids
+    FROM position_defs pd
+    LEFT JOIN position_def_churches pdc ON pdc.position_def_id = pd.id
+    GROUP BY pd.id
+    ORDER BY pd.scope_type, pd.sort_order, pd.id`);
+  return rows.map((row) => ({
+    ...row,
+    regionalChurchIds: (row.church_ids ?? "")
+      .split(",")
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  }));
 }
 
-/** Positions usable in a church: state-wide ones plus that church's own. */
-export function defsForChurch<T extends { regionalChurchId?: number | null }>(
+/** Positions usable in a church: state-wide ones plus the ones ticked for it. */
+export function defsForChurch<T extends { regionalChurchIds?: number[] }>(
   defs: T[],
   churchId: number | null | undefined,
 ): T[] {
   if (churchId == null) return defs;
-  return defs.filter((d) => d.regionalChurchId == null || d.regionalChurchId === churchId);
+  return defs.filter((d) => {
+    const ids = d.regionalChurchIds ?? [];
+    return ids.length === 0 || ids.includes(churchId);
+  });
 }
 
 /** Human scope title for admin tabs (English fallback; views translate it). */

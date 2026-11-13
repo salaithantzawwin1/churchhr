@@ -285,9 +285,11 @@ export const churchDepartments = sqliteTable(
     nameEn: text("name_en"),
     active: integer("active").notNull().default(1),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** NULL keeps the department available to every church. */
+    regionalChurchId: integer("regional_church_id").references(() => regionalChurches.id),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
   },
-  (t) => ({ nameUq: uniqueIndex("church_departments_name_uq").on(t.name) }),
+  (t) => ({ churchIdx: index("church_departments_church_idx").on(t.regionalChurchId) }),
 );
 
 /** Editable position catalogue. `scope_type` is church, regional_church,

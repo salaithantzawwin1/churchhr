@@ -8,6 +8,8 @@ export type DepartmentRow = {
   nameEn: string | null;
   active: number;
   sortOrder: number;
+  /** NULL means the department is shared by every church. */
+  regionalChurchId: number | null;
 };
 
 /** Active departments by default; management pages can include inactive rows. */
@@ -19,6 +21,7 @@ export async function loadDepartments(db: DB, activeOnly = true): Promise<Depart
       nameEn: churchDepartments.nameEn,
       active: churchDepartments.active,
       sortOrder: churchDepartments.sortOrder,
+      regionalChurchId: churchDepartments.regionalChurchId,
     })
     .from(churchDepartments)
     .where(activeOnly ? eq(churchDepartments.active, 1) : undefined)

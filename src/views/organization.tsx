@@ -25,6 +25,9 @@ export type OrgDepartment = {
   name_en: string | null;
   sort_order: number;
   member_count: number;
+  regional_church_id?: number | null;
+  church_name?: string | null;
+  church_name_en?: string | null;
   church_ids?: string | null;
 };
 
@@ -260,7 +263,9 @@ export function OrganizationPage(props: Common & {
     ? cells.filter((c) => c.regional_church_id === selectedChurch.id)
     : cells;
   const scopedDepartments = churchScoped
-    ? departments.filter((d) => (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
+    ? departments.filter((d) => d.regional_church_id != null
+      ? d.regional_church_id === selectedChurch.id
+      : (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
     : departments;
   const states = groupCells(scopedCells, clusters, L);
   const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);

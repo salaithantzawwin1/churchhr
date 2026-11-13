@@ -10,6 +10,8 @@ type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lan
 export type AdminDepartmentRow = DepartmentRow & {
   role_count: number;
   member_count: number;
+  church_name: string | null;
+  church_name_en: string | null;
 };
 
 /** One active holder of a department role, listed on the department card. */
@@ -20,17 +22,25 @@ export type DepartmentLeaderRow = {
   memberName: string | null;
 };
 
-type DepartmentFormValues = { name: string; nameEn: string; sortOrder: number; active: boolean };
+type DepartmentFormValues = {
+  name: string;
+  nameEn: string;
+  sortOrder: number;
+  active: boolean;
+  regionalChurchId: number | "";
+};
 
 function DepartmentFields(props: {
   department?: AdminDepartmentRow;
   values?: DepartmentFormValues;
+  churches: { id: number; name: string }[];
   lang: Lang;
 }) {
-  const { department, values, lang } = props;
+  const { department, values, churches, lang } = props;
   const t = getDict(lang);
   const name = values?.name ?? department?.name ?? "";
   const nameEn = values?.nameEn ?? department?.nameEn ?? "";
+  const churchId = values?.regionalChurchId ?? department?.regionalChurchId ?? "";
   return (
     <>
       <label class="field">
@@ -40,6 +50,16 @@ function DepartmentFields(props: {
       <label class="field">
         <span class="lbl">{t("dept.nameEn")}</span>
         <input type="text" name="name_en" value={nameEn} maxlength={120} />
+      </label>
+      <label class="field">
+        <span class="lbl">{t("dept.church")}</span>
+        <select name="regional_church_id">
+          <option value="" selected={churchId === ""}>{t("org.positionChurchAll")}</option>
+          {churches.map((church) => (
+            <option value={String(church.id)} selected={churchId === church.id}>{church.name}</option>
+          ))}
+        </select>
+        <span class="field-hint">{t("dept.churchHint")}</span>
       </label>
     </>
   );
@@ -87,10 +107,11 @@ function DepartmentGlyph() {
 export function DepartmentModal(props: {
   department?: AdminDepartmentRow;
   values?: DepartmentFormValues;
+  churches: { id: number; name: string }[];
   error?: string | null;
   lang?: Lang;
 }) {
-  const { department, values, error, lang } = props;
+  const { department, values, churches, error, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   return (
@@ -100,7 +121,7 @@ export function DepartmentModal(props: {
         action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
         data-modal-ajax>
         <div class="form-grid dept-fields">
-          <DepartmentFields department={department} values={values} lang={L} />
+          <DepartmentFields department={department} values={values} churches={churches} lang={L} />
         </div>
         <DepartmentMeta department={department} values={values} lang={L} />
         {!department && <p class="muted small dept-form-note">{t("dept.addHint")}</p>}
@@ -126,6 +147,9 @@ export type DepartmentDetailData = {
   name: string;
   name_en: string | null;
   member_count: number;
+  regional_church_id?: number | null;
+  church_name?: string | null;
+  church_name_en?: string | null;
 };
 
 /** An active member of the department, with the church their Home Cell belongs
@@ -178,6 +202,11 @@ export function DepartmentDetailPage(props: Common & {
         <h1>
           {departmentName(department, L)}
           <span class="count-pill">{department.member_count} {t("org.membersShort")}</span>
+          {department.church_name && (
+            <span class="role-chip church">
+              {L !== "mm" && department.church_name_en ? department.church_name_en : department.church_name}
+            </span>
+          )}
         </h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
@@ -364,6 +393,11 @@ export function DepartmentsPage(props: Common & {
                   <span class="hh-card-meta">
                     <span class="hh-count"><b>{d.member_count}</b> {t("org.membersShort")}</span>
                     <span class="muted small">{filledRoles(d.id)} / {roleDefs.length} {t("dept.rolesFilled")}</span>
+                    {d.church_name && (
+                      <span class="dept-card-church">
+                        {L !== "mm" && d.church_name_en ? d.church_name_en : d.church_name}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
