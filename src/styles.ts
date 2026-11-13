@@ -410,14 +410,14 @@ body.auth-page .footer { padding-top: 0; }
   content: ""; position: absolute; right: -90px; bottom: -110px; width: 280px; height: 280px;
   border-radius: 50%; background: rgba(255,255,255,.06); pointer-events: none;
 }
-.auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; min-width: 0; }
+.auth-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 15px; min-width: 0; }
 .auth-brand-name {
   font-size: 12px; font-weight: 600; letter-spacing: .04em; line-height: 1.4;
   color: rgba(255,255,255,.9); text-transform: uppercase;
 }
 .auth-mark {
-  width: 46px; height: 46px; border-radius: 12px; background: #fff; padding: 4px; flex: none;
-  box-shadow: 0 6px 18px rgba(0,0,0,.22);
+  width: 96px; height: 96px; border-radius: 22px; background: #fff; padding: 8px; flex: none;
+  box-shadow: 0 10px 26px rgba(0,0,0,.24);
 }
 .auth-welcome { position: relative; z-index: 1; margin: auto 0; }
 .auth-aside h1 { margin: 0; font-size: 28px; line-height: 1.25; letter-spacing: -.015em; }
@@ -471,7 +471,7 @@ html[lang="my"] .auth-lead { line-height: 1.9; }
   .auth-card { grid-template-columns: 1fr; }
   .auth-aside { padding: 22px; gap: 14px; }
   .auth-aside h1 { font-size: 22px; }
-  .auth-mark { width: 40px; height: 40px; border-radius: 10px; }
+  .auth-mark { width: 64px; height: 64px; border-radius: 16px; padding: 6px; }
   .auth-aside-foot { display: none; }
   .auth-brand-name { display: none; }
   .auth-lead { max-width: none; margin-top: 6px; font-size: 13px; }
@@ -480,7 +480,7 @@ html[lang="my"] .auth-lead { line-height: 1.9; }
 @media (max-width: 420px) {
   .auth-main { padding: 22px 18px; }
   .auth-aside { padding: 18px; }
-  .auth-mark { width: 36px; height: 36px; border-radius: 9px; }
+  .auth-mark { width: 60px; height: 60px; border-radius: 15px; padding: 6px; }
   .auth-card { border-radius: var(--radius-lg); }
 }
 /* ---------- dashboard / KPI stat cards ---------- */
