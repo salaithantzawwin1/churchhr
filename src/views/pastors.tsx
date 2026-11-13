@@ -76,6 +76,9 @@ function PastorFields(props: {
 }) {
   const { values, regions, churches, spouses, selfId, lang, editing, photoUrl } = props;
   const t = getDict(lang);
+  const spouseChoices = spouses.filter((s) => s.id !== selfId);
+  const spouseSelected = spouseChoices.find((s) => s.id === values.spouseId);
+  const spouseText = spouseSelected ? spouseLabel(spouseSelected, lang) : "";
   const initial = Array.from((values.name || values.nameEn || "Ps").trim())[0] ?? "Ps";
   return (
     <>
@@ -150,16 +153,26 @@ function PastorFields(props: {
             <span class="lbl">{t("form.dob")}</span>
             <input type="date" name="date_of_birth" value={values.dateOfBirth} />
           </label>
-          <label class="field span-2">
+          <label class="field">
             <span class="lbl">{t("org.pastorSpouse")}</span>
-            <select name="spouse_pastor_id">
-              <option value="">{t("org.pastorNoSpouse")}</option>
-              {spouses.filter((s) => s.id !== selfId).map((spouse) => (
-                <option value={String(spouse.id)} selected={values.spouseId === spouse.id}>
-                  {spouseLabel(spouse, lang)}
-                </option>
-              ))}
-            </select>
+            {/* The directory can be long, so this is the same searchable picker
+                used for a cluster's pastor: type to filter, × to unlink. */}
+            <div class="head-picker pastor-picker" data-search-picker
+              data-no-match={t("org.pastorNoMatch")}>
+              <input type="search" data-search-input value={spouseText}
+                placeholder={t("org.pastorSearch")} aria-label={t("org.pastorSpouse")}
+                autocomplete="off" role="combobox" aria-expanded="false" />
+              <button type="button" class="head-clear" data-search-clear
+                aria-label={t("org.pastorClear")} hidden={!spouseSelected}>×</button>
+              <select name="spouse_pastor_id" data-search-select>
+                <option value="">{t("org.pastorNoSpouse")}</option>
+                {spouseChoices.map((spouse) => (
+                  <option value={String(spouse.id)} selected={values.spouseId === spouse.id}>
+                    {spouseLabel(spouse, lang)}
+                  </option>
+                ))}
+              </select>
+            </div>
             <span class="hint">{t("org.pastorSpouseHint")}</span>
           </label>
         </div>

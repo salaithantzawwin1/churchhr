@@ -159,6 +159,16 @@ a { color: var(--link); }
 .page-head h1 { margin: 0; font-size: 21px; }
 /* Toolbar: tab pills with count badges. The page's primary action lives in the
    page head (top right), keeping this row to the tabs alone. */
+/* Breadcrumb above a detail title: without this it sat flush against the h1. */
+.breadcrumb {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
+  margin: 0 0 12px; font-size: 12.5px; line-height: 1.6;
+}
+.breadcrumb a { color: var(--muted); text-decoration: none; }
+.breadcrumb a:hover { color: var(--link); text-decoration: underline; }
+.breadcrumb > span { color: var(--line-strong); }
+.page-head .member-head { align-items: flex-start; }
+.page-head .member-head h1 { margin: 0 0 3px; }
 .page-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 14px; }
 .page-toolbar .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* The options page has many tab pills: on narrow screens keep them on one
@@ -229,7 +239,8 @@ tbody tr:hover { background: var(--row-hover); }
 .dp { display: inline-flex; gap: 6px; width: 100%; min-width: 0; }
 /* A date field in a filter row needs room for three parts; the shared
    "flex: 1 1 170px" would squeeze the month down to an arrow. */
-.filters label.field:has(.dp) { flex: 1 1 250px; min-width: 214px; max-width: 320px; }
+.filters label.field:has(.dp),
+.filters label.range-field { flex: 1 1 250px; min-width: 214px; max-width: 320px; }
 .dp .dp-part { flex: 0 0 auto; width: auto; padding: 0 4px 0 8px; }
 .dp .dp-part:first-child { width: 58px; } /* day */
 .dp .dp-part:nth-child(2) { flex: 1 1 0; min-width: 66px; } /* month name */
@@ -893,12 +904,15 @@ td.empty-state .small { margin-top: 4px; }
   text-decoration: none; white-space: nowrap;
 }
 .filter-clear:hover { color: var(--ink); text-decoration: underline; }
-.quick-ranges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+/* Quick ranges are a secondary shortcut, so they stay a compact row of pills
+   rather than competing with the primary actions above them. */
+.quick-ranges { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
 .quick-chip {
-  display: inline-flex; align-items: center; min-height: 38px; padding: 6px 13px;
+  display: inline-flex; align-items: center; min-height: 30px; padding: 3px 11px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-  color: var(--ink); font-size: 13.5px; font-weight: 600; text-decoration: none;
+  color: var(--muted); font-size: 12.5px; font-weight: 600; text-decoration: none;
 }
+.quick-chip.active { color: var(--link); }
 .quick-chip:hover { border-color: var(--muted); text-decoration: none; }
 .quick-chip.active { border-color: var(--link); background: var(--accent-soft, #e8f0fb); color: var(--link); }
 .filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 12px; }
@@ -2217,7 +2231,7 @@ td.empty-state .small { margin-top: 4px; }
   .org-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .org-card { padding: 14px; }
   .quick-ranges { margin-bottom: 10px; }
-  .quick-chip { min-height: 44px; }
+  .quick-chip { min-height: 34px; padding: 5px 12px; }
 }
 
 /* ---------- reports: phone layout ---------- */
@@ -2290,7 +2304,7 @@ td.empty-state .small { margin-top: 4px; }
   .topbar nav { column-gap: 0; }
   .topbar nav a { padding: 5px 4px; font-size: 12px; }
   .quick-ranges { gap: 4px; }
-  .quick-chip { padding: 6px 7px; font-size: 12px; }
+  .quick-chip { padding: 5px 9px; font-size: 11.5px; }
   .org-code { display: none; }
 }
 

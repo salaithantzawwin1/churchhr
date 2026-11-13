@@ -183,11 +183,11 @@ export function ReportsListPage(props: Common & {
         </summary>
         <form method="get" action="/reports" class="filters">
           {team && <input type="hidden" name="scope" value="team" />}
-          <label class="field">
+          <label class="field range-field">
             <span class="lbl">{t("rep.from")}</span>
             <input type="date" name="from" value={range.from} />
           </label>
-          <label class="field">
+          <label class="field range-field">
             <span class="lbl">{t("rep.to")}</span>
             <input type="date" name="to" value={range.to} />
           </label>
