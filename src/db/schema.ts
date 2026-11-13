@@ -9,6 +9,24 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+/**
+ * Drizzle definitions for the tables the app queries through Drizzle.
+ *
+ * A few schema objects live only in `migrations/` because the code touches them
+ * with raw SQL (`env.DB.prepare(...)`); they are listed here so this file stays
+ * an accurate picture of the database:
+ *
+ *   tables
+ *   - `audit_log` (0035) — audit trail written by src/audit.ts
+ *   - `pastor_history` (0036) — ministry years, src/pastor-history.ts
+ *   - `position_def_churches` (0037) — church-scoped positions, src/position-catalog.ts
+ *   - `region_position_migration` (0040) — one-off rollback bookkeeping, no runtime code
+ *
+ *   columns
+ *   - `members.photo` (0015) — BLOB profile photo
+ *   - `position_defs.parent_code` (0030) — code of the parent position
+ *   - `position_defs.regional_church_id` (0034) — church that owns a church-scoped code
+ */
 export const regions = sqliteTable("regions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -134,9 +152,12 @@ export const lookupOptions = sqliteTable(
     /** Township prefix for Family Group codes (INS -> INS_FG001); unique per type+region. */
     shortCode: text("short_code"),
   },
+  // Uniqueness of (type, label, region_id) comes from the table definition
+  // itself (0007_option_parent.sql), which SQLite stores as
+  // `sqlite_autoindex_lookup_options_1`. A uniqueIndex() here would add a second
+  // index for the same tuple, so the constraint is documented rather than declared.
   (t) => ({
     typeIdx: index("lookup_options_type_idx").on(t.type),
-    typeLabelUq: uniqueIndex("lookup_options_type_label_uq").on(t.type, t.label, t.regionId),
     regionIdx: index("lookup_options_region_idx").on(t.regionId),
     parentIdx: index("lookup_options_parent_idx").on(t.parentId),
     supervisionClusterIdx: index("lookup_options_supervision_cluster_idx").on(t.supervisionClusterId),
@@ -253,6 +274,7 @@ export const members = sqliteTable(
     departmentId: integer("department_id").references(() => churchDepartments.id),
     householdId: integer("family_id"),
     relationship: text("relationship").notNull().default(""),
+    // members.photo (0015) is only touched through raw SQL, see the file header.
     regionId: integer("region_id")
       .notNull()
       .references(() => regions.id),
@@ -304,6 +326,7 @@ export const appBranding = sqliteTable("app_branding", {
   updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
 });
 
+/** parent_code (0030) and regional_church_id (0034) are raw-SQL only, see the file header. */
 export const positionDefs = sqliteTable(
   "position_defs",
   {
