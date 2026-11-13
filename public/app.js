@@ -1036,14 +1036,16 @@
     });
   })();
 
-  // Collapsible filter panels: open on desktop, collapsed on phones. Once the
-  // user toggles one, resize only forces it open for wide viewports.
+  // Collapsible filter panels: open on desktop, collapsed on phones — unless a
+  // filter is already narrowing the list, in which case the panel stays open so
+  // the chosen values remain visible. Once the user toggles one, resize only
+  // forces it open for wide viewports.
   (function initFilterBoxes() {
     var boxes = document.querySelectorAll("details.filter-box");
     if (!boxes.length) return;
     var mq = window.matchMedia("(max-width: 640px)");
     Array.prototype.forEach.call(boxes, function (d) {
-      if (mq.matches) d.open = false;
+      if (mq.matches && !d.querySelector(".filter-count")) d.open = false;
       mq.addEventListener("change", function () {
         if (!mq.matches) d.open = true;
       });
@@ -1079,15 +1081,6 @@
     }
     sync();
     window.addEventListener("resize", sync);
-  })();
-
-  // A phone has room for the filter panel or the list, not both, so the panel
-  // starts closed there unless a filter is already narrowing the results.
-  (function initFilterPanels() {
-    if (!window.matchMedia("(max-width: 640px)").matches) return;
-    Array.prototype.forEach.call(document.querySelectorAll("details.filter-box[open]"), function (panel) {
-      if (!panel.querySelector(".filter-count")) panel.removeAttribute("open");
-    });
   })();
 
   // Card/list preference for collection pages. Both views use the same server
