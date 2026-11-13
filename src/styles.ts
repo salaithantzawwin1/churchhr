@@ -987,16 +987,29 @@ td.empty-state .small { margin-top: 4px; }
    A uniform grid gives every control the same column width and a tidy edge. */
 .members-filter {
   display: grid; gap: 8px; align-items: center;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  /* Search takes the first line, the eight dropdowns fill two even rows. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px;
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: var(--radius);
 }
 .members-filter input, .members-filter select { width: 100%; }
-.members-filter input[type="search"] { grid-column: span 2; }
-.members-filter .filter-clear { justify-self: start; }
-@media (max-width: 640px) {
+/* Beats the 240px search field of the dashboard toolbar. */
+.filter-toolbar.members-filter input[type="search"] { width: 100%; grid-column: 1 / -1; }
+.members-filter .filter-clear { grid-column: 1 / -1; justify-self: start; }
+@media (max-width: 900px) {
   .members-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .members-filter input[type="search"],
-  .members-filter .filter-clear { grid-column: 1 / -1; }
 }
+@media (max-width: 640px) {
+  .members-filter { padding: 10px; }
+  .filter-box[open] > form.members-filter {
+    border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
+  }
+}
+/* Table options sit with the other list actions instead of floating under the
+   filters. */
+.page-head .actions .col-chooser { margin: 0; }
+.page-head .actions .col-menu { left: auto; right: 0; }
 /* Quick ranges are a secondary shortcut, so they stay a compact row of pills
    rather than competing with the primary actions above them. */
 .quick-ranges { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
@@ -3104,6 +3117,10 @@ th { font-size: 13px; }
   }
   .members-tbl tbody td:first-child::before { display: none; }
   .members-tbl tbody td[data-col="role"] { grid-column: 1 / -1; }
+  /* The cards stack, so phone and township fit again; on a phone those are the
+     two fields people look a member up by. */
+  .members-tbl tbody :is(td)[data-col="phone"],
+  .members-tbl tbody :is(td)[data-col="township"] { display: block; }
   /* Home cell is one of the facts you scan for on a phone, so it keeps its own
      full-width line instead of being hidden below 520px. */
   .members-tbl tbody td[data-col="homeCell"] { grid-column: 1 / -1; }

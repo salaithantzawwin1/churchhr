@@ -179,6 +179,18 @@ export function MembersListPage(props: ListProps) {
       <div class="page-head">
         <h1>{t("members.title")}<span class="count-pill">{total}</span></h1>
         <div class="actions" style="margin:0">
+          <div class="col-chooser">
+            <details>
+              <summary class="btn secondary sm">{t("members.cols")}</summary>
+              <div class="col-menu">
+                {cols.map((c) => (
+                  <label>
+                    <input type="checkbox" data-col={c.key} checked={c.key !== "id"} /> {c.label}
+                  </label>
+                ))}
+              </div>
+            </details>
+          </div>
           {canImport && <a class="btn secondary" href="/members/import">{t("members.importCsv")}</a>}
           {canExport && <a class="btn secondary" href={`/members/export${filterQs(f)}`}>{t("members.exportCsv")}</a>}
           {canCreate && <a class="btn primary-action" href="/members/new">{t("members.addNew")}</a>}
@@ -261,19 +273,6 @@ export function MembersListPage(props: ListProps) {
           <a class="filter-clear-all" href="/members">{t("dash.clearAll")}</a>
         </div>
       )}
-
-      <div class="col-chooser">
-        <details>
-          <summary class="btn secondary sm">{t("members.cols")}</summary>
-          <div class="col-menu">
-            {cols.map((c) => (
-              <label>
-                <input type="checkbox" data-col={c.key} checked={c.key !== "id"} /> {c.label}
-              </label>
-            ))}
-          </div>
-        </details>
-      </div>
 
       {(canDelete || canUpdate) && (
         <form method="post" action="/members/bulk" id="bulk-form">
