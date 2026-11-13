@@ -72,12 +72,15 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
           {title} — {t("app.name")}
         </title>
         <link rel="icon" type="image/png" href="/logo.png" />
+        {/* Flowbite datepicker: bundled CSS first, so styles.css can theme it. */}
+        <link rel="stylesheet" href={`/vendor/flowbite-datepicker/datepicker.css?v=${ASSET_V}`} />
         <link rel="stylesheet" href={`/styles.css?v=${ASSET_V}`} />
         <script>
           {/* Raw JS (no double quotes / &-entities) so Hono's HTML escaper cannot
               rewrite it — inside <script>, `&quot;` is a literal SyntaxError. */}
           {html`try{var t=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}`}
         </script>
+        <script src={`/vendor/flowbite-datepicker/Datepicker.umd.js?v=${ASSET_V}`} defer></script>
         <script src={`/app.js?v=${ASSET_V}`} defer></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

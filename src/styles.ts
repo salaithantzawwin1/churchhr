@@ -3035,4 +3035,65 @@ th { font-size: 13px; }
   .admin-tbl .row-icon-actions { margin-left: auto; }
 }
 
+/* Login branding: the form and a live copy of the sign-in brand panel. */
+.brand-layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  gap: 18px; align-items: start;
+}
+.brand-layout .brand-form { margin: 0; }
+.brand-preview-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.brand-preview-col h2 { margin: 0; font-size: 15px; }
+.brand-preview-col .muted { margin: 2px 0 0; line-height: 1.6; }
+.brand-preview {
+  min-height: 0; border-radius: 18px; padding: 22px 20px; gap: 18px;
+  border: 1px solid var(--line); overflow: hidden;
+}
+.brand-preview .auth-mark { width: 88px; height: 88px; border-radius: 22px; padding: 7px; }
+.brand-preview-title { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -.02em; color: #fff; }
+.brand-preview .auth-lead { font-size: 13px; margin-top: 8px; }
+.brand-preview .auth-aside-foot { font-size: 10.5px; padding-top: 12px; }
+.dp-pop { position: fixed; z-index: 60; }
+.dp-pop[hidden] { display: none; }
+.dp-pop .datepicker { display: block; }
+@media (max-width: 900px) {
+  .brand-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.dp-pop .datepicker-picker {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 14px; overflow: hidden; min-width: 264px;
+  box-shadow: 0 24px 54px rgba(2, 8, 23, .45); font-size: 13px;
+}
+.dp-pop .datepicker-main { padding: 6px; }
+.dp-pop .datepicker-title, .dp-pop .datepicker-footer {
+  background: transparent; box-shadow: none; color: var(--ink);
+}
+.dp-pop .datepicker-controls button,
+.dp-pop .datepicker-controls .button {
+  background: transparent; border: 0; color: var(--ink);
+  border-radius: 9px; height: 30px; padding: 0 9px; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.dp-pop .datepicker-controls button:hover,
+.dp-pop .datepicker-controls .button:hover { background: var(--surface-2); color: var(--ink); }
+.dp-pop .datepicker-controls button:focus-visible,
+.dp-pop .datepicker-controls .button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.dp-pop .datepicker-controls button[disabled] { opacity: .4; cursor: default; }
+.dp-pop .datepicker-view .dow { color: var(--muted); font-size: 11px; font-weight: 600; height: 28px; line-height: 28px; }
+.dp-pop .datepicker-cell { color: var(--ink); height: 32px; line-height: 32px; border-radius: 9px; font-size: 13px; }
+.dp-pop .datepicker-cell:hover,
+.dp-pop .datepicker-cell.focused,
+.dp-pop .datepicker-cell.highlighted { background: var(--surface-2); color: var(--ink); }
+.dp-pop .datepicker-cell.prev, .dp-pop .datepicker-cell.next { color: var(--muted); opacity: .7; }
+.dp-pop .datepicker-cell.today { box-shadow: inset 0 0 0 1px var(--line-strong); font-weight: 700; }
+.dp-pop .datepicker-cell.selected, .dp-pop .datepicker-cell.selected:hover {
+  background: var(--brand); color: var(--brand-ink); font-weight: 700; box-shadow: none;
+}
+.dp-pop .datepicker-cell.disabled { opacity: .3; }
+.dp-pop .datepicker-view .week { color: var(--muted); }
+/* The app draws its own calendar, so the native trigger stays hidden while the
+   field keeps its normal date semantics, keyboard entry and validation. */
+.dp-input::-webkit-calendar-picker-indicator { opacity: 0; width: 0; height: 0; margin: 0; }
+.dp-input::-webkit-inner-spin-button { display: none; }
+
 `; // end of stylesheet

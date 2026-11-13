@@ -24,6 +24,7 @@ export function BrandingPage(props: Common & { branding: Branding }) {
         </div>
       </div>
 
+      <div class="brand-layout">
       <form method="post" action="/admin/branding" class="card brand-form">
         <h2>{t("brand.panelTitle")}</h2>
         <p class="muted small">{t("brand.panelHint")}</p>
@@ -31,7 +32,8 @@ export function BrandingPage(props: Common & { branding: Branding }) {
           <label class="field">
             <span class="lbl">{t("brand.churchName")}</span>
             <input type="text" name="church_name" value={branding.churchName}
-              maxlength={80} placeholder={t("brand.churchNamePlaceholder")} />
+              maxlength={80} placeholder={t("brand.churchNamePlaceholder")}
+              data-brand-name-input data-fallback={t("login.brandShort")} />
             <span class="field-hint">{t("brand.churchNameHint")}</span>
           </label>
         </div>
@@ -67,6 +69,33 @@ export function BrandingPage(props: Common & { branding: Branding }) {
           <button class="btn" type="submit">{t("dept.save")}</button>
         </div>
       </form>
+
+      {/* Exactly the login page's brand panel, so the saved name and photo are
+          seen the way visitors will see them. public/app.js keeps it in sync. */}
+      <div class="brand-preview-col">
+        <div>
+          <h2>{t("brand.previewTitle")}</h2>
+          <p class="muted small">{t("brand.previewHint")}</p>
+        </div>
+        <aside class="auth-aside brand-preview" aria-live="polite">
+          <div class="auth-brand">
+            <img class="auth-mark" data-brand-preview-img src={photoUrl || "/logo.png"} alt="" />
+            <span class="auth-brand-text">
+              <span class="auth-brand-name" data-brand-preview-name>
+                {branding.churchName || t("login.brandShort")}
+              </span>
+              <span class="auth-brand-sub">{t("login.brandSub")}</span>
+            </span>
+          </div>
+          <div class="auth-welcome">
+            <span class="auth-eyebrow">{t("login.eyebrow")}</span>
+            <p class="brand-preview-title">{t("login.welcome")}</p>
+            <p class="auth-lead">{t("login.asideLead")}</p>
+          </div>
+          <p class="auth-aside-foot">{t("login.asideFoot")}</p>
+        </aside>
+      </div>
+      </div>
     </Layout>
   );
 }

@@ -53,6 +53,8 @@ export const KO: Record<string, string> = {
   "brand.churchNameHint": "비워 두면 Good News Mission이 표시됩니다.",
   "brand.photo": "브랜드 사진",
   "brand.photoHint": "JPG, PNG 또는 WebP. 정사각형 이미지가 가장 좋습니다. 비워 두면 기본 로고를 사용합니다.",
+  "brand.previewTitle": "로그인 화면 미리보기",
+  "brand.previewHint": "이름을 입력하거나 사진을 고르면 이 패널이 바로 바뀝니다.",
   "org.positionHolders": "담당자",
   "org.positionHoldersEmpty": "현재 이 직책을 맡은 사람이 없습니다.",
   "org.positionHoldersHint": "이 직책에 배정된 활동 중인 성도와 목회자입니다.",

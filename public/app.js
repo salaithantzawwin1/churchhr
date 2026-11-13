@@ -901,6 +901,13 @@
 
   // Member profile photo: centre-crop the chosen image, resize it to 500×500
   // and encode WebP at quality 0.85 before the form submits.
+  // The branding screen mirrors the chosen mark into its login preview.
+  function syncBrandMark(src) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-brand-preview-img]"), function (node) {
+      node.src = src || "/logo.png";
+    });
+  }
+
   function initPhotoInputs(root) {
     Array.prototype.forEach.call(root.querySelectorAll("[data-photo-field]"), function (field) {
       var input = field.querySelector("[data-photo-input]");
@@ -919,10 +926,12 @@
       function showFallback() {
         if (img) { img.hidden = true; img.removeAttribute("src"); }
         if (fallback) { fallback.hidden = false; fallback.textContent = initial; }
+        syncBrandMark("");
       }
       function showImage(url) {
         if (img) { img.src = url; img.hidden = false; }
         if (fallback) fallback.hidden = true;
+        syncBrandMark(url);
       }
       input.addEventListener("change", function () {
         var file = input.files && input.files[0];
@@ -972,6 +981,99 @@
     });
   }
   initPhotoInputs(document);
+  // Login branding: the preview name follows the name field as it is typed.
+  (function initBrandPreview() {
+    var input = document.querySelector("[data-brand-name-input]");
+    var target = document.querySelector("[data-brand-preview-name]");
+    if (!input || !target) return;
+    var fallback = input.getAttribute("data-fallback") || "";
+    function update() { target.textContent = (input.value || "").trim() || fallback; }
+    input.addEventListener("input", update);
+    update();
+  })();
+
+  // Date fields use the Flowbite datepicker. The library renders a calendar
+  // inline when it is created on a div, so one is mounted per field as a fixed
+  // popover: no form, label or CSS selector around the input changes, and the
+  // input keeps its yyyy-mm-dd value, native validation and min/max limits.
+  (function initDatePickers() {
+    if (typeof window.Datepicker !== "function") return;
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+    function parse(value) { return value ? new Date(value + "T00:00:00") : null; }
+    var openPop = null;
+    var openInput = null;
+
+    function close() {
+      if (openPop) openPop.hidden = true;
+      openPop = null;
+      openInput = null;
+    }
+    function place() {
+      if (!openPop || !openInput) return;
+      var rect = openInput.getBoundingClientRect();
+      var width = openPop.offsetWidth;
+      var height = openPop.offsetHeight;
+      var left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+      var top = rect.bottom + 6;
+      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+      openPop.style.left = left + "px";
+      openPop.style.top = top + "px";
+    }
+
+    document.addEventListener("click", function (e) {
+      if (openPop && !openPop.contains(e.target) && e.target !== openInput) close();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && openPop) close();
+    });
+    window.addEventListener("resize", place);
+
+    Array.prototype.forEach.call(document.querySelectorAll('input[type="date"]'), function (input) {
+      if (input.getAttribute("data-dp") === "1") return;
+      input.setAttribute("data-dp", "1");
+      input.classList.add("dp-input");
+      var pop = document.createElement("div");
+      pop.className = "dp-pop";
+      pop.hidden = true;
+      document.body.appendChild(pop);
+      var dp = new window.Datepicker(pop, {
+        dateFormat: "yyyy-mm-dd",
+        maxDate: parse(input.getAttribute("max")),
+        minDate: parse(input.getAttribute("min")),
+      });
+
+      pop.addEventListener("changeDate", function (e) {
+        var date = e.detail && e.detail.date;
+        if (!date) return;
+        input.value = iso(date);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        close();
+      });
+
+      input.addEventListener("focus", function () {
+        if (openPop && openPop !== pop) openPop.hidden = true;
+        openPop = pop;
+        openInput = input;
+        dp.setOptions({
+          maxDate: parse(input.getAttribute("max")),
+          minDate: parse(input.getAttribute("min")),
+        });
+        var current = parse(input.value);
+        if (current) dp.setDate(current, { render: true, silent: true });
+        else dp.setDate({ clear: true, render: true, silent: true });
+        pop.hidden = false;
+        place();
+      });
+      input.addEventListener("input", function () {
+        if (openPop !== pop) return;
+        var current = parse(input.value);
+        if (current) dp.setDate(current, { render: true, silent: true });
+      });
+    });
+  })();
+
 
   // Member list column chooser: each checkbox shows/hides the matching th+td
   // (data-col) and the choice persists in localStorage so it survives reloads.
