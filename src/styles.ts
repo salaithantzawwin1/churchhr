@@ -2917,7 +2917,7 @@ th { font-size: 13px; }
   .members-tbl tbody tr, .admin-tbl tbody tr {
     position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px 12px; padding: 12px 13px; background: var(--card);
-    border: 1px solid var(--line); border-radius: 12px;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
   }
   .members-tbl tbody td, .admin-tbl tbody td {
     display: block; padding: 0; border: 0; white-space: normal;
@@ -2946,7 +2946,7 @@ th { font-size: 13px; }
   .members-tbl .member-role-inline { display: none; }
   .members-tbl tbody td.row-actions-cell,
   .admin-tbl tbody td.row-actions-cell {
-    grid-column: 1 / -1; display: flex; justify-content: flex-end;
+    grid-column: 1 / -1; display: flex; justify-content: flex-end; width: auto;
     position: static; z-index: auto; background: transparent; box-shadow: none;
     padding-top: 5px; margin-top: 2px; border-top: 1px solid var(--hairline);
   }
