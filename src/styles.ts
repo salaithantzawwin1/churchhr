@@ -489,14 +489,20 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
 @media (max-width: 820px) {
   body.auth-page .container { padding: 16px 12px; }
   .auth-card { grid-template-columns: 1fr; }
-  .auth-aside { padding: 24px 22px; gap: 18px; min-height: 0; }
-  .auth-aside h1 { font-size: 24px; }
+  /* Phones get a centred brand hero: logo, name, a quiet line and the welcome
+     copy as one block, instead of a left-aligned strip beside the form. */
+  .auth-aside { padding: 22px 20px 24px; gap: 16px; min-height: 0; }
+  .auth-aside h1 { font-size: 23px; }
   .auth-mark { width: 96px; height: 96px; border-radius: 23px; padding: 8px; }
-  .auth-brand-name { display: none; }
-  .auth-brand-sub { font-size: 10px; }
-  .auth-eyebrow { margin-bottom: 8px; }
+  .auth-brand { flex-direction: column; align-items: center; text-align: center; gap: 9px; }
+  .auth-brand-text { align-items: center; gap: 2px; }
+  .auth-brand-name { display: block; font-size: 13.5px; line-height: 1.4; }
+  .auth-brand-sub { font-size: 9.5px; letter-spacing: .1em; }
+  .auth-welcome { text-align: center; }
+  .auth-eyebrow { justify-content: center; margin-bottom: 8px; font-size: 9.5px; letter-spacing: .13em; }
+  .auth-eyebrow::after { content: ""; width: 22px; height: 2px; border-radius: 2px; background: #93c5fd; }
   .auth-aside-foot { display: none; }
-  .auth-lead { max-width: none; margin-top: 6px; font-size: 13px; }
+  .auth-lead { max-width: 300px; margin: 7px auto 0; font-size: 13px; }
   .auth-main { padding: 26px 22px; }
 }
 @media (max-width: 420px) {
