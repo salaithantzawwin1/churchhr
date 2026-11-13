@@ -234,34 +234,16 @@ tbody tr:hover { background: var(--row-hover); }
   line-height: 1.35; min-height: 40px;
 }
 .btn:hover { filter: brightness(1.08); }
-/* Easy date entry (app.js): day / month / year selects in front of the native
-   input, which stays in the form as the submitted value. */
-.dp { display: inline-flex; gap: 6px; width: 100%; min-width: 0; }
-/* A date field in a filter row needs room for three parts; the shared
-   "flex: 1 1 170px" would squeeze the month down to an arrow. */
-.filters label.field:has(.dp),
+/* Date fields (app.js): the Flowbite calendar opens under the field, so the
+   native indicator would only be a second, cramped picker. */
 .filters label.range-field { flex: 1 1 250px; min-width: 214px; max-width: 320px; }
-.dp .dp-part { flex: 0 0 auto; width: auto; padding: 0 4px 0 8px; }
-.dp .dp-part:first-child { width: 58px; } /* day */
-.dp .dp-part:nth-child(2) { flex: 1 1 0; min-width: 66px; } /* month name */
-.dp .dp-part:last-child { width: 78px; } /* year */
-/* Optional "Today" shortcut: the picker needs the full field width, so the
-   button sits under it, right-aligned, rather than squeezing the year select. */
-.dp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; min-width: 0; }
-.dp-row .dp { flex: 1 1 100%; }
 .dp-today {
-  flex: 0 0 auto; margin-left: auto; height: 32px; min-height: 32px;
+  display: block; margin: 6px 0 0 auto; height: 32px; min-height: 32px;
   padding: 0 11px; font-size: 12.5px; white-space: nowrap;
 }
 @media (max-width: 640px) {
   .dp-today { min-height: 40px; height: 40px; }
 }
-.dp-native {
-  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
-  border: 0; opacity: 0; pointer-events: none; overflow: hidden;
-}
-.filter-toolbar .dp { width: 100%; max-width: 262px; }
-.filter-toolbar .dp .dp-part { height: 36px; font-size: 13.5px; }
 /* Sent forms lock their button until the response arrives (app.js). */
 .btn.is-submitting { pointer-events: none; opacity: .65; }
 .btn.secondary { background: var(--btn2-bg); color: var(--ink); border: 1px solid var(--line); }
@@ -3065,35 +3047,27 @@ th { font-size: 13px; }
   box-shadow: 0 24px 54px rgba(2, 8, 23, .45); font-size: 13px;
 }
 .dp-pop .datepicker-main { padding: 6px; }
-.dp-pop .datepicker-title, .dp-pop .datepicker-footer {
-  background: transparent; box-shadow: none; color: var(--ink);
-}
-.dp-pop .datepicker-controls button,
-.dp-pop .datepicker-controls .button {
+.dp-pop .datepicker-controls button {
   background: transparent; border: 0; color: var(--ink);
   border-radius: 9px; height: 30px; padding: 0 9px; font-size: 13px; font-weight: 600;
   cursor: pointer;
 }
-.dp-pop .datepicker-controls button:hover,
-.dp-pop .datepicker-controls .button:hover { background: var(--surface-2); color: var(--ink); }
-.dp-pop .datepicker-controls button:focus-visible,
-.dp-pop .datepicker-controls .button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.dp-pop .datepicker-controls button:hover { background: var(--surface-2); }
+.dp-pop .datepicker-controls button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .dp-pop .datepicker-controls button[disabled] { opacity: .4; cursor: default; }
 .dp-pop .datepicker-view .dow { color: var(--muted); font-size: 11px; font-weight: 600; height: 28px; line-height: 28px; }
 .dp-pop .datepicker-cell { color: var(--ink); height: 32px; line-height: 32px; border-radius: 9px; font-size: 13px; }
 .dp-pop .datepicker-cell:hover,
-.dp-pop .datepicker-cell.focused,
-.dp-pop .datepicker-cell.highlighted { background: var(--surface-2); color: var(--ink); }
+.dp-pop .datepicker-cell.focused { background: var(--surface-2); color: var(--ink); }
 .dp-pop .datepicker-cell.prev, .dp-pop .datepicker-cell.next { color: var(--muted); opacity: .7; }
 .dp-pop .datepicker-cell.today { box-shadow: inset 0 0 0 1px var(--line-strong); font-weight: 700; }
+.dp-pop .datepicker-cell.today:not(.selected) { background: transparent; color: var(--ink); }
 .dp-pop .datepicker-cell.selected, .dp-pop .datepicker-cell.selected:hover {
   background: var(--brand); color: var(--brand-ink); font-weight: 700; box-shadow: none;
 }
 .dp-pop .datepicker-cell.disabled { opacity: .3; }
-.dp-pop .datepicker-view .week { color: var(--muted); }
-/* The app draws its own calendar, so the native trigger stays hidden while the
-   field keeps its normal date semantics, keyboard entry and validation. */
+/* The calendar opens from the field itself, so the native trigger is hidden;
+   the input keeps its value format, keyboard entry and validation. */
 .dp-input::-webkit-calendar-picker-indicator { opacity: 0; width: 0; height: 0; margin: 0; }
-.dp-input::-webkit-inner-spin-button { display: none; }
 
 `; // end of stylesheet

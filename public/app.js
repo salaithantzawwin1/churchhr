@@ -992,87 +992,6 @@
     update();
   })();
 
-  // Date fields use the Flowbite datepicker. The library renders a calendar
-  // inline when it is created on a div, so one is mounted per field as a fixed
-  // popover: no form, label or CSS selector around the input changes, and the
-  // input keeps its yyyy-mm-dd value, native validation and min/max limits.
-  (function initDatePickers() {
-    if (typeof window.Datepicker !== "function") return;
-    function pad(n) { return (n < 10 ? "0" : "") + n; }
-    function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-    function parse(value) { return value ? new Date(value + "T00:00:00") : null; }
-    var openPop = null;
-    var openInput = null;
-
-    function close() {
-      if (openPop) openPop.hidden = true;
-      openPop = null;
-      openInput = null;
-    }
-    function place() {
-      if (!openPop || !openInput) return;
-      var rect = openInput.getBoundingClientRect();
-      var width = openPop.offsetWidth;
-      var height = openPop.offsetHeight;
-      var left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-      var top = rect.bottom + 6;
-      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
-      openPop.style.left = left + "px";
-      openPop.style.top = top + "px";
-    }
-
-    document.addEventListener("click", function (e) {
-      if (openPop && !openPop.contains(e.target) && e.target !== openInput) close();
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && openPop) close();
-    });
-    window.addEventListener("resize", place);
-
-    Array.prototype.forEach.call(document.querySelectorAll('input[type="date"]'), function (input) {
-      if (input.getAttribute("data-dp") === "1") return;
-      input.setAttribute("data-dp", "1");
-      input.classList.add("dp-input");
-      var pop = document.createElement("div");
-      pop.className = "dp-pop";
-      pop.hidden = true;
-      document.body.appendChild(pop);
-      var dp = new window.Datepicker(pop, {
-        dateFormat: "yyyy-mm-dd",
-        maxDate: parse(input.getAttribute("max")),
-        minDate: parse(input.getAttribute("min")),
-      });
-
-      pop.addEventListener("changeDate", function (e) {
-        var date = e.detail && e.detail.date;
-        if (!date) return;
-        input.value = iso(date);
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-        close();
-      });
-
-      input.addEventListener("focus", function () {
-        if (openPop && openPop !== pop) openPop.hidden = true;
-        openPop = pop;
-        openInput = input;
-        dp.setOptions({
-          maxDate: parse(input.getAttribute("max")),
-          minDate: parse(input.getAttribute("min")),
-        });
-        var current = parse(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
-        else dp.setDate({ clear: true, render: true, silent: true });
-        pop.hidden = false;
-        place();
-      });
-      input.addEventListener("input", function () {
-        if (openPop !== pop) return;
-        var current = parse(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
-      });
-    });
-  })();
 
 
   // Member list column chooser: each checkbox shows/hides the matching th+td
@@ -1139,8 +1058,6 @@
       form.addEventListener("change", function (e) {
         var el = e.target;
         if (!el || el.tagName !== "SELECT") return;
-        // Date picker parts submit once, when the whole date is settled.
-        if (el.hasAttribute("data-dp-part")) return;
         window.setTimeout(function () {
           if (form.requestSubmit) form.requestSubmit();
           else form.submit();
@@ -1328,175 +1245,129 @@
     }, 0);
   }, false);
 
-  // Date fields: the browser's date input makes you click a masked year segment
-  // and step back decade by decade, which is slow for 1940s birth dates. Each
-  // date input is given day / month / year selects instead. The native input
-  // stays in the form (so the submitted value and no-JS behaviour are
-  // unchanged) and hands its constraints to the selects.
+  // Date fields: the Flowbite datepicker renders an inline calendar, so one is
+  // mounted per field and shown under it on focus. The native input stays
+  // visible and in the form, so its yyyy-mm-dd value, required flag, min/max
+  // limits, change events and no-JS submission behave exactly as before.
   function initDatePickers(root) {
-    var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    if (typeof window.Datepicker !== "function") return;
     function pad(n) { return (n < 10 ? "0" : "") + n; }
-    function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+    function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+    function parseValue(value) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+      return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+    }
     // "Today" must agree with the server, which dates reports in Myanmar time
     // (UTC+6:30); a browser in another timezone can otherwise pick tomorrow.
     function yangonToday() {
       var now = new Date();
-      var shifted = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
-      return { y: shifted.getFullYear(), m: shifted.getMonth() + 1, d: shifted.getDate() };
+      return new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
     }
-    function labelFor(input, part) {
-      var lbl = input.closest("label");
-      var text = "";
-      if (lbl) {
-        var span = lbl.querySelector(".lbl");
-        text = (span ? span.textContent : lbl.textContent) || "";
-      } else if (input.getAttribute("aria-label")) {
-        text = input.getAttribute("aria-label");
+    var openPop = null;
+    var openInput = null;
+
+    function close() {
+      if (openPop) openPop.hidden = true;
+      openPop = null;
+      openInput = null;
+    }
+    function place() {
+      if (!openPop || !openInput) return;
+      var rect = openInput.getBoundingClientRect();
+      var height = openPop.offsetHeight;
+      var left = Math.max(8, Math.min(rect.left, window.innerWidth - openPop.offsetWidth - 8));
+      var top = rect.bottom + 6;
+      // Flip above the field when there is no room below it.
+      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+      openPop.style.left = left + "px";
+      openPop.style.top = top + "px";
+    }
+    function setValue(input, date) {
+      input.value = date ? iso(date) : "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      var form = input.form;
+      if (date && form && form.hasAttribute("data-auto-submit")) {
+        window.setTimeout(function () {
+          if (form.requestSubmit) form.requestSubmit();
+          else form.submit();
+        }, 0);
       }
-      text = text.replace(/\s*\*\s*$/, "").replace(/\(.*?\)/g, "").trim();
-      return (text ? text + " " : "") + part;
     }
 
-    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"]'), function (native) {
-      if (native.getAttribute("data-dp-ready")) return;
-      native.setAttribute("data-dp-ready", "1");
-
-      var nowDate = new Date();
-      var minAttr = native.getAttribute("min") || "";
-      var maxAttr = native.getAttribute("max") || "";
-      var minYear = /^\d{4}/.test(minAttr) ? Number(minAttr.slice(0, 4)) : 1900;
-      var maxYear = /^\d{4}/.test(maxAttr) ? Number(maxAttr.slice(0, 4)) : nowDate.getFullYear() + 1;
-      if (minYear > maxYear) minYear = maxYear;
-      var required = native.hasAttribute("required");
-      native.removeAttribute("required");
-      native.removeAttribute("min");
-      native.removeAttribute("max");
-      native.classList.add("dp-native");
-      native.setAttribute("tabindex", "-1");
-
-      var wrap = document.createElement("span");
-      wrap.className = "dp";
-      var makePart = function (part) {
-        var sel = document.createElement("select");
-        sel.className = "dp-part";
-        sel.setAttribute("data-dp-part", "1");
-        sel.setAttribute("aria-label", labelFor(native, part));
-        return sel;
-      };
-      var day = makePart("day");
-      var month = makePart("month");
-      var year = makePart("year");
-      if (required) year.setAttribute("required", "required");
-
-      var blank = function () {
-        var o = document.createElement("option");
-        o.value = "";
-        o.textContent = "—";
-        return o;
-      };
-      month.appendChild(blank());
-      MONTHS.forEach(function (name, i) {
-        var o = document.createElement("option");
-        o.value = pad(i + 1);
-        o.textContent = name;
-        month.appendChild(o);
+    if (!initDatePickers.bound) {
+      initDatePickers.bound = true;
+      document.addEventListener("click", function (e) {
+        if (openPop && !openPop.contains(e.target) && e.target !== openInput) close();
       });
-      year.appendChild(blank());
-      for (var y = maxYear; y >= minYear; y--) {
-        var yo = document.createElement("option");
-        yo.value = String(y);
-        yo.textContent = String(y);
-        year.appendChild(yo);
-      }
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && openPop) close();
+      });
+      window.addEventListener("resize", place);
+    }
 
-      function fillDays() {
-        var keep = day.value;
-        day.textContent = "";
-        day.appendChild(blank());
-        var yv = Number(year.value) || 2000;
-        var mv = Number(month.value) || 1;
-        var total = daysInMonth(yv, mv);
-        for (var d = 1; d <= total; d++) {
-          var o = document.createElement("option");
-          o.value = pad(d);
-          o.textContent = String(d);
-          day.appendChild(o);
-        }
-        day.value = keep && Number(keep) <= total ? keep : "";
-      }
+    Array.prototype.forEach.call(root.querySelectorAll('input[type="date"]'), function (input) {
+      if (input.getAttribute("data-dp-ready")) return;
+      input.setAttribute("data-dp-ready", "1");
+      input.classList.add("dp-input");
 
-      function apply() {
-        var yv = year.value;
-        var mv = month.value;
-        var dv = day.value;
-        native.value = yv && mv && dv ? yv + "-" + mv + "-" + dv : "";
-      }
+      var pop = document.createElement("div");
+      pop.className = "dp-pop";
+      pop.hidden = true;
+      document.body.appendChild(pop);
+      var dp = new window.Datepicker(pop, {
+        dateFormat: "yyyy-mm-dd",
+        todayHighlight: true,
+        maxDate: parseValue(input.getAttribute("max")),
+        minDate: parseValue(input.getAttribute("min")),
+      });
 
-      function settled() {
-        var parts = [year.value, month.value, day.value];
-        var filled = parts.filter(function (p) { return p; }).length;
-        return filled === 0 || filled === 3;
-      }
+      pop.addEventListener("changeDate", function (e) {
+        var date = e.detail && e.detail.date;
+        if (!date) return;
+        setValue(input, date);
+        close();
+      });
 
-      fillDays();
-      var value = /^(\d{4})-(\d{2})-(\d{2})$/.exec(native.value || "");
-      if (value) {
-        year.value = value[1];
-        month.value = value[2];
-        fillDays();
-        day.value = value[3];
-      }
-
-      Array.prototype.forEach.call([day, month, year], function (sel) {
-        sel.addEventListener("change", function () {
-          if (sel === month || sel === year) fillDays();
-          apply();
-          var form = native.form;
-          if (form && form.hasAttribute("data-auto-submit") && settled()) {
-            window.setTimeout(function () {
-              if (form.requestSubmit) form.requestSubmit();
-              else form.submit();
-            }, 0);
-          }
+      input.addEventListener("focus", function () {
+        dp.setOptions({
+          maxDate: parseValue(input.getAttribute("max")),
+          minDate: parseValue(input.getAttribute("min")),
         });
+        var current = parseValue(input.value);
+        if (current) dp.setDate(current, { render: true, silent: true });
+        else dp.setDate({ clear: true, render: true, silent: true });
+        // Set the open state after setDate: rendering the calendar can fire its
+        // own changeDate, and closing must not leave a visible popover behind.
+        if (openPop && openPop !== pop) openPop.hidden = true;
+        openPop = pop;
+        openInput = input;
+        pop.hidden = false;
+        place();
       });
-
-      wrap.appendChild(day);
-      wrap.appendChild(month);
-      wrap.appendChild(year);
+      input.addEventListener("input", function () {
+        if (openPop !== pop) return;
+        var current = parseValue(input.value);
+        if (current) dp.setDate(current, { render: true, silent: true });
+      });
 
       // Optional "Today" shortcut, for dates that usually mean now (a daily
       // report) rather than a birth date. The label travels on the input so it
       // stays translated.
-      var container = wrap;
-      if (native.hasAttribute("data-today")) {
+      if (input.hasAttribute("data-today")) {
         var todayBtn = document.createElement("button");
         todayBtn.type = "button";
         todayBtn.className = "btn secondary dp-today";
-        todayBtn.textContent = native.getAttribute("data-today-label") || "Today";
+        todayBtn.textContent = input.getAttribute("data-today-label") || "Today";
         todayBtn.addEventListener("click", function () {
-          var now = yangonToday();
-          var yv = String(now.y);
-          if (Number(yv) < minYear || Number(yv) > maxYear) return;
-          year.value = yv;
-          month.value = pad(now.m);
-          fillDays();
-          day.value = pad(now.d);
-          apply();
-          var form = native.form;
-          if (form && form.hasAttribute("data-auto-submit")) {
-            window.setTimeout(function () {
-              if (form.requestSubmit) form.requestSubmit();
-              else form.submit();
-            }, 0);
-          }
+          var today = yangonToday();
+          var min = parseValue(input.getAttribute("min"));
+          var max = parseValue(input.getAttribute("max"));
+          if ((min && today < min) || (max && today > max)) return;
+          setValue(input, today);
         });
-        container = document.createElement("span");
-        container.className = "dp-row";
-        container.appendChild(wrap);
-        container.appendChild(todayBtn);
+        input.parentNode.insertBefore(todayBtn, input.nextSibling);
       }
-      native.parentNode.insertBefore(container, native.nextSibling);
     });
   }
   initDatePickers(document);
