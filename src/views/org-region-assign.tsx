@@ -52,8 +52,18 @@ export function RegionPastorModal(props: {
         ) : (
           holders.map((holder) => (
             <div class="region-holder-row">
-              <span class="badge position">{t("org.priority")} {holder.priority}</span>
               <strong>{holder.name}</strong>
+              {/* Saving a holder again updates their priority in place. */}
+              <form method="post" action="/organization/region-assign" data-modal-ajax class="region-holder-priority">
+                <input type="hidden" name="region" value={String(regionId)} />
+                <input type="hidden" name="position" value={def.code} />
+                <input type="hidden" name="pastor_id" value={String(holder.pastorId)} />
+                <label class="region-holder-priority-field">
+                  <span class="muted small">{t("org.priority")}</span>
+                  <input type="number" name="priority" min="1" max="99" value={String(holder.priority)} />
+                </label>
+                <button class="btn sm secondary" type="submit">{t("form.save")}</button>
+              </form>
               <form method="post" action="/organization/region-assign/remove" data-confirm={t("org.removeHolderConfirm")}>
                 <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
                 <input type="hidden" name="region" value={String(regionId)} />

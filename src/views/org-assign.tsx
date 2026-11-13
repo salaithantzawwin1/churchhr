@@ -67,7 +67,8 @@ export function AssignLeaderModal(props: {
   };
 
   return (
-    <form method="post" action="/organization/assign" data-modal-ajax>
+    <>
+      <form method="post" action="/organization/assign" data-modal-ajax>
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="church" value={String(churchId)} />
       <input type="hidden" name="position" value={def.code} />
@@ -106,12 +107,10 @@ export function AssignLeaderModal(props: {
             <div class="region-holder-row">
               <span class="badge position">{t("org.priority")} {holder.priority}</span>
               <strong>{holder.name}</strong>
-              <form method="post" action="/organization/assign/remove" data-confirm={t("org.removeHolderConfirm")}>
-                <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
-                <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="church" value={String(churchId)} />
-                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-              </form>
+              {/* Each delete lives in its own form after this one: a form nested
+                  here would close this form early and orphan Save. */}
+              <button class="btn sm outline-danger" type="submit"
+                form={`remove-holder-${holder.assignmentId}`}>{t("members.delete")}</button>
             </div>
           ))}
         </div>
@@ -171,6 +170,23 @@ export function AssignLeaderModal(props: {
         <button class="btn" type="submit">{t("form.save")}</button>
         <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
       </div>
-    </form>
+      </form>
+
+      {/* Removal forms stay outside the assignment form, so nothing is nested;
+          each holder's Delete button submits the form named by its id. */}
+      {allowMultiple && holders.map((holder) => (
+        <form
+          id={`remove-holder-${holder.assignmentId}`}
+          method="post"
+          action="/organization/assign/remove"
+          data-confirm={t("org.removeHolderConfirm")}
+          hidden
+        >
+          <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
+          <input type="hidden" name="tab" value={tab} />
+          <input type="hidden" name="church" value={String(churchId)} />
+        </form>
+      ))}
+    </>
   );
 }

@@ -537,13 +537,42 @@ organizationRoutes.post("/region-assign", requirePermission("members.update"), a
   if (!pastor) return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
 
   const now = Math.floor(Date.now() / 1000);
-  // One regional post per person in this region; adding a second priority row
-  // would just make the same person appear twice.
-  const existing = (await db.all<{ id: number }>(sql`
-    SELECT id FROM member_positions
+  const regionName = (await db.all<{ name: string }>(
+    sql`SELECT name FROM regions WHERE id = ${regionId} LIMIT 1`,
+  ))[0]?.name ?? "";
+  const summary = `${positionDefLabel(def, c.get("lang"))} · ${regionName}`;
+  // One regional post per person in this region: a second row would only show
+  // the same person twice. Re-saving a holder updates their priority, and a
+  // different regional role held here is reported instead of silently ignored.
+  const existing = (await db.all<{ id: number; position: string }>(sql`
+    SELECT id, position FROM member_positions
      WHERE pastor_id = ${pastor.id} AND scope_type = 'region'
        AND region_id = ${regionId} LIMIT 1`))[0];
-  if (!existing) {
+  if (existing && existing.position !== def.code) {
+    if (!modal) return c.redirect(`${back}&err=region-position-conflict`, 303);
+    return c.html(
+      <RegionPastorModal
+        lang={c.get("lang")}
+        regionId={regionId}
+        regionName={regionName}
+        def={def}
+        candidates={await regionPastorCandidates(db, regionId, "")}
+        holders={await regionHolders(db, regionId, def.code)}
+        error={flashText("region-position-conflict", c.get("lang"))}
+      />,
+      422,
+    );
+  }
+  if (existing) {
+    await db.run(sql`
+      UPDATE member_positions
+         SET priority = ${priority}, updated_at = ${now}
+       WHERE id = ${existing.id}`);
+    await recordPositionHistory(db, {
+      entity: "assignment", action: "updated", actorId: c.get("user").id,
+      scopeType: "region", code: def.code, positionDefId: def.id, summary,
+    });
+  } else {
     await db.insert(memberPositions).values({
       memberId: null,
       pastorId: pastor.id,
@@ -563,7 +592,7 @@ organizationRoutes.post("/region-assign", requirePermission("members.update"), a
     await recordPositionHistory(db, {
       entity: "assignment", action: "assigned", actorId: c.get("user").id,
       scopeType: "region", code: def.code, positionDefId: def.id,
-      summary: `${positionDefLabel(def, c.get("lang"))} · ${(await db.all<{ name: string }>(sql`SELECT name FROM regions WHERE id = ${regionId}`))[0]?.name ?? ""}`,
+      summary,
     });
   }
   const done = `${back}&ok=church-leader-saved`;
@@ -1570,7 +1599,10 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   const attached = await db.all<{ n: number }>(sql`
     SELECT
       (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
-      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) +
+      -- pastors.regional_church_id has no ON DELETE rule, so a linked pastor
+      -- must block the change instead of failing the foreign key on delete.
+      (SELECT COUNT(*) FROM pastors WHERE regional_church_id = ${id}) AS n`);
   const used = attached[0]?.n ?? 0;
   if (regionId !== current.regionId && used > 0) return await fail("regional-state-locked");
   if (current.active === 1 && active === 0 && used > 0) return await fail("regional-in-use");
@@ -1674,7 +1706,10 @@ organizationRoutes.post("/regional-churches/:id/delete", requirePermission("opti
   const used = await db.all<{ n: number }>(sql`
     SELECT
       (SELECT COUNT(*) FROM lookup_options WHERE regional_church_id = ${id}) +
-      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) AS n`);
+      (SELECT COUNT(*) FROM member_positions WHERE regional_church_id = ${id}) +
+      -- pastors.regional_church_id has no ON DELETE rule, so a linked pastor
+      -- must block the change instead of failing the foreign key on delete.
+      (SELECT COUNT(*) FROM pastors WHERE regional_church_id = ${id}) AS n`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/regional-churches?err=regional-in-use", 303);
   await db.run(sql`DELETE FROM regional_churches WHERE id = ${id}`);
   return c.redirect("/organization/regional-churches?ok=regional-deleted", 303);

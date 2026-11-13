@@ -15,6 +15,7 @@ const FLASH_KEYS: Record<string, string> = {
   "member-position": "flash.positionSaved",
   "church-leader-saved": "flash.churchLeaderSaved",
   "church-leader-cleared": "flash.churchLeaderCleared",
+  "region-position-conflict": "flash.regionPositionConflict",
   "position-parent-invalid": "flash.positionParentInvalid",
   "position-church-invalid": "position-church-invalid",
   "position-parent-cycle": "flash.positionParentCycle",

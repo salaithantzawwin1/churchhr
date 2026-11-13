@@ -321,8 +321,12 @@ export function OrganizationPage(props: Common & {
   const canManageOptions = perms.has("options.manage");
   const cellHref = (id: number) => `/members?home_cell=${id}`;
 
-  // A church only sees state-wide positions plus the ones filed under it.
-  const churchDefs = defsForChurch(positionDefs, selectedChurch?.id);
+  // Only the Church tab narrows roles to the selected church. The other tabs
+  // draw every church, so filtering by one church would hide roles filed under
+  // another one and show that church's roles on every cell.
+  const churchDefs = churchScoped && selectedChurch
+    ? defsForChurch(positionDefs, selectedChurch.id)
+    : positionDefs;
   const churchRows = positionRows(churchDefs, "church", L);
   const selectedChurchCellCount = selectedChurch
     ? cells.filter((c) => c.regional_church_id === selectedChurch.id).length

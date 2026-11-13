@@ -1562,6 +1562,9 @@ td.empty-state .small { margin-top: 4px; }
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
 }
 .region-holder-row form { margin: 0 0 0 auto; }
+.region-holder-priority { display: flex; align-items: center; gap: 6px; }
+.region-holder-priority-field { display: flex; align-items: center; gap: 4px; }
+.region-holder-priority-field input { width: 64px; }
 .org-dept-card { gap: 10px; }
 .org-dept-card .org-card-head h3 { margin: 0; }
 /* Position assignment modal: a compact identity summary followed by three
