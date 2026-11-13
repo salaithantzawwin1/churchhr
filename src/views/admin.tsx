@@ -806,7 +806,7 @@ function emptyStateRow(cols: number, t: (k: string) => string) {
   return (
     <tr>
       <td colSpan={cols} class="empty-state">
-        <strong>{t("dash.none")}</strong>
+        <strong>{t("adm.emptyTitle")}</strong>
         <div class="small">{t("adm.addHint")}</div>
       </td>
     </tr>
@@ -845,7 +845,7 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
     return (
       <div class="card hh-empty">
         <span class="hh-avatar lg" aria-hidden="true"><Glyph /></span>
-        <h2>{t("dash.none")}</h2>
+        <h2>{t("adm.emptyTitle")}</h2>
         <p class="muted small">{t("adm.addHint")}</p>
       </div>
     );
@@ -861,7 +861,7 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
               <span class="hh-card-name" title={o.label}>{o.label}</span>
               <span class="hh-card-meta">
                 {o.code && <span class="muted small">{o.code}</span>}
-                <span class="hh-count"><b>{o.used}</b> {t("adm.usage")}</span>
+                <span class="hh-count">{t("adm.usage")}: <b>{o.used}</b></span>
               </span>
             </div>
           </div>
@@ -875,9 +875,7 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
               <>
                 <div class="hh-fact">
                   <span class="hh-fact-label">{t("form.church")}</span>
-                  <span class={`hh-fact-value${o.church ? "" : " muted"}`}>
-                    {o.church || t("adm.churchNone")}
-                  </span>
+                  <span class={`hh-fact-value${o.church ? "" : " muted"}`}>{o.church || "—"}</span>
                 </div>
                 <div class="hh-fact">
                   <span class="hh-fact-label">{t("form.township")}</span>
@@ -907,7 +905,7 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
               </button>
             </form>
             <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")}>
-              <button class="btn sm outline-danger icon-btn" type="submit"
+              <button class="btn sm danger icon-btn" type="submit"
                 title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
             </form>
           </div>
@@ -954,7 +952,9 @@ export function AdminOptionsPage(props: OptionsProps) {
             <a class={`btn sm ${t2.key === type ? "" : "secondary"}`} href={`/admin/options${qs({ type: t2.key })}`}
                aria-current={t2.key === type ? "page" : undefined}>
               {t2.key === "region" ? t("adm.regionTab") : (TL[t2.key as OptionType] ?? t2.label)}
-              {t2.active ? "" : <span class="dim tab-off"> ({t("adm.offShort")})</span>}
+              {/* An empty list has nothing to disable, so the marker only
+                  appears when the type has entries and all of them are off. */}
+              {!t2.active && t2.count !== 0 && <span class="dim tab-off"> ({t("adm.offShort")})</span>}
               {t2.count != null && <span class="count">{t2.count}</span>}
             </a>
           ))}
@@ -1020,7 +1020,7 @@ export function AdminOptionsPage(props: OptionsProps) {
                     <td><code>{r.code || "—"}</code></td>
                     <td>{r.name}</td>
                     <td>{r.name_en || "—"}</td>
-                    <td class={`num${r.used === 0 ? " muted" : ""}`}>{r.used} {t("members.count")}</td>
+                    <td class={`num${r.used === 0 ? " muted" : ""}`}>{r.used}</td>
                     <td class="row-actions-cell">
                       <div class="row-icon-actions">
                         <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/regions/${r.id}/edit`}
@@ -1054,9 +1054,9 @@ export function AdminOptionsPage(props: OptionsProps) {
                 <td><code>{o.code || "—"}</code></td>
                 <td>{o.label}</td>
                 {scoped && <td>{o.state || <span class="muted small">{t("adm.allStates")}</span>}</td>}
-                {type === "home_cell" && <td>{o.church || <span class="muted small">{t("adm.churchNone")}</span>}</td>}
+                {type === "home_cell" && <td>{o.church || <span class="muted">—</span>}</td>}
                 {(type === "home_cell" || type === "family_group") && <td>{o.parent || <span class="muted">—</span>}</td>}
-                <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used} {t("members.count")}</td>
+                <td class={`num${o.used === 0 ? " muted" : ""}`}>{o.used}</td>
                 <td>
                   {o.active === 1
                     ? <span class="badge active">{t("adm.active")}</span>
