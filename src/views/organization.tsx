@@ -19,6 +19,20 @@ export type OrgCell = {
   member_count: number;
 };
 
+/** A Family Group with its Home Cell and the counts the tab lists. */
+export type OrgFamilyGroup = {
+  id: number;
+  label: string;
+  code: string | null;
+  region_id: number;
+  state_name: string;
+  state_name_en: string | null;
+  township: string | null;
+  home_cell: string | null;
+  member_count: number;
+  household_count: number;
+};
+
 export type OrgDepartment = {
   id: number;
   name: string;
@@ -234,8 +248,9 @@ function nestRoles(rows: PositionDefRow[], lead: PositionDefRow | null) {
 }
 
 export function OrganizationPage(props: Common & {
-  tab: "church" | "main" | "home-cells" | "regional";
+  tab: "church" | "main" | "home-cells" | "regional" | "family-groups";
   cells: OrgCell[];
+  familyGroups: OrgFamilyGroup[];
   departments: OrgDepartment[];
   leaders: OrgLeader[];
   regionalChurches: RegionalChurchRow[];
@@ -253,7 +268,7 @@ export function OrganizationPage(props: Common & {
   region?: number | null;
 }) {
   const {
-    user, perms, flash, lang, tab, cells, departments, leaders,
+    user, perms, flash, lang, tab, cells, familyGroups, departments, leaders,
     regionalChurches, regions, clusters, positionDefs, canManageDepartments, canManageStructure,
     canManageClusters, canManagePositions, unassignedMembers, selectedChurchId, region,
   } = props;
@@ -283,6 +298,23 @@ export function OrganizationPage(props: Common & {
       : (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
     : departments;
   const states = groupCells(scopedCells, clusters, L);
+  /** Family Groups grouped under their state, like the home-cell list. */
+  const familyGroupStates = (() => {
+    const byState = new Map<number, { id: number; name: string; groups: OrgFamilyGroup[] }>();
+    for (const group of familyGroups) {
+      let state = byState.get(group.region_id);
+      if (!state) {
+        state = {
+          id: group.region_id,
+          name: L !== "mm" && group.state_name_en ? group.state_name_en : group.state_name,
+          groups: [],
+        };
+        byState.set(group.region_id, state);
+      }
+      state.groups.push(group);
+    }
+    return [...byState.values()];
+  })();
   const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const orderedChurches = regionalOnly;
   const regionalStates = (() => {
@@ -656,6 +688,8 @@ export function OrganizationPage(props: Common & {
             aria-current={tab === "regional" ? "page" : undefined}>{t("org.regionalTab")}</a>
           <a class={`btn sm ${tab === "home-cells" ? "" : "secondary"}`} href="/organization?tab=home-cells"
             aria-current={tab === "home-cells" ? "page" : undefined}>{t("org.cellsTab")}</a>
+          <a class={`btn sm ${tab === "family-groups" ? "" : "secondary"}`} href="/organization?tab=family-groups"
+            aria-current={tab === "family-groups" ? "page" : undefined}>{t("org.fgTab")}</a>
         </div>
       </div>
 
@@ -1129,6 +1163,56 @@ export function OrganizationPage(props: Common & {
             );
           })()}
         </>
+      ) : tab === "family-groups" ? (
+        <section class="org-departments">
+          <div class="org-section-head">
+            <div>
+              <h2>{t("org.fgTitle")}</h2>
+              <p class="muted small">{t("org.fgIntro")}</p>
+            </div>
+            {canManageOptions && (
+              <a class="btn secondary sm" href="/admin/options?type=family_group">{t("org.manageFamilyGroups")}</a>
+            )}
+          </div>
+
+          {familyGroups.length === 0 ? (
+            <div class="card org-empty org-empty-small">
+              <p class="muted">{t("org.fgEmpty")}</p>
+            </div>
+          ) : (
+            <div class="org-region-groups">
+              {familyGroupStates.map((state) => (
+                <section class="org-region-group">
+                  <div class="org-region-group-head">
+                    <h3>{state.name}</h3>
+                    <span class="muted small">
+                      {state.groups.length} {t("org.fgCount")} · {state.groups.reduce((sum, g) => sum + g.member_count, 0)} {t("org.membersShort")}
+                    </span>
+                  </div>
+                  <div class="org-cell-list">
+                    {state.groups.map((group) => (
+                      <div class="org-cell-row">
+                        <div class="org-cell-name">
+                          <a href={`/members?family_group=${group.id}&status=active`}>{group.label}</a>
+                          {group.code && <span class="org-code">{group.code}</span>}
+                        </div>
+                        <span class="muted small">
+                          {[group.township, group.home_cell].filter(Boolean).join(" · ") || t("org.fgNoCell")}
+                        </span>
+                        <span class="org-row-counts">
+                          <a class="org-cell-count" href={`/members?family_group=${group.id}&status=active`}>
+                            {group.member_count} {t("org.membersShort")}
+                          </a>
+                          <span class="muted small">{group.household_count} {t("org.fgHouseholds")}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
       ) : cells.length === 0 ? (
         <div class="card org-empty">
           <h2>{t("org.emptyTitle")}</h2>

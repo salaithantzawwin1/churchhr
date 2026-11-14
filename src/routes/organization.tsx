@@ -6,7 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { churchDepartments, memberHistory, memberPositions, members } from "../db/schema";
 import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
-import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgLeader } from "../views/organization";
+import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgFamilyGroup, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow, type DepartmentMemberRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, PositionHoldersModal, RegionalChurchModal, type ListStatus, type PositionHolderRow, type RegionalValues } from "../views/org-settings";
@@ -67,11 +67,12 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const scope = scopeOf(c);
   const tabParam = c.req.query("tab");
   // Main Church leads the page; the other tabs are explicit links.
-  const tab: "church" | "main" | "regional" | "home-cells" =
+  const tab: "church" | "main" | "regional" | "home-cells" | "family-groups" =
     tabParam === "home-cells" ? "home-cells"
-      : tabParam === "regional" ? "regional"
-        : tabParam === "church" ? "church"
-          : "main";
+      : tabParam === "family-groups" ? "family-groups"
+        : tabParam === "regional" ? "regional"
+          : tabParam === "church" ? "church"
+            : "main";
 
   const cells = await db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,
@@ -151,10 +152,28 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE m.home_cell_id IS NULL AND m.status = 'active'
       AND ${memberScopeCond(scope)}`);
 
+  // Family Groups hang off a Home Cell; members and households are counted per
+  // group so the list doubles as the reporting view for them.
+  const familyGroups = await db.all<OrgFamilyGroup>(sql`
+    SELECT fg.id, fg.label, fg.code, fg.region_id,
+           r.name AS state_name, r.name_en AS state_name_en,
+           hc.label AS home_cell,
+           t.label AS township,
+           (SELECT COUNT(*) FROM members m
+             WHERE m.family_group_id = fg.id AND m.status = 'active'
+               AND ${memberScopeCond(scope)}) AS member_count,
+           (SELECT COUNT(*) FROM families f WHERE f.family_group_id = fg.id) AS household_count
+    FROM lookup_options fg
+    JOIN regions r ON r.id = fg.region_id
+    LEFT JOIN lookup_options hc ON hc.id = fg.parent_id AND hc.type = 'home_cell'
+    LEFT JOIN lookup_options t ON t.id = hc.parent_id AND t.type = 'township'
+    WHERE fg.type = 'family_group' AND fg.active = 1 AND ${statesCond(scope, sql`fg.region_id`)}
+    ORDER BY r.id, t.sort_order, t.label, fg.sort_order, fg.label`);
+
   return c.html(
     <OrganizationPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      lang={c.get("lang")} tab={tab} cells={cells}
+      lang={c.get("lang")} tab={tab} cells={cells} familyGroups={familyGroups}
       departments={departments} leaders={leaders}
       regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs} regions={regions}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}

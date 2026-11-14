@@ -63,6 +63,14 @@ export function DashboardPage(props: {
   const moved = data.byStatus.moved ?? 0;
   const inactive = data.byStatus.inactive ?? 0;
   const canView = perms.has("members.view");
+  /** Active records still missing a detail, in the order the card lists them. */
+  const gapItems = [
+    { key: "family_group", label: t("dash.gapFamilyGroup"), n: data.gaps.familyGroup },
+    { key: "home_cell", label: t("dash.gapHomeCell"), n: data.gaps.homeCell },
+    { key: "phone", label: t("dash.gapPhone"), n: data.gaps.phone },
+    { key: "dob", label: t("dash.gapDob"), n: data.gaps.dob },
+  ];
+  const gapTotal = gapItems.reduce((sum, g) => sum + g.n, 0);
   const scopeLabel = data.scopeAll ? t("dash.allStates") : `${data.stateCount} ${t("dash.stateScope")}`;
   const genderLabels: Record<string, string> =
     (lang ?? "en") === "mm" ? GENDERS : (lang ?? "en") === "kr" ? GENDERS_KR : GENDERS_EN;
@@ -311,6 +319,27 @@ export function DashboardPage(props: {
           </div>
         </section>
       </div>
+
+      {canView && (
+        <section class="card dash-card gap-card">
+          <div class="dc-head">
+            <h2>{t("dash.gapsTitle")}</h2>
+            <span class="muted small">{t("dash.gapsHint")}</span>
+          </div>
+          {gapTotal === 0 ? (
+            <p class="muted small">{t("dash.gapsDone")}</p>
+          ) : (
+            <div class="gap-grid">
+              {gapItems.map((g) => (
+                <a class="gap-tile" href={`/members${qs({ missing: g.key, status: "active" })}`}>
+                  <span class="gap-n">{g.n}</span>
+                  <span class="gap-l">{g.label}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {perms.has("reports.view") && (
         <section class="card dash-card" style="margin-bottom:14px">

@@ -30,6 +30,8 @@ export type DashboardData = {
   ageGroups: { id: number; name: string; min_age: number; max_age: number; male: number; female: number }[];
   /** Active members with a family group assigned + distinct group count. */
   familyGroup: { members: number; groups: number };
+  /** Active members still missing a detail the registry expects. */
+  gaps: { familyGroup: number; homeCell: number; phone: number; dob: number };
   /** Daily activity reports over the last 7 days, by state (State filter applies). */
   reports: {
     days: number;
@@ -145,6 +147,18 @@ export async function loadDashboard(
     FROM members m
     WHERE ${scopeM} AND ${mfc()} AND m.status = 'active' AND m.family_group_id IS NOT NULL`);
 
+  // Data-entry hygiene: how many active members are missing each detail.
+  const gapRow = await db.all<{
+    familyGroup: number | null; homeCell: number | null; phone: number | null; dob: number | null;
+  }>(sql`
+    SELECT
+      SUM(CASE WHEN m.family_group_id IS NULL THEN 1 ELSE 0 END) AS familyGroup,
+      SUM(CASE WHEN m.home_cell_id IS NULL THEN 1 ELSE 0 END) AS homeCell,
+      SUM(CASE WHEN m.phone IS NULL OR m.phone = '' THEN 1 ELSE 0 END) AS phone,
+      SUM(CASE WHEN m.date_of_birth IS NULL OR m.date_of_birth = '' THEN 1 ELSE 0 END) AS dob
+    FROM members m
+    WHERE ${scopeM} AND ${mfc()} AND m.status = 'active'`);
+
   // Filter bar options: regions/home cells stay scope-wide and townships stay
   // distinct-once so the dropdowns never collapse while the user is picking.
   const scopeR = scope.scopeAll
@@ -194,6 +208,12 @@ export async function loadDashboard(
     familyGroup: {
       members: Number(familyGroupRow[0]?.members ?? 0),
       groups: Number(familyGroupRow[0]?.groups ?? 0),
+    },
+    gaps: {
+      familyGroup: Number(gapRow[0]?.familyGroup ?? 0),
+      homeCell: Number(gapRow[0]?.homeCell ?? 0),
+      phone: Number(gapRow[0]?.phone ?? 0),
+      dob: Number(gapRow[0]?.dob ?? 0),
     },
     reports: {
       days: 7,

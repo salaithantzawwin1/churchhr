@@ -1230,6 +1230,23 @@ a.dash-note:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px
 .dash-note .ico { width: 32px; height: 32px; border-radius: var(--radius-sm); flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-purple-bg); color: var(--chip-purple-ink); }
 .dash-note .ico svg { width: 16px; height: 16px; }
 
+/* incomplete member records */
+.gap-card .dc-head { flex-wrap: wrap; }
+.gap-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.gap-tile {
+  display: flex; flex-direction: column; gap: 2px; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color: inherit; text-decoration: none;
+}
+.gap-n { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gap-l { font-size: 12px; color: var(--muted); }
+a.gap-tile:hover { border-color: var(--brand); }
+a.gap-tile:hover .gap-l { color: var(--link); }
+a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+@media (max-width: 760px) {
+  .gap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* age-group distribution */
 .age-list { display: flex; flex-direction: column; gap: 12px; }
 /* Says what the bar length means: each bar is measured against the biggest age
@@ -1556,6 +1573,7 @@ a.dash-note:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px
 }
 .org-cell-leader { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; }
 .org-role-label { flex: none; color: var(--muted); font-size: 11.5px; }
+.org-row-counts { display: flex; align-items: baseline; gap: 10px; justify-content: flex-end; }
 .org-cell-count { color: var(--muted); font-size: 12.5px; white-space: nowrap; text-decoration: none; }
 .org-cell-count:hover { color: var(--link); text-decoration: underline; }
 .org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }

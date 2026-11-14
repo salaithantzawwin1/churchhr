@@ -127,6 +127,10 @@ function scopeCond(scope: Scope) {
   return cond;
 }
 
+/** Details the dashboard's data-gap card can drill into. */
+const MISSING_FIELDS = ["family_group", "home_cell", "phone", "dob"] as const;
+type MissingField = (typeof MISSING_FIELDS)[number];
+
 function parseFilters(q: Record<string, string | undefined>): Filters {
   return {
     q: (q.q ?? "").trim().slice(0, 100),
@@ -139,6 +143,8 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     fellowship: intParam(q.fellowship),
     ageGroup: intParam(q.age_group),
     familyGroup: q.family_group === "any" ? "any" : intParam(q.family_group),
+    missing: (MISSING_FIELDS as readonly string[]).includes(q.missing ?? "")
+      ? (q.missing as MissingField) : "",
   };
 }
 
@@ -164,6 +170,10 @@ function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: nu
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
   if (f.familyGroup === "any") cond = sql`${cond} AND m.family_group_id IS NOT NULL`;
   else if (f.familyGroup) cond = sql`${cond} AND m.family_group_id = ${f.familyGroup}`;
+  if (f.missing === "family_group") cond = sql`${cond} AND m.family_group_id IS NULL`;
+  else if (f.missing === "home_cell") cond = sql`${cond} AND m.home_cell_id IS NULL`;
+  else if (f.missing === "phone") cond = sql`${cond} AND (m.phone IS NULL OR m.phone = '')`;
+  else if (f.missing === "dob") cond = sql`${cond} AND (m.date_of_birth IS NULL OR m.date_of_birth = '')`;
   if (f.fellowship) cond = sql`${cond} AND m.fellowship_category_id = ${f.fellowship}`;
   // Same age bucket and population the dashboard card counts (active members
   // with a birth date), so the drilled-down total matches the number clicked.

@@ -36,6 +36,8 @@ export type MemberListItem = {
   updated_at?: number;
 };
 
+export type FilterMissing = "family_group" | "home_cell" | "phone" | "dob";
+
 export type Filters = {
   q: string;
   state: number | null;
@@ -49,6 +51,8 @@ export type Filters = {
   ageGroup: number | null;
   /** Dashboard drill-down: "any" keeps every member that has a family group. */
   familyGroup: number | "any" | null;
+  /** Dashboard drill-down: records still missing this detail. */
+  missing: FilterMissing | "";
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -76,13 +80,13 @@ function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup, family_group: f.familyGroup, page: page ?? null,
+    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, page: page ?? null,
   });
 }
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -141,7 +145,7 @@ export function MembersListPage(props: ListProps) {
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup, family_group: f.familyGroup,
+    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing,
     sort: sort || null, dir: sort ? dir : null,
   };
   const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
@@ -172,6 +176,16 @@ export function MembersListPage(props: ListProps) {
   // "any" comes from the dashboard's family-group card; a number is a single group.
   if (f.familyGroup) {
     chips.push({ label: t("members.thFamilyGroup"), href: withoutFilter("family_group") });
+  }
+  // Incomplete-records drill-down from the dashboard's data-gap card.
+  if (f.missing) {
+    const field = {
+      family_group: t("members.thFamilyGroup"),
+      home_cell: t("members.thHomeCell"),
+      phone: t("members.thPhone"),
+      dob: t("form.dob"),
+    }[f.missing];
+    chips.push({ label: `${t("members.missing")}: ${field}`, href: withoutFilter("missing") });
   }
   if (f.ageGroup && props.ageGroup) {
     const g = props.ageGroup;
@@ -264,6 +278,7 @@ export function MembersListPage(props: ListProps) {
           ))}
         </select>
         {f.familyGroup && <input type="hidden" name="family_group" value={String(f.familyGroup)} />}
+        {f.missing && <input type="hidden" name="missing" value={f.missing} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
         {/* Always rendered so the grid keeps its shape: hidden (not removed)
