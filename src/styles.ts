@@ -2263,6 +2263,36 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
 .org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
 .org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+/* Desktop opens a Home Cell structure panel below the chart; phones keep the
+   direct link to that cell's member list. */
+.hc-desktop-link { display: none; }
+@media (min-width: 961px) {
+  .hc-desktop-link { display: inline; }
+  .hc-mobile-link { display: none; }
+}
+.org-cell-panel { margin-top: var(--card-gap); scroll-margin-top: 84px; }
+.org-cell-panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.org-cell-panel-head h2 { display: flex; align-items: center; gap: 9px; margin: 3px 0 4px; font-size: 20px; }
+.org-cell-panel-facts {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0 18px;
+  padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.org-cell-panel-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: 24px; align-items: start; }
+.org-cell-panel-body h3 { margin: 0 0 10px; font-size: 14px; }
+.org-cell-panel-roles { display: flex; flex-wrap: wrap; gap: 14px 22px; }
+.org-cell-panel-side { min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
+@media (max-width: 960px) {
+  .org-cell-panel-body { grid-template-columns: 1fr; }
+  .org-cell-panel-side { padding-left: 0; border-left: 0; padding-top: 16px; border-top: 1px solid var(--line); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .org-cell-panel { animation: cellPanelIn .34s cubic-bezier(.2, .7, .3, 1) both; }
+  @keyframes cellPanelIn {
+    from { opacity: 0; transform: translateY(-14px); }
+    to { opacity: 1; transform: none; }
+  }
+}
 .org-flow-cluster { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--row-alt, rgba(15,23,42,.025)); }
 .org-flow-cluster > summary { list-style: none; cursor: pointer; }
 .org-flow-cluster > summary::-webkit-details-marker { display: none; }

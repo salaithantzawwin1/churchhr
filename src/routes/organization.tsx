@@ -6,7 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { churchDepartments, memberHistory, memberPositions, members } from "../db/schema";
 import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery, flashText } from "../flash";
-import { OrganizationPage, type OrgCell, type OrgDepartment, type OrgFamilyGroup, type OrgLeader } from "../views/organization";
+import { OrganizationPage, type OrgCell, type OrgCellFamilyGroup, type OrgDepartment, type OrgFamilyGroup, type OrgLeader } from "../views/organization";
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow, type DepartmentMemberRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, PositionHoldersModal, RegionalChurchModal, type ListStatus, type PositionHolderRow, type RegionalValues } from "../views/org-settings";
@@ -170,10 +170,25 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE fg.type = 'family_group' AND fg.active = 1 AND ${statesCond(scope, sql`fg.region_id`)}
     ORDER BY r.id, t.sort_order, t.label, fg.sort_order, fg.label`);
 
+  // Desktop opens a Home Cell structure panel (?cell=id); it also lists the
+  // Family Groups that hang off that cell.
+  const selectedCellId = intParam(c.req.query("cell"));
+  const cellFamilyGroups = selectedCellId
+    ? await db.all<OrgCellFamilyGroup>(sql`
+        SELECT fg.id, fg.label, fg.code,
+               (SELECT COUNT(*) FROM members m
+                 WHERE m.family_group_id = fg.id AND m.status = 'active'
+                   AND ${memberScopeCond(scope)}) AS member_count
+        FROM lookup_options fg
+        WHERE fg.type = 'family_group' AND fg.active = 1 AND fg.parent_id = ${selectedCellId}
+        ORDER BY fg.sort_order, fg.label`)
+    : [];
+
   return c.html(
     <OrganizationPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells} familyGroups={familyGroups}
+      selectedCellId={selectedCellId} cellFamilyGroups={cellFamilyGroups}
       departments={departments} leaders={leaders}
       regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs} regions={regions}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
