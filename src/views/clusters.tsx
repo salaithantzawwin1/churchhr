@@ -1,6 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
+import { canManageStructure } from "../rbac";
 import { CardViewToggle } from "./view-toggle";
 import { clusterName, type SupervisionClusterRow } from "../org-units";
 
@@ -137,6 +138,8 @@ export function SupervisionClusterModal(props: {
   error?: string | null;
   cellError?: string | null;
   selectedCellIds?: number[];
+  /** Rights of the caller; the delete action is hidden without structures.delete. */
+  perms?: Set<string>;
   lang?: Lang;
 }) {
   const { cluster, regions, homeCells, error, cellError } = props;
@@ -233,7 +236,7 @@ export function SupervisionClusterModal(props: {
         </div>
       </form>
 
-      {cluster && (
+      {cluster && canManageStructure(props.perms, "delete") && (
         <div class="cluster-modal-foot">
           {cells.length === 0 ? (
             <form
@@ -282,6 +285,8 @@ export function SupervisionClustersPage(props: Common & {
     (status === "all" || (status === "active" ? c.active === 1 : c.active === 0)) &&
     matchesQuery(q, [c.name, c.nameEn, c.stateName, c.stateNameEn]));
   const filtered = q.trim().length > 0 || status !== "all" || region != null;
+  const canCreate = canManageStructure(perms, "create");
+  const canUpdate = canManageStructure(perms, "update");
   const attached = homeCells.filter((c) => c.supervisionClusterId != null).length;
   const unattached = homeCells.length - attached;
 
@@ -294,10 +299,12 @@ export function SupervisionClustersPage(props: Common & {
         </div>
         <div class="page-head-actions">
           <CardViewToggle lang={lang} viewKey="clusters" />
-          <a class="btn js-add-modal" href="/organization/clusters/new"
-            data-modal-title={t("org.addCluster")}>
-            + {t("org.addCluster")}
-          </a>
+          {canCreate && (
+            <a class="btn js-add-modal" href="/organization/clusters/new"
+              data-modal-title={t("org.addCluster")}>
+              + {t("org.addCluster")}
+            </a>
+          )}
           <a class="btn secondary" href="/organization?tab=home-cells">{t("dept.back")}</a>
         </div>
       </div>
@@ -381,12 +388,14 @@ export function SupervisionClustersPage(props: Common & {
                   </div>
                 )}
 
-                <div class="hh-card-actions">
-                  <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
-                    data-modal-title={t("org.editCluster")}>
-                    {t("members.edit")}
-                  </a>
-                </div>
+                {canUpdate && (
+                  <div class="hh-card-actions">
+                    <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
+                      data-modal-title={t("org.editCluster")}>
+                      {t("members.edit")}
+                    </a>
+                  </div>
+                )}
               </article>
             );
           })}

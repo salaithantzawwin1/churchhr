@@ -1,6 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
+import { canManageStructure } from "../rbac";
 import {
   CONFIGURABLE_POSITION_SCOPES,
   positionDefLabel,
@@ -487,6 +488,8 @@ export function RegionalChurchModal(props: {
   /** Rejected Home Cell picks, so a failed attach keeps what was chosen. */
   selectedCellIds?: number[];
   lang?: Lang;
+  /** Rights of the caller; the delete action is hidden without structures.delete. */
+  perms?: Set<string>;
 }) {
   const { church, regions, homeCells, error, cellError } = props;
   const churchNames = new Map((props.churches ?? []).map((c) => [c.id, c.name]));
@@ -572,7 +575,7 @@ export function RegionalChurchModal(props: {
         </div>
       </form>
 
-      {church && (
+      {church && canManageStructure(props.perms, "delete") && (
         <div class="cluster-modal-foot">
           {cells.length === 0 ? (
             <form
@@ -607,6 +610,8 @@ export function RegionalChurchesPage(props: Common & {
   const { user, perms, flash, lang, churches, regions, homeCells } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  const canCreate = canManageStructure(perms, "create");
+  const canUpdate = canManageStructure(perms, "update");
   const q = props.q ?? "";
   const status = props.status ?? "all";
   const region = props.region ?? null;
@@ -675,13 +680,15 @@ export function RegionalChurchesPage(props: Common & {
           </div>
         )}
 
-        <div class="hh-card-actions">
-          <a
-            class="btn sm secondary js-edit-modal"
-            href={`/organization/regional-churches/${church.id}/edit`}
-            data-modal-title={t("org.editRegional")}
-          >{t("members.edit")}</a>
-        </div>
+        {canUpdate && (
+          <div class="hh-card-actions">
+            <a
+              class="btn sm secondary js-edit-modal"
+              href={`/organization/regional-churches/${church.id}/edit`}
+              data-modal-title={t("org.editRegional")}
+            >{t("members.edit")}</a>
+          </div>
+        )}
       </article>
     );
   };
@@ -695,11 +702,13 @@ export function RegionalChurchesPage(props: Common & {
         </div>
         <div class="page-head-actions">
           <CardViewToggle lang={lang} viewKey="regional-churches" />
-          <a
-            class="btn js-add-modal"
-            href="/organization/regional-churches/new"
-            data-modal-title={t("org.addRegional")}
-          >+ {t("org.addRegional")}</a>
+          {canCreate && (
+            <a
+              class="btn js-add-modal"
+              href="/organization/regional-churches/new"
+              data-modal-title={t("org.addRegional")}
+            >+ {t("org.addRegional")}</a>
+          )}
           <a class="btn secondary" href="/organization?tab=regional">{t("dept.back")}</a>
         </div>
       </div>

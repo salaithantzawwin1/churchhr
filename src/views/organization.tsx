@@ -370,6 +370,9 @@ export function OrganizationPage(props: Common & {
     : 0;
   const canEdit = perms.has("members.update");
   const canManageOptions = perms.has("options.manage");
+  // Home Cell / Family Group management is reachable with the structure grant
+  // alone; those pages then hide Add/Edit/Delete the caller may not use.
+  const canViewStructures = canManageStructure || perms.has("structures.view");
   const cellHref = (id: number) => `/members?home_cell=${id}`;
 
   // Only the Church tab narrows roles to the selected church. The other tabs
@@ -1032,7 +1035,7 @@ export function OrganizationPage(props: Common & {
             <div class="card org-empty">
               <h2>{t("org.emptyTitle")}</h2>
               <p class="muted">{churchScoped ? t("org.noChurchCells") : t("org.emptyBody")}</p>
-              {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
+              {canViewStructures && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
             </div>
           ) : (
             <div class="org-church">
@@ -1367,7 +1370,7 @@ export function OrganizationPage(props: Common & {
               <h2>{t("org.fgTitle")}</h2>
               <p class="muted small">{t("org.fgIntro")}</p>
             </div>
-            {canManageOptions && (
+            {canViewStructures && (
               <a class="btn secondary sm" href="/admin/options?type=family_group">{t("org.manageFamilyGroups")}</a>
             )}
           </div>
@@ -1439,7 +1442,7 @@ export function OrganizationPage(props: Common & {
         <div class="card org-empty">
           <h2>{t("org.emptyTitle")}</h2>
           <p class="muted">{t("org.emptyBody")}</p>
-          {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
+          {canViewStructures && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
         </div>
       ) : (
         <section class="card org-chart org-flow">

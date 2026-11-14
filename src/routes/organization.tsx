@@ -1779,6 +1779,7 @@ organizationRoutes.get("/regional-churches/new", requireAnyPermission("options.m
   if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
   return c.html(
     <RegionalChurchModal
+      perms={c.get("perms")}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope)}
       churches={await positionChurchOptions(db, c.get("lang"))}
@@ -1798,6 +1799,7 @@ organizationRoutes.get("/regional-churches/:id/edit", requireAnyPermission("opti
   if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
   return c.html(
     <RegionalChurchModal
+      perms={c.get("perms")}
       church={church}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope)}
@@ -1829,6 +1831,7 @@ organizationRoutes.post("/regional-churches", requireAnyPermission("options.mana
     if (!modal) return c.redirect(`/organization/regional-churches?err=${err}`, 303);
     return c.html(
       <RegionalChurchModal
+      perms={c.get("perms")}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope)}
         churches={await positionChurchOptions(db, c.get("lang"))}
@@ -1886,6 +1889,7 @@ organizationRoutes.post("/regional-churches/:id", requireAnyPermission("options.
       .find((r) => r.id === id);
     return c.html(
       <RegionalChurchModal
+      perms={c.get("perms")}
         church={church}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope)}
@@ -1983,6 +1987,7 @@ organizationRoutes.post("/regional-churches/:id/cells", requireAnyPermission("op
         .find((r) => r.id === id);
       return c.html(
         <RegionalChurchModal
+      perms={c.get("perms")}
           church={row}
           regions={await orgRegions(db, scope, c.get("lang"))}
           homeCells={await loadAdminHomeCells(db, scope)}
@@ -2412,12 +2417,13 @@ organizationRoutes.get("/clusters", requireAnyPermission("options.manage", "stru
   );
 });
 
-organizationRoutes.get("/clusters/new", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/clusters/new", requireAnyPermission("options.manage", "structures.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   if (!modalRequest(c)) return c.redirect("/organization/clusters", 303);
   return c.html(
     <SupervisionClusterModal
+      perms={c.get("perms")}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
       lang={c.get("lang")}
@@ -2425,7 +2431,7 @@ organizationRoutes.get("/clusters/new", requirePermission("options.manage"), asy
   );
 });
 
-organizationRoutes.get("/clusters/:id/edit", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/clusters/:id/edit", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -2434,6 +2440,7 @@ organizationRoutes.get("/clusters/:id/edit", requirePermission("options.manage")
   if (!modalRequest(c)) return c.redirect("/organization/clusters", 303);
   return c.html(
     <SupervisionClusterModal
+      perms={c.get("perms")}
       cluster={cluster}
       regions={await orgRegions(db, scope, c.get("lang"))}
       homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
@@ -2459,6 +2466,7 @@ organizationRoutes.post("/clusters", requireAnyPermission("options.manage", "str
     if (!modal) return c.redirect(`/organization/clusters?err=${err}`, 303);
     return c.html(
       <SupervisionClusterModal
+      perms={c.get("perms")}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}
         values={values} error={flashText(err, c.get("lang"))} lang={c.get("lang")}
@@ -2513,6 +2521,7 @@ organizationRoutes.post("/clusters/:id", requireAnyPermission("options.manage", 
     const cluster = (await adminClusters(db, scope)).find((r) => r.id === id);
     return c.html(
       <SupervisionClusterModal
+      perms={c.get("perms")}
         cluster={cluster}
         regions={await orgRegions(db, scope, c.get("lang"))}
         homeCells={await loadAdminHomeCells(db, scope) as ClusterHomeCell[]}

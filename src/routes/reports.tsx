@@ -640,10 +640,10 @@ reportsRoutes.post("/:id/edit", requireAnyPermission("reports.update", "reports.
 });
 
 // ---------- POST /reports/:id/delete: remove a report ----------
-// Authors may always remove their own report; a holder of reports.delete may
-// also remove one inside their state scope.
+// An author may remove their own report while it is still editable; a holder of
+// reports.delete may remove any report inside their state scope.
 
-reportsRoutes.post("/:id/delete", requirePermission("reports.delete"), async (c) => {
+reportsRoutes.post("/:id/delete", requireAnyPermission("reports.delete", "reports.create", "reports.update"), async (c) => {
   const db = getDb(c.env);
   const user = c.get("user");
   const scope = scopeOf(c);
@@ -654,9 +654,19 @@ reportsRoutes.post("/:id/delete", requirePermission("reports.delete"), async (c)
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
   const report = await loadReport(db, id);
   if (!report) return c.redirect(back, 302);
+  const perms = c.get("perms");
   const own = report.author_id === user.id;
   const inScope = scope.scopeAll || scope.stateIds.includes(report.region_id);
-  if (!own && !inScope) {
+  // Two separate rights, deliberately:
+  //  • author cleanup — you may delete a report you wrote while it is still
+  //    yours to edit (reports.create or reports.update, and not yet reviewed,
+  //    exactly like the edit screen);
+  //  • manager delete — reports.delete removes any report inside the states
+  //    you manage, reviewed or not.
+  const authorMayDelete =
+    own && report.status !== "reviewed" && (perms.has("reports.create") || perms.has("reports.update"));
+  const managerMayDelete = perms.has("reports.delete") && inScope;
+  if (!authorMayDelete && !managerMayDelete) {
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
   // report_edits has no cascade, so the history goes first.
@@ -706,7 +716,11 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
       user={user} perms={perms} flash={flashFromQuery(c.req.query(), lang)} lang={lang}
       report={report} canCreate={perms.has("reports.create")}
       canEdit={own && (perms.has("reports.update") || perms.has("reports.create")) && report.status !== "reviewed"}
-      canDelete={perms.has("reports.delete") && (own || inScope)}
+      // Mirror of the delete route: author while editable, or a scoped manager.
+      canDelete={
+        (own && report.status !== "reviewed" && (perms.has("reports.create") || perms.has("reports.update"))) ||
+        (perms.has("reports.delete") && inScope)
+      }
       canReview={perms.has("reports.review") && inScope}
       edits={editRows} regionNames={regionNames}
     />,

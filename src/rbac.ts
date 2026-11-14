@@ -136,5 +136,16 @@ export const PERMISSION_LABELS_EN: Record<Permission, string> = {
   "audit.view": "View audit log",
 };
 
+/** May this permission set perform a structure action (Home Cell, Family Group,
+ * Township, Cluster, Regional Church)? options.manage still implies all of them,
+ * which is what the seeded system roles carry. */
+export function canManageStructure(
+  perms: Set<string> | undefined,
+  action: "view" | "create" | "update" | "delete",
+): boolean {
+  if (!perms) return false;
+  return perms.has("options.manage") || perms.has(`structures.${action}`);
+}
+
 /** Special region_id row meaning "every state". Kept out of FK constraints on purpose. */
 export const ALL_STATES_WILDCARD = 0;

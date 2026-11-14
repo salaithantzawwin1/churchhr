@@ -1,7 +1,7 @@
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
+import { canManageStructure, PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
 import { countLabel, getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
@@ -870,8 +870,10 @@ function TownshipGlyph() {
 
 /** Home Cell and Home Cell supervision entries as cards, sharing the collection
  *  shell used by households and departments; app.js flips the list view. */
-function OptionCollection(props: { type: string; typeLabel: string; options: OptionUsage[]; lang?: Lang }) {
-  const { type, typeLabel, options } = props;
+function OptionCollection(props: { type: string; typeLabel: string; options: OptionUsage[]; lang?: Lang; perms?: Set<string> }) {
+  const { type, typeLabel, options, perms } = props;
+  const canUpdate = canManageStructure(perms, "update");
+  const canDelete = canManageStructure(perms, "delete");
   const L = props.lang ?? "en";
   const t = getDict(L);
   const isCell = type === "home_cell";
@@ -930,22 +932,28 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
           </div>
 
           <div class="hh-card-actions">
-            <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
-              data-modal-title={`${typeLabel}: ${o.label}`}
-              data-modal-size="md" title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-            <form method="post" action={`/admin/options/${o.id}`}>
-              <input type="hidden" name="toggle" value="1" />
-              <input type="hidden" name="label" value={o.label} />
-              <button class="btn sm secondary" type="submit">
-                {o.active === 1 ? t("adm.disable") : t("adm.enable")}
-              </button>
-            </form>
-            <form method="post" action={`/admin/options/${o.id}/delete`}
-              data-confirm={t("detail.confirmDelete")}
-              data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
-              <button class="btn sm danger icon-btn" type="submit"
-                title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
-            </form>
+            {canUpdate && (
+              <>
+                <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
+                  data-modal-title={`${typeLabel}: ${o.label}`}
+                  data-modal-size="md" title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                <form method="post" action={`/admin/options/${o.id}`}>
+                  <input type="hidden" name="toggle" value="1" />
+                  <input type="hidden" name="label" value={o.label} />
+                  <button class="btn sm secondary" type="submit">
+                    {o.active === 1 ? t("adm.disable") : t("adm.enable")}
+                  </button>
+                </form>
+              </>
+            )}
+            {canDelete && (
+              <form method="post" action={`/admin/options/${o.id}/delete`}
+                data-confirm={t("detail.confirmDelete")}
+                data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
+                <button class="btn sm danger icon-btn" type="submit"
+                  title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+              </form>
+            )}
           </div>
         </article>
       ))}
@@ -960,6 +968,11 @@ export function AdminOptionsPage(props: OptionsProps) {
     : (lang ?? "en") === "kr" ? OPTION_TYPE_LABELS_KR : OPTION_TYPE_LABELS_EN;
   const isRegion = type === "region";
   const scoped = isRegionScopedType(type);
+  // A viewer with only structures.view gets the list and nothing to click:
+  // Add, Edit, enable/disable and Delete follow their own permission.
+  const canCreateOption = canManageStructure(perms, "create");
+  const canUpdateOption = canManageStructure(perms, "update");
+  const canDeleteOption = canManageStructure(perms, "delete");
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
   // Actions sit in the last column, which is off-screen on phones until the
   // table is swiped; the hint matches the member list's scroll affordance.
@@ -979,10 +992,12 @@ export function AdminOptionsPage(props: OptionsProps) {
             <a class="btn secondary" href="/admin/options/township-codes">{t("adm.shortCodesButton")}</a>
           )}
           {/* Two- and three-field editors open small, option editors wider. */}
-          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle}
-            data-modal-size={isRegion || type === "age_group" ? "sm" : "md"}>
-            + {t("adm.addOption")}
-          </a>
+          {canCreateOption && (
+            <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle}
+              data-modal-size={isRegion || type === "age_group" ? "sm" : "md"}>
+              + {t("adm.addOption")}
+            </a>
+          )}
         </div>
       </div>
 
@@ -1084,7 +1099,7 @@ export function AdminOptionsPage(props: OptionsProps) {
           </div>
         </>
       ) : type === "home_cell" || type === "township" ? (
-        <OptionCollection type={type} typeLabel={typeLabel} options={options} lang={lang} />
+        <OptionCollection type={type} typeLabel={typeLabel} options={options} lang={lang} perms={perms} />
       ) : (
         <>
       {scrollHint}
@@ -1108,19 +1123,25 @@ export function AdminOptionsPage(props: OptionsProps) {
                 </td>
                 <td class="row-actions-cell">
                   <div class="row-icon-actions">
-                    <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
-                       data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="md"
-                       title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-                    <form method="post" action={`/admin/options/${o.id}`}>
-                      <input type="hidden" name="toggle" value="1" />
-                      <input type="hidden" name="label" value={o.label} />
-                      <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
-                    </form>
-                    <form method="post" action={`/admin/options/${o.id}/delete`}
-                      data-confirm={t("detail.confirmDelete")}
-                      data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
-                      <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
-                    </form>
+                    {canUpdateOption && (
+                      <>
+                        <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/options/${o.id}/edit`}
+                           data-modal-title={`${typeLabel}: ${o.label}`} data-modal-size="md"
+                           title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                        <form method="post" action={`/admin/options/${o.id}`}>
+                          <input type="hidden" name="toggle" value="1" />
+                          <input type="hidden" name="label" value={o.label} />
+                          <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
+                        </form>
+                      </>
+                    )}
+                    {canDeleteOption && (
+                      <form method="post" action={`/admin/options/${o.id}/delete`}
+                        data-confirm={t("detail.confirmDelete")}
+                        data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
+                        <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
+                      </form>
+                    )}
                   </div>
                 </td>
               </tr>
