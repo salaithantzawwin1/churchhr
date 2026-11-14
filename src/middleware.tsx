@@ -36,12 +36,16 @@ export function forgetSession(token: string | null | undefined): void {
   if (token) sessionCache.delete(token);
 }
 
-/** Keeps the cached session in step after the account language changes: without
+/** Keeps the cached sessions in step after the account language changes: without
  * this the next page would read the language the account had a moment ago,
- * render in it, and overwrite the fresh language cookie with it. */
-function rememberLanguage(token: string, language: string): void {
-  const hit = sessionCache.get(token);
-  if (hit) hit.value.user.language = language;
+ * render in it, and overwrite the fresh language cookie with it. Every cached
+ * session of that account is patched, not just the one that made the switch, so
+ * a second device signed in as the same user follows along at once instead of
+ * showing the old language until its cache entry expires. */
+function rememberLanguage(userId: number, language: string): void {
+  for (const hit of sessionCache.values()) {
+    if (hit.value.user.id === userId) hit.value.user.language = language;
+  }
 }
 
 type SessionAccessRow = {
@@ -137,7 +141,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
     if (user.language !== fromQuery) {
       try {
         await db.update(users).set({ language: fromQuery }).where(eq(users.id, user.id));
-        if (token) rememberLanguage(token, fromQuery);
+        rememberLanguage(user.id, fromQuery);
       } catch (err) {
         // Pre-migration safety: the cookie still remembers it in this browser.
         console.warn("could not save account language:", err);
