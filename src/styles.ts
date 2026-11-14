@@ -185,6 +185,9 @@ a { color: var(--link); }
   .page-toolbar .tabs::-webkit-scrollbar { display: none; }
   .page-toolbar .tabs .btn { flex: 0 0 auto; }
   .page-toolbar .tabs .tab-off { display: none; }
+  /* Pages with only a handful of tabs ask for wrapping, so no tab sits hidden
+     past the right edge of a swipeable row. */
+  .page-toolbar .tabs.tabs-wrap { flex-wrap: wrap; overflow-x: visible; }
 }
 .page-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .page-toolbar .count {
@@ -1350,7 +1353,7 @@ td.empty-state .small { margin-top: 4px; }
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
 }
 .hh-view-toggle button {
-  display: inline-flex; align-items: center; gap: 5px; min-height: 30px;
+  display: inline-flex; align-items: center; gap: 5px; min-height: 36px;
   padding: 4px 9px; border: 0; border-radius: var(--radius-xs);
   background: transparent; color: var(--muted);
   font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
@@ -1495,7 +1498,7 @@ td.empty-state .small { margin-top: 4px; }
   .hh-card { padding: 14px; }
   .hh-facts { gap: 8px 12px; }
   .hh-list-actions { justify-content: space-between; }
-  .hh-view-toggle button { min-height: 34px; }
+  .hh-view-toggle button { min-height: 36px; }
   .hh-grid.is-list .hh-card { padding: 12px; }
   .hh-grid.is-list .hh-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page-head .actions.hh-page-actions { width: auto; }
@@ -1958,7 +1961,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .page-head-actions .btn { min-height: 36px; padding: 7px 14px; font-size: 13.5px; }
 .page-head-actions .btn.js-add-modal:not(.secondary) { font-weight: 600; }
 .page-head-actions .hh-view-toggle { flex: none; padding: 2px; }
-.page-head-actions .hh-view-toggle button { min-height: 32px; padding: 4px 10px; }
+.page-head-actions .hh-view-toggle button { min-height: 36px; padding: 4px 10px; }
 @media (max-width: 640px) {
   .role-list.is-list .role-card { flex-direction: column; align-items: stretch; gap: 10px; }
 }
@@ -2974,6 +2977,9 @@ th { font-size: 13px; }
   .dc-head a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 2px; }
   .members-tbl input[type="checkbox"],
   .bulk-check-all { width: 18px; height: 18px; }
+  /* Row selection is the one control people tap repeatedly in the list. */
+  .members-tbl input[type="checkbox"].bulk-check { width: 24px; height: 24px; min-width: 24px; }
+  .members-tbl input[type="checkbox"].bulk-check::before { width: 14px; height: 14px; }
 }
 @media (max-width: 380px) {
   /* The account block (language pills, username, Sign out) must still fit on a

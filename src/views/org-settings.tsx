@@ -327,7 +327,7 @@ export function PositionsPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs" role="tablist" aria-label={t("org.positionsTitle")}>
+        <div class="tabs tabs-wrap" role="tablist" aria-label={t("org.positionsTitle")}>
           {CONFIGURABLE_POSITION_SCOPES.map((s) => (
             <a class={`btn sm ${scope === s ? "" : "secondary"}`} href={`/organization/positions?scope=${s}`}
               aria-current={scope === s ? "page" : undefined}>

@@ -65,7 +65,7 @@ export function VacancyReportPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs">
+        <div class="tabs tabs-wrap">
           {tabs.map((tab) => {
             const active = (scope ?? "") === tab.key;
             return (

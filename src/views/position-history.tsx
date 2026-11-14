@@ -64,7 +64,7 @@ export function PositionHistoryPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs">
+        <div class="tabs tabs-wrap">
           {tabs.map((tab) => (
             <a class={`btn sm ${filter === tab.key ? "" : "secondary"}`} href={tab.href}
               aria-current={filter === tab.key ? "page" : undefined}>{tab.label}</a>
