@@ -2280,7 +2280,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 }
 .org-cell-panel-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: 24px; align-items: start; }
 .org-cell-panel-body h3 { margin: 0 0 10px; font-size: 14px; }
-.org-cell-panel-roles { display: flex; flex-wrap: wrap; gap: 14px 22px; }
+.org-cell-panel-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 26px; }
 .org-cell-panel-side { min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
 @media (max-width: 960px) {
   .org-cell-panel-body { grid-template-columns: 1fr; }
@@ -2303,6 +2303,16 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-flow-cluster-meta { display: flex; align-items: center; gap: 8px; flex: none; }
 .org-flow-chev { color: var(--muted); font-size: 12px; line-height: 1; transition: transform .15s ease; }
 .org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
+/* An open cluster takes the whole row, so its supervisor and Home Cells read as
+   one structure instead of a narrow column with empty space beside it. */
+.org-flow-cluster[open] { grid-column: 1 / -1; }
+@media (prefers-reduced-motion: no-preference) {
+  .org-flow-cluster[open] .org-flow-cluster-body { animation: clusterOpen .28s ease-out both; }
+  @keyframes clusterOpen {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
+  }
+}
 .org-flow-cluster-body { padding-top: 6px; }
 .org-flow-pastor { display: flex; justify-content: center; }
 .org-flow-actions { display: flex; flex-wrap: wrap; gap: 6px; }
