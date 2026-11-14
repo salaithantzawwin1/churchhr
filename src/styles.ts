@@ -3357,4 +3357,89 @@ th { font-size: 13px; }
   :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="range"]):not([type="color"]) { font-size: 16px; }
 }
 
+
+/* ---------- native selects ---------- */
+/* The platform drew its own grey arrow on a dark field, at a size and offset
+   that disagreed with every other control. One chevron, drawn once, keeps the
+   filter bars and the church switcher looking like the rest of the form. */
+select:not([multiple]) {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%237d8ca4' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5 6 6.5l5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 12px 8px;
+}
+select:not([multiple]):hover { border-color: var(--line-strong); }
+select:not([multiple]):disabled { opacity: .6; cursor: not-allowed; }
+select option { background: var(--surface-2); color: var(--ink); }
+/* Compact select inside a department row keeps its width for the name. */
+.dept-pos-form select { padding-right: 22px; background-position: right 6px center; background-size: 9px 6px; }
+.org-church-control select { background-color: var(--field-bg); }
+
+/* ---------- organization: regions & churches ---------- */
+/* One state/region per fold: a long list of open charts pushed the next state
+   far below the fold, so each card starts collapsed except the first. */
+.org-region-group {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); overflow: hidden;
+}
+.org-region-group > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px;
+  min-height: 54px; padding: 12px 16px; cursor: pointer; list-style: none;
+  background: var(--surface-3);
+}
+.org-region-group > summary::-webkit-details-marker { display: none; }
+.org-region-group > summary:hover { background: var(--surface-2); }
+.org-region-group-head h3 { margin: 0; font-size: 16px; }
+.org-region-group-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
+.org-region-chev { color: var(--muted); font-size: 11px; transition: transform .15s ease; }
+.org-region-group[open] > summary .org-region-chev { transform: rotate(180deg); }
+.org-region-group-body { padding: 14px 16px 16px; border-top: 1px solid var(--line); }
+/* The team used to be its own card; inside the folded state card a second
+   frame read as a box in a box, so it flattens into the body. */
+.org-region-group-body .org-region-team {
+  margin: 0 0 14px; padding: 0; border: 0; background: transparent; box-shadow: none;
+}
+.org-dot { color: var(--muted); }
+
+/* ---------- organization: family groups ---------- */
+.fg-search { margin-bottom: 14px; }
+.fg-total { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 12px; color: var(--muted); font-size: 12.5px; }
+.fg-total b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.fg-groups { display: grid; gap: 12px; }
+.fg-group { padding: 0; overflow: hidden; }
+.fg-group-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 13px 16px; border-bottom: 1px solid var(--line); background: var(--surface-3);
+}
+.fg-group-head h3 { margin: 0; font-size: 16px; }
+.fg-rows { display: grid; }
+/* The whole row is the link: the counts used to be the only target and sat far
+   from the name on a wide screen. */
+.fg-row {
+  display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(140px, 1fr) auto;
+  align-items: center; gap: 6px 14px; padding: 11px 16px;
+  border-top: 1px solid var(--line); color: inherit; text-decoration: none;
+}
+.fg-rows .fg-row:first-child { border-top: 0; }
+.fg-row:hover { background: var(--row-alt, rgba(15,23,42,.04)); }
+.fg-row-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fg-label { color: var(--link); font-weight: 600; overflow-wrap: anywhere; }
+.fg-row:hover .fg-label { text-decoration: underline; }
+.fg-row-cell { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.fg-row-counts { display: flex; align-items: center; gap: 6px; justify-self: end; }
+.fg-chip {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 9px;
+  border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 12px; white-space: nowrap;
+}
+.fg-chip b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.fg-go { color: var(--muted); font-size: 12px; }
+.fg-row:hover .fg-go { color: var(--link); }
+@media (max-width: 700px) {
+  .fg-row { grid-template-columns: 1fr; }
+  .fg-row-counts { justify-self: start; }
+  .org-region-group-meta { margin-left: 0; width: 100%; }
+}
 `; // end of stylesheet

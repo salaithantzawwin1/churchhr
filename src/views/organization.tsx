@@ -258,6 +258,8 @@ export function OrganizationPage(props: Common & {
   selectedCellId?: number | null;
   /** Gap filter for the Home Cell tab (query ?gap=). */
   gap?: "leader" | "vacancy" | "members" | null;
+  /** Search text for the Family Groups tab (query ?fg=). */
+  fg?: string;
   /** Family Groups hanging off that Home Cell. */
   cellFamilyGroups?: OrgCellFamilyGroup[];
   departments: OrgDepartment[];
@@ -278,7 +280,7 @@ export function OrganizationPage(props: Common & {
 }) {
   const {
     user, perms, flash, lang, tab, cells, familyGroups, departments, leaders,
-    selectedCellId, gap, cellFamilyGroups = [],
+    selectedCellId, gap, fg, cellFamilyGroups = [],
     regionalChurches, regions, clusters, positionDefs, canManageDepartments, canManageStructure,
     canManageClusters, canManagePositions, unassignedMembers, selectedChurchId, region,
   } = props;
@@ -308,10 +310,18 @@ export function OrganizationPage(props: Common & {
       : (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
     : departments;
   const states = groupCells(scopedCells, clusters, L);
+  // The Family Groups tab doubles as the reporting view, so it can be searched by
+  // name, code, Home Cell or township before the state grouping runs.
+  const fgQuery = (fg ?? "").trim();
+  const fgNeedle = fgQuery.toLowerCase();
+  const visibleFamilyGroups = fgNeedle
+    ? familyGroups.filter((group) => [group.label, group.code, group.home_cell, group.township]
+      .some((value) => (value ?? "").toLowerCase().includes(fgNeedle)))
+    : familyGroups;
   /** Family Groups grouped under their state, like the home-cell list. */
   const familyGroupStates = (() => {
     const byState = new Map<number, { id: number; name: string; groups: OrgFamilyGroup[] }>();
-    for (const group of familyGroups) {
+    for (const group of visibleFamilyGroups) {
       let state = byState.get(group.region_id);
       if (!state) {
         state = {
@@ -1195,12 +1205,23 @@ export function OrganizationPage(props: Common & {
               </div>
             ) : (
               <div class="org-region-groups">
-                {regionGroups.map((group) => (
-                  <section class="org-region-group">
-                    <div class="org-region-group-head">
+                {regionGroups.map((group, groupIndex) => {
+                  const groupCells = cells.filter((c) => group.churches.some((ch) => ch.id === c.regional_church_id));
+                  const groupMembers = groupCells.reduce((sum, c) => sum + c.member_count, 0);
+                  return (
+                  <details class="org-region-group" open={groupIndex === 0}>
+                    <summary class="org-region-group-head">
                       <h3>{group.name}</h3>
-                      <span class="muted small">{group.churches.length} {t("org.churchesShort")}</span>
-                    </div>
+                      <span class="org-region-group-meta">
+                        <span class="muted small">{group.churches.length} {t("org.churchesShort")}</span>
+                        <span class="org-dot" aria-hidden="true">·</span>
+                        <span class="muted small">{groupCells.length} {t("org.cells")}</span>
+                        <span class="org-dot" aria-hidden="true">·</span>
+                        <span class="muted small">{groupMembers} {t("org.membersShort")}</span>
+                        <span class="org-region-chev" aria-hidden="true">▾</span>
+                      </span>
+                    </summary>
+                    <div class="org-region-group-body">
 
                     <article class="card org-region-team">
                       <div class="org-section-head">
@@ -1299,8 +1320,10 @@ export function OrganizationPage(props: Common & {
                         );
                       })}
                     </div>
-                  </section>
-                ))}
+                    </div>
+                  </details>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -1349,42 +1372,67 @@ export function OrganizationPage(props: Common & {
             )}
           </div>
 
+          <form class="filters settings-filters fg-search" method="get" action="/organization" data-auto-submit="1">
+            <input type="hidden" name="tab" value="family-groups" />
+            <input type="search" name="fg" value={fgQuery} placeholder={t("org.fgSearchPlaceholder")}
+              aria-label={t("org.fgSearch")} />
+            <div class="actions">
+              <button class="btn sm secondary" type="submit">{t("members.search")}</button>
+              {fgQuery !== "" && (
+                <a class="btn sm secondary" href="/organization?tab=family-groups">{t("org.clearSearch")}</a>
+              )}
+            </div>
+          </form>
+
           {familyGroups.length === 0 ? (
             <div class="card org-empty org-empty-small">
               <p class="muted">{t("org.fgEmpty")}</p>
             </div>
-          ) : (
-            <div class="org-region-groups">
-              {familyGroupStates.map((state) => (
-                <section class="org-region-group">
-                  <div class="org-region-group-head">
-                    <h3>{state.name}</h3>
-                    <span class="muted small">
-                      {state.groups.length} {t("org.fgCount")} · {state.groups.reduce((sum, g) => sum + g.member_count, 0)} {t("org.membersShort")}
-                    </span>
-                  </div>
-                  <div class="org-cell-list">
-                    {state.groups.map((group) => (
-                      <div class="org-cell-row">
-                        <div class="org-cell-name">
-                          <a href={`/members?family_group=${group.id}&status=active`}>{group.label}</a>
-                          {group.code && <span class="org-code">{group.code}</span>}
-                        </div>
-                        <span class="muted small">
-                          {[group.township, group.home_cell].filter(Boolean).join(" · ") || t("org.fgNoCell")}
-                        </span>
-                        <span class="org-row-counts">
-                          <a class="org-cell-count" href={`/members?family_group=${group.id}&status=active`}>
-                            {group.member_count} {t("org.membersShort")}
-                          </a>
-                          <span class="muted small">{group.household_count} {t("org.fgHouseholds")}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
+          ) : visibleFamilyGroups.length === 0 ? (
+            <div class="card org-empty org-empty-small">
+              <p class="muted">{t("org.fgNoMatch")}</p>
             </div>
+          ) : (
+            <>
+              <p class="fg-total">
+                <span><b>{visibleFamilyGroups.length}</b> {t("org.fgCount")}</span>
+                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.member_count, 0)}</b> {t("org.membersShort")}</span>
+                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.household_count, 0)}</b> {t("org.fgHouseholds")}</span>
+              </p>
+              <div class="fg-groups">
+                {familyGroupStates.map((state) => (
+                  <section class="card fg-group">
+                    <header class="fg-group-head">
+                      <h3>{state.name}</h3>
+                      <span class="muted small">
+                        {state.groups.length} {t("org.fgCount")} · {state.groups.reduce((sum, g) => sum + g.member_count, 0)} {t("org.membersShort")} · {state.groups.reduce((sum, g) => sum + g.household_count, 0)} {t("org.fgHouseholds")}
+                      </span>
+                    </header>
+                    <div class="fg-rows">
+                      {state.groups.map((group) => {
+                        const href = `/members?family_group=${group.id}&status=active`;
+                        return (
+                          <a class="fg-row" href={href}>
+                            <span class="fg-row-name">
+                              <span class="fg-label">{group.label}</span>
+                              {group.code && group.code !== group.label && <span class="org-code">{group.code}</span>}
+                            </span>
+                            <span class="fg-row-cell">
+                              {[group.township, group.home_cell].filter(Boolean).join(" · ") || t("org.fgNoCell")}
+                            </span>
+                            <span class="fg-row-counts">
+                              <span class="fg-chip"><b>{group.member_count}</b> {t("org.membersShort")}</span>
+                              <span class="fg-chip"><b>{group.household_count}</b> {t("org.fgHouseholds")}</span>
+                              <span class="fg-go" aria-hidden="true">→</span>
+                            </span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </>
           )}
         </section>
       ) : cells.length === 0 ? (

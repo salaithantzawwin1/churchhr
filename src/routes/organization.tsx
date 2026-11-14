@@ -173,6 +173,8 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   // Desktop opens a Home Cell structure panel (?cell=id); it also lists the
   // Family Groups that hang off that cell.
   const selectedCellId = intParam(c.req.query("cell"));
+  // Search text for the Family Groups tab (?fg=).
+  const fgQuery = listQuery(c.req.query("fg"));
   // Gap filter for the Home Cell tab (leadership, vacancies or empty cells).
   const gapParam = c.req.query("gap");
   const gap = gapParam === "leader" || gapParam === "vacancy" || gapParam === "members"
@@ -193,7 +195,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     <OrganizationPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells} familyGroups={familyGroups}
-      selectedCellId={selectedCellId} gap={gap} cellFamilyGroups={cellFamilyGroups}
+      selectedCellId={selectedCellId} gap={gap} fg={fgQuery} cellFamilyGroups={cellFamilyGroups}
       departments={departments} leaders={leaders}
       regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs} regions={regions}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
