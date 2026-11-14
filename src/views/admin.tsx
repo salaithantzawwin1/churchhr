@@ -342,7 +342,7 @@ export function RoleFormFragment(props: {
       </div>
       <div style="margin-top:10px">
         <strong class="small">{t("adm.permissions")}:</strong>
-        <div class="form-grid" style="margin-top:8px">
+        <div class="form-grid" style="margin-top:8px; row-gap:8px">
           {PERMISSIONS.map((p) => (
             <label class="field" style="font-size:14px">
               <input type="checkbox" name="permissions" value={p}
@@ -352,9 +352,10 @@ export function RoleFormFragment(props: {
           ))}
         </div>
       </div>
+      {/* Cancel first like every other modal, primary action last (right). */}
       <div class="actions">
-        <button class="btn" type="submit">{isNew ? t("adm.createRole") : t("adm.savePerms")}</button>
         <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+        <button class="btn" type="submit">{isNew ? t("adm.createRole") : t("adm.savePerms")}</button>
       </div>
     </form>
   );
@@ -397,7 +398,7 @@ export function AdminRolesPage(props: RolesProps) {
         <h1>{t("adm.rolesHeading")}</h1>
         <div class="page-actions">
           <a class="btn secondary" href="/">← {t("nav.dashboard")}</a>
-          <a class="btn js-add-modal" href="/admin/roles/new?add=1" data-modal-title={t("adm.newRole")} data-modal-size="sm">
+          <a class="btn js-add-modal" href="/admin/roles/new?add=1" data-modal-title={t("adm.newRole")} data-modal-size="md">
             + {t("adm.newRole")}
           </a>
         </div>
@@ -433,7 +434,8 @@ export function AdminRolesPage(props: RolesProps) {
                        data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md"
                        title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
                     {r.is_system !== 1 && (
-                      <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}>
+                      <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}
+                        data-confirm-title={`${t("modal.confirmTitle")}: ${roleName(r, t)}`}>
                         <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
                       </form>
                     )}
