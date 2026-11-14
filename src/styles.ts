@@ -597,7 +597,9 @@ th.bar-col { width: 42%; }
 .modal-card.md { width: min(620px, 100%); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 20px; border-bottom: 1px solid var(--line); }
 .modal-head h3 { margin: 0; font-size: 17px; }
-.modal-x { background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 9px; border-radius: var(--radius-sm); font-family: inherit; }
+.modal-x { background: none; border: 0; font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted); border-radius: var(--radius-sm); font-family: inherit;
+  /* A real hit area for thumbs: the × glyph stays the same size. */
+  display: grid; place-items: center; min-width: 40px; min-height: 40px; padding: 0; }
 .modal-x:hover { background: var(--chip-bg); color: var(--ink); }
 .modal-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; }
 .modal-body .card { margin-bottom: 14px; }
@@ -1843,6 +1845,8 @@ table.list-tbl.ph-tbl { min-width: 0; }
    danger section that is not a sticky action bar, and inline error text. */
 .modal-note { margin: 2px 0 0; }
 .modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* Confirm buttons line up with the form footers: Cancel left, action right. */
+.modal-confirm .actions, .modal-body > .actions { justify-content: flex-end; }
 .modal-error {
   margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--err-bg, #fdecec); color: var(--err-ink); font-size: 13px;

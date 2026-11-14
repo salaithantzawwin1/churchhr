@@ -535,7 +535,7 @@ function optionParentField(
           <option value={String(p.id)} selected={selected === String(p.id)} data-region={p.regionId === 0 ? "" : String(p.regionId)}>{p.label}</option>
         ))}
       </select>
-      <span class="field-hint">{t("adm.parentHint")}</span>
+      <span class="field-hint">{parentType === "township" ? t("adm.parentHintTownship") : t("adm.parentHintHomeCell")}</span>
     </label>
   );
 }
@@ -904,7 +904,9 @@ function OptionCollection(props: { type: string; typeLabel: string; options: Opt
                 {o.active === 1 ? t("adm.disable") : t("adm.enable")}
               </button>
             </form>
-            <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+            <form method="post" action={`/admin/options/${o.id}/delete`}
+              data-confirm={t("detail.confirmDelete")}
+              data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
               <button class="btn sm danger icon-btn" type="submit"
                 title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
             </form>
@@ -940,7 +942,9 @@ export function AdminOptionsPage(props: OptionsProps) {
           {type === "township" && (
             <a class="btn secondary" href="/admin/options/township-codes">{t("adm.shortCodesButton")}</a>
           )}
-          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle} data-modal-size="md">
+          {/* Two- and three-field editors open small, option editors wider. */}
+          <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle}
+            data-modal-size={isRegion || type === "age_group" ? "sm" : "md"}>
             + {t("adm.addOption")}
           </a>
         </div>
@@ -994,7 +998,9 @@ export function AdminOptionsPage(props: OptionsProps) {
                       <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/age-groups/${g.id}/edit`}
                          data-modal-title={`${t("adm.ageTab")}: ${g.name}`} data-modal-size="sm"
                          title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-                      <form method="post" action={`/admin/age-groups/${g.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                      <form method="post" action={`/admin/age-groups/${g.id}/delete`}
+                        data-confirm={t("detail.confirmDelete")}
+                        data-confirm-title={`${t("modal.confirmTitle")}: ${g.name}`}>
                         <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
                       </form>
                     </div>
@@ -1026,7 +1032,9 @@ export function AdminOptionsPage(props: OptionsProps) {
                         <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/regions/${r.id}/edit`}
                            data-modal-title={`${t("adm.regionTab")}: ${r.name}`} data-modal-size="sm"
                            title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-                        <form method="post" action={`/admin/regions/${r.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                        <form method="post" action={`/admin/regions/${r.id}/delete`}
+                          data-confirm={t("detail.confirmDelete")}
+                          data-confirm-title={`${t("modal.confirmTitle")}: ${r.name}`}>
                           <button class="btn sm danger icon-btn" type="submit" disabled={r.used > 0}
                            title={r.used > 0 ? t("flash.errRegionUsed") : t("members.delete")}
                            aria-label={t("members.delete")}><TrashIcon /></button>
@@ -1072,7 +1080,9 @@ export function AdminOptionsPage(props: OptionsProps) {
                       <input type="hidden" name="label" value={o.label} />
                       <button class="btn sm secondary" type="submit">{o.active === 1 ? t("adm.disable") : t("adm.enable")}</button>
                     </form>
-                    <form method="post" action={`/admin/options/${o.id}/delete`} data-confirm={t("detail.confirmDelete")}>
+                    <form method="post" action={`/admin/options/${o.id}/delete`}
+                      data-confirm={t("detail.confirmDelete")}
+                      data-confirm-title={`${t("modal.confirmTitle")}: ${o.label}`}>
                       <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>
                     </form>
                   </div>

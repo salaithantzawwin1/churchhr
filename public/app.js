@@ -1402,27 +1402,31 @@
       box.innerHTML =
         '<p style="margin:0 0 4px">' + text + "</p>" +
         '<div class="actions" style="margin-top:14px">' +
-        '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
         '<button type="button" class="btn secondary" data-confirm-no="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
+        '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
         "</div>";
       bodyEl.appendChild(box);
-      var inlineYes = box.querySelector("[data-confirm-yes]");
-      if (inlineYes) inlineYes.focus();
+      // Focus the safe choice, not the destructive one.
+      var inlineNo = box.querySelector("[data-confirm-no]");
+      if (inlineNo) inlineNo.focus();
       return;
     }
     openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", "sm");
     bodyEl.innerHTML =
       '<p style="margin:0 0 4px">' + text + "</p>" +
       '<div class="actions" style="margin-top:14px">' +
-      '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
       '<button type="button" class="btn secondary" data-close="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
+      '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
       "</div>";
-    var yes = bodyEl.querySelector("[data-confirm-yes]");
-    if (yes) yes.focus();
+    var no = bodyEl.querySelector("[data-close]");
+    if (no) no.focus();
   });
 
   function setModalHtml(doc) {
     bodyEl.innerHTML = "";
+    // A re-rendered form (validation error, or edit after add) starts at the
+    // top so the error summary is not left scrolled out of view.
+    bodyEl.scrollTop = 0;
     Array.prototype.forEach.call(doc.body.children, function (n) {
       bodyEl.appendChild(document.importNode(n, true));
     });
