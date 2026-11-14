@@ -1847,6 +1847,13 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
 /* Confirm buttons line up with the form footers: Cancel left, action right. */
 .modal-confirm .actions, .modal-body > .actions { justify-content: flex-end; }
+/* Role editor: permissions grouped by area, two balanced columns from 700px so
+   the sixteen checkboxes read as a short list instead of one long column. */
+.perm-groups { margin-top: 8px; }
+.perm-group { break-inside: avoid; margin-bottom: 12px; }
+.perm-group-label { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.perm-list { display: grid; gap: 6px; }
+@media (min-width: 700px) { .perm-groups { columns: 2; column-gap: 24px; } }
 .modal-error {
   margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--err-bg, #fdecec); color: var(--err-ink); font-size: 13px;

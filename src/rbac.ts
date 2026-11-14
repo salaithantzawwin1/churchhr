@@ -20,6 +20,34 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+/** Editor grouping for the role form. Every permission belongs to exactly one
+ * group; the form appends anything unlisted to the last group, so a permission
+ * added to the catalogue above can never silently drop out of the UI. */
+export const PERMISSION_GROUPS: { labelKey: string; permissions: Permission[] }[] = [
+  {
+    labelKey: "adm.permGroupRecords",
+    permissions: [
+      "dashboard.view",
+      "members.view",
+      "members.create",
+      "members.update",
+      "members.delete",
+      "members.export",
+      "members.import",
+      "pastors.view",
+      "pastors.manage",
+    ],
+  },
+  {
+    labelKey: "adm.permGroupReports",
+    permissions: ["reports.view", "reports.create", "reports.review"],
+  },
+  {
+    labelKey: "adm.permGroupAdmin",
+    permissions: ["users.manage", "roles.manage", "options.manage", "audit.view"],
+  },
+];
+
 export const PERMISSION_LABELS: Record<Permission, string> = {
   "dashboard.view": "Dashboard ကြည့်ခွင့်",
   "members.view": "Member စာရင်း ကြည့်ခွင့်",

@@ -1,7 +1,7 @@
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { PERMISSIONS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR } from "../rbac";
+import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
@@ -294,6 +294,17 @@ type RolesProps = Common & {
   saveErrors: string[];
 };
 
+/** Permissions as the role form lists them: grouped, with any permission that
+ * is missing from the grouping kept (appended to the last group) so the editor
+ * can never hide a permission. */
+function permissionGroups(): { labelKey: string; permissions: Permission[] }[] {
+  const groups = PERMISSION_GROUPS.map((g) => ({ labelKey: g.labelKey, permissions: [...g.permissions] as Permission[] }));
+  const covered = new Set<Permission>(groups.flatMap((g) => g.permissions));
+  const rest = PERMISSIONS.filter((p) => !covered.has(p));
+  if (rest.length > 0) groups[groups.length - 1].permissions.push(...rest);
+  return groups;
+}
+
 function permCheckboxes(role: { id: number; permissions: string[] } | null, labels: Record<string, string>) {
   return (
     <div class="form-grid" style="margin-top:8px">
@@ -342,13 +353,20 @@ export function RoleFormFragment(props: {
       </div>
       <div style="margin-top:10px">
         <strong class="small">{t("adm.permissions")}:</strong>
-        <div class="form-grid" style="margin-top:8px; row-gap:8px">
-          {PERMISSIONS.map((p) => (
-            <label class="field" style="font-size:14px">
-              <input type="checkbox" name="permissions" value={p}
-                checked={perms.includes(p)} /> {PL[p]}
-              <span class="hint"> ({p})</span>
-            </label>
+        <div class="perm-groups">
+          {permissionGroups().map((g) => (
+            <div class="perm-group">
+              <p class="perm-group-label">{t(g.labelKey)}</p>
+              <div class="perm-list">
+                {g.permissions.map((p) => (
+                  <label class="field" style="font-size:14px">
+                    <input type="checkbox" name="permissions" value={p}
+                      checked={perms.includes(p)} /> {PL[p]}
+                    <span class="hint"> ({p})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
