@@ -579,12 +579,18 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               <select name="blood_type">
                 <option value="">{t("form.choose")}</option>
                 {(() => {
-                  // Managed options first (code · label); fall back to the
-                  // std eight when none are active, merging so both show.
-                  const opts = options.blood_type ?? [];
-                  const rows = opts.length > 0
-                    ? opts.map((o) => ({ value: o.label, text: optionText(o.code, o.label) }))
-                    : BLOOD_TYPES.map((b) => ({ value: b, text: b }));
+                  // The std eight always stay selectable; managed options (with
+                  // their code) are merged on top of them, replacing a std entry
+                  // when the label matches, so enabling one managed blood type
+                  // never hides the rest of the list.
+                  const rows = BLOOD_TYPES.map((b) => ({ value: b, text: b }));
+                  for (const o of options.blood_type ?? []) {
+                    const key = o.label.trim().toLowerCase();
+                    const at = rows.findIndex((r) => r.value.trim().toLowerCase() === key);
+                    const row = { value: o.label, text: optionText(o.code, o.label) };
+                    if (at >= 0) rows[at] = row;
+                    else rows.push(row);
+                  }
                   if (v.blood_type && !rows.some((r) => r.value === v.blood_type)) {
                     rows.push({ value: v.blood_type, text: v.blood_type });
                   }
