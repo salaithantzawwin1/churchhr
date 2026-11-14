@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
 import { qs } from "../util";
@@ -286,6 +286,8 @@ export type AdminRoleRow = {
   description: string | null;
   is_system: number;
   permissions: string[];
+  /** Accounts holding this role; a role in use cannot be deleted. */
+  user_count?: number;
 };
 
 type RolesProps = Common & {
@@ -342,13 +344,17 @@ export function RoleFormFragment(props: {
           <ul class="err-list">{props.errors.map((e) => <li>{e}</li>)}</ul>
         </div>
       )}
-      {role && <input type="hidden" name="name" value={role.name} />}
       <div class="form-grid">
         <label class="field">
           <span class="lbl">{t("adm.roleName")} {isNew && "*"}</span>
-          <input type="text" name={isNew ? "name" : "description"} value={isNew ? v.name ?? "" : role?.description ?? ""}
-            required={isNew} {...isNew ? { maxLength: 60 } : {}} />
-          {isNew && <span class="field-hint">{t("adm.roleNameHint")}</span>}
+          <input type="text" name="name" value={isNew ? v.name ?? "" : role?.name ?? ""}
+            required={isNew} maxLength={60} readOnly={!isNew && role?.is_system === 1}
+            title={!isNew && role?.is_system === 1 ? t("adm.roleSystemLocked") : undefined} />
+          <span class="field-hint">{isNew ? t("adm.roleNameHint") : role?.is_system === 1 ? t("adm.roleSystemLocked") : t("adm.roleNameHint")}</span>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.desc")}</span>
+          <input type="text" name="description" value={v.description ?? role?.description ?? ""} maxLength={160} />
         </label>
       </div>
       <div style="margin-top:10px">
@@ -434,6 +440,11 @@ export function AdminRolesPage(props: RolesProps) {
                 <td data-label={t("adm.roleName")}>
                   {roleName(r, t)}
                   {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
+                  {(r.user_count ?? 0) > 0 && (
+                    <span class="hint" style="display:block;font-size:12px">
+                      {countLabel(t, "adm.roleUsers", r.user_count ?? 0)}
+                    </span>
+                  )}
                 </td>
                 <td class="small muted" data-label={t("adm.desc")}>{roleDescription(r, t)}</td>
                 <td class="small" data-label={t("adm.permissions")}>
@@ -451,7 +462,12 @@ export function AdminRolesPage(props: RolesProps) {
                     <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/roles/${r.id}/edit`}
                        data-modal-title={`${t("adm.rolesHeading")}: ${roleName(r, t)}`} data-modal-size="md"
                        title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-                    {r.is_system !== 1 && (
+                    {r.is_system !== 1 && (r.user_count ?? 0) > 0 && (
+                      <span class="muted" style="font-size:12px" title={t("adm.errRoleInUse")}>
+                        {t("adm.roleInUseLocked")}
+                      </span>
+                    )}
+                    {r.is_system !== 1 && (r.user_count ?? 0) === 0 && (
                       <form method="post" action={`/admin/roles/${r.id}/delete`} data-confirm={t("adm.confirmRole")}
                         data-confirm-title={`${t("modal.confirmTitle")}: ${roleName(r, t)}`}>
                         <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}><TrashIcon /></button>

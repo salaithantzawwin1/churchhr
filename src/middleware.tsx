@@ -16,8 +16,28 @@ export type Access = {
   homeCellIds: number[];
 };
 
-/** Loads effective permissions (union of the user's roles) and state scope. */
+/** Resolving who may do what costs several D1 round-trips per request, and it
+ * only changes when an administrator edits a role. A short per-isolate cache
+ * keeps page navigation at roughly one query; edits clear it explicitly. */
+const ACCESS_TTL_MS = 15_000;
+const accessCache = new Map<number, { at: number; access: Access }>();
+
+/** Forgets cached permissions after a role or account change. */
+export function clearAccessCache(): void {
+  accessCache.clear();
+}
+
+/** Effective permissions (union of the user's roles), state scope and Home Cell limit. */
 export async function loadAccess(db: ReturnType<typeof getDb>, userId: number): Promise<Access> {
+  const cached = accessCache.get(userId);
+  if (cached && Date.now() - cached.at < ACCESS_TTL_MS) return cached.access;
+  const access = await computeAccess(db, userId);
+  if (accessCache.size > 1000) accessCache.clear();
+  accessCache.set(userId, { at: Date.now(), access });
+  return access;
+}
+
+async function computeAccess(db: ReturnType<typeof getDb>, userId: number): Promise<Access> {
   const roleRows = await db
     .select({ roleId: userRoles.roleId })
     .from(userRoles)

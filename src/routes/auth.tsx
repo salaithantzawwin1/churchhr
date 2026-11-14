@@ -32,7 +32,7 @@ const REMEMBER_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 // Per-IP sliding window: at most 10 attempts inside 10 minutes, else 15-min wait.
 const IP_WINDOW_SECONDS = 600;
-const IP_MAX_ATTEMPTS = 10;
+const IP_MAX_ATTEMPTS = 25;
 const IP_WAIT_SECONDS = 900;
 
 /** Counted inside the sliding window; prunes old rows opportunistically. */
@@ -116,7 +116,14 @@ publicAuthRoutes.post("/login", async (c) => {
     "local";
   if (await ipRateLimited(db, ip, now)) return fail(t("login.rateLimited"), 429);
 
-  const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  // Exact match first, then a case-insensitive one when it is unambiguous: a
+  // capitalised username is a typing slip, not a wrong password.
+  let user = (await db.select().from(users).where(eq(users.username, username)).limit(1))[0];
+  if (!user && username) {
+    const ci = await db.select().from(users)
+      .where(sql`lower(${users.username}) = ${username.toLowerCase()}`).limit(2);
+    if (ci.length === 1 && ci[0]) user = ci[0];
+  }
   if (!user || user.active !== 1) {
     // Spend the same PBKDF2 work as a real check so response timing does not
     // reveal whether a username exists.
@@ -149,6 +156,9 @@ publicAuthRoutes.post("/login", async (c) => {
   }
 
   await db.update(users).set({ failedAttempts: 0, lockedUntil: 0 }).where(eq(users.id, user.id));
+  // A good sign-in clears this address's recent failures: an office shares one
+  // public IP, so one person's typos must not lock everybody else out.
+  await db.all(sql`DELETE FROM login_attempts WHERE ip = ${ip}`);
   const token = await createSession(db, user.id, remember ? REMEMBER_TTL_SECONDS : SESSION_TTL_SECONDS);
   setCookie(c, "session", token, {
     path: "/",

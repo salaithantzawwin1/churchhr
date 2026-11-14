@@ -387,11 +387,12 @@ export function ReportDetailPage(props: Common & {
   canCreate: boolean;
   canReview: boolean;
   canEdit?: boolean;
+  canDelete?: boolean;
   edits?: ReportEdit[];
   regionNames?: Record<number, string>;
 }) {
   const {
-    user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false,
+    user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false, canDelete = false,
     edits = [], regionNames = {},
   } = props;
   const L = lang ?? "en";
@@ -423,6 +424,11 @@ export function ReportDetailPage(props: Common & {
           <a class="btn secondary" href="/reports">{t("rep.backToList")}</a>
           {canEdit && <a class="btn secondary" href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>}
           {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
+          {canDelete && (
+            <form method="post" action={`/reports/${r.id}/delete`} data-confirm={t("rep.confirmDelete")}>
+              <button class="btn danger" type="submit">{t("members.delete")}</button>
+            </form>
+          )}
         </div>
       </div>
 

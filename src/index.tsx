@@ -18,7 +18,8 @@ import { DashboardPage } from "./views/dashboard";
 import { RegionsPage } from "./views/regions";
 import { GenericErrorPage, NotFoundPage } from "./views/errors";
 import { CSS } from "./styles";
-import { checkHealth } from "./health";
+import { ASSET_V } from "./assets";
+import { checkHealth, type HealthResult } from "./health";
 import { auditMutations } from "./audit";
 
 const app = new Hono<AppEnv>();
@@ -115,9 +116,19 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-app.get("/styles.css", (c) =>
-  c.body(CSS, 200, { "Content-Type": "text/css; charset=utf-8" }),
-);
+/** The whole stylesheet (~185 KB) was re-sent on every page load. The link
+ * carries ASSET_V, so it can be immutable for a year: a release changes the URL
+ * instead of making browsers fetch the same CSS again. */
+const STYLES_ETAG = `"css-${ASSET_V}"`;
+app.get("/styles.css", (c) => {
+  const headers = {
+    "Content-Type": "text/css; charset=utf-8",
+    "Cache-Control": "public, max-age=31536000, immutable",
+    ETag: STYLES_ETAG,
+  };
+  if (c.req.header("if-none-match") === STYLES_ETAG) return new Response(null, { status: 304, headers });
+  return c.body(CSS, 200, headers);
+});
 
 /** Public deploy probe: verifies the Worker, D1 connection and the migrations
  * this build needs, so a release can be checked without signing in. */
@@ -128,6 +139,17 @@ app.get("/healthz", async (c) => {
     "X-Robots-Tag": "noindex",
   });
 });
+
+/** The dashboard's status chip ran the full 20-statement schema probe on every
+ * page view. It reports infrastructure state, so a minute of staleness is fine:
+ * /healthz still probes for real on every call. */
+let healthCache: { at: number; value: HealthResult } | null = null;
+async function dashboardHealth(env: Parameters<typeof checkHealth>[0]): Promise<HealthResult> {
+  if (healthCache && Date.now() - healthCache.at < 60_000) return healthCache.value;
+  const value = await checkHealth(env);
+  healthCache = { at: Date.now(), value };
+  return value;
+}
 
 // Public routes first so requireAuth (below) never intercepts them.
 app.route("/", publicAuthRoutes);
@@ -151,7 +173,7 @@ app.get("/", requirePermission("dashboard.view"), async (c) => {
       scopeAll: c.get("scopeAll"),
       stateIds: c.get("stateIds"),
     }, filters),
-    checkHealth(c.env),
+    dashboardHealth(c.env),
   ]);
   return c.html(
     <DashboardPage

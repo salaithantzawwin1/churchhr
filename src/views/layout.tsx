@@ -41,20 +41,23 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/admin/households", label: t("nav.households"), perm: ["members.view"] },
     { href: "/organization/pastors", label: t("nav.pastors"), perm: ["pastors.view", "pastors.manage"] },
   ];
-  const ADMIN_NAV: { href: string; label: string; perm: Permission; section?: string }[] = [
+  const ADMIN_NAV: { href: string; label: string; perm: Permission | Permission[]; section?: string }[] = [
     { href: "/members/import", label: t("nav.import"), perm: "members.import" },
     { href: "/admin/users", label: t("nav.users"), perm: "users.manage" },
     { href: "/admin/roles", label: t("nav.roles"), perm: "roles.manage" },
-    { href: "/admin/options", label: t("nav.options"), perm: "options.manage" },
+    // Structure editing is grantable on its own (structures.*), so those pages
+    // stay reachable with either permission.
+    { href: "/admin/options", label: t("nav.options"), perm: ["options.manage", "structures.view"] },
     { href: "/admin/branding", label: t("nav.branding"), perm: "users.manage" },
     { href: "/admin/audit", label: t("nav.audit"), perm: "audit.view" },
     { href: "/organization/positions", label: t("nav.positions"), perm: "options.manage", section: "structure" },
     { href: "/organization/departments", label: t("nav.departments"), perm: "options.manage", section: "structure" },
-    { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: "options.manage", section: "structure" },
-    { href: "/organization/clusters", label: t("nav.clusters"), perm: "options.manage", section: "structure" },
+    { href: "/organization/regional-churches", label: t("nav.regionalChurches"), perm: ["options.manage", "structures.view"], section: "structure" },
+    { href: "/organization/clusters", label: t("nav.clusters"), perm: ["options.manage", "structures.view"], section: "structure" },
     { href: "/organization/vacancies", label: t("vacancy.link"), perm: "members.view", section: "structure" },
   ];
-  const allowed = (n: { perm: Permission }) => !perms || perms.has(n.perm);
+  const allowed = (n: { perm: Permission | Permission[] }) =>
+    !perms || (Array.isArray(n.perm) ? n.perm.some((p) => perms.has(p)) : perms.has(n.perm));
   const allowedAny = (n: { perm: Permission[] }) => !perms || n.perm.some((p) => perms.has(p));
   const primaryItems = PRIMARY_NAV.filter(allowed);
   const memberItems = MEMBER_NAV.filter(allowedAny);

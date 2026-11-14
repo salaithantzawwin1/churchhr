@@ -1756,7 +1756,7 @@ async function loadAdminHomeCells(db: DB, scope: Scope): Promise<AdminHomeCell[]
     ORDER BY hc.region_id, t.sort_order, t.label, hc.sort_order, hc.label`);
 }
 
-organizationRoutes.get("/regional-churches", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/regional-churches", requireAnyPermission("options.manage", "structures.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const churches = await loadRegionalChurches(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds });
@@ -1773,7 +1773,7 @@ organizationRoutes.get("/regional-churches", requirePermission("options.manage")
   );
 });
 
-organizationRoutes.get("/regional-churches/new", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/regional-churches/new", requireAnyPermission("options.manage", "structures.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   if (!modalRequest(c)) return c.redirect("/organization/regional-churches", 303);
@@ -1787,7 +1787,7 @@ organizationRoutes.get("/regional-churches/new", requirePermission("options.mana
   );
 });
 
-organizationRoutes.get("/regional-churches/:id/edit", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/regional-churches/:id/edit", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1813,7 +1813,7 @@ async function regionalChurchNameTaken(db: DB, name: string, exceptId?: number):
   return rows.some((r) => r.id !== exceptId);
 }
 
-organizationRoutes.post("/regional-churches", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/regional-churches", requireAnyPermission("options.manage", "structures.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
@@ -1853,7 +1853,7 @@ organizationRoutes.post("/regional-churches", requirePermission("options.manage"
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/regional-churches/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/regional-churches/:id", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -1946,7 +1946,7 @@ organizationRoutes.post("/regional-churches/:id", requirePermission("options.man
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/regional-churches/:id/cells", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/regional-churches/:id/cells", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -2005,7 +2005,7 @@ organizationRoutes.post("/regional-churches/:id/cells", requirePermission("optio
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/regional-churches/:id/delete", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/regional-churches/:id/delete", requireAnyPermission("options.manage", "structures.delete"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -2396,7 +2396,7 @@ async function clusterPastorCandidates(db: DB, regionId: number): Promise<{ id: 
   return loadPastorOptions(db, { regionId });
 }
 
-organizationRoutes.get("/clusters", requirePermission("options.manage"), async (c) => {
+organizationRoutes.get("/clusters", requireAnyPermission("options.manage", "structures.view"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   return c.html(
@@ -2443,7 +2443,7 @@ organizationRoutes.get("/clusters/:id/edit", requirePermission("options.manage")
   );
 });
 
-organizationRoutes.post("/clusters", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/clusters", requireAnyPermission("options.manage", "structures.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const body = await c.req.parseBody();
@@ -2478,7 +2478,7 @@ organizationRoutes.post("/clusters", requirePermission("options.manage"), async 
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/clusters/:id", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));
@@ -2584,7 +2584,7 @@ organizationRoutes.post("/clusters/:id", requirePermission("options.manage"), as
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
-organizationRoutes.post("/clusters/:id/delete", requirePermission("options.manage"), async (c) => {
+organizationRoutes.post("/clusters/:id/delete", requireAnyPermission("options.manage", "structures.delete"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const id = intParam(c.req.param("id"));

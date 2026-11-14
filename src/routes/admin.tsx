@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import {
   ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, OPTION_TYPES, regions,
   rolePermissions, roles, userHomeCellAssignments, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
-import { requirePermission } from "../middleware";
+import { clearAccessCache, requireAnyPermission, requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
@@ -110,12 +110,28 @@ function canManageOption(scope: OptionScope, effectiveRegionId: number): boolean
   return isOptionsAdmin(scope) || effectiveRegionId !== 0 && scope.stateIds.includes(effectiveRegionId);
 }
 
+/** Granular structure rights. Home Cells, Family Groups, Townships, Clusters
+ * and Regional Churches can be managed with structures.* alone, so a State
+ * Manager can build cells in their own states without the admin bundle —
+ * including create+update without delete. options.manage still implies all. */
+type StructureAction = "view" | "create" | "update" | "delete";
+
+function canStructure(c: any, action: StructureAction): boolean {
+  const perms = c.get("perms") as Set<string> | undefined;
+  if (!perms) return false;
+  return perms.has("options.manage") || perms.has(`structures.${action}`);
+}
+
 /** 403 for state managers touching admin-only option areas. */
 function forbidden(c: any) {
   return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
 }
 
-type RoleInfo = { id: number; name: string; description: string | null; is_system: number; permissions: string[] };
+type RoleInfo = {
+  id: number; name: string; description: string | null; is_system: number; permissions: string[];
+  /** Accounts currently holding the role: a role in use cannot be deleted. */
+  user_count: number;
+};
 
 async function loadRoles(db: DB): Promise<RoleInfo[]> {
   const roleRows = await db
@@ -124,12 +140,17 @@ async function loadRoles(db: DB): Promise<RoleInfo[]> {
     .orderBy(roles.id);
   const permRows = await db.select({ roleId: rolePermissions.roleId, permission: rolePermissions.permission })
     .from(rolePermissions);
+  const countRows = await db
+    .select({ roleId: userRoles.roleId, n: sql<number>`COUNT(*)` })
+    .from(userRoles)
+    .groupBy(userRoles.roleId);
   return roleRows.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
     is_system: r.isSystem,
     permissions: permRows.filter((p) => p.roleId === r.id).map((p) => p.permission),
+    user_count: Number(countRows.find((c) => c.roleId === r.id)?.n ?? 0),
   }));
 }
 
@@ -392,6 +413,7 @@ adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   for (const homeCellId of p.homeCellsRaw) {
     await db.insert(userHomeCellAssignments).values({ userId: newId, homeCellId });
   }
+  clearAccessCache();
   return c.redirect("/admin/users?ok=user-created", 302);
 });
 
@@ -446,6 +468,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
   for (const homeCellId of p.homeCellsRaw) {
     await db.insert(userHomeCellAssignments).values({ userId: id, homeCellId });
   }
+  clearAccessCache();
   return c.redirect("/admin/users?ok=user-updated", 302);
 });
 
@@ -498,6 +521,7 @@ adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
     .returning({ id: roles.id });
   const roleId = created[0]!.id;
   for (const p of perms) await db.insert(rolePermissions).values({ roleId, permission: p });
+  clearAccessCache();
   return c.redirect("/admin/roles?ok=role-created", 302);
 });
 
@@ -527,17 +551,30 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
   const body = await c.req.parseBody({ all: true });
   const perms = validPerms(multi(body.permissions));
+  // Seeded system roles keep their fixed names (the UI translates them by id).
+  const name = role.isSystem === 1 ? role.name : (s(body.name) || role.name).trim();
+  const description = s(body.description).trim();
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  if (fromModal && !perms.length) {
-    const all = await loadRoles(db);
-    const info = all.find((r) => r.id === role.id) as AdminRoleRow;
-    return c.html(
-      <RoleFormFragment lang={c.get("lang")} edit existing={info} errors={[t("adm.errRoleBad")]} />,
-      400,
-    );
+  const fail = (msg: string) => {
+    const info: AdminRoleRow = {
+      id: role.id, name, description: description || role.description,
+      is_system: role.isSystem, permissions: perms, user_count: 0,
+    };
+    return fromModal
+      ? c.html(<RoleFormFragment lang={c.get("lang")} edit existing={info} errors={[msg]} />, 400)
+      : c.redirect(errRedirect("/admin/roles", msg), 302);
+  };
+  if (name.length < 2 || name.length > 60) return fail(t("adm.errRoleName"));
+  if (description.length > 160) return fail(t("adm.errRoleDesc"));
+  const dup = await db.select({ id: roles.id }).from(roles)
+    .where(and(eq(roles.name, name), ne(roles.id, role.id))).limit(1);
+  if (dup[0]) return fail(t("adm.errRoleDup"));
+  if (name !== role.name || (description || null) !== role.description) {
+    await db.update(roles).set({ name, description: description || null }).where(eq(roles.id, role.id));
   }
   await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
   for (const p of perms) await db.insert(rolePermissions).values({ roleId: role.id, permission: p });
+  clearAccessCache();
   return c.redirect("/admin/roles?ok=role-updated", 302);
 });
 
@@ -546,7 +583,15 @@ adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
   if (!role) return c.redirect(errRedirect("/admin/roles", getDict(c.get("lang"))("adm.errNoRole")), 302);
   if (role.isSystem === 1) return c.redirect(errRedirect("/admin/roles", "err-systemrole"), 302);
+  // A role that still grants rights to an account may not disappear: deleting it
+  // would silently strip those users of every permission (and lock them out).
+  const inUse = await db.all<{ n: number }>(
+    sql`SELECT COUNT(*) AS n FROM user_roles WHERE role_id = ${role.id}`,
+  );
+  if (Number(inUse[0]?.n ?? 0) > 0) return c.redirect(errRedirect("/admin/roles", "role-in-use"), 302);
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
   await db.delete(roles).where(eq(roles.id, role.id));
+  clearAccessCache();
   return c.redirect("/admin/roles?ok=role-deleted", 302);
 });
 
@@ -696,7 +741,7 @@ async function ageGroupCount(db: DB): Promise<number> {
   return Number(rows[0]?.n ?? 0);
 }
 
-adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
+adminRoutes.get("/options", requireAnyPermission("options.manage", "structures.view"), async (c) => {
   const scope = optionScopeOf(c);
   const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
   // Default tab differs by scope: admins start on State/Region (the first tab,
@@ -705,8 +750,9 @@ adminRoutes.get("/options", requirePermission("options.manage"), async (c) => {
   // ethnicity with a confusing 403.
   const rawType = c.req.query("type") ?? (isOptionsAdmin(scope) ? "region" : "township");
   const type = rawType;
-  // State managers only get the four region-scoped types, in their own states.
-  if (!isOptionsAdmin(scope)) {
+  // State managers only get the four region-scoped types, in their own states;
+  // holders of a structure grant see the same tabs without the admin bundle.
+  if (!isOptionsAdmin(scope) || !c.get("perms").has("options.manage")) {
     if (!isRegionScopedType(type)) return forbidden(c);
     return optionsPage(c, type, opts, scope);
   }
@@ -754,7 +800,7 @@ async function nextOptionCode(db: DB, type: string): Promise<string | null> {
   return nextCodeCandidate(rows.map((r) => r.code), type);
 }
 
-adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
+adminRoutes.post("/options", requireAnyPermission("options.manage", "structures.create"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const scope = optionScopeOf(c);
@@ -780,6 +826,7 @@ adminRoutes.post("/options", requirePermission("options.manage"), async (c) => {
           400,
         )
       : c.redirect(errRedirect(back, msg), 302);
+  if (!canStructure(c, "create")) return forbidden(c);
   if (!canManageType(scope, type)) return forbidden(c);
   if (!isOptionType(type)) return fail(t("adm.errOptionType"));
   if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
@@ -925,7 +972,7 @@ adminRoutes.post("/options/township-codes", requirePermission("options.manage"),
   return c.redirect("/admin/options/township-codes?ok=option-updated", 302);
 });
 
-adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async (c) => {
+adminRoutes.get("/options/:id/edit", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const lang = c.get("lang");
   const scope = optionScopeOf(c);
@@ -935,6 +982,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  if (!canStructure(c, "update")) return forbidden(c);
   if (!canManageType(scope, current.type)) return forbidden(c);
   const allOpts = await loadAllOptions(db);
   const byId = new Map(allOpts.map((o) => [o.id, o] as const));
@@ -974,7 +1022,7 @@ adminRoutes.get("/options/:id/edit", requirePermission("options.manage"), async 
   );
 });
 
-adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) => {
+adminRoutes.post("/options/:id", requireAnyPermission("options.manage", "structures.update"), async (c) => {
   const db = getDb(c.env);
   const scope = optionScopeOf(c);
   const admin = isOptionsAdmin(scope);
@@ -1113,7 +1161,7 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   return c.redirect(`${back}&ok=option-updated`, 302);
 });
 
-adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), async (c) => {
+adminRoutes.post("/options/:id/delete", requireAnyPermission("options.manage", "structures.delete"), async (c) => {
   const db = getDb(c.env);
   const scope = optionScopeOf(c);
   const id = Number(c.req.param("id"));
@@ -1121,6 +1169,7 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
+  if (!canStructure(c, "update")) return forbidden(c);
   if (!canManageType(scope, current.type)) return forbidden(c);
   const allOpts = await loadAllOptions(db);
   const byId = new Map(allOpts.map((o) => [o.id, o] as const));

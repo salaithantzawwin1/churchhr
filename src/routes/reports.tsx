@@ -3,7 +3,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { activityReports, regions, reportEdits } from "../db/schema";
-import { requirePermission } from "../middleware";
+import { requireAnyPermission, requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { buildCsv } from "../csv";
 import { addDays, intParam, parseDateFlexible, s, todayInYangon } from "../util";
@@ -493,7 +493,7 @@ reportsRoutes.post("/:id/review", requirePermission("reports.review"), async (c)
 
 // ---------- GET /reports/:id/edit ----------
 
-reportsRoutes.get("/:id/edit", requirePermission("reports.create"), async (c) => {
+reportsRoutes.get("/:id/edit", requireAnyPermission("reports.update", "reports.create"), async (c) => {
   const db = getDb(c.env);
   const user = c.get("user");
   const scope = scopeOf(c);
@@ -537,7 +537,7 @@ reportsRoutes.get("/:id/edit", requirePermission("reports.create"), async (c) =>
 
 // ---------- POST /reports/:id/edit ----------
 
-reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) => {
+reportsRoutes.post("/:id/edit", requireAnyPermission("reports.update", "reports.create"), async (c) => {
   const db = getDb(c.env);
   const user = c.get("user");
   const scope = scopeOf(c);
@@ -639,6 +639,32 @@ reportsRoutes.post("/:id/edit", requirePermission("reports.create"), async (c) =
   }
 });
 
+// ---------- POST /reports/:id/delete: remove a report ----------
+// Authors may always remove their own report; a holder of reports.delete may
+// also remove one inside their state scope.
+
+reportsRoutes.post("/:id/delete", requirePermission("reports.delete"), async (c) => {
+  const db = getDb(c.env);
+  const user = c.get("user");
+  const scope = scopeOf(c);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const id = Number(c.req.param("id"));
+  const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
+  const report = await loadReport(db, id);
+  if (!report) return c.redirect(back, 302);
+  const own = report.author_id === user.id;
+  const inScope = scope.scopeAll || scope.stateIds.includes(report.region_id);
+  if (!own && !inScope) {
+    return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
+  }
+  // report_edits has no cascade, so the history goes first.
+  await db.delete(reportEdits).where(eq(reportEdits.reportId, id));
+  await db.delete(activityReports).where(eq(activityReports.id, id));
+  return c.redirect("/reports?ok=report-deleted", 302);
+});
+
 // ---------- GET /reports/:id ----------
 
 reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
@@ -679,7 +705,8 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
     <ReportDetailPage
       user={user} perms={perms} flash={flashFromQuery(c.req.query(), lang)} lang={lang}
       report={report} canCreate={perms.has("reports.create")}
-      canEdit={own && perms.has("reports.create") && report.status !== "reviewed"}
+      canEdit={own && (perms.has("reports.update") || perms.has("reports.create")) && report.status !== "reviewed"}
+      canDelete={perms.has("reports.delete") && (own || inScope)}
       canReview={perms.has("reports.review") && inScope}
       edits={editRows} regionNames={regionNames}
     />,
