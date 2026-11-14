@@ -1200,23 +1200,28 @@ td.empty-state .small { margin-top: 4px; }
 .rk-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--link), var(--brand)); }
 
 /* gender donut + legend */
-.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; flex: 1 1 auto; }
+/* Donut, legend and the family-group note share one row, so the height the note
+   used to take as a footer strip goes to the circle instead. */
+.donut-wrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: 1 1 auto; }
 .donut {
-  width: 132px; height: 132px; border-radius: 50%; flex: none;
+  width: 148px; height: 148px; border-radius: 50%; flex: none;
   display: grid; place-items: center; position: relative;
 }
-.donut::after { content: ""; position: absolute; inset: 15px; border-radius: 50%; background: var(--card); }
+.donut::after { content: ""; position: absolute; inset: 17px; border-radius: 50%; background: var(--card); }
 .donut .d-center { position: relative; z-index: 1; text-align: center; line-height: 1.2; }
-.donut .d-center b { display: block; font-size: 23px; font-variant-numeric: tabular-nums; }
+.donut .d-center b { display: block; font-size: 25px; font-variant-numeric: tabular-nums; }
 .donut .d-center span { font-size: 11px; color: var(--muted); }
-.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; flex: 0 1 180px; min-width: 150px; }
+.legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; flex: 0 1 auto; min-width: 124px; }
 .legend .lg { display: grid; grid-template-columns: 9px 1fr auto auto; gap: 8px; align-items: center; }
 .legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 .legend .dot.m { background: var(--male); }
 .legend .dot.f { background: var(--female); }
 .legend .lg b { font-variant-numeric: tabular-nums; }
 .legend .lg-pct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
-.dash-note { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.dash-note {
+  display: flex; align-items: center; gap: 9px; flex: 1 1 120px; min-width: 0;
+  padding-left: 14px; border-left: 1px solid var(--line); font-size: 12.5px; line-height: 1.35;
+}
 .dash-note > div { min-width: 0; }
 .dash-note .ico { width: 32px; height: 32px; border-radius: var(--radius-sm); flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-purple-bg); color: var(--chip-purple-ink); }
 .dash-note .ico svg { width: 16px; height: 16px; }
@@ -1278,7 +1283,10 @@ td.empty-state .small { margin-top: 4px; }
 @media (max-width: 560px) {
   .kpi .k-num { font-size: 26px; }
   .donut { width: 116px; height: 116px; }
+  .donut::after { inset: 14px; }
   .donut .d-center b { font-size: 20px; }
+  /* A phone is too narrow for one row, so the note drops to its own line. */
+  .dash-note { flex: 1 1 100%; padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--line); font-size: 13px; }
 }
 /* ---------- phones/tablets: whole nav visible, no sideways scrolling ---------- */
 @media (max-width: 1180px) {

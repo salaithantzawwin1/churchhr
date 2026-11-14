@@ -284,12 +284,14 @@ export function DashboardPage(props: {
                 <span class="lg-pct">{femalePct}%</span>
               </div>
             </div>
-          </div>
-          <div class="dash-note">
-            <Ico name="users" tone="purple" />
-            <div>
-              <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
-              <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+            {/* Family-group coverage shares the donut row instead of its own
+                footer strip, so the spare height goes to the circle. */}
+            <div class="dash-note">
+              <Ico name="users" tone="purple" />
+              <div>
+                <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
+                <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+              </div>
             </div>
           </div>
         </section>
