@@ -4,7 +4,7 @@ import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
-import { getDict, type Lang } from "../i18n";
+import { getDict, pluralLabel, type Lang } from "../i18n";
 import { positionLabels } from "../positions";
 import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
@@ -1336,7 +1336,7 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
               <input type="hidden" name="csv_b64" value={report.csvB64} />
               <div class="actions">
                 <a class="btn secondary" href="/members/import">{t("form.cancel")}</a>
-                <button class="btn" type="submit">{t("import.commit1")} {report.valid} {t("import.commit2")}</button>
+                <button class="btn" type="submit">{t("import.commit1")} {report.valid} {pluralLabel(t, "import.commit2", report.valid)}</button>
               </div>
               <p class="muted small">{t("import.keptOut")}</p>
             </form>

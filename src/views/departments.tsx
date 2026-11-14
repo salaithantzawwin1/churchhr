@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { countLabel, getDict, type Lang } from "../i18n";
+import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
 import { defsForScope, positionDefLabel, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { departmentName, type DepartmentRow } from "../departments";
 import { CardViewToggle } from "./view-toggle";
@@ -251,7 +251,7 @@ export function DepartmentDetailPage(props: Common & {
           <div class="dept-members-count">
             <strong>{members.length}</strong>
             <span>
-              {filtered ? `/ ${department.member_count} ${t("org.membersShort")}` : t("org.membersShort")}
+              {filtered ? `/ ${pluralLabel(t, "org.membersShort", department.member_count)}` : t("org.membersShort")}
             </span>
           </div>
         </div>
@@ -397,7 +397,7 @@ export function DepartmentsPage(props: Common & {
                     {L !== "mm" && d.nameEn ? d.nameEn : d.name}
                   </span>
                   <span class="hh-card-meta">
-                    <span class="hh-count"><b>{d.member_count}</b> {t("org.membersShort")}</span>
+                    <span class="hh-count"><b>{d.member_count}</b> {pluralLabel(t, "org.membersShort", d.member_count)}</span>
                     <span class="muted small">{filledRoles(d.id)} / {roleDefs.length} {t("dept.rolesFilled")}</span>
                     {d.church_name && (
                       <span class="dept-card-church">

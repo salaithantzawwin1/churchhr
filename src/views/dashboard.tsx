@@ -3,7 +3,7 @@ import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { DashboardData } from "../dashboard";
 import type { HealthResult } from "../health";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
 import { GENDERS, GENDERS_EN, GENDERS_KR } from "../enums";
 import { qs } from "../util";
 
@@ -71,7 +71,7 @@ export function DashboardPage(props: {
     { key: "dob", label: t("dash.gapDob"), n: data.gaps.dob },
   ];
   const gapTotal = gapItems.reduce((sum, g) => sum + g.n, 0);
-  const scopeLabel = data.scopeAll ? t("dash.allStates") : `${data.stateCount} ${t("dash.stateScope")}`;
+  const scopeLabel = data.scopeAll ? t("dash.allStates") : `${pluralLabel(t, "dash.stateScope", data.stateCount)}`;
   const genderLabels: Record<string, string> =
     (lang ?? "en") === "mm" ? GENDERS : (lang ?? "en") === "kr" ? GENDERS_KR : GENDERS_EN;
   /** Current query params, used to build "remove this filter" links. */
@@ -244,7 +244,7 @@ export function DashboardPage(props: {
             </ol>
           )}
           <div class="dc-foot">
-            <span><b>{data.total}</b> {t("dash.count")}</span>
+            <span><b>{data.total}</b> {pluralLabel(t, "dash.count", data.total)}</span>
             {byState.length > 0 && byState.length < data.byState.length ? (
               <span
                 class="dc-cov"
@@ -304,7 +304,7 @@ export function DashboardPage(props: {
                 <Ico name="users" tone="purple" />
                 <div>
                   <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
-                  <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+                  <div class="small muted">{countLabel(t, "dash.groupUnit", data.familyGroup.groups)}</div>
                 </div>
               </a>
             ) : (
@@ -312,7 +312,7 @@ export function DashboardPage(props: {
                 <Ico name="users" tone="purple" />
                 <div>
                   <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
-                  <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+                  <div class="small muted">{countLabel(t, "dash.groupUnit", data.familyGroup.groups)}</div>
                 </div>
               </div>
             )}

@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, type Lang } from "../i18n";
 import { VACANCY_SCOPES, type VacancyReport, type VacancyScope, type VacancyStructure } from "../vacancies";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -105,7 +105,7 @@ export function VacancyReportPage(props: Common & {
               <div>
                 <h2>{t(SCOPE_SHORT[group.scope])}</h2>
                 <p class="muted small">
-                  {group.rows.length} {t("vacancy.structures")} ·{" "}
+                  {countLabel(t, "vacancy.structures", group.rows.length)} ·{" "}
                   {group.rows.reduce((n, r) => n + r.vacancies.length, 0)} {t("vacancy.vacant")}
                 </p>
               </div>

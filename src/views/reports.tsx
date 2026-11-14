@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, type Lang } from "../i18n";
 import { qs } from "../util";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -137,7 +137,7 @@ export function ReportsListPage(props: Common & {
       <div class="page-head">
         <h1>
           {t("rep.title")}
-          <span class="count-pill">{total} {t("rep.count")}</span>
+          <span class="count-pill">{countLabel(t, "rep.count", total)}</span>
         </h1>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href={`/reports/export${linkQs(range.from, range.to)}`}>

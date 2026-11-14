@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { countLabel, getDict, type Lang } from "../i18n";
+import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
 import {
   CONFIGURABLE_POSITION_SCOPES,
   positionDefLabel,
@@ -638,7 +638,7 @@ export function RegionalChurchesPage(props: Common & {
               <span class="muted small">
                 {L !== "mm" && church.stateNameEn ? church.stateNameEn : church.stateName}
               </span>
-              <span class="hh-count"><b>{cells.length}</b> {t("org.cells")}</span>
+              <span class="hh-count"><b>{cells.length}</b> {pluralLabel(t, "org.cells", cells.length)}</span>
             </span>
           </div>
         </div>
