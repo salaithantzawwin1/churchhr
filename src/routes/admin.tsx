@@ -639,11 +639,28 @@ async function optionsPage(c: any, type: string, opts: {
   const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
   const admin = isOptionsAdmin(scope);
-  // Independent reads for the tab: issued together, not one round-trip each.
-  const [stateListAll, churchRows, all] = await Promise.all([
+  const column = OPTION_RAW_COLUMN[type as OptionType];
+  // Township and blood type store the option label in the member row (no id),
+  // so their usage is counted by label.
+  const labelStored = isLabelOptionType(type);
+  // Everything this tab needs, in one wait: regions, churches, the option list
+  // and both usage counts (members, plus leadership slots for Home Cells).
+  const [stateListAll, churchRows, all, usageRows, positionRows] = await Promise.all([
     loadRegionsLite(db, lang),
     loadRegionalChurches(db, { activeOnly: true, scopeAll: admin, stateIds: scope.stateIds }),
     loadAllOptions(db),
+    labelStored
+      ? db.all<{ oid: string; n: number }>(
+          sql`SELECT ${sql.raw(column)} AS oid, COUNT(*) AS n FROM members WHERE ${sql.raw(column)} IS NOT NULL AND ${sql.raw(column)} <> '' GROUP BY ${sql.raw(column)}`,
+        )
+      : db.all<{ oid: string | number; n: number }>(
+          sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
+        ),
+    type === "home_cell"
+      ? db.all<{ oid: number; n: number }>(sql`
+          SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
+          WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`)
+      : Promise.resolve([] as { oid: number; n: number }[]),
   ]);
   // State managers pick only among their own states; no "all states" choice.
   const stateList = admin ? stateListAll : stateListAll.filter((r) => scope.stateIds.includes(r.id));
@@ -665,26 +682,6 @@ async function optionsPage(c: any, type: string, opts: {
     // State managers see only options anchored inside their states (all-states
     // options belong to the global admin and are hidden from them).
     .filter((o) => admin || canManageOption(scope, effectiveRegion(o, byId)));
-  const column = OPTION_RAW_COLUMN[type as OptionType];
-  // Township and blood type store the option label in the member row (no id),
-  // so their usage is counted by label.
-  const labelStored = isLabelOptionType(type);
-  // Usage counts (members, plus leadership slots for Home Cells) together.
-  const [usageRows, positionRows] = await Promise.all([
-    labelStored
-      ? db.all<{ oid: string; n: number }>(
-          sql`SELECT ${sql.raw(column)} AS oid, COUNT(*) AS n FROM members WHERE ${sql.raw(column)} IS NOT NULL AND ${sql.raw(column)} <> '' GROUP BY ${sql.raw(column)}`,
-        )
-      : db.all<{ oid: string | number; n: number }>(
-          sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
-        ),
-    // A Home Cell can hold a leadership assignment even when no member uses it.
-    type === "home_cell"
-      ? db.all<{ oid: number; n: number }>(sql`
-          SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
-          WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`)
-      : Promise.resolve([] as { oid: number; n: number }[]),
-  ]);
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
   const positionUsage = new Map<number, number>();
   for (const row of positionRows) positionUsage.set(row.oid, row.n);

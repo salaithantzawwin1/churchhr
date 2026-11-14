@@ -227,11 +227,8 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
   const cond = sql`ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
       AND ${where} AND ${statusCond} AND ${authorCond}`;
 
-  const countRows = await db.all<{ n: number }>(sql`
-    SELECT COUNT(*) AS n FROM activity_reports ar WHERE ${cond}`);
-  const total = countRows[0]?.n ?? 0;
 
-  const rows = await db.all<ReportListRow>(sql`
+  const rowsP = db.all<ReportListRow>(sql`
     SELECT ar.id, ar.report_date, ar.title, ar.status, ar.township,
            ar.author_id, ar.region_id, ar.attendance, ar.new_contacts, ar.follow_ups,
            r.name AS state_name, r.name_en AS state_name_en,
@@ -245,21 +242,31 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
 
   // The pile a leader actually acts on: submitted reports nobody has reviewed
   // yet, regardless of the status filter currently applied.
-  const awaitingRows = canReview
-    ? await db.all<{ n: number }>(sql`
+  const awaitingRowsP = canReview
+    ? db.all<{ n: number }>(sql`
         SELECT COUNT(*) AS n FROM activity_reports ar
         WHERE ar.report_date >= ${range.from} AND ar.report_date <= ${range.to}
           AND ${where} AND ${authorCond} AND ar.status = 'submitted'`)
     : [];
-  const awaiting = awaitingRows[0]?.n ?? 0;
-
-  const authorRows = team
-    ? await db.all<{ id: number; username: string }>(sql`
+  const authorRowsP = team
+    ? db.all<{ id: number; username: string }>(sql`
         SELECT DISTINCT u.id, u.username
         FROM activity_reports ar JOIN users u ON u.id = ar.author_id
         WHERE ${scopeCond(scope)}
         ORDER BY u.username`)
     : [];
+
+  // Count, page rows, the review backlog and the author filter are independent:
+  // one wait instead of four round-trips.
+  const [countRows, rows, awaitingRows, authorRows] = await Promise.all([
+    db.all<{ n: number }>(sql`
+      SELECT COUNT(*) AS n FROM activity_reports ar WHERE ${cond}`),
+    rowsP,
+    awaitingRowsP,
+    authorRowsP,
+  ]);
+  const total = countRows[0]?.n ?? 0;
+  const awaiting = awaitingRows[0]?.n ?? 0;
 
   return c.html(
     <ReportsListPage
