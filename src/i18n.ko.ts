@@ -154,6 +154,7 @@ export const KO: Record<string, string> = {
   "dash.overview": "성도 등록부 요약",
   "dash.viewAll": "전체 보기",
   "dash.assigned": "가족 그룹에 속한 성도",
+  "dash.assignedOpen": "가족 그룹에 속한 성도 보기",
   "dash.totalShort": "전체",
   "dash.regionsWithMembers": "성도가 있는 지역",
   "dash.regionOne": "성도가 있는 지역",

@@ -138,6 +138,7 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     group: intParam(q.group),
     fellowship: intParam(q.fellowship),
     ageGroup: intParam(q.age_group),
+    familyGroup: q.family_group === "any" ? "any" : intParam(q.family_group),
   };
 }
 
@@ -161,6 +162,8 @@ function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: nu
   if (f.homeCell) cond = sql`${cond} AND m.home_cell_id = ${f.homeCell}`;
   if (f.department) cond = sql`${cond} AND m.department_id = ${f.department}`;
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
+  if (f.familyGroup === "any") cond = sql`${cond} AND m.family_group_id IS NOT NULL`;
+  else if (f.familyGroup) cond = sql`${cond} AND m.family_group_id = ${f.familyGroup}`;
   if (f.fellowship) cond = sql`${cond} AND m.fellowship_category_id = ${f.fellowship}`;
   // Same age bucket and population the dashboard card counts (active members
   // with a birth date), so the drilled-down total matches the number clicked.

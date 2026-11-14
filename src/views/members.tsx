@@ -47,6 +47,8 @@ export type Filters = {
   fellowship: number | null;
   /** Dashboard Age Group drill-down; narrows to that group's age range. */
   ageGroup: number | null;
+  /** Dashboard drill-down: "any" keeps every member that has a family group. */
+  familyGroup: number | "any" | null;
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -74,13 +76,13 @@ function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup, page: page ?? null,
+    age_group: f.ageGroup, family_group: f.familyGroup, page: page ?? null,
   });
 }
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -139,7 +141,7 @@ export function MembersListPage(props: ListProps) {
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup,
+    age_group: f.ageGroup, family_group: f.familyGroup,
     sort: sort || null, dir: sort ? dir : null,
   };
   const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
@@ -166,6 +168,10 @@ export function MembersListPage(props: ListProps) {
   if (f.fellowship) {
     const fellowship = fellowships.find((o) => o.id === f.fellowship);
     if (fellowship) chips.push({ label: fellowship.label, href: withoutFilter("fellowship") });
+  }
+  // "any" comes from the dashboard's family-group card; a number is a single group.
+  if (f.familyGroup) {
+    chips.push({ label: t("members.thFamilyGroup"), href: withoutFilter("family_group") });
   }
   if (f.ageGroup && props.ageGroup) {
     const g = props.ageGroup;
@@ -257,6 +263,7 @@ export function MembersListPage(props: ListProps) {
             <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
           ))}
         </select>
+        {f.familyGroup && <input type="hidden" name="family_group" value={String(f.familyGroup)} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
         {/* Always rendered so the grid keeps its shape: hidden (not removed)

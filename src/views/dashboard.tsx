@@ -285,14 +285,29 @@ export function DashboardPage(props: {
               </div>
             </div>
             {/* Family-group coverage shares the donut row instead of its own
-                footer strip, so the spare height goes to the circle. */}
-            <div class="dash-note">
-              <Ico name="users" tone="purple" />
-              <div>
-                <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
-                <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+                footer strip, so the spare height goes to the circle. The count
+                drills down to those members, like the region and age rows. */}
+            {canView ? (
+              <a
+                class="dash-note"
+                href={`/members${qs({ family_group: "any", status: "active" })}`}
+                title={t("dash.assignedOpen")}
+              >
+                <Ico name="users" tone="purple" />
+                <div>
+                  <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
+                  <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+                </div>
+              </a>
+            ) : (
+              <div class="dash-note">
+                <Ico name="users" tone="purple" />
+                <div>
+                  <b>{data.familyGroup.members}</b> <span>{t("dash.assigned")}</span>
+                  <div class="small muted">{data.familyGroup.groups} {t("dash.groupUnit")}</div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
       </div>

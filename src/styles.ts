@@ -1220,9 +1220,13 @@ td.empty-state .small { margin-top: 4px; }
 .legend .lg-pct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
 .dash-note {
   display: flex; align-items: center; gap: 9px; flex: 1 1 120px; min-width: 0;
+  color: inherit; text-decoration: none; border-radius: var(--radius-sm);
+  /* The count is a drill-down; the whole note is the hit area. */
   padding-left: 14px; border-left: 1px solid var(--line); font-size: 12.5px; line-height: 1.35;
 }
 .dash-note > div { min-width: 0; }
+a.dash-note:hover b, a.dash-note:focus-visible b { color: var(--link); }
+a.dash-note:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .dash-note .ico { width: 32px; height: 32px; border-radius: var(--radius-sm); flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-purple-bg); color: var(--chip-purple-ink); }
 .dash-note .ico svg { width: 16px; height: 16px; }
 
