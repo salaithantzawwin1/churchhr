@@ -2263,12 +2263,26 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
 .org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
 .org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
-/* Desktop opens a Home Cell structure panel below the chart; phones keep the
-   direct link to that cell's member list. */
-.hc-desktop-link { display: none; }
+/* Home Cell chooser inside a cluster: buttons on wide screens, a dropdown on
+   phones, so only the chosen cell's structure is open at a time. */
+.hc-cells { display: grid; gap: 10px; padding-top: 14px; position: relative; }
+.hc-cells::before { content: ""; position: absolute; top: 0; left: 6%; right: 6%; height: 2px; background: var(--line); }
+.hc-cells-buttons { display: none; flex-wrap: wrap; gap: 8px; }
+.hc-cell-btn {
+  display: flex; flex-direction: column; gap: 1px; min-width: 160px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  color: inherit; text-decoration: none; font-size: 13px;
+}
+.hc-cell-btn-name { font-weight: 600; color: var(--link); }
+.hc-cell-btn-meta { font-size: 11.5px; color: var(--muted); }
+a.hc-cell-btn:hover { border-color: var(--brand); }
+a.hc-cell-btn.is-active { border-color: var(--brand); background: var(--chip-brand-bg); }
+a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.hc-cell-select-label { display: grid; gap: 4px; max-width: 340px; }
+.hc-cell-select-label select { width: 100%; }
 @media (min-width: 961px) {
-  .hc-desktop-link { display: inline; }
-  .hc-mobile-link { display: none; }
+  .hc-cells-buttons { display: flex; }
+  .hc-cells-select { display: none; }
 }
 .org-cell-panel { margin-top: var(--card-gap); scroll-margin-top: 84px; }
 .org-cell-panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }

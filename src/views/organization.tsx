@@ -519,50 +519,39 @@ export function OrganizationPage(props: Common & {
             {assistants.map((def) => renderPersonNode(positionDefLabel(def, L), role(def.code), "sm"))}
           </div>
           <div class="org-flow-line" aria-hidden="true" />
-          <div class="org-flow-cells">
-          {group.cells.map((cell) => {
-            // Same parent_code rule as the church chart, one tree per Home Cell.
-            const cellForest = nestRoles(cellRows.all, cellRows.lead);
-            const cellRoleBranch = (target: OrgCell, def: PositionDefRow) => {
-              const children = cellForest.kids.get(def.code) ?? [];
-              return (
-                <div class="org-role-branch">
-                  <span class="org-flow-role">
-                    <span class="org-role-label">{positionDefLabel(def, L)}</span>
-                    <LeaderLink
-                      leader={homeRole(target.id, def.code)}
-                      empty={def.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
-                      photoPreview
-                    />
-                  </span>
-                  {children.length > 0 && (
-                    <div class="org-role-kids">
-                      {children.map((child) => cellRoleBranch(target, child))}
-                    </div>
-                  )}
-                </div>
-              );
-            };
-            return (
-            <article class="org-flow-cell">
-              <div class="org-flow-cell-head">
-                <LeaderAvatar leader={cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null} size="sm" />
-                <div class="org-flow-cell-main">
-                  {/* Desktop opens the structure panel below; phones keep the
-                      direct jump to the member list. */}
-                  <a class="hc-desktop-link" href={`/organization?tab=home-cells&cell=${cell.id}#home-cell-panel`}>{cell.label}</a>
-                  <a class="hc-mobile-link" href={cellHref(cell.id)}>{cell.label}</a>
-                  <span class="muted small">
+          {/* Choosing a Home Cell replaces the old all-at-once list: wide screens
+              get a row of buttons, phones a dropdown, and only the chosen cell's
+              structure opens (in the panel below). */}
+          <div class="hc-cells">
+            <div class="hc-cells-buttons">
+              {group.cells.map((cell) => (
+                <a
+                  class={`hc-cell-btn${cell.id === selectedCellId ? " is-active" : ""}`}
+                  href={`/organization?tab=home-cells&cell=${cell.id}#home-cell-panel`}
+                  aria-current={cell.id === selectedCellId ? "true" : undefined}
+                >
+                  <span class="hc-cell-btn-name">{cell.label}</span>
+                  <span class="hc-cell-btn-meta">
                     {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
                   </span>
-                </div>
-              </div>
-              <div class="org-flow-cell-roles">
-                {cellForest.roots.map((def) => cellRoleBranch(cell, def))}
-              </div>
-            </article>
-            );
-          })}
+                </a>
+              ))}
+            </div>
+            {/* The fragment in the action keeps the panel in view after the jump. */}
+            <form class="hc-cells-select" method="get" action="/organization#home-cell-panel" data-auto-submit="1">
+              <input type="hidden" name="tab" value="home-cells" />
+              <label class="hc-cell-select-label">
+                <span class="muted small">{t("org.cellPick")}</span>
+                <select name="cell" aria-label={t("org.cellPick")}>
+                  <option value="">{t("org.cellPickNone")}</option>
+                  {group.cells.map((cell) => (
+                    <option value={String(cell.id)} selected={cell.id === selectedCellId}>
+                      {cell.label} · {cell.member_count} {t("org.membersShort")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </form>
           </div>
         </div>
       </details>

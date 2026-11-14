@@ -190,6 +190,8 @@ export const KO: Record<string, string> = {
   "members.thAge": "나이",
   "members.thMarital": "혼인",
   "members.thFamilyGroup": "가족 그룹",
+  "org.cellPick": "홈셀 선택",
+  "org.cellPickNone": "— 홈셀을 선택하세요 —",
   "org.cellPanelKicker": "홈셀 조직 구조",
   "org.cellPanelRoles": "직분",
   "org.cellPanelClose": "닫기",
