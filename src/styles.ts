@@ -803,7 +803,8 @@ th.bar-col { width: 42%; }
   color: var(--ink); min-height: 34px; padding: 5px 12px;
 }
 .topbar .who form .btn:hover { background: var(--btn2-hover); filter: none; }
-.topbar .langswitch a { min-height: 30px; display: inline-flex; align-items: center; }
+.topbar .langswitch a { min-height: 36px; display: inline-flex; align-items: center; }
+.topbar .who-link { display: inline-flex; align-items: center; min-height: 36px; }
 
 /* Between tablet and desktop the nav needs its own row; keeping it inline
    would wrap a few items under the brand and leave an awkward gap. */
@@ -1341,7 +1342,7 @@ td.empty-state .small { margin-top: 4px; }
 }
 
 /* ---------- households: responsive cards, detail panels, member roster ---------- */
-.back-link { display: inline-block; margin: 0 0 2px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.back-link { display: inline-flex; align-items: center; min-height: 36px; margin: 0 0 2px; color: var(--muted); font-size: 13px; text-decoration: none; }
 .back-link:hover { color: var(--link); text-decoration: underline; }
 .hh-list-actions { gap: 8px; }
 .hh-view-toggle {
@@ -2968,8 +2969,8 @@ th { font-size: 13px; }
 /* Touch targets: the header pills and the "View all" links were sized for a
    mouse pointer; on a phone they are the smallest things on the screen. */
 @media (max-width: 640px) {
-  .topbar .langswitch a { min-height: 34px; padding: 2px 11px; }
-  .topbar .who-link { display: inline-flex; align-items: center; min-height: 34px; }
+  .topbar .langswitch a { min-height: 36px; padding: 2px 11px; }
+  .topbar .who-link { display: inline-flex; align-items: center; min-height: 36px; }
   .dc-head a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 2px; }
   .members-tbl input[type="checkbox"],
   .bulk-check-all { width: 18px; height: 18px; }
@@ -3001,7 +3002,9 @@ th { font-size: 13px; }
 .audit-summary { display: block; margin-top: 2px; }
 .audit-device { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .audit-ip { display: block; font-size: 11.5px; }
-.audit-detail details > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.audit-detail details > summary { cursor: pointer; color: var(--muted); font-size: 12px;
+  /* Rows are opened by tapping this line; 12px text left it 27px tall. */
+  display: list-item; min-height: 36px; padding: 6px 0; }
 .audit-detail details > summary:hover { color: var(--ink); }
 .audit-ua { margin-top: 6px; font-size: 11.5px; line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
 @media (max-width: 900px) {
@@ -3026,6 +3029,35 @@ th { font-size: 13px; }
   .audit-tbl td.audit-action-cell, .audit-tbl td.audit-detail { display: block; text-align: left; }
   .audit-tbl td.audit-action-cell::before, .audit-tbl td.audit-detail::before { display: none; }
   .audit-tbl td.audit-when { justify-content: flex-start; }
+}
+
+/* ---------- township short codes ----------
+   Four columns, one of them an input. The input sat past the right edge on a
+   phone, so below 900px each township becomes a labelled card with a
+   full-width field instead of a sideways-scrolling table. */
+.codes-tbl td { vertical-align: middle; }
+.codes-tbl td input { max-width: 120px; }
+@media (max-width: 900px) {
+  .codes-wrap { overflow: visible; border: 0; background: transparent; }
+  table.list-tbl.codes-tbl { display: block; min-width: 0; border: 0; background: transparent; }
+  .codes-tbl thead { display: none; }
+  .codes-tbl tbody { display: grid; gap: 10px; }
+  .codes-tbl tr {
+    display: block; padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .codes-tbl td {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 3px 0; border: 0; text-align: right; white-space: normal; font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .codes-tbl td::before {
+    content: attr(data-label); flex: none; text-align: left;
+    color: var(--muted); font-size: 12px; font-weight: 600;
+  }
+  .codes-tbl td.codes-input-cell { display: block; padding-top: 8px; }
+  .codes-tbl td.codes-input-cell::before { display: block; margin-bottom: 4px; }
+  .codes-tbl td input { max-width: none; width: 100%; }
 }
 
 /* ---------- pastor ministry history (timeline) ---------- */
@@ -3231,5 +3263,15 @@ th { font-size: 13px; }
 /* The calendar opens from the field itself, so the native trigger is hidden;
    the input keeps its value format, keyboard entry and validation. */
 .dp-input::-webkit-calendar-picker-indicator { opacity: 0; width: 0; height: 0; margin: 0; }
+
+/* iOS Safari zooms the whole page when a focused field's text is under 16px, so
+   every form on a phone jumped as soon as you tapped it. Phone-sized screens get
+   16px fields; desktop keeps the tighter 13.5-15px sizes. Attribute selectors in
+   the :not() list raise specificity above the per-page font rules. */
+@media (max-width: 640px) {
+  /* :is() keeps the attribute-selector weight for selects and textareas too,
+     so the per-page .filters select rules cannot pull them back under 16px. */
+  :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="range"]):not([type="color"]) { font-size: 16px; }
+}
 
 `; // end of stylesheet

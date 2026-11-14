@@ -46,8 +46,10 @@ export function TownshipCodesPage(props: {
         </div>
       ) : (
         <form method="post" action="/admin/options/township-codes" data-flash-ok="option-updated">
-          <div class="tbl-wrap">
-            <table>
+          {/* data-label turns every row into a labelled card on a phone, so the
+              short-code field is never parked off-screen behind a sideways scroll. */}
+          <div class="tbl-wrap codes-wrap">
+            <table class="list-tbl codes-tbl">
               <thead>
                 <tr>
                   <th>{t("detail.state")}</th>
@@ -59,14 +61,14 @@ export function TownshipCodesPage(props: {
               <tbody>
                 {props.rows.map((r) => (
                   <tr>
-                    <td>{r.state || "—"}</td>
-                    <td><code>{r.code || "—"}</code> {r.label}</td>
-                    <td class="num">{r.groups}</td>
-                    <td>
+                    <td data-label={t("detail.state")}>{r.state || "—"}</td>
+                    <td data-label={t("form.township")}><code>{r.code || "—"}</code> {r.label}</td>
+                    <td class="num" data-label={t("adm.shortCodeGroups")}>{r.groups}</td>
+                    <td class="codes-input-cell" data-label={t("adm.shortCodeCol")}>
                       <input type="text" name={`short_${r.id}`}
                         value={props.values?.[r.id] ?? r.shortCode ?? ""}
                         maxLength={8} pattern="[A-Za-z0-9]{0,8}" placeholder="INS"
-                        style="max-width:120px" />
+                        aria-label={`${t("adm.shortCodeCol")} — ${r.label}`} />
                     </td>
                   </tr>
                 ))}
