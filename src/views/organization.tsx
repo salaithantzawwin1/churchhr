@@ -380,27 +380,110 @@ export function OrganizationPage(props: Common & {
   const selectedCell = selectedCellId != null
     ? cells.find((c) => c.id === selectedCellId) ?? null
     : null;
-  // Same parent_code nesting the cluster card uses, rendered for one Home Cell.
+  // The Parent Code tree is the same for every Home Cell, so it is built once and
+  // drawn inside whichever cluster card holds the chosen cell. Picking another
+  // cell therefore swaps the structure in place: the open card stays open and the
+  // previous cell's structure is replaced rather than left behind or closed.
   const cellPanelForest = nestRoles(cellRows.all, cellRows.lead);
-  const renderCellPanelBranch = (def: PositionDefRow) => {
-    const children = cellPanelForest.kids.get(def.code) ?? [];
-    const holder = selectedCell ? homeRole(selectedCell.id, def.code) : null;
-    return (
-      <div class="org-role-branch">
-        <span class={`org-flow-role${holder ? "" : " org-vacant"}`}>
-          <span class="org-role-label">{positionDefLabel(def, L)}</span>
-          {selectedCell && (
+  const cellStructure = (cell: OrgCell) => {
+    const forest = cellPanelForest;
+    const filled = cellRows.all.filter((def) => homeRole(cell.id, def.code)).length;
+    const groups = cell.id === selectedCellId ? cellFamilyGroups : [];
+    const cluster = cell.supervision_cluster_id
+      ? clusters.find((c) => c.id === cell.supervision_cluster_id) ?? null
+      : null;
+    const church = cell.regional_church_id
+      ? regionalChurches.find((c) => c.id === cell.regional_church_id) ?? null
+      : null;
+    const path = [
+      L !== "mm" && cell.state_name_en ? cell.state_name_en : cell.state_name,
+      cell.township,
+      cluster ? clusterName(cluster, L) : null,
+      church ? regionalChurchName(church, L) : null,
+    ].filter(Boolean).join(" · ");
+    const branch = (def: PositionDefRow) => {
+      const children = forest.kids.get(def.code) ?? [];
+      const holder = homeRole(cell.id, def.code);
+      const isLead = def.code === cellRows.lead?.code;
+      return (
+        <li class={`org-tree-node${holder ? "" : " is-vacant"}${isLead ? " is-lead" : ""}`}>
+          <span class="org-tree-role">
+            <span class="org-role-label">{positionDefLabel(def, L)}</span>
             <LeaderLink
               leader={holder}
-              empty={def.code === cellRows.lead?.code ? t("org.noLeader") : t("org.vacant")}
+              empty={isLead ? t("org.noLeader") : t("org.vacant")}
               photoPreview
             />
+          </span>
+          {children.length > 0 && (
+            <ul class="org-tree-kids">
+              {children.map((child) => branch(child))}
+            </ul>
           )}
-        </span>
-        {children.length > 0 && (
-          <div class="org-role-kids">{children.map(renderCellPanelBranch)}</div>
-        )}
-      </div>
+        </li>
+      );
+    };
+    return (
+      <section class="org-cell-panel" id="home-cell-panel"
+        aria-label={`${t("org.cellPanelKicker")}: ${cell.label}`}>
+        <div class="org-cell-panel-head">
+          <div class="org-cell-panel-title">
+            <span class="org-supervision-title">{t("org.cellPanelKicker")}</span>
+            <h3>
+              {cell.label}
+              {cell.code && <span class="org-code">{cell.code}</span>}
+            </h3>
+            {path && <p class="org-cell-panel-path">{path}</p>}
+          </div>
+          <a class="org-cell-panel-close" href="/organization?tab=home-cells">
+            <span aria-hidden="true">✕</span>{t("org.cellPanelClose")}
+          </a>
+        </div>
+
+        <div class="org-cell-panel-facts">
+          <span class="org-cell-fact"><b>{cell.member_count}</b> {t("org.membersShort")}</span>
+          <span class="org-cell-fact"><b>{groups.length}</b> {t("org.fgCount")}</span>
+          <span class="org-cell-fact">
+            <b>{filled}</b> / {cellRows.all.length} {t("dept.rolesFilled")}
+          </span>
+          <a class="org-cell-panel-members" href={cellHref(cell.id)}>
+            {t("org.cellPanelMembers")} <span aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <div class="org-cell-panel-body">
+          <div class="org-cell-panel-roles-wrap">
+            <h4>{t("org.cellPanelRoles")}</h4>
+            {cellRows.all.length === 0 ? (
+              <p class="muted small">{t("org.noPositions")}</p>
+            ) : (
+              <ul class="org-tree">
+                {forest.roots.map((def) => branch(def))}
+              </ul>
+            )}
+          </div>
+          <aside class="org-cell-panel-side">
+            <h4>{t("org.fgTab")}</h4>
+            {groups.length === 0 ? (
+              <p class="muted small">{t("org.fgEmpty")}</p>
+            ) : (
+              <ul class="org-family-list">
+                {groups.map((group) => (
+                  <li>
+                    <a class="org-family-name" href={`/members?family_group=${group.id}&status=active`}>
+                      {group.label}
+                      {group.code && <span class="org-code">{group.code}</span>}
+                    </a>
+                    <a class="org-cell-count" href={`/members?family_group=${group.id}&status=active`}>
+                      {group.member_count} {t("org.membersShort")}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
+        </div>
+      </section>
     );
   };
   const regionalRows = positionRows(positionDefs, "region", L);
@@ -497,8 +580,13 @@ export function OrganizationPage(props: Common & {
     const pastor = group.kind === "cluster" ? clusterRole(group.id, "cluster_pastor") : null;
     const supervisor = leadDef(defs);
     const assistants = defs.filter((d) => d !== supervisor);
+    // The chosen Home Cell has to stay where it was chosen: its card opens on
+    // load and draws that cell's structure, so a second pick swaps in place.
+    const openCell = selectedCell && group.cells.some((c) => c.id === selectedCell.id)
+      ? selectedCell
+      : null;
     return (
-      <details class="org-flow-cluster">
+      <details class={`org-flow-cluster${openCell ? " is-active" : ""}`} open={openCell != null}>
         <summary class="org-flow-cluster-head">
           <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
@@ -521,7 +609,7 @@ export function OrganizationPage(props: Common & {
           <div class="org-flow-line" aria-hidden="true" />
           {/* Choosing a Home Cell replaces the old all-at-once list: wide screens
               get a row of buttons, phones a dropdown, and only the chosen cell's
-              structure opens (in the panel below). */}
+              structure is drawn, right under this chooser. */}
           <div class="hc-cells">
             <div class="hc-cells-buttons">
               {group.cells.map((cell) => (
@@ -553,6 +641,7 @@ export function OrganizationPage(props: Common & {
               </label>
             </form>
           </div>
+          {openCell && cellStructure(openCell)}
         </div>
       </details>
     );
@@ -1264,74 +1353,6 @@ export function OrganizationPage(props: Common & {
 
           {states.map(renderStateHierarchy)}
         </section>
-
-        {selectedCell && (
-          <section class="card org-cell-panel" id="home-cell-panel">
-            <div class="org-cell-panel-head">
-              <div>
-                <span class="org-supervision-title">{t("org.cellPanelKicker")}</span>
-                <h2>
-                  {selectedCell.label}
-                  {selectedCell.code && <span class="org-code">{selectedCell.code}</span>}
-                </h2>
-                <p class="muted small">
-                  {[
-                    L !== "mm" && selectedCell.state_name_en ? selectedCell.state_name_en : selectedCell.state_name,
-                    selectedCell.township,
-                    selectedCell.supervision_cluster_id
-                      ? clusterName(clusters.find((c) => c.id === selectedCell.supervision_cluster_id)!, L)
-                      : null,
-                    selectedCell.regional_church_id
-                      ? regionalChurchName(regionalChurches.find((c) => c.id === selectedCell.regional_church_id)!, L)
-                      : null,
-                  ].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.cellPanelClose")}</a>
-            </div>
-
-            <div class="org-cell-panel-facts">
-              <span><b>{selectedCell.member_count}</b> {t("org.membersShort")}</span>
-              <span><b>{cellFamilyGroups.length}</b> {t("org.fgCount")}</span>
-              <span>
-                <b>{cellRows.all.filter((def) => homeRole(selectedCell.id, def.code)).length}</b> / {cellRows.all.length} {t("dept.rolesFilled")}
-              </span>
-            </div>
-
-            <div class="org-cell-panel-body">
-              <div class="org-cell-panel-roles-wrap">
-                <h3>{t("org.cellPanelRoles")}</h3>
-                {cellRows.all.length === 0 ? (
-                  <p class="muted small">{t("org.noPositions")}</p>
-                ) : (
-                  <div class="org-cell-panel-roles">
-                    {cellPanelForest.roots.map(renderCellPanelBranch)}
-                  </div>
-                )}
-              </div>
-              <aside class="org-cell-panel-side">
-                <h3>{t("org.fgTab")}</h3>
-                {cellFamilyGroups.length === 0 ? (
-                  <p class="muted small">{t("org.fgEmpty")}</p>
-                ) : (
-                  <div class="org-cell-list">
-                    {cellFamilyGroups.map((group) => (
-                      <div class="org-cell-row">
-                        <div class="org-cell-name">
-                          <a href={`/members?family_group=${group.id}&status=active`}>{group.label}</a>
-                          {group.code && <span class="org-code">{group.code}</span>}
-                        </div>
-                        <a class="org-cell-count" href={`/members?family_group=${group.id}&status=active`}>
-                          {group.member_count} {t("org.membersShort")}
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </aside>
-            </div>
-          </section>
-        )}
         </>
       )}
     </Layout>

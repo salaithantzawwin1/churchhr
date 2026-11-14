@@ -2284,26 +2284,89 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .hc-cells-buttons { display: flex; }
   .hc-cells-select { display: none; }
 }
-.org-cell-panel { margin-top: var(--card-gap); scroll-margin-top: 84px; }
-.org-cell-panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.org-cell-panel-head h2 { display: flex; align-items: center; gap: 9px; margin: 3px 0 4px; font-size: 20px; }
-.org-cell-panel-facts {
-  display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0 18px;
-  padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-  font-size: 13px;
+/* The chosen Home Cell's structure, drawn inside its own cluster card so the
+   chosen card stays open and picking another cell swaps it in place. */
+.org-cell-panel {
+  margin-top: 16px; padding: 14px 16px 16px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); scroll-margin-top: 84px;
 }
-.org-cell-panel-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: 24px; align-items: start; }
-.org-cell-panel-body h3 { margin: 0 0 10px; font-size: 14px; }
-.org-cell-panel-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 26px; }
-.org-cell-panel-side { min-width: 0; padding-left: 22px; border-left: 1px solid var(--line); }
+.org-cell-panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.org-cell-panel-title { min-width: 0; }
+.org-cell-panel-title h3 {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 3px 0 4px; font-size: 17px; line-height: 1.35; overflow-wrap: anywhere;
+}
+.org-cell-panel-path { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.org-cell-panel-close {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); color: var(--muted); font-size: 12px; font-weight: 600;
+  text-decoration: none;
+}
+.org-cell-panel-close:hover { color: var(--ink); border-color: var(--line-strong, var(--line)); }
+.org-cell-panel-close:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.org-cell-panel-facts {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+  margin: 12px 0 14px; padding: 9px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  color: var(--muted); font-size: 12.5px;
+}
+.org-cell-fact b { color: var(--ink); font-size: 14px; }
+.org-cell-panel-members { margin-left: auto; color: var(--link); font-weight: 600; text-decoration: none; }
+.org-cell-panel-members:hover { text-decoration: underline; }
+.org-cell-panel-body { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(200px, 1fr); gap: 22px; align-items: start; }
+.org-cell-panel-body h4 {
+  margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.org-cell-panel-side { min-width: 0; padding-left: 20px; border-left: 1px solid var(--line); }
 @media (max-width: 960px) {
   .org-cell-panel-body { grid-template-columns: 1fr; }
-  .org-cell-panel-side { padding-left: 0; border-left: 0; padding-top: 16px; border-top: 1px solid var(--line); }
+  .org-cell-panel-side { padding-left: 0; border-left: 0; padding-top: 14px; border-top: 1px solid var(--line); }
 }
+/* Position tree: one column with connector lines, so the chain from the Home
+   Cell leader down to each assistant role reads as one hierarchy. */
+.org-tree, .org-tree-kids { list-style: none; margin: 0; padding: 0; }
+.org-tree { display: grid; gap: 6px; max-width: 560px; }
+.org-tree-kids {
+  display: grid; gap: 6px; margin: 6px 0 0 9px; padding-left: 14px;
+  border-left: 2px solid var(--connector);
+}
+.org-tree-node { position: relative; }
+.org-tree-kids > .org-tree-node::before {
+  content: ""; position: absolute; top: 17px; left: -16px; width: 11px; height: 2px;
+  background: var(--connector); border-radius: 2px;
+}
+.org-tree-role {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--row-alt, rgba(15,23,42,.025)); font-size: 12.5px; line-height: 1.45;
+}
+.org-tree-role .org-role-label { font-size: 10.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.org-tree-role a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-tree-role a:hover { color: var(--link); text-decoration: underline; }
+.org-tree-node.is-lead > .org-tree-role { border-color: var(--brand); background: var(--chip-brand-bg); }
+.org-tree-node.is-vacant > .org-tree-role { border-style: dashed; }
+.org-tree-node.is-vacant > .org-tree-role .muted::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px;
+  border-radius: 50%; background: var(--vacant-dot); vertical-align: middle;
+}
+.org-family-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.org-family-list > li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px;
+}
+.org-family-list > li:last-child { border-bottom: 0; }
+.org-family-name {
+  display: inline-flex; align-items: baseline; gap: 6px; min-width: 0;
+  color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere;
+}
+.org-family-name:hover { color: var(--link); text-decoration: underline; }
 @media (prefers-reduced-motion: no-preference) {
   .org-cell-panel { animation: cellPanelIn .34s cubic-bezier(.2, .7, .3, 1) both; }
   @keyframes cellPanelIn {
-    from { opacity: 0; transform: translateY(-14px); }
+    from { opacity: 0; transform: translateY(-8px); }
     to { opacity: 1; transform: none; }
   }
 }
@@ -2320,6 +2383,9 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 /* An open cluster takes the whole row, so its supervisor and Home Cells read as
    one structure instead of a narrow column with empty space beside it. */
 .org-flow-cluster[open] { grid-column: 1 / -1; }
+/* The card holding the chosen Home Cell keeps a brand edge, so it is obvious
+   which cluster the open structure belongs to. */
+.org-flow-cluster.is-active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--chip-brand-bg); }
 @media (prefers-reduced-motion: no-preference) {
   .org-flow-cluster[open] .org-flow-cluster-body { animation: clusterOpen .28s ease-out both; }
   @keyframes clusterOpen {

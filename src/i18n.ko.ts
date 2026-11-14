@@ -195,6 +195,7 @@ export const KO: Record<string, string> = {
   "org.cellPanelKicker": "홈셀 조직 구조",
   "org.cellPanelRoles": "직분",
   "org.cellPanelClose": "닫기",
+  "org.cellPanelMembers": "구성원 보기",
   "dash.gapsTitle": "미입력 정보",
   "dash.gapsHint": "활동 중인 성도에게 비어 있는 정보 — 눌러서 확인하세요",
   "dash.gapFamilyGroup": "가족 그룹 없음",
