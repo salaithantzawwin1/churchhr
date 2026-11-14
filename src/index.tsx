@@ -126,7 +126,10 @@ app.get("/styles.css", (c) => {
     "Cache-Control": "public, max-age=31536000, immutable",
     ETag: STYLES_ETAG,
   };
-  if (c.req.header("if-none-match") === STYLES_ETAG) return new Response(null, { status: 304, headers });
+  // Cloudflare weakens the tag on the way out (W/"…"), so compare the value.
+  if ((c.req.header("if-none-match") ?? "").replace(/^W\//, "") === STYLES_ETAG) {
+    return new Response(null, { status: 304, headers });
+  }
   return c.body(CSS, 200, headers);
 });
 
