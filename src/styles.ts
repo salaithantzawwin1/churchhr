@@ -1983,8 +1983,12 @@ table.list-tbl.ph-tbl { min-width: 0; }
   }
   .settings-filters input[type="search"] { grid-column: 1 / -1; width: 100%; max-width: none; }
   .settings-filters select { width: 100%; }
-  .settings-filters .actions { margin: 0; }
-  .settings-filters .actions .btn { width: 100%; }
+  /* The action cell sits in the narrow 1fr column of the two-column grid, which
+     squeezed a Myanmar label into three stacked lines. Give it its own row. */
+  .settings-filters .actions {
+    grid-column: 1 / -1; margin: 0; display: flex; align-items: center; gap: 10px;
+  }
+  .settings-filters .actions .btn { width: auto; flex: 1 1 auto; white-space: nowrap; }
 }
 
 .regional-attached { display: grid; gap: 6px; margin-top: 10px; }
