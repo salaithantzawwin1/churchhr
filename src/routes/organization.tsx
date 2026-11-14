@@ -74,7 +74,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
           : tabParam === "church" ? "church"
             : "main";
 
-  const cells = await db.all<OrgCell>(sql`
+  const cellsP = db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,
            hc.parent_id AS township_id,
            hc.regional_church_id,
@@ -89,10 +89,10 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE hc.type = 'home_cell' AND hc.active = 1 AND ${scopeCond(scope)}
     ORDER BY r.id, t.sort_order, t.label, hc.sort_order, hc.label`);
 
-  const regionalChurches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
-  const clusters = await loadSupervisionClusters(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
-  const positionDefs = await loadPositionDefs(db);
-  const regions = await db.all<{ id: number; name: string; nameEn: string | null }>(sql`
+  const regionalChurchesP = loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const clustersP = loadSupervisionClusters(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const positionDefsP = loadPositionDefs(db);
+  const regionsP = db.all<{ id: number; name: string; nameEn: string | null }>(sql`
     SELECT r.id, r.name, r.name_en AS nameEn
     FROM regions r
     WHERE ${statesCond(scope, sql`r.id`)}
@@ -100,7 +100,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   // Same rule as the department page: a church-filed department belongs to that
   // church's state, a shared one stays visible with its members scoped.
-  const departments = await db.all<OrgDepartment>(sql`
+  const departmentsP = db.all<OrgDepartment>(sql`
     SELECT d.id, d.name, d.name_en, d.sort_order, d.regional_church_id,
       (SELECT COUNT(*) FROM members m
         WHERE m.department_id = d.id AND m.status = 'active' AND ${memberScopeCond(scope)}) AS member_count,
@@ -113,7 +113,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE d.active = 1 AND (d.regional_church_id IS NULL OR ${statesCond(scope, sql`rc.region_id`)})
     ORDER BY d.sort_order, d.name`);
 
-  const leaders = await db.all<OrgLeader>(sql`
+  const leadersP = db.all<OrgLeader>(sql`
     SELECT mp.position, mp.scope_type, mp.scope_id, mp.department_id, mp.regional_church_id,
            mp.region_id, mp.priority, mp.supervision_cluster_id,
            m.id AS member_id,
@@ -147,14 +147,14 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     WHERE p.active = 1
     ORDER BY position`);
 
-  const unassignedRows = await db.all<{ n: number }>(sql`
+  const unassignedRowsP = db.all<{ n: number }>(sql`
     SELECT COUNT(*) AS n FROM members m
     WHERE m.home_cell_id IS NULL AND m.status = 'active'
       AND ${memberScopeCond(scope)}`);
 
   // Family Groups hang off a Home Cell; members and households are counted per
   // group so the list doubles as the reporting view for them.
-  const familyGroups = await db.all<OrgFamilyGroup>(sql`
+  const familyGroupsP = db.all<OrgFamilyGroup>(sql`
     SELECT fg.id, fg.label, fg.code, fg.region_id,
            r.name AS state_name, r.name_en AS state_name_en,
            hc.label AS home_cell,
@@ -172,6 +172,16 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
 
   // Desktop opens a Home Cell structure panel (?cell=id); it also lists the
   // Family Groups that hang off that cell.
+  // Nine independent reads for one page: send them together instead of paying
+  // nine production round-trips (~200ms each) one after another.
+  const [
+    cells, regionalChurches, clusters, positionDefs, regions,
+    departments, leaders, unassignedRows, familyGroups,
+  ] = await Promise.all([
+    cellsP, regionalChurchesP, clustersP, positionDefsP, regionsP,
+    departmentsP, leadersP, unassignedRowsP, familyGroupsP,
+  ]);
+
   const selectedCellId = intParam(c.req.query("cell"));
   // Search text for the Family Groups tab (?fg=).
   const fgQuery = listQuery(c.req.query("fg"));

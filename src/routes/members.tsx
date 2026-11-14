@@ -245,7 +245,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
   const currentPage = Math.min(page, pages);
   const offset = (currentPage - 1) * PER_PAGE;
 
-  const rows = await db.all(sql`
+  const rowsP = db.all(sql`
     SELECT m.id, m.member_code, m.name_myanmar, m.name_english, m.gender, m.phone, m.status,
            m.date_of_birth, m.marital_status, m.township, m.updated_at,
            (m.photo IS NOT NULL) AS has_photo,
@@ -265,14 +265,18 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     ORDER BY ${sql.raw(orderByFrom(c.req.query()))}
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
 
-  const allRegions = await loadRegions(db);
-  const allOptions = await loadAllOptions(db);
-  const departments = await loadDepartments(db, true);
-  const positionDefs = await loadPositionDefs(db);
-  // Every active age group, so the filter can be picked or switched here too.
-  const ageGroups = await db.all<{ id: number; name: string; min_age: number; max_age: number }>(
-    sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
-  );
+  // Reference lists and the page rows are independent: one wait, not six.
+  const [rows, allRegions, allOptions, departments, positionDefs, ageGroups] = await Promise.all([
+    rowsP,
+    loadRegions(db),
+    loadAllOptions(db),
+    loadDepartments(db, true),
+    loadPositionDefs(db),
+    // Every active age group, so the filter can be picked or switched here too.
+    db.all<{ id: number; name: string; min_age: number; max_age: number }>(
+      sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
+    ),
+  ]);
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}

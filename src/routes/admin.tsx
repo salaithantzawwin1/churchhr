@@ -264,12 +264,18 @@ adminRoutes.post("/branding", requirePermission("users.manage"), async (c) => {
 
 adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
   const db = getDb(c.env);
-  const [usersList, roleList, regionsList] = [await loadAdminUsers(db, c.get("lang")), await loadRoles(db), await loadRegionsLite(db, c.get("lang"))];
+  // Independent reads issued together: one wait instead of four round-trips.
+  const [usersList, roleList, regionsList, homeCells] = await Promise.all([
+    loadAdminUsers(db, c.get("lang")),
+    loadRoles(db),
+    loadRegionsLite(db, c.get("lang")),
+    homeCellOptions(db, c.get("lang")),
+  ]);
   return c.html(
     <AdminUsersPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       users={usersList} roles={roleList} regions={regionsList}
-      homeCells={await homeCellOptions(db, c.get("lang"))}
+      homeCells={homeCells}
       editUser={null} createErrors={[]} editErrors={[]}
       lang={c.get("lang")}
     />,
@@ -633,17 +639,19 @@ async function optionsPage(c: any, type: string, opts: {
   const t = getDict(lang);
   if (!isOptionType(type)) type = OPTION_TYPES[0]!;
   const admin = isOptionsAdmin(scope);
-  const stateListAll = await loadRegionsLite(db, lang);
+  // Independent reads for the tab: issued together, not one round-trip each.
+  const [stateListAll, churchRows, all] = await Promise.all([
+    loadRegionsLite(db, lang),
+    loadRegionalChurches(db, { activeOnly: true, scopeAll: admin, stateIds: scope.stateIds }),
+    loadAllOptions(db),
+  ]);
   // State managers pick only among their own states; no "all states" choice.
   const stateList = admin ? stateListAll : stateListAll.filter((r) => scope.stateIds.includes(r.id));
   // Home Cells may be bound to a Regional Church in the same State/Region.
-  const churches = (await loadRegionalChurches(db, {
-    activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
-  })).map((church) => ({ id: church.id, name: regionalChurchName(church, lang), regionId: church.regionId }));
+  const churches = churchRows.map((church) => ({ id: church.id, name: regionalChurchName(church, lang), regionId: church.regionId }));
   if (opts.showAddForm && !canStructure(c, "create")) opts.showAddForm = false;
   if (opts.modal) {
     if (!canStructure(c, "create")) return forbidden(c);
-    const all = await loadAllOptions(db);
     const parentType = PARENT_TYPE[type];
     return c.html(
       <AddOptionForm type={type} lang={lang} regions={stateList} modal lockRegion={!admin && stateList.length === 1}
@@ -651,7 +659,6 @@ async function optionsPage(c: any, type: string, opts: {
         parentOptions={parentType ? all.filter((o) => o.type === parentType && o.active === 1 && canManageOption(scope, o.regionId === 0 ? 0 : o.regionId)) : []} />,
     );
   }
-  const all = await loadAllOptions(db);
   const byId = new Map(all.map((o) => [o.id, o] as const));
   const list = all
     .filter((o) => o.type === type)
@@ -662,23 +669,25 @@ async function optionsPage(c: any, type: string, opts: {
   // Township and blood type store the option label in the member row (no id),
   // so their usage is counted by label.
   const labelStored = isLabelOptionType(type);
-  const usageRows: { oid: string | number; n: number }[] = labelStored
-    ? await db.all<{ oid: string; n: number }>(
-        sql`SELECT ${sql.raw(column)} AS oid, COUNT(*) AS n FROM members WHERE ${sql.raw(column)} IS NOT NULL AND ${sql.raw(column)} <> '' GROUP BY ${sql.raw(column)}`,
-      )
-    : await db.all<{ oid: number; n: number }>(
-        sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
-      );
+  // Usage counts (members, plus leadership slots for Home Cells) together.
+  const [usageRows, positionRows] = await Promise.all([
+    labelStored
+      ? db.all<{ oid: string; n: number }>(
+          sql`SELECT ${sql.raw(column)} AS oid, COUNT(*) AS n FROM members WHERE ${sql.raw(column)} IS NOT NULL AND ${sql.raw(column)} <> '' GROUP BY ${sql.raw(column)}`,
+        )
+      : db.all<{ oid: string | number; n: number }>(
+          sql.raw(`SELECT ${column} AS oid, COUNT(*) AS n FROM members WHERE ${column} IS NOT NULL GROUP BY ${column}`),
+        ),
+    // A Home Cell can hold a leadership assignment even when no member uses it.
+    type === "home_cell"
+      ? db.all<{ oid: number; n: number }>(sql`
+          SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
+          WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`)
+      : Promise.resolve([] as { oid: number; n: number }[]),
+  ]);
   const usage = new Map(usageRows.map((u) => [u.oid, u.n]));
-  // A Home Cell can have a leadership assignment even when no member currently
-  // uses it, so count positions too before offering delete.
   const positionUsage = new Map<number, number>();
-  if (type === "home_cell") {
-    const rows = await db.all<{ oid: number; n: number }>(sql`
-      SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
-      WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`);
-    for (const row of rows) positionUsage.set(row.oid, row.n);
-  }
+  for (const row of positionRows) positionUsage.set(row.oid, row.n);
   const stateNames = stateListAll;
   const stateName = (id: number | null) =>
     id == null ? null : stateNames.find((r) => r.id === id)?.name ?? null;

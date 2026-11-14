@@ -3442,4 +3442,13 @@ select option { background: var(--surface-2); color: var(--ink); }
   .fg-row-counts { justify-self: start; }
   .org-region-group-meta { margin-left: 0; width: 100%; }
 }
+
+/* Navigation feedback: a slim bar at the top while the next server-rendered
+   page is loading, plus a progress cursor so a click never feels ignored. */
+.nav-progress { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 90; opacity: 0; transition: opacity .12s ease; pointer-events: none; }
+.nav-progress.is-on { opacity: 1; }
+.nav-progress.is-on::before { content: ""; display: block; height: 100%; width: 40%; border-radius: 0 2px 2px 0; background: var(--brand); animation: nav-progress-slide 1.1s ease-in-out infinite; }
+html.is-navigating, html.is-navigating body { cursor: progress; }
+@keyframes nav-progress-slide { 0% { transform: translateX(-45%); } 100% { transform: translateX(285%); } }
+@media (prefers-reduced-motion: reduce) { .nav-progress.is-on::before { animation: none; width: 100%; } }
 `; // end of stylesheet

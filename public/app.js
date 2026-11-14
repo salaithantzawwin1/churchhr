@@ -1790,4 +1790,47 @@
       if (other !== el) other.open = false;
     });
   }, true);
+
+  // Pages are rendered on the server, so a click waits for the next response.
+  // Show a slim progress bar immediately and warm the destination on hover so
+  // moving between pages feels instant instead of dead.
+  var progress = null;
+  function showProgress() {
+    if (!progress) {
+      progress = document.createElement("div");
+      progress.className = "nav-progress";
+      progress.setAttribute("aria-hidden", "true");
+      document.body.appendChild(progress);
+    }
+    progress.classList.add("is-on");
+    document.documentElement.classList.add("is-navigating");
+  }
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target && e.target.closest ? e.target.closest("a") : null;
+    if (!a || a.target || a.hasAttribute("download") || (a.origin && a.origin !== location.origin)) return;
+    var href = a.getAttribute("href") || "";
+    if (!href || href.charAt(0) === "#" || /^(mailto|tel|javascript):/i.test(href)) return;
+    showProgress();
+  });
+  var prefetched = {};
+  function prefetch(href) {
+    if (prefetched[href] || href.charAt(0) !== "/") return;
+    if (Object.keys(prefetched).length >= 12) return;
+    prefetched[href] = true;
+    var l = document.createElement("link");
+    l.rel = "prefetch";
+    l.as = "document";
+    l.href = href;
+    document.head.appendChild(l);
+  }
+  document.addEventListener("pointerover", function (e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[href^='/']") : null;
+    if (!a || a.target || (a.origin && a.origin !== location.origin)) return;
+    prefetch(a.getAttribute("href"));
+  }, { passive: true });
+  window.addEventListener("pageshow", function () {
+    if (progress) progress.classList.remove("is-on");
+    document.documentElement.classList.remove("is-navigating");
+  });
 })();

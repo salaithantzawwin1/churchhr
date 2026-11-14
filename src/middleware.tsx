@@ -1,11 +1,11 @@
 import { createMiddleware } from "hono/factory";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { AppEnv } from "./env";
-import { getDb } from "./db/client";
+import { getDb, type DB } from "./db/client";
 import { rolePermissions, userHomeCellAssignments, userRoles, userStateAssignments, users } from "./db/schema";
 import { ALL_STATES_WILDCARD, type Permission } from "./rbac";
-import { getSessionUser } from "./session";
+import { nowSeconds, sessionTokenHash, type SessionUser } from "./session";
 import { LANG_COOKIE, langFromQuery, normalizeLang } from "./i18n";
 import { ForbiddenPage } from "./views/errors";
 
@@ -16,73 +16,108 @@ export type Access = {
   homeCellIds: number[];
 };
 
-/** Resolving who may do what costs several D1 round-trips per request, and it
- * only changes when an administrator edits a role. A short per-isolate cache
- * keeps page navigation at roughly one query; edits clear it explicitly. */
+/** Session, permissions and scope come back in a single statement, cached per
+ * isolate for a short window. Production D1 round-trips cost ~200ms each and
+ * this path used to run five of them before any page handler started, which is
+ * what made moving between pages feel slow. Edits clear the cache explicitly. */
 const ACCESS_TTL_MS = 15_000;
-const accessCache = new Map<number, { at: number; access: Access }>();
+type SessionAccess = { user: SessionUser; access: Access };
+const sessionCache = new Map<string, { at: number; value: SessionAccess }>();
+const SESSION_CACHE_MAX = 500;
 
-/** Forgets cached permissions after a role or account change. */
+/** Forgets cached sessions/permissions after a role or account change. */
 export function clearAccessCache(): void {
-  accessCache.clear();
+  sessionCache.clear();
 }
 
-/** Effective permissions (union of the user's roles), state scope and Home Cell limit. */
-export async function loadAccess(db: ReturnType<typeof getDb>, userId: number): Promise<Access> {
-  const cached = accessCache.get(userId);
-  if (cached && Date.now() - cached.at < ACCESS_TTL_MS) return cached.access;
-  const access = await computeAccess(db, userId);
-  if (accessCache.size > 1000) accessCache.clear();
-  accessCache.set(userId, { at: Date.now(), access });
-  return access;
+/** Drops one cached session the moment it is destroyed (logout), so the cookie
+ * cannot keep working from this isolate's cache. */
+export function forgetSession(token: string | null | undefined): void {
+  if (token) sessionCache.delete(token);
 }
 
-async function computeAccess(db: ReturnType<typeof getDb>, userId: number): Promise<Access> {
-  const roleRows = await db
-    .select({ roleId: userRoles.roleId })
-    .from(userRoles)
-    .where(eq(userRoles.userId, userId));
-  const roleIds = roleRows.map((r) => r.roleId);
+type SessionAccessRow = {
+  id: number;
+  username: string;
+  mustChangePassword: number;
+  active: number;
+  language: string | null;
+  perms: string | null;
+  states: string | null;
+  cells: string | null;
+};
 
-  const permRows = roleIds.length
-    ? await db
-        .select({ permission: rolePermissions.permission })
-        .from(rolePermissions)
-        .where(inArray(rolePermissions.roleId, roleIds))
-    : [];
+/** One statement: the live session's user plus its permission and scope sets. */
+async function querySessionAccess(
+  db: DB, tokenHash: string, opts: { language: boolean; cells: boolean },
+): Promise<SessionAccessRow | undefined> {
+  const language = opts.language ? sql`u.language` : sql`NULL`;
+  const cells = opts.cells
+    ? sql`(SELECT GROUP_CONCAT(home_cell_id) FROM user_home_cell_assignments WHERE user_id = u.id)`
+    : sql`NULL`;
+  const rows = await db.all<SessionAccessRow>(sql`
+    SELECT u.id, u.username, u.must_change_password AS mustChangePassword, u.active,
+      ${language} AS language,
+      (SELECT GROUP_CONCAT(rp.permission) FROM role_permissions rp
+         WHERE rp.role_id IN (SELECT role_id FROM user_roles WHERE user_id = u.id)) AS perms,
+      (SELECT GROUP_CONCAT(region_id) FROM user_state_assignments WHERE user_id = u.id) AS states,
+      ${cells} AS cells
+    FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.token_hash = ${tokenHash} AND s.expires_at > ${nowSeconds()}
+    LIMIT 1`);
+  return rows[0];
+}
 
-  const assignmentRows = await db
-    .select({ regionId: userStateAssignments.regionId })
-    .from(userStateAssignments)
-    .where(eq(userStateAssignments.userId, userId));
+async function loadSessionAccess(db: DB, token: string): Promise<SessionAccess | null> {
+  const started = Date.now();
+  const hit = sessionCache.get(token);
+  if (hit && started - hit.at < ACCESS_TTL_MS) return hit.value;
 
-  const scopeAll = assignmentRows.some((r) => r.regionId === ALL_STATES_WILDCARD);
-  const stateIds = assignmentRows
-    .filter((r) => r.regionId !== ALL_STATES_WILDCARD)
-    .map((r) => r.regionId);
-
-  // Optional per-account member-list limit by Home Cell (0033).
-  let homeCellIds: number[] = [];
-  try {
-    const homeCellRows = await db
-      .select({ homeCellId: userHomeCellAssignments.homeCellId })
-      .from(userHomeCellAssignments)
-      .where(eq(userHomeCellAssignments.userId, userId));
-    homeCellIds = homeCellRows.map((r) => r.homeCellId);
-  } catch (err) {
-    // Deploy-before-migration safety: the table may not exist yet.
-    homeCellIds = [];
+  const tokenHash = await sessionTokenHash(token);
+  let row: SessionAccessRow | undefined;
+  // Deploy-before-migration safety: drop columns/tables this database may not
+  // have yet instead of failing every request.
+  let withLanguage = true;
+  let withCells = true;
+  for (;;) {
+    try {
+      row = await querySessionAccess(db, tokenHash, { language: withLanguage, cells: withCells });
+      break;
+    } catch (err) {
+      if (withCells) { withCells = false; continue; }
+      if (withLanguage) { withLanguage = false; continue; }
+      throw err;
+    }
   }
+  if (!row || row.active !== 1) return null;
 
-  return { perms: new Set(permRows.map((r) => r.permission)), scopeAll, stateIds, homeCellIds };
+  const stateList = (row.states ?? "").split(",").filter(Boolean).map(Number);
+  const value: SessionAccess = {
+    user: {
+      id: row.id,
+      username: row.username,
+      mustChangePassword: row.mustChangePassword === 1,
+      language: row.language ?? null,
+    },
+    access: {
+      perms: new Set((row.perms ?? "").split(",").filter(Boolean)),
+      scopeAll: stateList.includes(ALL_STATES_WILDCARD),
+      stateIds: stateList.filter((id) => Number.isInteger(id) && id !== ALL_STATES_WILDCARD),
+      homeCellIds: (row.cells ?? "").split(",").filter(Boolean).map(Number).filter((id) => Number.isInteger(id)),
+    },
+  };
+  if (sessionCache.size > SESSION_CACHE_MAX) sessionCache.clear();
+  sessionCache.set(token, { at: started, value });
+  return value;
 }
 
 /** Redirects to /login when no live session; loads perms + scope into context vars. */
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   const db = getDb(c.env);
   const token = getCookie(c, "session");
-  const user = token ? await getSessionUser(db, token) : null;
-  if (!user) return c.redirect("/login", 302);
+  const resolved = token ? await loadSessionAccess(db, token) : null;
+  if (!resolved) return c.redirect("/login", 302);
+  const user = resolved.user;
 
   // Account language: an explicit ?lang= switch wins and is saved to the
   // account, otherwise the saved language applies on every device. Without a
@@ -115,7 +150,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
     return c.redirect("/profile?msg=change", 302);
   }
 
-  const access = await loadAccess(db, user.id);
+  const access = resolved.access;
   c.set("user", user);
   c.set("perms", access.perms);
   c.set("scopeAll", access.scopeAll);

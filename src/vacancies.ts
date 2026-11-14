@@ -134,7 +134,7 @@ export async function loadVacancyReport(
     held.set(key, (held.get(key) ?? 0) + 1);
   }
 
-  const regionRows = await db.all<StructureRow>(sql`
+  const regionRowsP = db.all<StructureRow>(sql`
     SELECT r.id, r.name, r.name_en AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
@@ -142,7 +142,7 @@ export async function loadVacancyReport(
     WHERE ${stateFilter(scope, "r.id")}
     ORDER BY r.name`);
 
-  const churchRows = await db.all<StructureRow>(sql`
+  const churchRowsP = db.all<StructureRow>(sql`
     SELECT rc.id, rc.name, rc.name_en AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
@@ -151,7 +151,7 @@ export async function loadVacancyReport(
     WHERE rc.active = 1 AND ${stateFilter(scope, "rc.region_id")}
     ORDER BY r.name, rc.sort_order, rc.name`);
 
-  const homeCellRows = await db.all<StructureRow>(sql`
+  const homeCellRowsP = db.all<StructureRow>(sql`
     SELECT hc.id, hc.label AS name, NULL AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            t.label AS townshipName,
@@ -164,7 +164,7 @@ export async function loadVacancyReport(
     WHERE hc.type = 'home_cell' AND hc.active = 1 AND ${stateFilter(scope, "hc.region_id")}
     ORDER BY r.id, t.sort_order, t.label, hc.sort_order, hc.label`);
 
-  const clusterRows = await db.all<StructureRow>(sql`
+  const clusterRowsP = db.all<StructureRow>(sql`
     SELECT sc.id, sc.name, sc.name_en AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
@@ -173,7 +173,7 @@ export async function loadVacancyReport(
     WHERE sc.active = 1 AND ${stateFilter(scope, "sc.region_id")}
     ORDER BY r.id, sc.sort_order, sc.name`);
 
-  const townshipRows = await db.all<StructureRow>(sql`
+  const townshipRowsP = db.all<StructureRow>(sql`
     SELECT t.id, t.label AS name, NULL AS nameEn,
            r.name AS stateName, r.name_en AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
@@ -182,13 +182,18 @@ export async function loadVacancyReport(
     WHERE t.type = 'township' AND t.active = 1 AND ${stateFilter(scope, "t.region_id")}
     ORDER BY r.id, t.sort_order, t.label`);
 
-  const departmentRows = await db.all<StructureRow>(sql`
+  const departmentRowsP = db.all<StructureRow>(sql`
     SELECT d.id, d.name, d.name_en AS nameEn,
            '' AS stateName, NULL AS stateNameEn,
            NULL AS townshipName, NULL AS regionalName, NULL AS regionalNameEn
     FROM church_departments d
     WHERE d.active = 1
     ORDER BY d.sort_order, d.name`);
+
+  // Six independent structure lists: one wait for the whole report instead of
+  // six production round-trips.
+  const [regionRows, churchRows, homeCellRows, clusterRows, townshipRows, departmentRows] =
+    await Promise.all([regionRowsP, churchRowsP, homeCellRowsP, clusterRowsP, townshipRowsP, departmentRowsP]);
 
   const localized = (name: string, nameEn: string | null) => (lang !== "mm" && nameEn ? nameEn : name);
   const stateOf = (row: StructureRow) =>

@@ -21,6 +21,7 @@ import { LoginPage, ProfilePage } from "../views/auth";
 import { getDict } from "../i18n";
 import type { Flash } from "../views/layout";
 import { loadBranding } from "../branding";
+import { clearAccessCache, forgetSession } from "../middleware";
 
 const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_SECONDS = 600;
@@ -196,6 +197,7 @@ profileRoutes.get("/logout", async (c) => {
   const db = getDb(c.env);
   const token = getCookie(c, "session");
   if (token) await destroySession(db, token);
+  forgetSession(token);
   deleteCookie(c, "session", { path: "/" });
   return c.redirect(c.req.query("auto") ? "/login?msg=auto-logout" : "/login", 302);
 });
@@ -204,6 +206,7 @@ profileRoutes.post("/logout", async (c) => {
   const db = getDb(c.env);
   const token = getCookie(c, "session");
   if (token) await destroySession(db, token);
+  forgetSession(token);
   deleteCookie(c, "session", { path: "/" });
   return c.redirect("/login", 302);
 });
@@ -252,5 +255,6 @@ profileRoutes.post("/profile", async (c) => {
     .where(eq(users.id, user.id));
   // A changed password signs out the account's other devices but keeps this one.
   await destroyOtherSessions(db, user.id, getCookie(c, "session") ?? null);
+  clearAccessCache();
   return redirect();
 });
