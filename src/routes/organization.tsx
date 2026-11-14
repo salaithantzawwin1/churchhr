@@ -555,7 +555,8 @@ async function cellCandidates(
   q: string,
 ) {
   const like = `%${q}%`;
-  const church = cell.regionalChurchId ?? -1;
+  // A cell role is filled from that cell's own members: the same church's other
+  // Home Cells and its unassigned members are not candidates here.
   return db.all<AssignCandidate>(sql`
     SELECT m.id,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '#') AS name,
@@ -568,13 +569,9 @@ async function cellCandidates(
     LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
     LEFT JOIN lookup_options hc2 ON hc2.id = mp.scope_id
     WHERE m.status = 'active' AND ${memberScopeCond(scope)}
-      AND (
-        m.home_cell_id = ${cell.id}
-        OR hc.regional_church_id = ${church}
-        OR (m.home_cell_id IS NULL AND m.region_id = ${cell.regionId})
-      )
+      AND m.home_cell_id = ${cell.id}
       ${q ? sql`AND (m.name_myanmar LIKE ${like} OR m.name_english LIKE ${like})` : sql``}
-    ORDER BY (m.home_cell_id = ${cell.id}) DESC, name
+    ORDER BY name
     LIMIT 300`);
 }
 
@@ -670,11 +667,18 @@ organizationRoutes.post("/cell-assign", requirePermission("members.update"), asy
 
   let target: { id: number } | null = null;
   if (memberId) {
-    const rows = await db.all<{ id: number; region_id: number }>(sql`
-      SELECT m.id, m.region_id FROM members m
+    const rows = await db.all<{ id: number; region_id: number; home_cell_id: number | null }>(sql`
+      SELECT m.id, m.region_id, m.home_cell_id FROM members m
       WHERE m.id = ${memberId} AND m.status = 'active' LIMIT 1`);
     if (!rows[0] || !regionInScope(scope, rows[0].region_id)) {
       return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+    }
+    // The picker only offers this cell's members, so hold the save to the same
+    // rule: an old dialog or a hand-made post may not pull in another cell.
+    if (rows[0].home_cell_id !== cell.id) {
+      return reject(c.get("lang") === "mm"
+        ? "ဤအသင်းသားသည် ဤ Home Cell တွင် မပါဝင်ပါ။"
+        : "This member does not belong to this Home Cell.");
     }
     target = { id: rows[0].id };
   }

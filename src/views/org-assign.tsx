@@ -140,6 +140,7 @@ export function AssignLeaderModal(props: {
         </label>
 
         {pastorDirectory && <p class="assign-hint">{t("org.assignPastorHint")}</p>}
+        {scopeField === "cell" && <p class="assign-hint">{t("org.assignCellHint")}</p>}
 
         {candidates.length === 0 ? (
           <p class="assign-empty">{t("org.assignEmpty")}</p>
