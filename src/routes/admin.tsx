@@ -1074,6 +1074,28 @@ adminRoutes.post("/options/:id", requirePermission("options.manage"), async (c) 
   await db.update(lookupOptions)
     .set({ label, regionId: anchorRegion, parentId, code: rawCode || null, shortCode, regionalChurchId })
     .where(eq(lookupOptions.id, id));
+  // Township and blood type are stored on members (and a household's township)
+  // as text, so a rename has to follow through or those rows keep pointing at a
+  // label that no longer exists. Township labels are per state, so only rows in
+  // the option's own state are rewritten (an all-states township touches all).
+  if (current.type === "township" && label !== current.label) {
+    const regional = anchorRegion !== 0;
+    for (const table of ["members", "families"] as const) {
+      await db.run(sql`
+        UPDATE ${sql.raw(table)} SET township = ${label}
+        WHERE lower(trim(township)) = lower(trim(${current.label}))
+        ${regional ? sql`AND region_id = ${anchorRegion}` : sql``}`);
+    }
+    await db.run(sql`
+      UPDATE members SET updated_at = unixepoch()
+      WHERE lower(trim(township)) = lower(trim(${label}))
+      ${regional ? sql`AND region_id = ${anchorRegion}` : sql``}`);
+  }
+  if (current.type === "blood_type" && label !== current.label) {
+    await db.run(sql`
+      UPDATE members SET blood_type = ${label}, updated_at = unixepoch()
+      WHERE lower(trim(blood_type)) = lower(trim(${current.label}))`);
+  }
   // Changing a township's short code renumbers the Family Groups under it so the
   // INS_FG001 sequence stays correct (only when the prefix actually changed).
   if (current.type === "township" && shortCode && shortCode !== (current.shortCode ?? "")) {
@@ -1113,9 +1135,17 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
     : column
       ? await db.all<{ n: number }>(sql.raw(`SELECT COUNT(*) AS n FROM members WHERE ${column} = ${id}`))
       : [{ n: 0 }];
-  const positionUsed = current.type === "home_cell"
-    ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM member_positions WHERE scope_type = 'home_cell' AND scope_id = ${id}`)
-    : [{ n: 0 }];
+  // Positions can be scoped to a Home Cell or a Township (scope_id), so any
+  // reference — not just the home-cell one — must keep the row alive.
+  const positionUsed = await db.all<{ n: number }>(
+    sql`SELECT COUNT(*) AS n FROM member_positions WHERE scope_id = ${id}`,
+  );
+  // Households point at their Home Cell, Group and Family Group by id; deleting
+  // one underneath them would fail the foreign key or orphan the household.
+  const householdUsed = await db.all<{ n: number }>(
+    sql`SELECT COUNT(*) AS n FROM families
+        WHERE home_cell_id = ${id} OR group_id = ${id} OR family_group_id = ${id}`,
+  );
   // Anything else that still points at this option: child options (a township's
   // home cells, a home cell's family groups), a manager's home-cell scope and
   // reports filed against it. Deleting the row underneath them would leave those
@@ -1132,6 +1162,7 @@ adminRoutes.post("/options/:id/delete", requirePermission("options.manage"), asy
       ? await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM activity_reports WHERE group_id = ${id}`)
       : [{ n: 0 }];
   if ((used[0]?.n ?? 0) > 0 || (positionUsed[0]?.n ?? 0) > 0 ||
+      (householdUsed[0]?.n ?? 0) > 0 ||
       (childUsed[0]?.n ?? 0) > 0 || (userCellUsed[0]?.n ?? 0) > 0 || (reportUsed[0]?.n ?? 0) > 0) {
     await db.update(lookupOptions).set({ active: 0 }).where(eq(lookupOptions.id, id));
     return c.redirect(`${back}&err=${encodeURIComponent("err-used")}`, 302);
@@ -1257,6 +1288,7 @@ async function loadRegionRows(db: DB): Promise<RegionRow[]> {
       + (SELECT COUNT(*) FROM regional_churches rc WHERE rc.region_id = r.id)
       + (SELECT COUNT(*) FROM lookup_options lo WHERE lo.region_id = r.id)
       + (SELECT COUNT(*) FROM pastors p WHERE p.region_id = r.id)
+      + (SELECT COUNT(*) FROM families f WHERE f.region_id = r.id)
       + (SELECT COUNT(*) FROM activity_reports ar WHERE ar.region_id = r.id) AS used
     FROM regions r ORDER BY r.id`);
   return rows.map((r) => ({ id: r.id, name: r.name, name_en: r.name_en ?? "", code: r.code ?? null, used: Number(r.used) }));
@@ -1404,7 +1436,8 @@ adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), asy
          + (SELECT COUNT(*) FROM regional_churches WHERE region_id = ${id})
          + (SELECT COUNT(*) FROM lookup_options WHERE region_id = ${id})
          + (SELECT COUNT(*) FROM pastors WHERE region_id = ${id})
-         + (SELECT COUNT(*) FROM activity_reports WHERE region_id = ${id}) AS n`);
+         + (SELECT COUNT(*) FROM activity_reports WHERE region_id = ${id})
+         + (SELECT COUNT(*) FROM families WHERE region_id = ${id}) AS n`);
   if ((usedRows[0]?.n ?? 0) > 0) {
     return c.redirect(`${back}&err=err-region-used`, 302);
   }
