@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, type Lang } from "../i18n";
 import { defsForScope, positionDefLabel, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { departmentName, type DepartmentRow } from "../departments";
 import { CardViewToggle } from "./view-toggle";
@@ -201,7 +201,7 @@ export function DepartmentDetailPage(props: Common & {
       <div class="page-head">
         <h1>
           {departmentName(department, L)}
-          <span class="count-pill">{department.member_count} {t("org.membersShort")}</span>
+          <span class="count-pill">{countLabel(t, "org.membersShort", department.member_count)}</span>
           {department.church_name && (
             <span class="role-chip church">
               {L !== "mm" && department.church_name_en ? department.church_name_en : department.church_name}

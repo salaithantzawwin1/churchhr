@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, type Lang } from "../i18n";
 import {
   CONFIGURABLE_POSITION_SCOPES,
   positionDefLabel,
@@ -757,7 +757,7 @@ export function RegionalChurchesPage(props: Common & {
                 <div class="org-section-head">
                   <div>
                     <h2>{group.name}</h2>
-                    <p class="muted small">{group.churches.length} {t("org.churchesShort")}</p>
+                    <p class="muted small">{countLabel(t, "org.churchesShort", group.churches.length)}</p>
                   </div>
                 </div>
                 <div class="hh-grid" data-view-grid>{group.churches.map(renderChurchCard)}</div>

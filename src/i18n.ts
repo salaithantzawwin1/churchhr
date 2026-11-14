@@ -229,7 +229,11 @@ const MM: Dict = {
   "org.fgIntro": "တိုင်း/ပြည်နယ်အလိုက် မိသားစုအဖွဲ့တွေနဲ့ သူတို့ရဲ့ Home Cell ကို ကြည့်ပါ။ အုပ်စုတစ်ခုကို နှိပ်ရင် အဖွဲ့ဝင် စာရင်း ရောက်ပါမယ်။",
   "org.fgEmpty": "မိသားစုအဖွဲ့ မရှိသေးပါ။",
   "org.fgCount": "အုပ်စု",
+  "org.fgCount.one": "အုပ်စု",
+  "org.fgCount.other": "အုပ်စု",
   "org.fgHouseholds": "အိမ်ထောင်",
+  "org.fgHouseholds.one": "အိမ်ထောင်",
+  "org.fgHouseholds.other": "အိမ်ထောင်",
   "org.fgNoCell": "Home Cell မသတ်မှတ်ရသေး",
   "org.fgSearch": "မိသားစုအဖွဲ့ ရှာရန်",
   "org.fgSearchPlaceholder": "အမည်၊ ကုဒ် သို့မဟုတ် Home Cell",
@@ -805,6 +809,8 @@ const MM: Dict = {
   // errors pages
   "org.title": "အသင်းဖွဲ့စည်းပုံ",
   "org.cells": "Home Cell",
+  "org.cells.one": "Home Cell",
+  "org.cells.other": "Home Cell",
   "org.intro": "Church ဖွဲ့စည်းပုံနှင့် Home Cell တစ်ခုချင်းစီ၏ ခေါင်းဆောင်များကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။ Member စာရင်းမှ ရာထူး သတ်မှတ်လိုက်တာနှင့် ချက်ချင်း ပြသပါမည်။",
   "org.churchTab": "အသင်းတော် ဖွဲ့စည်းပုံ",
   "org.churchesTitle": "အသင်းတော်များ",
@@ -850,6 +856,8 @@ const MM: Dict = {
   "org.allVacant": "ခေါင်းဆောင် မသတ်မှတ်ရသေးပါ",
   "org.allVacantHint": "ခေါင်းဆောင်တစ်ဦး သတ်မှတ်ပြီး ဒီအသင်း၏ ဖွဲ့စည်းပုံကို စတင်ပါ။",
   "org.positionsVacant": "ရာထူး လစ်လပ်",
+  "org.positionsVacant.one": "ရာထူး လစ်လပ်",
+  "org.positionsVacant.other": "ရာထူး လစ်လပ်",
   "org.changeLeader": "ခေါင်းဆောင် ပြောင်းရန်",
   "org.positionParent": "အထက်လူကြီး ရာထူး",
   "org.positionParentNone": "ထိပ်တန်း (အထက်လူကြီး မရှိ)",
@@ -871,7 +879,11 @@ const MM: Dict = {
   "org.mainChurchHint": "Yangon Church (Main) ကို Regional Church များနှင့် သီးသန့်ခွဲထားပါသည်။",
   "org.mainChurchEmpty": "ပင်မ အသင်းကို မသတ်မှတ်ရသေးပါ။",
   "org.churchesShort": "အသင်း",
+  "org.churchesShort.one": "အသင်း",
+  "org.churchesShort.other": "အသင်း",
   "org.departmentsShort": "ဌာန",
+  "org.departmentsShort.one": "ဌာန",
+  "org.departmentsShort.other": "ဌာန",
   "org.editStructure": "ဖွဲ့စည်းပုံ ပြင်မည်",
   "org.homeCells": "Home Cell များ",
   "org.viewDetails": "အသေးစိတ် ကြည့်ရန်",
@@ -1050,7 +1062,11 @@ const MM: Dict = {
   "org.emptyBody": "Home Cell များ ထည့်ပြီးမှ ဖွဲ့စည်းပုံ ပေါ်လာပါမည်။",
   "org.manageCells": "Home Cell စီမံရန်",
   "org.membersShort": "member",
+  "org.membersShort.one": "member",
+  "org.membersShort.other": "member",
   "org.leadersShort": "leader",
+  "org.leadersShort.one": "leader",
+  "org.leadersShort.other": "leader",
   "org.noLeader": "ခေါင်းဆောင် မရှိ",
   "org.position": "ရာထူး",
   "org.assign": "သတ်မှတ်",
@@ -1382,7 +1398,11 @@ const EN: Dict = {
   "org.fgIntro": "Every Family Group by state, with the home cell it belongs to. Open one to see its members.",
   "org.fgEmpty": "No family groups yet.",
   "org.fgCount": "groups",
+  "org.fgCount.one": "group",
+  "org.fgCount.other": "groups",
   "org.fgHouseholds": "households",
+  "org.fgHouseholds.one": "household",
+  "org.fgHouseholds.other": "households",
   "org.fgNoCell": "No home cell",
   "org.fgSearch": "Search family groups",
   "org.fgSearchPlaceholder": "Name, code or Home Cell",
@@ -1945,6 +1965,8 @@ const EN: Dict = {
   "org.historyErrRange": "The end year cannot be before the start year.",
   "org.title": "Organization Structure",
   "org.cells": "Home Cells",
+  "org.cells.one": "Home Cell",
+  "org.cells.other": "Home Cells",
   "org.intro": "See the church hierarchy and the leaders serving each Home Cell. Assign a position from the member list and this structure updates immediately.",
   "org.churchTab": "Church Structure",
   "org.churchesTitle": "Churches",
@@ -1990,6 +2012,8 @@ const EN: Dict = {
   "org.allVacant": "No leadership assigned yet",
   "org.allVacantHint": "Assign a leader to start building this church's leadership.",
   "org.positionsVacant": "positions vacant",
+  "org.positionsVacant.one": "position vacant",
+  "org.positionsVacant.other": "positions vacant",
   "org.changeLeader": "Change leader",
   "org.positionParent": "Reports to",
   "org.positionParentNone": "Top level (no parent)",
@@ -2011,7 +2035,11 @@ const EN: Dict = {
   "org.mainChurchHint": "Yangon Church (Main) is kept separate from the Regional Churches.",
   "org.mainChurchEmpty": "No Main Church has been set yet.",
   "org.churchesShort": "churches",
+  "org.churchesShort.one": "church",
+  "org.churchesShort.other": "churches",
   "org.departmentsShort": "departments",
+  "org.departmentsShort.one": "department",
+  "org.departmentsShort.other": "departments",
   "org.editStructure": "Edit structure",
   "org.homeCells": "Home Cells",
   "org.viewDetails": "View details",
@@ -2190,7 +2218,11 @@ const EN: Dict = {
   "org.emptyBody": "Add Home Cells and they will appear here as an organization structure.",
   "org.manageCells": "Manage Home Cells",
   "org.membersShort": "members",
+  "org.membersShort.one": "member",
+  "org.membersShort.other": "members",
   "org.leadersShort": "leaders",
+  "org.leadersShort.one": "leader",
+  "org.leadersShort.other": "leaders",
   "org.noLeader": "No leader",
   "org.position": "Position",
   "org.assign": "Assign",
@@ -2324,4 +2356,19 @@ export function getDict(lang: Lang): T {
   const dict = DICTS[lang];
   const fallback = lang === "kr" ? DICTS.en : DICTS.mm;
   return (key: string) => dict[key] ?? fallback[key] ?? key;
+}
+
+/** A counted noun: English inflects (1 church / 2 churches), Myanmar and Korean
+ *  use one word for both, so every dictionary carries a ".one" and ".other"
+ *  variant and this picks between them. Falls back to the plain key when a
+ *  variant is missing. */
+export function pluralLabel(t: T, key: string, count: number): string {
+  const variant = `${key}.${count === 1 ? "one" : "other"}`;
+  const label = t(variant);
+  return label === variant ? t(key) : label;
+}
+
+/** "1 church" / "2 churches" — the count and its counted noun together. */
+export function countLabel(t: T, key: string, count: number): string {
+  return `${count} ${pluralLabel(t, key, count)}`;
 }

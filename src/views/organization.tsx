@@ -1,6 +1,6 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { getDict, type Lang } from "../i18n";
+import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
 import { positionDefLabel, defsForScope, defsForChurch, leadDef, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName } from "../departments";
@@ -469,8 +469,8 @@ export function OrganizationPage(props: Common & {
         </div>
 
         <div class="org-cell-panel-facts">
-          <span class="org-cell-fact"><b>{cell.member_count}</b> {t("org.membersShort")}</span>
-          <span class="org-cell-fact"><b>{groups.length}</b> {t("org.fgCount")}</span>
+          <span class="org-cell-fact"><b>{cell.member_count}</b> {pluralLabel(t, "org.membersShort", cell.member_count)}</span>
+          <span class="org-cell-fact"><b>{groups.length}</b> {pluralLabel(t, "org.fgCount", groups.length)}</span>
           <span class="org-cell-fact">
             <b>{filled}</b> / {cellRows.all.length} {t("dept.rolesFilled")}
           </span>
@@ -503,7 +503,7 @@ export function OrganizationPage(props: Common & {
                       {group.code && <span class="org-code">{group.code}</span>}
                     </a>
                     <a class="org-cell-count" href={`/members?family_group=${group.id}&status=active`}>
-                      {group.member_count} {t("org.membersShort")}
+                      {countLabel(t, "org.membersShort", group.member_count)}
                     </a>
                   </li>
                 ))}
@@ -653,7 +653,7 @@ export function OrganizationPage(props: Common & {
               </span>
               <span class="org-fill-text"><b>{rolesFilled}</b>/{rolesAll} {t("org.rolesShort")}</span>
             </span>
-            <span class="muted small">{group.cells.length} {t("org.cells")}</span>
+            <span class="muted small">{countLabel(t, "org.cells", group.cells.length)}</span>
             <span class="org-flow-chev" aria-hidden="true">▾</span>
           </span>
         </summary>
@@ -680,7 +680,7 @@ export function OrganizationPage(props: Common & {
                 >
                   <span class="hc-cell-btn-name">{cell.label}</span>
                   <span class="hc-cell-btn-meta">
-                    {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
+                    {cell.township ? `${cell.township} · ` : ""}{countLabel(t, "org.membersShort", cell.member_count)}
                   </span>
                   <span class="hc-cell-btn-fill">
                     <span class="org-fill-track" aria-hidden="true">
@@ -702,7 +702,7 @@ export function OrganizationPage(props: Common & {
                   <option value="">{t("org.cellPickNone")}</option>
                   {group.cells.map((cell) => (
                     <option value={String(cell.id)} selected={cell.id === selectedCellId}>
-                      {cell.label} · {cell.member_count} {t("org.membersShort")} · {cellFilled(cell)}/{cellRows.all.length}
+                      {cell.label} · {countLabel(t, "org.membersShort", cell.member_count)} · {cellFilled(cell)}/{cellRows.all.length}
                     </option>
                   ))}
                 </select>
@@ -796,7 +796,7 @@ export function OrganizationPage(props: Common & {
             </ul>
           </div>
           <div class="org-section-actions">
-            <span class="org-vacant-count">{rows.all.length} {t("org.positionsVacant")}</span>
+            <span class="org-vacant-count">{countLabel(t, "org.positionsVacant", rows.all.length)}</span>
             {canEdit && rows.lead ? (
               <a class="btn sm js-edit-modal" href={assignHref(rows.lead.code)}
                 data-modal-title={assignTitle(rows.lead, null)} data-modal-size="md">
@@ -835,14 +835,14 @@ export function OrganizationPage(props: Common & {
         <div class="org-flow-state-head">
           <span class="org-flow-state-name">{state.name}</span>
           <span class="muted small">
-            {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")}
+            {countLabel(t, "org.cells", state.cells.length)} · {countLabel(t, "org.membersShort", stateMembers)}
           </span>
         </div>
         {[...churchGroups.values()].map((churchGroup) => (
           <div class="org-church-block">
             <div class="org-church-block-head">
               <h3>{churchGroup.name}</h3>
-              <span class="muted small">{churchGroup.cells.length} {t("org.cells")}</span>
+              <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
             </div>
             <div class="org-flow-clusters">
               {supervisionGroups(churchGroup.cells, clusters, L).map(renderSupervisionGroup)}
@@ -857,7 +857,7 @@ export function OrganizationPage(props: Common & {
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head org-page-head">
         <div>
-          <h1>{t("org.title")}<span class="count-pill">{cells.length} {t("org.cells")}</span></h1>
+          <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span></h1>
           <p class="page-sub">{t("org.intro")}</p>
         </div>
       </div>
@@ -920,7 +920,7 @@ export function OrganizationPage(props: Common & {
                   <span class="org-church-fact org-church-state">
                     {L !== "mm" && selectedChurch.stateNameEn ? selectedChurch.stateNameEn : selectedChurch.stateName}
                   </span>
-                  <span class="org-church-fact"><b>{selectedChurchCellCount}</b> {t("org.cells")}</span>
+                  <span class="org-church-fact"><b>{selectedChurchCellCount}</b> {pluralLabel(t, "org.cells", selectedChurchCellCount)}</span>
                   {churchRows.all.length > 0 && (
                     <span class="org-church-fact">
                       <b>{selectedChurchFilled}</b> / {churchRows.all.length} {t("dept.rolesFilled")}
@@ -958,7 +958,7 @@ export function OrganizationPage(props: Common & {
             ) : (
               <details class="org-collapse">
                 <summary class="org-collapse-summary">
-                  <span>{scopedDepartments.length} {t("org.departmentsShort")} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
+                  <span>{countLabel(t, "org.departmentsShort", scopedDepartments.length)} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
                   <span class="chev" aria-hidden="true">▾</span>
                 </summary>
                 <div class="org-collapse-body">
@@ -998,7 +998,7 @@ export function OrganizationPage(props: Common & {
                         <div class="org-dept-title">
                           <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
                           <span class="muted small">
-                            {d.member_count} {t("org.membersShort")}
+                            {countLabel(t, "org.membersShort", d.member_count)}
                           </span>
                         </div>
                       </div>
@@ -1062,7 +1062,7 @@ export function OrganizationPage(props: Common & {
                       <div>
                         <h2>{state.name}</h2>
                         <p class="muted small">
-                          {state.cells.length} {t("org.cells")} · {stateMembers} {t("org.membersShort")} · {stateLeaders} {t("org.leadersShort")}
+                          {countLabel(t, "org.cells", state.cells.length)} · {countLabel(t, "org.membersShort", stateMembers)} · {countLabel(t, "org.leadersShort", stateLeaders)}
                         </p>
                       </div>
                     </div>
@@ -1071,14 +1071,14 @@ export function OrganizationPage(props: Common & {
                       <div class="org-church-block-head">
                         <h3>{churchGroup.name}</h3>
                         <span class="muted small">
-                          {churchGroup.cells.length} {t("org.cells")}
+                          {countLabel(t, "org.cells", churchGroup.cells.length)}
                         </span>
                       </div>
                     {groupByTownship(churchGroup.cells, churchGroup.name).map((town) => (
                       <details class="org-township">
                         <summary>
                           <span class="org-township-name">{town.name}</span>
-                          <span class="muted small">{town.cells.length} {t("org.cells")}</span>
+                          <span class="muted small">{countLabel(t, "org.cells", town.cells.length)}</span>
                           <span class="chev" aria-hidden="true">▾</span>
                         </summary>
                         {townshipSupervision(town)}
@@ -1092,7 +1092,7 @@ export function OrganizationPage(props: Common & {
                               </div>
                               {cellRoles(cell, "row")}
                               <a class="org-cell-count" href={cellHref(cell.id)}>
-                                {cell.member_count} {t("org.membersShort")}
+                                {countLabel(t, "org.membersShort", cell.member_count)}
                               </a>
                             </div>
                           ))}
@@ -1125,7 +1125,7 @@ export function OrganizationPage(props: Common & {
                 <div>
                   <h2>{regionalChurchName(church, L)}</h2>
                   <p class="muted small">
-                    {t("org.mainChurchHint")} · {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
+                    {t("org.mainChurchHint")} · {countLabel(t, "org.cells", churchCells.length)} · {countLabel(t, "org.membersShort", churchMembers)}
                   </p>
                 </div>
                 <div class="org-section-actions">
@@ -1149,7 +1149,7 @@ export function OrganizationPage(props: Common & {
                       <div class="org-main-township">
                         <div class="org-regional-township-head">
                           <span class="org-township-name">{town.name}</span>
-                          <span class="muted small">{town.cells.length} {t("org.cells")}</span>
+                          <span class="muted small">{countLabel(t, "org.cells", town.cells.length)}</span>
                         </div>
                         {town.cells.map((cell) => (
                           <div class="org-cell-row">
@@ -1159,7 +1159,7 @@ export function OrganizationPage(props: Common & {
                               {cell.code && <span class="org-code">{cell.code}</span>}
                             </div>
                             <a class="org-cell-count" href={cellHref(cell.id)}>
-                              {cell.member_count} {t("org.membersShort")}
+                              {countLabel(t, "org.membersShort", cell.member_count)}
                             </a>
                           </div>
                         ))}
@@ -1213,11 +1213,11 @@ export function OrganizationPage(props: Common & {
                     <summary class="org-region-group-head">
                       <h3>{group.name}</h3>
                       <span class="org-region-group-meta">
-                        <span class="muted small">{group.churches.length} {t("org.churchesShort")}</span>
+                        <span class="muted small">{countLabel(t, "org.churchesShort", group.churches.length)}</span>
                         <span class="org-dot" aria-hidden="true">·</span>
-                        <span class="muted small">{groupCells.length} {t("org.cells")}</span>
+                        <span class="muted small">{countLabel(t, "org.cells", groupCells.length)}</span>
                         <span class="org-dot" aria-hidden="true">·</span>
-                        <span class="muted small">{groupMembers} {t("org.membersShort")}</span>
+                        <span class="muted small">{countLabel(t, "org.membersShort", groupMembers)}</span>
                         <span class="org-region-chev" aria-hidden="true">▾</span>
                       </span>
                     </summary>
@@ -1288,7 +1288,7 @@ export function OrganizationPage(props: Common & {
                                   {church.isMain === 1 && <span class="badge position"> {t("org.mainChurch")}</span>}
                                 </h3>
                                 <span class="muted small">
-                                  {churchCells.length} {t("org.cells")} · {churchMembers} {t("org.membersShort")}
+                                  {countLabel(t, "org.cells", churchCells.length)} · {countLabel(t, "org.membersShort", churchMembers)}
                                 </span>
                               </div>
                             </div>
@@ -1351,7 +1351,7 @@ export function OrganizationPage(props: Common & {
                         {cell.township ? ` · ${cell.township}` : ""}
                       </span>
                       <a class="org-cell-count" href={cellHref(cell.id)}>
-                        {cell.member_count} {t("org.membersShort")}
+                        {countLabel(t, "org.membersShort", cell.member_count)}
                       </a>
                     </div>
                   ))}
@@ -1395,9 +1395,9 @@ export function OrganizationPage(props: Common & {
           ) : (
             <>
               <p class="fg-total">
-                <span><b>{visibleFamilyGroups.length}</b> {t("org.fgCount")}</span>
-                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.member_count, 0)}</b> {t("org.membersShort")}</span>
-                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.household_count, 0)}</b> {t("org.fgHouseholds")}</span>
+                <span><b>{visibleFamilyGroups.length}</b> {pluralLabel(t, "org.fgCount", visibleFamilyGroups.length)}</span>
+                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.member_count, 0)}</b> {pluralLabel(t, "org.membersShort", visibleFamilyGroups.reduce((sum, g) => sum + g.member_count, 0))}</span>
+                <span><b>{visibleFamilyGroups.reduce((sum, g) => sum + g.household_count, 0)}</b> {pluralLabel(t, "org.fgHouseholds", visibleFamilyGroups.reduce((sum, g) => sum + g.household_count, 0))}</span>
               </p>
               <div class="fg-groups">
                 {familyGroupStates.map((state) => (
@@ -1405,7 +1405,7 @@ export function OrganizationPage(props: Common & {
                     <header class="fg-group-head">
                       <h3>{state.name}</h3>
                       <span class="muted small">
-                        {state.groups.length} {t("org.fgCount")} · {state.groups.reduce((sum, g) => sum + g.member_count, 0)} {t("org.membersShort")} · {state.groups.reduce((sum, g) => sum + g.household_count, 0)} {t("org.fgHouseholds")}
+                        {countLabel(t, "org.fgCount", state.groups.length)} · {countLabel(t, "org.membersShort", state.groups.reduce((sum, g) => sum + g.member_count, 0))} · {countLabel(t, "org.fgHouseholds", state.groups.reduce((sum, g) => sum + g.household_count, 0))}
                       </span>
                     </header>
                     <div class="fg-rows">
@@ -1421,8 +1421,8 @@ export function OrganizationPage(props: Common & {
                               {[group.township, group.home_cell].filter(Boolean).join(" · ") || t("org.fgNoCell")}
                             </span>
                             <span class="fg-row-counts">
-                              <span class="fg-chip"><b>{group.member_count}</b> {t("org.membersShort")}</span>
-                              <span class="fg-chip"><b>{group.household_count}</b> {t("org.fgHouseholds")}</span>
+                              <span class="fg-chip"><b>{group.member_count}</b> {pluralLabel(t, "org.membersShort", group.member_count)}</span>
+                              <span class="fg-chip"><b>{group.household_count}</b> {pluralLabel(t, "org.fgHouseholds", group.household_count)}</span>
                               <span class="fg-go" aria-hidden="true">→</span>
                             </span>
                           </a>
@@ -1460,7 +1460,7 @@ export function OrganizationPage(props: Common & {
                 </select>
               </label>
               {gap && (
-                <span class="org-gap-count">{chartCells.length} / {scopedCells.length} {t("org.cells")}</span>
+                <span class="org-gap-count">{chartCells.length} / {countLabel(t, "org.cells", scopedCells.length)}</span>
               )}
             </form>
           </div>
