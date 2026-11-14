@@ -2310,7 +2310,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 }
 .org-tree-node { position: relative; }
 .org-tree-kids > .org-tree-node::before {
-  content: ""; position: absolute; top: 17px; left: -16px; width: 11px; height: 2px;
+  content: ""; position: absolute; top: 17px; left: -16px; width: 16px; height: 2px;
   background: var(--connector); border-radius: 2px;
 }
 .org-tree-role {
@@ -3001,11 +3001,17 @@ th { font-size: 13px; }
 .assign-list-clear { margin-top: var(--space-2); }
 
 /* Nested roles in the Home Cell and Department charts: children hang off their
-   parent on a connector rail, the same reading as the church tree. */
+   parent on a connector rail, the same reading as the church tree — each child
+   gets a stem from the rail so it visibly attaches to its parent. */
 .org-role-kids {
   margin-left: 12px; padding-left: 10px;
   border-left: 2px solid var(--connector);
   display: grid; gap: 2px;
+}
+.org-role-kids > * { position: relative; }
+.org-role-kids > *::before {
+  content: ""; position: absolute; top: 15px; left: -12px; width: 12px; height: 2px;
+  background: var(--connector); border-radius: 2px;
 }
 .org-role-branch { display: grid; gap: 2px; }
 .org-role-kids .org-mini { margin-top: 0; }
