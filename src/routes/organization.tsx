@@ -575,6 +575,7 @@ async function cellRoleHolders(db: DB, cellId: number, code: string) {
 /** The dialog body, shared by the GET that opens it and a rejected POST. */
 async function cellAssignModal(
   db: DB,
+  defs: PositionDefRow[],
   lang: Lang,
   scope: Scope,
   cell: HomeCellRow,
@@ -582,7 +583,6 @@ async function cellAssignModal(
   q: string,
   error: string | null = null,
 ) {
-  const defs = await loadPositionDefs(db);
   const holders = await cellRoleHolders(db, cell.id, def.code);
   const holder = holders[0] ?? null;
   return (
@@ -623,11 +623,11 @@ organizationRoutes.get("/cell-assign", requirePermission("members.update"), asyn
   if (!modalRequest(c)) return c.redirect("/organization?tab=home-cells", 303);
 
   const cell = await loadScopedHomeCell(db, cellId, scope);
-  const def = (await loadPositionDefs(db))
-    .find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
+  const defs = await loadPositionDefs(db);
+  const def = defs.find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
   if (!cell || !def) return c.html(<p class="muted">Not found</p>, 404);
 
-  return c.html(await cellAssignModal(db, c.get("lang"), scope, cell, def, q));
+  return c.html(await cellAssignModal(db, defs, c.get("lang"), scope, cell, def, q));
 });
 
 /** Saves the slot. An empty member_id clears it, so one dialog handles both. */
@@ -643,12 +643,12 @@ organizationRoutes.post("/cell-assign", requirePermission("members.update"), asy
   const back = cellId ? cellLanding(cellId) : "/organization?tab=home-cells";
 
   const cell = await loadScopedHomeCell(db, cellId, scope);
-  const def = (await loadPositionDefs(db))
-    .find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
+  const defs = await loadPositionDefs(db);
+  const def = defs.find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
   if (!cell || !def) return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
 
   const reject = async (message: string) =>
-    modal ? c.html(await cellAssignModal(db, c.get("lang"), scope, cell, def, "", message), 400)
+    modal ? c.html(await cellAssignModal(db, defs, c.get("lang"), scope, cell, def, "", message), 400)
       : c.redirect(`${back}&err=position-taken`, 303);
 
   let target: { id: number } | null = null;
@@ -707,7 +707,7 @@ organizationRoutes.post("/cell-assign", requirePermission("members.update"), asy
 
   // The client re-renders just this cluster card, so the structure updates in
   // place instead of reloading the whole page.
-  if (modal) return c.json({ ok: true, refreshCluster: cellClusterKey(cell), cell: cell.id });
+  if (modal) return c.json({ ok: true, refreshCluster: cellClusterKey(cell) });
   return c.redirect(cellLanding(cell.id, target ? "church-leader-saved" : "church-leader-cleared"), 303);
 });
 

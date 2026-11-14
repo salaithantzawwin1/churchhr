@@ -878,8 +878,6 @@ export const KO: Record<string, string> = {
   "org.clusterPastor": "목사",
   "org.noPastor": "목사 없음",
   "org.clusterPastorHint": "한 목사가 여러 클러스터를 담당할 수 있습니다.",
-  "org.expandAll": "모두 펼치기",
-  "org.collapseAll": "모두 접기",
   "cluster-pastor-invalid": "선택한 목사가 이 클러스터의 주/지역에 속한 활성 성도이 아닙니다.",
   "org.departments": "부서",
   "org.departmentsHint": "각 교회 부서의 리더십 직책입니다.",

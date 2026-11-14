@@ -1198,8 +1198,7 @@
   // card it belongs to: the structure and its fill counts update in place and
   // the page keeps its scroll position.
   function refreshClusterCard(key) {
-    var panelEl = document.getElementById("home-cell-panel");
-    var clusterCard = panelEl && panelEl.closest ? panelEl.closest("details[data-cluster-key]") : null;
+    var clusterCard = document.querySelector('details[data-cluster-key="' + key + '"]');
     if (!clusterCard || !clusterCard.parentNode) {
       closeModal();
       location.assign("/organization?tab=home-cells");

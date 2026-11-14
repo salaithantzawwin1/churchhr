@@ -1578,20 +1578,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-cell-count:hover { color: var(--link); text-decoration: underline; }
 .org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .org-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px; }
-.org-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.org-card-head h3 { margin: 0 0 2px; font-size: 16px; line-height: 1.4; }
-.org-card-head h3 a { color: var(--ink); text-decoration: none; }
-.org-card-head h3 a:hover { color: var(--link); text-decoration: underline; }
-.org-card-head p { margin: 0; }
-.org-roles { display: grid; gap: 6px; margin: 0; }
-.org-roles > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.org-roles dt { color: var(--muted); font-size: 12px; }
-.org-roles dd { margin: 0; text-align: right; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
-.org-roles .org-vacant dd { color: var(--muted); font-weight: 400; }
-.org-card-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line);
-}
 .org-empty { text-align: center; padding: 34px 20px; }
 .org-empty h2 { margin-top: 0; }
 .org-empty-small { padding: 20px; }
@@ -1601,7 +1587,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .org-section-head h2 { margin: 0 0 2px; }
 .org-section-head p { margin: 0; }
-.org-leadership { margin-bottom: 18px; padding: 18px 20px; }
 .org-lead-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
 }
@@ -1616,12 +1601,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-departments { margin: 0 0 18px; }
 .org-dept-grid { margin-top: 0; }
 .org-section-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.org-structure-bar {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  margin: -4px 0 16px; padding: 8px 10px; border: 1px dashed var(--line);
-  border-radius: var(--radius); background: var(--row-alt, rgba(15,23,42,.025));
-}
-.org-structure-bar .org-manage-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .org-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: auto; padding-top: 8px; }
 .org-card-actions .org-card-link { margin-top: 0; padding-top: 0; }
 .org-collapse { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); overflow: hidden; }
@@ -1635,7 +1614,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-collapse[open] > .org-collapse-summary .chev { transform: rotate(180deg); }
 .org-collapse-body { padding: 0 14px 14px; }
 .org-collapse-hint { font-weight: 400; }
-.org-main-church .org-chart-level { margin-top: 6px; }
 .org-main-church .org-collapse { margin-top: 16px; }
 .org-main-cells .org-collapse-body { padding-bottom: 4px; }
 .org-main-township + .org-main-township { margin-top: 8px; }
@@ -1667,7 +1645,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .region-holder-priority { display: flex; align-items: center; gap: 6px; }
 .region-holder-priority-field { display: flex; align-items: center; gap: 4px; }
 .org-dept-card { gap: 10px; }
-.org-dept-card .org-card-head h3 { margin: 0; }
 /* Position assignment modal: a compact identity summary followed by three
    clearly numbered role areas. */
 .position-hero {
@@ -1779,17 +1756,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   .pastor-actions { width: 100%; }
   .pastor-actions .btn, .pastor-actions form { flex: 1 1 auto; }
 }
-.org-manage-links { display: flex; flex-wrap: wrap; gap: 8px; }
-.org-settings-add { padding: 16px 18px; }
-.org-settings-add h2 { margin: 0 0 2px; }
-.org-settings-add form { margin-top: 12px; }
-.org-settings-list { display: grid; gap: 14px; }
-.org-settings-row { padding: 16px 18px; }
-.org-settings-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.org-settings-head h3 { margin: 0 0 2px; font-size: 16px; overflow-wrap: anywhere; }
-.org-settings-head p { margin: 0; }
-.org-settings-row form + form { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
-.org-settings-row .actions { margin-top: 12px; }
 .regional-cells-form .regional-cells-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-bottom: 8px; }
 .check-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .check-chip {
@@ -2137,23 +2103,13 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--field-bg); border: 1px dashed var(--line); }
 .org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
 .org-supervision .org-mini-list { margin: 0; }
-.org-card-supervision { margin-top: 10px; }
-.org-cell-regional { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
-.org-regional-card .org-regional-cells { display: grid; gap: 4px; margin-top: 10px; }
-.org-regional-cell { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 6px 0; border-top: 1px dashed var(--line); font-size: 13px; }
-.org-regional-cell a { font-weight: 600; overflow-wrap: anywhere; }
-.org-regional-cell-lead { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
-.org-regional-empty { margin: 10px 0 0; }
 .org-unassigned { margin-top: 4px; }
 
 /* townships inside a regional church card */
-.org-regional-groups { display: grid; gap: 12px; margin-top: 10px; }
 .org-regional-township { padding-top: 10px; border-top: 1px dashed var(--line); }
 .org-regional-township-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .org-regional-township-head .org-township-name { font-weight: 700; }
 .org-regional-township .org-supervision { margin: 8px 0 6px; }
-.org-regional-township .org-regional-cells { margin-top: 4px; }
-.org-regional-township .org-regional-cell:first-child { border-top: 0; }
 
 /* ---------- position change history ---------- */
 .badge.warn { background: var(--warn-bg); color: var(--warn-ink); }
@@ -2224,36 +2180,9 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .dept-row .actions { margin-top: 12px; }
 /* ---------- organization chart ---------- */
 .org-chart { margin-bottom: var(--card-gap); padding: var(--card-pad-y) var(--card-pad-x) var(--space-6); overflow: hidden; }
-.org-chart-level { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 18px; flex-wrap: wrap; }
-.org-chart-level-top { margin-top: 4px; }
-.org-chart-connector { width: 2px; height: 24px; margin: 0 auto; background: var(--connector); }
-.org-chart-level-team { max-width: 780px; margin: 0 auto; padding-top: 22px; }
-.org-chart-level-team::before {
-  content: ""; position: absolute; top: 0; left: 16%; right: 16%; height: 2px; background: var(--connector);
-}
-.org-chart-level-team .org-node::before {
-  content: ""; position: absolute; top: -22px; left: 50%; width: 2px; height: 22px; background: var(--connector);
-}
 
 /* Home Cell hierarchy: supervisor team, then cell leaders, grouped by state
    and by cluster (or township when a cell has no cluster). */
-.org-state-list { display: grid; gap: 14px; margin-bottom: 18px; }
-.org-state-hierarchy { padding: 18px 20px; }
-.org-supervision-group { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--row-alt, rgba(15,23,42,.025)); }
-.org-supervision-group + .org-supervision-group { margin-top: 12px; }
-.org-supervision-group-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.org-supervision-group-head h3 { margin: 2px 0 0; font-size: 15px; }
-.org-supervision-team { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-bottom: 12px; }
-.org-supervision-person { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
-.org-supervision-person.is-lead { flex: 1 1 210px; border-color: var(--line-strong, var(--line)); }
-.org-supervision-person > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.org-supervision-cells { display: grid; gap: 2px; border-top: 1px dashed var(--line); padding-top: 8px; }
-.org-supervision-cell { display: grid; grid-template-columns: auto minmax(140px, 1fr) minmax(160px, 1.2fr); align-items: center; gap: 8px 12px; padding: 8px 4px; }
-.org-supervision-cell + .org-supervision-cell { border-top: 1px solid var(--line); }
-.org-supervision-cell-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.org-supervision-cell-main a { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.org-supervision-cell-main a:hover { text-decoration: underline; }
-.org-supervision-cell-roles { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: flex-end; }
 /* Full leadership flow on Home Cell Structure: church-wide leaders flow down
    into state/cluster supervisor teams and their Home Cell leader nodes. */
 .org-flow { padding-bottom: 18px; }
@@ -2434,19 +2363,15 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }
 .position-subsection .form-grid { margin-top: 8px; }
-.org-manage-links, .page-head-actions { align-items: stretch; }
-.org-manage-links .btn, .page-head-actions .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+.page-head-actions { align-items: stretch; }
+.page-head-actions .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 .org-page-head { align-items: flex-start; }
 .org-page-head .page-head-actions { flex: 1 1 100%; width: 100%; justify-content: flex-start; gap: 6px; flex-wrap: nowrap; }
-.org-page-head .org-manage-links { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
 .org-page-head .page-head-actions .btn { padding: 6px 9px; font-size: 12.5px; }
 @media (max-width: 700px) {
-  .org-page-head .page-head-actions, .org-page-head .org-manage-links { flex-wrap: wrap; }
+  .org-page-head .page-head-actions { flex-wrap: wrap; }
 }
 @media (max-width: 640px) {
-  .org-supervision-cell { grid-template-columns: auto minmax(0, 1fr); }
-  .org-supervision-cell-roles { grid-column: 1 / -1; justify-content: flex-start; }
-  .org-supervision-team { display: grid; grid-template-columns: 1fr; }
 }
 
 .org-node {
@@ -2564,12 +2489,6 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-mini.org-vacant { opacity: .72; }
 .org-card-link { margin-top: auto; padding-top: 8px; color: var(--link); font-size: 12.5px; font-weight: 600; text-decoration: none; }
 .org-card-link:hover { text-decoration: underline; }
-.org-cell-card-head { display: flex; align-items: center; gap: 12px; }
-.org-cell-card-head h3 { margin: 0 0 2px; font-size: 16px; }
-.org-cell-card-head h3 a { color: var(--ink); text-decoration: none; }
-.org-cell-card-head h3 a:hover { color: var(--link); text-decoration: underline; }
-.org-cell-card-head p { margin: 0 0 4px; }
-.org-member-count { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip-bg); color: var(--muted); font-size: 11.5px; }
 .org-cell-lead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 0 0; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
 .org-cell-lead a { color: var(--ink); text-decoration: none; }
 .org-cell-lead a:hover { color: var(--link); text-decoration: underline; }
@@ -2644,20 +2563,10 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .dept-toggle:has(input:checked) .dept-toggle-text { color: var(--link); }
 @media (max-width: 760px) {
   .org-chart { padding: 16px 14px 20px; }
-  .org-chart-level { gap: 8px; }
-  .org-chart-level-team::before { left: 8%; right: 8%; }
   .org-avatar.lg { width: 76px; height: 76px; font-size: 26px; }
   .org-avatar.md { width: 54px; height: 54px; font-size: 19px; }
 }
 @media (max-width: 520px) {
-  .org-chart-level-team { padding-top: 16px; }
-  .org-chart-level-team::before,
-  .org-chart-level-team .org-node::before { display: none; }
-  .org-chart-level-team { display: grid; grid-template-columns: 1fr; gap: 4px; }
-  .org-chart-level .org-node { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
-  .org-chart-level .org-node .org-avatar { order: 0; }
-  .org-chart-level .org-node .org-node-role { order: 1; }
-  .org-chart-level .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
   .org-node-lead { width: 100%; flex-direction: column; text-align: center; }
   .org-node-lead .org-node-name { margin-left: 0; text-align: center; }
 }
@@ -2695,7 +2604,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .dept-members-tbl td.empty-state::before { display: none; }
   .dept-pos-form { width: 100%; align-items: stretch; }
   .dept-pos-form select { flex: 1 1 auto; min-width: 0; }
-  .org-leadership, .dept-add, .dept-row { padding: 14px 16px; }
+  .dept-add, .dept-row { padding: 14px 16px; }
   .org-lead-grid { grid-template-columns: 1fr 1fr; }
   .dept-row .form-grid { grid-template-columns: 1fr; }
   .dept-active { align-self: start; }

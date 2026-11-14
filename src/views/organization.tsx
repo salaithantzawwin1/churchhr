@@ -521,21 +521,20 @@ export function OrganizationPage(props: Common & {
   // Home Cell tab: ?gap= narrows the chart to the cells that need attention.
   // The cell whose structure is open is always kept, so saving the last vacancy
   // of a filtered cell never yanks its card away mid-edit.
-  const gapFilter = gap ?? null;
   const matchesGap = (cell: OrgCell) => {
-    if (gapFilter === "leader") return !(cellRows.lead && homeRole(cell.id, cellRows.lead.code));
-    if (gapFilter === "vacancy") return cellRows.all.some((def) => !homeRole(cell.id, def.code));
-    if (gapFilter === "members") return cell.member_count === 0;
+    if (gap === "leader") return !(cellRows.lead && homeRole(cell.id, cellRows.lead.code));
+    if (gap === "vacancy") return cellRows.all.some((def) => !homeRole(cell.id, def.code));
+    if (gap === "members") return cell.member_count === 0;
     return true;
   };
-  const chartCells = gapFilter ? scopedCells.filter(matchesGap) : scopedCells;
-  if (gapFilter && selectedCell && !chartCells.some((c) => c.id === selectedCell.id)) {
+  const chartCells = gap ? scopedCells.filter(matchesGap) : scopedCells;
+  if (gap && selectedCell && !chartCells.some((c) => c.id === selectedCell.id)) {
     chartCells.push(selectedCell);
   }
-  const chartStates = groupCells(chartCells, clusters, L);
+  const chartStates = gap ? groupCells(chartCells, clusters, L) : states;
   /** Home Cell tab links keep the gap filter, so picking a cell never resets it. */
   const cellsQuery = (extra = "") =>
-    `/organization?tab=home-cells${gapFilter ? `&gap=${gapFilter}` : ""}${extra}`;
+    `/organization?tab=home-cells${gap ? `&gap=${gap}` : ""}${extra}`;
 
   const cellRoles = (cell: OrgCell, variant: "card" | "row") => {
     const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
@@ -686,7 +685,7 @@ export function OrganizationPage(props: Common & {
             {/* The fragment in the action keeps the panel in view after the jump. */}
             <form class="hc-cells-select" method="get" action="/organization#home-cell-panel" data-auto-submit="1">
               <input type="hidden" name="tab" value="home-cells" />
-              {gapFilter && <input type="hidden" name="gap" value={gapFilter} />}
+              {gap && <input type="hidden" name="gap" value={gap} />}
               <label class="hc-cell-select-label">
                 <span class="muted small">{t("org.cellPick")}</span>
                 <select name="cell" aria-label={t("org.cellPick")}>
@@ -1406,19 +1405,19 @@ export function OrganizationPage(props: Common & {
               <label class="org-gap-filter-label">
                 <span class="muted small">{t("org.gapFilter")}</span>
                 <select name="gap" aria-label={t("org.gapFilter")}>
-                  <option value="" selected={!gapFilter}>{t("org.gapAll")}</option>
-                  <option value="leader" selected={gapFilter === "leader"}>{t("org.gapNoLeader")}</option>
-                  <option value="vacancy" selected={gapFilter === "vacancy"}>{t("org.gapVacancy")}</option>
-                  <option value="members" selected={gapFilter === "members"}>{t("org.gapEmpty")}</option>
+                  <option value="" selected={!gap}>{t("org.gapAll")}</option>
+                  <option value="leader" selected={gap === "leader"}>{t("org.gapNoLeader")}</option>
+                  <option value="vacancy" selected={gap === "vacancy"}>{t("org.gapVacancy")}</option>
+                  <option value="members" selected={gap === "members"}>{t("org.gapEmpty")}</option>
                 </select>
               </label>
-              {gapFilter && (
+              {gap && (
                 <span class="org-gap-count">{chartCells.length} / {scopedCells.length} {t("org.cells")}</span>
               )}
             </form>
           </div>
 
-          {gapFilter && chartCells.length === 0
+          {gap && chartCells.length === 0
             ? <p class="muted">{t("org.gapNone")}</p>
             : chartStates.map(renderStateHierarchy)}
         </section>
