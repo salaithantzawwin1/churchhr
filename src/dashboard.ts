@@ -56,7 +56,10 @@ export async function loadDashboard(
   scope: { scopeAll: boolean; stateIds: number[] },
   f: DashboardFilter = EMPTY_DASH_FILTERS,
 ): Promise<DashboardData> {
-  const idList = () => sql.join(scope.stateIds.map((id) => sql`${id}`));
+  // The separator is required: without it the bind parameters run together
+  // ("IN (??)"), which is a syntax error for anyone assigned two or more
+  // states — a State Manager over several states got a 500 dashboard.
+  const idList = () => sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `);
   // Row-level scope on members (table aliased m everywhere below).
   const scopeM = scope.scopeAll
     ? sql`1=1`

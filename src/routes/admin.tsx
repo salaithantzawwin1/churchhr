@@ -640,7 +640,9 @@ async function optionsPage(c: any, type: string, opts: {
   const churches = (await loadRegionalChurches(db, {
     activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
   })).map((church) => ({ id: church.id, name: regionalChurchName(church, lang), regionId: church.regionId }));
+  if (opts.showAddForm && !canStructure(c, "create")) opts.showAddForm = false;
   if (opts.modal) {
+    if (!canStructure(c, "create")) return forbidden(c);
     const all = await loadAllOptions(db);
     const parentType = PARENT_TYPE[type];
     return c.html(
@@ -741,6 +743,13 @@ async function ageGroupCount(db: DB): Promise<number> {
   return Number(rows[0]?.n ?? 0);
 }
 
+/** First tab to open: global admins start on State/Region, state managers on
+ * Township, and a structure-only grant on Home Cells (the tab it can edit). */
+function defaultOptionsType(scope: OptionScope, canAdminOptions: boolean): string {
+  if (isOptionsAdmin(scope) && canAdminOptions) return "region";
+  return canAdminOptions ? "township" : "home_cell";
+}
+
 adminRoutes.get("/options", requireAnyPermission("options.manage", "structures.view"), async (c) => {
   const scope = optionScopeOf(c);
   const opts = { modal: c.req.query("modal") === "1", showAddForm: c.req.query("add") === "1" };
@@ -748,7 +757,7 @@ adminRoutes.get("/options", requireAnyPermission("options.manage", "structures.v
   // always populated) rather than an empty lookup list, and state managers
   // start on Township (their first manageable type) instead of bouncing off
   // ethnicity with a confusing 403.
-  const rawType = c.req.query("type") ?? (isOptionsAdmin(scope) ? "region" : "township");
+  const rawType = c.req.query("type") ?? defaultOptionsType(scope, c.get("perms").has("options.manage"));
   const type = rawType;
   // State managers only get the four region-scoped types, in their own states;
   // holders of a structure grant see the same tabs without the admin bundle.
@@ -1169,7 +1178,7 @@ adminRoutes.post("/options/:id/delete", requireAnyPermission("options.manage", "
   const rows = await db.select().from(lookupOptions).where(eq(lookupOptions.id, id)).limit(1);
   const current = rows[0];
   if (!current) return c.redirect("/admin/options?err=err-notfound", 302);
-  if (!canStructure(c, "update")) return forbidden(c);
+  if (!canStructure(c, "delete")) return forbidden(c);
   if (!canManageType(scope, current.type)) return forbidden(c);
   const allOpts = await loadAllOptions(db);
   const byId = new Map(allOpts.map((o) => [o.id, o] as const));

@@ -6,7 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
+import { ALL_STATES, abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 import {
   getMemberPositions, isPositionForScope, positionLabel, positionTaken, setHomeCellPosition, setMemberPositions,
@@ -370,6 +370,14 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
     const raw = v[field];
     if (!raw) { optionIds[field] = null; continue; }
     const found = options.find((o) => o.type === type && o.id === asInt(raw));
+    // A state-scoped option from another state would silently attach the member
+    // to a structure the editor cannot see, so only accept the member's own
+    // state plus all-states (region 0) options.
+    if (found && found.regionId !== ALL_STATES && found.regionId !== regionId) {
+      errors.push(msg("val.option"));
+      optionIds[field] = null;
+      continue;
+    }
     if (!found) errors.push(msg("val.option"));
     optionIds[field] = found ? found.id : null;
   }
