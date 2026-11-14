@@ -113,7 +113,7 @@ export async function loadVacancyReport(
   };
 
   const held = new Map<string, number>();
-  const heldRows = await db.all<{
+  const heldRowsP = db.all<{
     position: string;
     scope_type: string;
     scope_id: number | null;
@@ -129,10 +129,6 @@ export async function loadVacancyReport(
     LEFT JOIN pastors p ON p.id = mp.pastor_id
     WHERE (mp.member_id IS NOT NULL AND m.status = 'active')
        OR (mp.pastor_id IS NOT NULL AND p.active = 1)`);
-  for (const row of heldRows) {
-    const key = positionKey(row);
-    held.set(key, (held.get(key) ?? 0) + 1);
-  }
 
   const regionRowsP = db.all<StructureRow>(sql`
     SELECT r.id, r.name, r.name_en AS nameEn,
@@ -190,10 +186,14 @@ export async function loadVacancyReport(
     WHERE d.active = 1
     ORDER BY d.sort_order, d.name`);
 
-  // Six independent structure lists: one wait for the whole report instead of
-  // six production round-trips.
-  const [regionRows, churchRows, homeCellRows, clusterRows, townshipRows, departmentRows] =
-    await Promise.all([regionRowsP, churchRowsP, homeCellRowsP, clusterRowsP, townshipRowsP, departmentRowsP]);
+  // Seven independent reads: one wait for the whole report instead of seven
+  // production round-trips.
+  const [heldRows, regionRows, churchRows, homeCellRows, clusterRows, townshipRows, departmentRows] =
+    await Promise.all([heldRowsP, regionRowsP, churchRowsP, homeCellRowsP, clusterRowsP, townshipRowsP, departmentRowsP]);
+  for (const row of heldRows) {
+    const key = positionKey(row);
+    held.set(key, (held.get(key) ?? 0) + 1);
+  }
 
   const localized = (name: string, nameEn: string | null) => (lang !== "mm" && nameEn ? nameEn : name);
   const stateOf = (row: StructureRow) =>
