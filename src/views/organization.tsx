@@ -256,6 +256,8 @@ export function OrganizationPage(props: Common & {
   familyGroups: OrgFamilyGroup[];
   /** Home Cell whose structure panel is open below the chart (query ?cell=). */
   selectedCellId?: number | null;
+  /** Gap filter for the Home Cell tab (query ?gap=). */
+  gap?: "leader" | "vacancy" | "members" | null;
   /** Family Groups hanging off that Home Cell. */
   cellFamilyGroups?: OrgCellFamilyGroup[];
   departments: OrgDepartment[];
@@ -276,7 +278,7 @@ export function OrganizationPage(props: Common & {
 }) {
   const {
     user, perms, flash, lang, tab, cells, familyGroups, departments, leaders,
-    selectedCellId, cellFamilyGroups = [],
+    selectedCellId, gap, cellFamilyGroups = [],
     regionalChurches, regions, clusters, positionDefs, canManageDepartments, canManageStructure,
     canManageClusters, canManagePositions, unassignedMembers, selectedChurchId, region,
   } = props;
@@ -323,7 +325,6 @@ export function OrganizationPage(props: Common & {
     }
     return [...byState.values()];
   })();
-  const clusterCount = states.reduce((sum, state) => sum + state.groups.length, 0);
   const orderedChurches = regionalOnly;
   const regionalStates = (() => {
     const groups = new Map<number, { id: number; name: string; churches: RegionalChurchRow[] }>();
@@ -385,9 +386,12 @@ export function OrganizationPage(props: Common & {
   // cell therefore swaps the structure in place: the open card stays open and the
   // previous cell's structure is replaced rather than left behind or closed.
   const cellPanelForest = nestRoles(cellRows.all, cellRows.lead);
+  /** Roles filled in one Home Cell; the cluster card sums these. */
+  const cellFilled = (cell: OrgCell) =>
+    cellRows.all.filter((def) => homeRole(cell.id, def.code)).length;
   const cellStructure = (cell: OrgCell) => {
     const forest = cellPanelForest;
-    const filled = cellRows.all.filter((def) => homeRole(cell.id, def.code)).length;
+    const filled = cellFilled(cell);
     const groups = cell.id === selectedCellId ? cellFamilyGroups : [];
     const cluster = cell.supervision_cluster_id
       ? clusters.find((c) => c.id === cell.supervision_cluster_id) ?? null
@@ -405,16 +409,30 @@ export function OrganizationPage(props: Common & {
       const children = forest.kids.get(def.code) ?? [];
       const holder = homeRole(cell.id, def.code);
       const isLead = def.code === cellRows.lead?.code;
+      const roleLabel = positionDefLabel(def, L);
+      const roleBody = (
+        <>
+          <span class="org-role-label">{roleLabel}</span>
+          <LeaderLink
+            leader={holder}
+            empty={isLead ? t("org.noLeader") : t("org.vacant")}
+            photoPreview
+          />
+        </>
+      );
+      // A vacant role is the place to act: it opens this cell's assign dialog,
+      // so staffing a Home Cell never leaves the structure card.
+      const assignTitle = `${t("org.assignLeader")} · ${roleLabel}`;
       return (
         <li class={`org-tree-node${holder ? "" : " is-vacant"}${isLead ? " is-lead" : ""}`}>
-          <span class="org-tree-role">
-            <span class="org-role-label">{positionDefLabel(def, L)}</span>
-            <LeaderLink
-              leader={holder}
-              empty={isLead ? t("org.noLeader") : t("org.vacant")}
-              photoPreview
-            />
-          </span>
+          {!holder && canEdit ? (
+            <a class="org-tree-role org-tree-action js-edit-modal"
+              href={`/organization/cell-assign?cell=${cell.id}&position=${def.code}`}
+              data-modal-title={assignTitle} data-modal-size="md"
+              aria-label={assignTitle}>{roleBody}</a>
+          ) : (
+            <span class="org-tree-role">{roleBody}</span>
+          )}
           {children.length > 0 && (
             <ul class="org-tree-kids">
               {children.map((child) => branch(child))}
@@ -435,7 +453,7 @@ export function OrganizationPage(props: Common & {
             </h3>
             {path && <p class="org-cell-panel-path">{path}</p>}
           </div>
-          <a class="org-cell-panel-close" href="/organization?tab=home-cells">
+          <a class="org-cell-panel-close" href={cellsQuery()}>
             <span aria-hidden="true">✕</span>{t("org.cellPanelClose")}
           </a>
         </div>
@@ -499,6 +517,25 @@ export function OrganizationPage(props: Common & {
     clusterId == null ? null : leaderFor(leaders, "cluster", position, { supervisionClusterId: clusterId });
   const regionalTeam = (regionId: number, position: string) =>
     leadersFor(leaders, "region", position, { regionId });
+
+  // Home Cell tab: ?gap= narrows the chart to the cells that need attention.
+  // The cell whose structure is open is always kept, so saving the last vacancy
+  // of a filtered cell never yanks its card away mid-edit.
+  const gapFilter = gap ?? null;
+  const matchesGap = (cell: OrgCell) => {
+    if (gapFilter === "leader") return !(cellRows.lead && homeRole(cell.id, cellRows.lead.code));
+    if (gapFilter === "vacancy") return cellRows.all.some((def) => !homeRole(cell.id, def.code));
+    if (gapFilter === "members") return cell.member_count === 0;
+    return true;
+  };
+  const chartCells = gapFilter ? scopedCells.filter(matchesGap) : scopedCells;
+  if (gapFilter && selectedCell && !chartCells.some((c) => c.id === selectedCell.id)) {
+    chartCells.push(selectedCell);
+  }
+  const chartStates = groupCells(chartCells, clusters, L);
+  /** Home Cell tab links keep the gap filter, so picking a cell never resets it. */
+  const cellsQuery = (extra = "") =>
+    `/organization?tab=home-cells${gapFilter ? `&gap=${gapFilter}` : ""}${extra}`;
 
   const cellRoles = (cell: OrgCell, variant: "card" | "row") => {
     const lead = cellRows.lead ? homeRole(cell.id, cellRows.lead.code) : null;
@@ -585,14 +622,28 @@ export function OrganizationPage(props: Common & {
     const openCell = selectedCell && group.cells.some((c) => c.id === selectedCell.id)
       ? selectedCell
       : null;
+    // Short fill summary for the whole cluster: every role in every cell it holds.
+    const rolesAll = cellRows.all.length * group.cells.length;
+    const rolesFilled = group.cells.reduce((sum, cell) => sum + cellFilled(cell), 0);
+    const rolesPercent = rolesAll === 0 ? 0 : Math.round((rolesFilled / rolesAll) * 100);
+    // Stable card identity: the client swaps this card after a save.
+    const clusterKey = group.kind === "cluster" ? `cluster:${group.id}` : `township:${group.id ?? "none"}`;
     return (
-      <details class={`org-flow-cluster${openCell ? " is-active" : ""}`} open={openCell != null}>
+      <details class={`org-flow-cluster${openCell ? " is-active" : ""}`}
+        open={openCell != null} data-cluster-key={clusterKey}>
         <summary class="org-flow-cluster-head">
           <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
             <span class="org-flow-cluster-name">{group.name}</span>
           </span>
           <span class="org-flow-cluster-meta">
+            <span class="org-fill" title={`${rolesFilled} / ${rolesAll} ${t("dept.rolesFilled")}`}>
+              <span class="org-fill-track" aria-hidden="true">
+                <span class={`org-fill-bar${rolesAll > 0 && rolesFilled === rolesAll ? " is-full" : ""}`}
+                  style={`width:${rolesPercent}%`} />
+              </span>
+              <span class="org-fill-text"><b>{rolesFilled}</b>/{rolesAll} {t("org.rolesShort")}</span>
+            </span>
             <span class="muted small">{group.cells.length} {t("org.cells")}</span>
             <span class="org-flow-chev" aria-hidden="true">▾</span>
           </span>
@@ -615,12 +666,19 @@ export function OrganizationPage(props: Common & {
               {group.cells.map((cell) => (
                 <a
                   class={`hc-cell-btn${cell.id === selectedCellId ? " is-active" : ""}`}
-                  href={`/organization?tab=home-cells&cell=${cell.id}#home-cell-panel`}
+                  href={cellsQuery(`&cell=${cell.id}#home-cell-panel`)}
                   aria-current={cell.id === selectedCellId ? "true" : undefined}
                 >
                   <span class="hc-cell-btn-name">{cell.label}</span>
                   <span class="hc-cell-btn-meta">
                     {cell.township ? `${cell.township} · ` : ""}{cell.member_count} {t("org.membersShort")}
+                  </span>
+                  <span class="hc-cell-btn-fill">
+                    <span class="org-fill-track" aria-hidden="true">
+                      <span class="org-fill-bar"
+                        style={`width:${cellRows.all.length === 0 ? 0 : Math.round((cellFilled(cell) / cellRows.all.length) * 100)}%`} />
+                    </span>
+                    <span class="hc-cell-btn-fill-text"><b>{cellFilled(cell)}</b>/{cellRows.all.length} {t("org.rolesShort")}</span>
                   </span>
                 </a>
               ))}
@@ -628,13 +686,14 @@ export function OrganizationPage(props: Common & {
             {/* The fragment in the action keeps the panel in view after the jump. */}
             <form class="hc-cells-select" method="get" action="/organization#home-cell-panel" data-auto-submit="1">
               <input type="hidden" name="tab" value="home-cells" />
+              {gapFilter && <input type="hidden" name="gap" value={gapFilter} />}
               <label class="hc-cell-select-label">
                 <span class="muted small">{t("org.cellPick")}</span>
                 <select name="cell" aria-label={t("org.cellPick")}>
                   <option value="">{t("org.cellPickNone")}</option>
                   {group.cells.map((cell) => (
                     <option value={String(cell.id)} selected={cell.id === selectedCellId}>
-                      {cell.label} · {cell.member_count} {t("org.membersShort")}
+                      {cell.label} · {cell.member_count} {t("org.membersShort")} · {cellFilled(cell)}/{cellRows.all.length}
                     </option>
                   ))}
                 </select>
@@ -1336,24 +1395,33 @@ export function OrganizationPage(props: Common & {
           {canManageOptions && <a class="btn secondary" href="/admin/options?type=home_cell">{t("org.manageCells")}</a>}
         </div>
       ) : (
-        <>
         <section class="card org-chart org-flow">
           <div class="org-section-head">
             <div>
               <h2>{t("org.homeCellLeadership")}</h2>
               <p class="muted small">{t("org.homeCellFlowHint")}</p>
             </div>
-            {clusterCount > 1 && (
-              <div class="org-flow-actions">
-                <button class="btn secondary sm" type="button" data-cluster-toggle="open">{t("org.expandAll")}</button>
-                <button class="btn secondary sm" type="button" data-cluster-toggle="close">{t("org.collapseAll")}</button>
-              </div>
-            )}
+            <form class="org-gap-filter" method="get" action="/organization" data-auto-submit="1">
+              <input type="hidden" name="tab" value="home-cells" />
+              <label class="org-gap-filter-label">
+                <span class="muted small">{t("org.gapFilter")}</span>
+                <select name="gap" aria-label={t("org.gapFilter")}>
+                  <option value="" selected={!gapFilter}>{t("org.gapAll")}</option>
+                  <option value="leader" selected={gapFilter === "leader"}>{t("org.gapNoLeader")}</option>
+                  <option value="vacancy" selected={gapFilter === "vacancy"}>{t("org.gapVacancy")}</option>
+                  <option value="members" selected={gapFilter === "members"}>{t("org.gapEmpty")}</option>
+                </select>
+              </label>
+              {gapFilter && (
+                <span class="org-gap-count">{chartCells.length} / {scopedCells.length} {t("org.cells")}</span>
+              )}
+            </form>
           </div>
 
-          {states.map(renderStateHierarchy)}
+          {gapFilter && chartCells.length === 0
+            ? <p class="muted">{t("org.gapNone")}</p>
+            : chartStates.map(renderStateHierarchy)}
         </section>
-        </>
       )}
     </Layout>
   );

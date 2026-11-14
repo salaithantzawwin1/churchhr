@@ -2275,9 +2275,30 @@ table.list-tbl.ph-tbl { min-width: 0; }
 }
 .hc-cell-btn-name { font-weight: 600; color: var(--link); }
 .hc-cell-btn-meta { font-size: 11.5px; color: var(--muted); }
+.hc-cell-btn-fill .org-fill-track { width: 40px; height: 4px; }
 a.hc-cell-btn:hover { border-color: var(--brand); }
 a.hc-cell-btn.is-active { border-color: var(--brand); background: var(--chip-brand-bg); }
 a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* Gap filter above the Home Cell chart: pick the cells that need attention. */
+.org-gap-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.org-gap-filter-label { display: grid; gap: 3px; min-width: 190px; }
+.org-gap-filter-label select { width: 100%; }
+.org-gap-count { color: var(--muted); font-size: 12px; white-space: nowrap; padding-bottom: 8px; }
+/* Fill summary: one compact bar plus count per cluster card and per cell button,
+   so the staffing level is readable without opening each structure. */
+.org-fill { display: inline-flex; align-items: center; gap: 7px; flex: none; }
+.org-fill-track { display: block; width: 52px; height: 5px; border-radius: 999px; background: var(--field-bg); overflow: hidden; }
+.org-fill-bar { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
+.org-fill-bar.is-full { background: var(--ok-ink); }
+.org-fill-text { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.org-fill-text b { color: var(--ink); font-weight: 700; }
+.hc-cell-btn-fill { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.hc-cell-btn-fill b { color: var(--ink); font-weight: 700; }
+.hc-cell-btn-fill-text { white-space: nowrap; }
+/* A vacant role row is the action: it opens the assign dialog for this cell. */
+.org-tree-action { color: inherit; text-decoration: none; cursor: pointer; }
+.org-tree-action:hover { border-color: var(--link); background: var(--chip-brand-bg); }
+.org-tree-action:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hc-cell-select-label { display: grid; gap: 4px; max-width: 340px; }
 .hc-cell-select-label select { width: 100%; }
 @media (min-width: 961px) {
@@ -2395,23 +2416,9 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 }
 .org-flow-cluster-body { padding-top: 6px; }
 .org-flow-pastor { display: flex; justify-content: center; }
-.org-flow-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .org-flow-cluster-team { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 4px 8px; }
 .org-flow-cluster-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
 .org-flow-cluster-team .org-node-lead { width: 190px; }
-.org-flow-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; position: relative; padding-top: 14px; }
-.org-flow-cells::before { content: ""; position: absolute; top: 0; left: 6%; right: 6%; height: 2px; background: var(--line); }
-.org-flow-cell { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
-.org-flow-cell::before { content: ""; position: absolute; top: -14px; left: 50%; width: 2px; height: 14px; background: var(--line); }
-.org-flow-cell-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.org-flow-cell-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.org-flow-cell-main a { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.org-flow-cell-main a:hover { text-decoration: underline; }
-.org-flow-cell-roles { display: grid; gap: 4px; padding-top: 7px; border-top: 1px dashed var(--line); }
-.org-flow-role { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; min-width: 0; }
-.org-flow-role .org-role-label { flex: none; }
-.org-flow-role a { text-align: right; color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.org-flow-role a:hover { color: var(--link); text-decoration: underline; }
 @media (max-width: 760px) {
   .org-flow-clusters { grid-template-columns: 1fr; }
   .org-flow-cluster-team .org-node { width: 190px; }
@@ -2423,9 +2430,6 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .org-flow-cluster-team .org-node-lead { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
   .org-flow-cluster-team .org-node .org-node-role { order: 1; }
   .org-flow-cluster-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
-  .org-flow-cells { grid-template-columns: 1fr; }
-  .org-flow-cells::before,
-  .org-flow-cell::before { display: none; }
 }
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }

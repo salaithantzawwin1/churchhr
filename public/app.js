@@ -1194,6 +1194,36 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
     lastFocus = null;
   }
+  // A Home Cell role saved from the structure card re-renders only the cluster
+  // card it belongs to: the structure and its fill counts update in place and
+  // the page keeps its scroll position.
+  function refreshClusterCard(key) {
+    var panelEl = document.getElementById("home-cell-panel");
+    var clusterCard = panelEl && panelEl.closest ? panelEl.closest("details[data-cluster-key]") : null;
+    if (!clusterCard || !clusterCard.parentNode) {
+      closeModal();
+      location.assign("/organization?tab=home-cells");
+      return;
+    }
+    fetch(location.pathname + location.search, { headers: { "X-Requested-With": "modal" } })
+      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var fresh = doc.querySelector('details[data-cluster-key="' + key + '"]');
+        if (!fresh) { location.assign("/organization?tab=home-cells"); return; }
+        fresh.setAttribute("open", "");
+        var next = document.importNode(fresh, true);
+        clusterCard.parentNode.replaceChild(next, clusterCard);
+        closeModal();
+        var saved = next.querySelector("#home-cell-panel");
+        if (saved) {
+          saved.setAttribute("tabindex", "-1");
+          saved.focus({ preventScroll: true });
+        }
+      })
+      .catch(function () { location.assign("/organization?tab=home-cells"); });
+  }
+
   modal.addEventListener("click", function (e) {
     var el = e.target;
     if (el && el.closest && el.closest("[data-close]")) closeModal();
@@ -1508,6 +1538,7 @@
         .then(function (r) {
           if (r.ok && (r.headers.get("content-type") || "").indexOf("application/json") > -1) {
             return r.json().then(function (data) {
+              if (data && data.refreshCluster) { refreshClusterCard(data.refreshCluster); return; }
               if (data && data.redirect) location.assign(data.redirect);
               else location.reload();
             });
@@ -1749,15 +1780,15 @@
     }, 5000);
   })();
 
-  // Home Cell structure: expand or collapse every cluster branch at once.
-  (function initClusterToggles() {
-    document.addEventListener("click", function (e) {
-      var toggle = e.target && e.target.closest ? e.target.closest("[data-cluster-toggle]") : null;
-      if (!toggle) return;
-      var open = toggle.getAttribute("data-cluster-toggle") === "open";
-      Array.prototype.forEach.call(document.querySelectorAll("details.org-flow-cluster"), function (cluster) {
-        cluster.open = open;
-      });
+  // Home Cell structure reads one cluster at a time: opening a card collapses the
+  // others, so two half-filled structures are never side by side. Capture phase,
+  // because `toggle` does not bubble and cards are replaced after a save.
+  document.addEventListener("toggle", function (e) {
+    var el = e.target;
+    if (!el || el.tagName !== "DETAILS" || !el.open) return;
+    if (!el.classList || !el.classList.contains("org-flow-cluster")) return;
+    Array.prototype.forEach.call(document.querySelectorAll("details.org-flow-cluster[open]"), function (other) {
+      if (other !== el) other.open = false;
     });
-  })();
+  }, true);
 })();

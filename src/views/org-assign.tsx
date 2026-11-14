@@ -23,9 +23,16 @@ export type AssignCandidate = {
 export function AssignLeaderModal(props: {
   lang: Lang;
   /** Tab the dialog was opened from; the save returns to it. */
-  tab: "church" | "main";
+  tab: "church" | "main" | "home-cells";
+  /** Id of the scope the role belongs to (a church, or a Home Cell). */
   churchId: number;
+  /** Name of that scope, shown in the dialog and posted back with the save. */
   churchName: string;
+  /** Hidden field carrying the scope id; Home Cell roles post `cell`. */
+  scopeField?: "church" | "cell";
+  /** Where the form saves; Home Cell roles have their own endpoint. */
+  action?: string;
+  removeAction?: string;
   def: PositionDefRow;
   candidates: AssignCandidate[];
   /** Form field the radio list posts: members, unless this is a pastoral post. */
@@ -52,6 +59,9 @@ export function AssignLeaderModal(props: {
     lang, tab, churchId, churchName, def, candidates,
     personField = "member_id", pastorDirectory, currentId, hasHolder, currentName, currentHref, labels, error,
     holders = [], allowMultiple,
+    scopeField = "church",
+    action = "/organization/assign",
+    removeAction = "/organization/assign/remove",
   } = props;
   const t = getDict(lang);
   const label = positionDefLabel(def, lang);
@@ -106,11 +116,11 @@ export function AssignLeaderModal(props: {
             <div class="region-holder-row">
               <span class="badge position">{t("org.priority")} {holder.priority}</span>
               <strong>{holder.name}</strong>
-              <form method="post" action="/organization/assign/remove"
+              <form method="post" action={removeAction}
                 data-confirm={t("org.removeHolderConfirm")}>
                 <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
                 <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="church" value={String(churchId)} />
+                <input type="hidden" name={scopeField} value={String(churchId)} />
                 <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
               </form>
             </div>
@@ -118,9 +128,9 @@ export function AssignLeaderModal(props: {
         </div>
       )}
 
-      <form method="post" action="/organization/assign" data-modal-ajax>
+      <form method="post" action={action} data-modal-ajax>
         <input type="hidden" name="tab" value={tab} />
-        <input type="hidden" name="church" value={String(churchId)} />
+        <input type="hidden" name={scopeField} value={String(churchId)} />
         <input type="hidden" name="position" value={def.code} />
 
         <label class="field assign-search">

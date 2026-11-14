@@ -10,7 +10,7 @@ import { OrganizationPage, type OrgCell, type OrgCellFamilyGroup, type OrgDepart
 import { DepartmentDetailPage, DepartmentModal, DepartmentsPage, type AdminDepartmentRow, type DepartmentLeaderRow, type DepartmentMemberRow } from "../views/departments";
 import { ForbiddenPage } from "../views/errors";
 import { RegionalChurchesPage, PositionsPage, PositionModal, PositionHoldersModal, RegionalChurchModal, type ListStatus, type PositionHolderRow, type RegionalValues } from "../views/org-settings";
-import { AssignLeaderModal } from "../views/org-assign";
+import { AssignLeaderModal, type AssignCandidate } from "../views/org-assign";
 import { RegionPastorModal, type RegionCandidate, type RegionHolder } from "../views/org-region-assign";
 import { SupervisionClusterModal, SupervisionClustersPage, type ClusterHomeCell, type ClusterValues } from "../views/clusters";
 import { PositionHistoryPage } from "../views/position-history";
@@ -173,6 +173,11 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   // Desktop opens a Home Cell structure panel (?cell=id); it also lists the
   // Family Groups that hang off that cell.
   const selectedCellId = intParam(c.req.query("cell"));
+  // Gap filter for the Home Cell tab (leadership, vacancies or empty cells).
+  const gapParam = c.req.query("gap");
+  const gap = gapParam === "leader" || gapParam === "vacancy" || gapParam === "members"
+    ? gapParam
+    : null;
   const cellFamilyGroups = selectedCellId
     ? await db.all<OrgCellFamilyGroup>(sql`
         SELECT fg.id, fg.label, fg.code,
@@ -188,7 +193,7 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
     <OrganizationPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")} tab={tab} cells={cells} familyGroups={familyGroups}
-      selectedCellId={selectedCellId} cellFamilyGroups={cellFamilyGroups}
+      selectedCellId={selectedCellId} gap={gap} cellFamilyGroups={cellFamilyGroups}
       departments={departments} leaders={leaders}
       regionalChurches={regionalChurches} clusters={clusters} positionDefs={positionDefs} regions={regions}
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
@@ -259,11 +264,15 @@ async function pastorCandidates(db: DB, church: { id: number; regionId: number }
              p.sort_order, name LIMIT 300`);
 }
 
-/** code → localized church position label, for labels on a member's current slot. */
-function churchPositionLabels(defs: PositionDefRow[], lang: string): Record<string, string> {
+/** code → localized position label, for the role a candidate already holds. */
+function churchPositionLabels(
+  defs: PositionDefRow[],
+  lang: string,
+  scopeType: "church" | "home_cell" = "church",
+): Record<string, string> {
   const out: Record<string, string> = {};
   for (const def of defs) {
-    if (def.scopeType === "church") out[def.code] = positionDefLabel(def, lang);
+    if (def.scopeType === scopeType) out[def.code] = positionDefLabel(def, lang);
   }
   return out;
 }
@@ -480,6 +489,247 @@ organizationRoutes.post("/assign/remove", requirePermission("members.update"), a
   await recordPositionHistory(db, {
     entity: "assignment", action: "updated", actorId: c.get("user").id,
     scopeType: "church", code: row.position,
+  });
+  return c.redirect(`${back}&ok=position-holder-removed`, 303);
+});
+
+// ---------- Home Cell leadership assignment ----------
+
+type HomeCellRow = {
+  id: number;
+  label: string;
+  regionId: number;
+  regionalChurchId: number | null;
+  townshipId: number | null;
+  clusterId: number | null;
+};
+
+/** The Home Cell named by ?cell=, when it is inside this user's scope. */
+async function loadScopedHomeCell(db: DB, cellId: number | null, scope: Scope): Promise<HomeCellRow | null> {
+  if (!cellId) return null;
+  const rows = await db.all<HomeCellRow>(sql`
+    SELECT hc.id, hc.label, hc.region_id AS regionId,
+           hc.regional_church_id AS regionalChurchId,
+           hc.parent_id AS townshipId,
+           hc.supervision_cluster_id AS clusterId
+    FROM lookup_options hc
+    WHERE hc.id = ${cellId} AND hc.type = 'home_cell' AND hc.active = 1
+      AND ${scopeCond(scope)}
+    LIMIT 1`);
+  return rows[0] ?? null;
+}
+
+/** Key the client uses to re-render the cluster card that holds the saved cell. */
+function cellClusterKey(cell: { clusterId: number | null; townshipId: number | null }): string {
+  return cell.clusterId ? `cluster:${cell.clusterId}` : `township:${cell.townshipId ?? "none"}`;
+}
+
+function cellLanding(cellId: number, ok?: string): string {
+  const base = `/organization?tab=home-cells&cell=${cellId}`;
+  return ok ? `${base}&ok=${ok}` : base;
+}
+
+/** Active members offered for a Home Cell role: the cell's own members first,
+ *  then the rest of its church, so a cell that is still forming can be staffed. */
+async function cellCandidates(
+  db: DB,
+  cell: { id: number; regionId: number; regionalChurchId: number | null },
+  scope: Scope,
+  q: string,
+) {
+  const like = `%${q}%`;
+  const church = cell.regionalChurchId ?? -1;
+  return db.all<AssignCandidate>(sql`
+    SELECT m.id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english, '#') AS name,
+           hc.label AS home_cell,
+           mp.position AS church_position,
+           mp.scope_id AS church_id,
+           hc2.label AS church_name
+    FROM members m
+    LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    LEFT JOIN member_positions mp ON mp.member_id = m.id AND mp.scope_type = 'home_cell'
+    LEFT JOIN lookup_options hc2 ON hc2.id = mp.scope_id
+    WHERE m.status = 'active' AND ${memberScopeCond(scope)}
+      AND (
+        m.home_cell_id = ${cell.id}
+        OR hc.regional_church_id = ${church}
+        OR (m.home_cell_id IS NULL AND m.region_id = ${cell.regionId})
+      )
+      ${q ? sql`AND (m.name_myanmar LIKE ${like} OR m.name_english LIKE ${like})` : sql``}
+    ORDER BY (m.home_cell_id = ${cell.id}) DESC, name
+    LIMIT 300`);
+}
+
+/** Live holders of one Home Cell role. */
+async function cellRoleHolders(db: DB, cellId: number, code: string) {
+  return db.all<{ assignment_id: number; person_id: number; name: string | null; priority: number }>(sql`
+    SELECT mp.id AS assignment_id, mp.member_id AS person_id,
+           COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS name, mp.priority
+    FROM member_positions mp JOIN members m ON m.id = mp.member_id
+    WHERE mp.scope_type = 'home_cell' AND mp.position = ${code}
+      AND mp.scope_id = ${cellId} AND m.status = 'active'
+    ORDER BY mp.priority, name`);
+}
+
+/** The dialog body, shared by the GET that opens it and a rejected POST. */
+async function cellAssignModal(
+  db: DB,
+  lang: Lang,
+  scope: Scope,
+  cell: HomeCellRow,
+  def: PositionDefRow,
+  q: string,
+  error: string | null = null,
+) {
+  const defs = await loadPositionDefs(db);
+  const holders = await cellRoleHolders(db, cell.id, def.code);
+  const holder = holders[0] ?? null;
+  return (
+    <AssignLeaderModal
+      lang={lang}
+      tab="home-cells"
+      scopeField="cell"
+      action="/organization/cell-assign"
+      removeAction="/organization/cell-assign/remove"
+      churchId={cell.id}
+      churchName={cell.label}
+      def={def}
+      candidates={await cellCandidates(db, cell, scope, q)}
+      currentId={holder?.person_id ?? null}
+      hasHolder={Boolean(holder)}
+      currentName={holder?.name ?? null}
+      currentHref={holder ? `/members/${holder.person_id}` : null}
+      holders={holders.map((row) => ({
+        assignmentId: row.assignment_id,
+        personId: row.person_id,
+        name: row.name ?? "—",
+        priority: row.priority,
+      }))}
+      allowMultiple={def.allowMultiple === 1}
+      labels={churchPositionLabels(defs, lang, "home_cell")}
+      error={error}
+    />
+  );
+}
+
+/** Opened from a vacant role in a Home Cell's structure card. */
+organizationRoutes.get("/cell-assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const cellId = intParam(c.req.query("cell"));
+  const code = s(c.req.query("position"));
+  const q = listQuery(c.req.query("q"));
+  if (!modalRequest(c)) return c.redirect("/organization?tab=home-cells", 303);
+
+  const cell = await loadScopedHomeCell(db, cellId, scope);
+  const def = (await loadPositionDefs(db))
+    .find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
+  if (!cell || !def) return c.html(<p class="muted">Not found</p>, 404);
+
+  return c.html(await cellAssignModal(db, c.get("lang"), scope, cell, def, q));
+});
+
+/** Saves the slot. An empty member_id clears it, so one dialog handles both. */
+organizationRoutes.post("/cell-assign", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const modal = modalRequest(c);
+  const cellId = intParam(s(body.cell));
+  const code = s(body.position);
+  const memberId = intParam(s(body.member_id));
+  const priority = Math.min(99, Math.max(1, intParam(s(body.priority)) ?? 1));
+  const back = cellId ? cellLanding(cellId) : "/organization?tab=home-cells";
+
+  const cell = await loadScopedHomeCell(db, cellId, scope);
+  const def = (await loadPositionDefs(db))
+    .find((d) => d.scopeType === "home_cell" && d.code === code && d.active === 1) ?? null;
+  if (!cell || !def) return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+
+  const reject = async (message: string) =>
+    modal ? c.html(await cellAssignModal(db, c.get("lang"), scope, cell, def, "", message), 400)
+      : c.redirect(`${back}&err=position-taken`, 303);
+
+  let target: { id: number } | null = null;
+  if (memberId) {
+    const rows = await db.all<{ id: number; region_id: number }>(sql`
+      SELECT m.id, m.region_id FROM members m
+      WHERE m.id = ${memberId} AND m.status = 'active' LIMIT 1`);
+    if (!rows[0] || !regionInScope(scope, rows[0].region_id)) {
+      return modal ? c.json({ ok: false, redirect: back }) : c.redirect(back, 303);
+    }
+    target = { id: rows[0].id };
+  }
+
+  const allowMultiple = def.allowMultiple === 1;
+  // A single-holder slot only accepts one live person; a member already sitting
+  // in this exact slot keeps it.
+  if (target && await positionTaken(db, "home_cell", def.code, {
+    homeCellId: cell.id, exceptMemberId: target.id, allowMultiple,
+  })) {
+    return reject(c.get("lang") === "mm" ? "ဤရာထူးကို ဖြည့်ထားပြီးဖြစ်ပါသည်။" : "This position is already filled.");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!allowMultiple) {
+    await db.delete(memberPositions).where(and(
+      eq(memberPositions.scopeType, "home_cell"),
+      eq(memberPositions.position, def.code),
+      eq(memberPositions.scopeId, cell.id),
+    ));
+  }
+  if (target) {
+    // A member holds at most one Home Cell role, so an existing one moves here.
+    await db.delete(memberPositions).where(and(
+      eq(memberPositions.scopeType, "home_cell"),
+      eq(memberPositions.memberId, target.id),
+    ));
+    await db.insert(memberPositions).values({
+      memberId: target.id,
+      position: def.code,
+      scopeType: "home_cell",
+      scopeId: cell.id,
+      departmentId: null,
+      regionalChurchId: null,
+      supervisionClusterId: null,
+      priority,
+      slotUnique: allowMultiple ? 0 : 1,
+      createdBy: c.get("user").id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  await recordPositionHistory(db, {
+    entity: "assignment", action: "updated", actorId: c.get("user").id,
+    scopeType: "home_cell", code: def.code,
+  });
+
+  // The client re-renders just this cluster card, so the structure updates in
+  // place instead of reloading the whole page.
+  if (modal) return c.json({ ok: true, refreshCluster: cellClusterKey(cell), cell: cell.id });
+  return c.redirect(cellLanding(cell.id, target ? "church-leader-saved" : "church-leader-cleared"), 303);
+});
+
+organizationRoutes.post("/cell-assign/remove", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const body = await c.req.parseBody();
+  const assignmentId = intParam(s(body.assignment_id));
+  const cellId = intParam(s(body.cell));
+  const back = cellId ? cellLanding(cellId) : "/organization?tab=home-cells";
+  if (!assignmentId || !cellId) return c.redirect(back, 303);
+
+  const row = (await db.all<{ id: number; position: string }>(sql`
+    SELECT mp.id, mp.position FROM member_positions mp
+    JOIN lookup_options hc ON hc.id = mp.scope_id AND hc.type = 'home_cell'
+    WHERE mp.id = ${assignmentId} AND mp.scope_type = 'home_cell'
+      AND mp.scope_id = ${cellId} AND ${scopeCond(scope)}`))[0];
+  if (!row) return c.redirect(back, 303);
+  await db.run(sql`DELETE FROM member_positions WHERE id = ${assignmentId}`);
+  await recordPositionHistory(db, {
+    entity: "assignment", action: "updated", actorId: c.get("user").id,
+    scopeType: "home_cell", code: row.position,
   });
   return c.redirect(`${back}&ok=position-holder-removed`, 303);
 });
