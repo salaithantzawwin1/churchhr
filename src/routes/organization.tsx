@@ -313,9 +313,11 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const tab = assignTab(c.req.query("tab"));
   if (!modalRequest(c)) return c.redirect("/organization", 303);
 
-  const churches = await loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds });
+  const [churches, defs] = await Promise.all([
+    loadRegionalChurches(db, { scopeAll: scope.scopeAll, stateIds: scope.stateIds }),
+    loadPositionDefs(db),
+  ]);
   const church = churchId ? churches.find((ch) => ch.id === churchId) : undefined;
-  const defs = await loadPositionDefs(db);
   const def = defs.find((d) => d.scopeType === "church" && d.code === code) ?? null;
   // A role ticked for specific churches is only offered there; the chart hides
   // it elsewhere, so the dialog must refuse it too.
@@ -328,7 +330,7 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
   const pastorSlot = isPastorSlot(def);
   // A pastor post may still be held by an older member assignment, so both kinds
   // of holder are resolved; either one can be cleared from this dialog.
-  const holders = await db.all<{
+  const holdersP = db.all<{
     assignment_id: number; person_type: string; person_id: number; name: string | null; priority: number;
   }>(sql`
     SELECT mp.id AS assignment_id, 'pastor' AS person_type, mp.pastor_id AS person_id,
@@ -343,6 +345,11 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
     WHERE mp.scope_type = 'church' AND mp.position = ${def.code}
       AND mp.regional_church_id = ${church.id} AND mp.member_id IS NOT NULL
     ORDER BY priority, name`);
+  // The candidate list does not depend on the current holders: one wait.
+  const [holders, candidates] = await Promise.all([
+    holdersP,
+    pastorSlot ? pastorCandidates(db, church, q) : assignCandidates(db, church.id, q),
+  ]);
   const holder = holders[0] ?? null;
   const holderIsPastor = holder?.person_type === "pastor";
   const canSeePastorProfile = c.get("perms").has("options.manage");
@@ -361,9 +368,7 @@ organizationRoutes.get("/assign", requirePermission("members.update"), async (c)
       def={def}
       personField={pastorSlot ? "pastor_id" : "member_id"}
       pastorDirectory={pastorSlot}
-      candidates={pastorSlot
-        ? await pastorCandidates(db, church, q)
-        : await assignCandidates(db, church.id, q)}
+      candidates={candidates}
       currentId={holder && holderIsPastor === pastorSlot ? holder.person_id : null}
       hasHolder={Boolean(holder)}
       currentName={holder?.name ?? null}

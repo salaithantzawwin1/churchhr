@@ -695,7 +695,18 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
   const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
 
-  const report = await loadReport(db, id);
+  // The report, its edit trail and the region labels are independent reads:
+  // one query window instead of three.
+  const [report, editRows, regionRows] = await Promise.all([
+    loadReport(db, id),
+    db.all<ReportEdit>(sql`
+      SELECT e.id, e.edited_at, e.changes, u.username AS editor_name
+      FROM report_edits e JOIN users u ON u.id = e.editor_id
+      WHERE e.report_id = ${id}
+      ORDER BY e.edited_at DESC, e.id DESC
+      LIMIT 100`),
+    db.select({ id: regions.id, name: regions.name, nameEn: regions.nameEn }).from(regions),
+  ]);
   if (!report) return c.redirect(back, 302);
 
   const own = report.author_id === user.id;
@@ -703,16 +714,6 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
   if (!own && !(perms.has("reports.review") && inScope)) {
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
-
-  const editRows = await db.all<ReportEdit>(sql`
-    SELECT e.id, e.edited_at, e.changes, u.username AS editor_name
-    FROM report_edits e JOIN users u ON u.id = e.editor_id
-    WHERE e.report_id = ${id}
-    ORDER BY e.edited_at DESC, e.id DESC
-    LIMIT 100`);
-  const regionRows = await db
-    .select({ id: regions.id, name: regions.name, nameEn: regions.nameEn })
-    .from(regions);
   const regionNames: Record<number, string> = {};
   for (const row of regionRows) {
     regionNames[row.id] = lang !== "mm" && row.nameEn ? row.nameEn : row.name;

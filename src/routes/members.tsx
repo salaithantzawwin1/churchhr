@@ -1181,18 +1181,23 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   const id = Number(c.req.param("id"));
   const notFound = () => c.redirect("/members?err=err-notfound", 302);
   if (!Number.isInteger(id) || id < 1) return notFound();
-  const row = await loadMemberDetail(db, id);
+  // The member, their history and the position labels are independent reads:
+  // one query window instead of three.
+  const [row, historyRows, positionDefs] = await Promise.all([
+    loadMemberDetail(db, id),
+    db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
+      SELECT h.id, h.action, h.created_at, u.username AS actor_name
+      FROM member_history h JOIN users u ON u.id = h.actor_id
+      WHERE h.member_id = ${id}
+      ORDER BY h.created_at DESC, h.id DESC
+      LIMIT 100`),
+    loadPositionDefs(db),
+  ]);
   if (!row || !inScope(row, scope)) return notFound();
-  const historyRows = await db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
-    SELECT h.id, h.action, h.created_at, u.username AS actor_name
-    FROM member_history h JOIN users u ON u.id = h.actor_id
-    WHERE h.member_id = ${id}
-    ORDER BY h.created_at DESC, h.id DESC
-    LIMIT 100`);
   return c.html(
     <MemberDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
-      history={historyRows as any} positionDefs={await loadPositionDefs(db)} lang={c.get("lang")}
+      history={historyRows as any} positionDefs={positionDefs} lang={c.get("lang")}
     />,
   );
 });
@@ -1211,8 +1216,24 @@ type PositionMemberState = {
   regionName: string;
 };
 
-async function positionFormState(db: DB, memberId: number, row: MemberDetail & { region_id: number }) {
-  const current = await getMemberPositions(db, memberId);
+/** Everything the position form needs apart from the member row itself. */
+function loadPositionFormSources(db: DB) {
+  return Promise.all([
+    loadDepartments(db),
+    loadPositionDefs(db),
+    // Every active church/cluster; the member's own state filter is applied
+    // below, so the row can be read in the same query window as these.
+    loadRegionalChurches(db, { activeOnly: true }),
+    loadSupervisionClusters(db, { activeOnly: true }),
+  ]).then(([departments, defs, churches, clusters]) => ({ departments, defs, churches, clusters }));
+}
+
+function positionFormState(
+  row: MemberDetail & { region_id: number },
+  memberId: number,
+  current: Awaited<ReturnType<typeof getMemberPositions>>,
+  src: Awaited<ReturnType<typeof loadPositionFormSources>>,
+) {
   const home = current.find((p) => p.scopeType === "home_cell");
   const department = current.find((p) => p.scopeType === "department");
   const church = current.find((p) => p.scopeType === "church");
@@ -1245,14 +1266,10 @@ async function positionFormState(db: DB, memberId: number, row: MemberDetail & {
       cluster: cluster?.position ?? "",
       clusterId: cluster?.supervisionClusterId ?? null,
     },
-    departments: await loadDepartments(db),
-    defs: await loadPositionDefs(db),
-    regionalChurches: await loadRegionalChurches(db, {
-      regionId: row.region_id, activeOnly: true,
-    }),
-    clusters: await loadSupervisionClusters(db, {
-      regionId: row.region_id, activeOnly: true,
-    }),
+    departments: src.departments,
+    defs: src.defs,
+    regionalChurches: src.churches.filter((ch) => ch.regionId === row.region_id),
+    clusters: src.clusters.filter((cl) => cl.regionId === row.region_id),
   };
 }
 
@@ -1261,9 +1278,14 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/members?err=err-notfound", 302);
-  const row = await loadMemberDetail(db, id);
+  // Member, current positions and every form lookup go out together: one wait.
+  const [row, current, src] = await Promise.all([
+    loadMemberDetail(db, id),
+    getMemberPositions(db, id),
+    loadPositionFormSources(db),
+  ]);
   if (!row || !inScope(row, scope)) return c.redirect("/members?err=err-notfound", 302);
-  const state = await positionFormState(db, id, row);
+  const state = positionFormState(row, id, current, src);
   const member = { ...state.member, name: row.name_myanmar || row.name_english || `#${id}` };
   const formProps = {
     member, assignments: state.assignments, departments: state.departments,

@@ -200,11 +200,13 @@ async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
 }
 
 async function userAssignments(db: DB, userId: number) {
-  const roleRows = await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, userId));
-  const stateRows = await db.select({ regionId: userStateAssignments.regionId })
-    .from(userStateAssignments).where(eq(userStateAssignments.userId, userId));
-  const homeCellRows = await db.select({ homeCellId: userHomeCellAssignments.homeCellId })
-    .from(userHomeCellAssignments).where(eq(userHomeCellAssignments.userId, userId));
+  const [roleRows, stateRows, homeCellRows] = await Promise.all([
+    db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, userId)),
+    db.select({ regionId: userStateAssignments.regionId })
+      .from(userStateAssignments).where(eq(userStateAssignments.userId, userId)),
+    db.select({ homeCellId: userHomeCellAssignments.homeCellId })
+      .from(userHomeCellAssignments).where(eq(userHomeCellAssignments.userId, userId)),
+  ]);
   return {
     selectedRoles: roleRows.map((r) => r.roleId),
     selectedStates: stateRows.filter((r) => r.regionId !== 0).map((r) => r.regionId),
@@ -294,16 +296,23 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) 
   if (!Number.isInteger(id) || id < 1 || id === c.get("user").id) {
     return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
   }
-  const usersList = await loadAdminUsers(db, c.get("lang"));
+  // Accounts, both selection sets and the picker options are independent: one
+  // query window instead of seven round-trips.
+  const [usersList, assignments, roleList, regionsList, homeCells] = await Promise.all([
+    loadAdminUsers(db, c.get("lang")),
+    userAssignments(db, id),
+    loadRoles(db),
+    loadRegionsLite(db, c.get("lang")),
+    homeCellOptions(db, c.get("lang")),
+  ]);
   const target = usersList.find((u) => u.id === id);
   if (!target) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
-  const assignments = await userAssignments(db, id);
   return c.html(
     <AdminUserEditPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       editUser={{ ...target, ...assignments }}
-      roles={await loadRoles(db)} regions={await loadRegionsLite(db, c.get("lang"))}
-      homeCells={await homeCellOptions(db, c.get("lang"))} editErrors={[]}
+      roles={roleList} regions={regionsList}
+      homeCells={homeCells} editErrors={[]}
       lang={c.get("lang")} modal={c.req.query("modal") === "1"}
     />,
   );
@@ -312,12 +321,15 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) 
 /** Bare create-user form for the js-add-modal fetch. */
 adminRoutes.get("/users/new", requirePermission("users.manage"), async (c) => {
   const db = getDb(c.env);
+  const [roleList, regionsList, homeCells] = await Promise.all([
+    loadRoles(db), loadRegionsLite(db, c.get("lang")), homeCellOptions(db, c.get("lang")),
+  ]);
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={[]}
       values={{ username: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
-      roles={(await loadRoles(db)) as any} regions={await loadRegionsLite(db, c.get("lang"))}
-      homeCells={await homeCellOptions(db, c.get("lang"))}
+      roles={roleList as any} regions={regionsList}
+      homeCells={homeCells}
     />,
   );
 });

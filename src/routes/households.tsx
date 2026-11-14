@@ -220,7 +220,7 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   const townshipCond = township ? sql`AND f.township = ${township}` : sql``;
   const region = intParam(c.req.query("region"));
   const regionCond = region ? sql`AND f.region_id = ${region}` : sql``;
-  const rows = (await db.all(sql`
+  const rowsP = db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
            r.name AS state_name, r.name_en AS state_name_en,
            head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
@@ -237,15 +237,22 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
       ON hm.family_id = f.id
     WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}
     ORDER BY f.id DESC
-    LIMIT 200`)) as any[];
+    LIMIT 200`);
   const lang = c.get("lang");
+  // The list, the township filter options and the state filter options are
+  // independent reads: one query window instead of three.
+  const [rowsRaw, allOptions, allRegions] = await Promise.all([
+    rowsP,
+    loadAllOptions(db),
+    loadRegions(db),
+  ]);
+  const rows = rowsRaw as any[];
   // Township dropdown options for the filter, scoped like the list itself.
-  const allOptions = await loadAllOptions(db);
   const townshipsInScope = scope.scopeAll
     ? allOptions.filter((o) => o.type === "township" && o.active === 1)
     : allOptions.filter((o) => o.type === "township" && o.active === 1 &&
         (o.regionId === 0 || scope.stateIds.includes(o.regionId)));
-  const regionOptions = (await loadRegions(db))
+  const regionOptions = allRegions
     .filter((r) => scope.scopeAll || scope.stateIds.includes(r.id))
     .map((r) => ({ id: r.id, name: lang !== "mm" && r.nameEn ? r.nameEn : r.name }));
   return c.html(
@@ -263,28 +270,34 @@ householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
   const lang = c.get("lang");
-  const allRegions = await loadRegions(db);
-  const allOptions = await loadAllOptions(db);
   // Pre-select the member when arriving from Member detail → "New household".
   const preMemberId = intParam(c.req.query("member"));
+  // Regions, options, the pre-selected member and the head dropdown are
+  // independent reads: one query window instead of four.
+  const [allRegions, allOptions, preMemberRows, headList] = await Promise.all([
+    loadRegions(db),
+    loadAllOptions(db),
+    preMemberId
+      ? db.all(sql`SELECT * FROM members m WHERE m.id = ${preMemberId}`)
+      : Promise.resolve([] as any[]),
+    headCandidates(db, scope, preMemberId),
+  ]);
   let values = defaultValues(scope);
-  if (preMemberId) {
-    const [m] = (await db.all(sql`SELECT * FROM members m WHERE m.id = ${preMemberId}`)) as any[];
-    if (m && (scope.scopeAll || scope.stateIds.includes(m.region_id))) {
-      values = {
-        name: m.name_myanmar || m.name_english || "",
-        region_id: String(m.region_id),
-        township: m.township ?? "",
-        phone: m.phone ?? "",
-        address: m.address ?? "",
-        head_member_id: String(m.id),
-        home_cell_id: m.home_cell_id ? String(m.home_cell_id) : "",
-        group_id: m.group_id ? String(m.group_id) : "",
-        family_group_id: m.family_group_id ? String(m.family_group_id) : "",
-      };
-    }
+  const preMember = (preMemberRows as any[])[0];
+  if (preMember && (scope.scopeAll || scope.stateIds.includes(preMember.region_id))) {
+    const m = preMember;
+    values = {
+      name: m.name_myanmar || m.name_english || "",
+      region_id: String(m.region_id),
+      township: m.township ?? "",
+      phone: m.phone ?? "",
+      address: m.address ?? "",
+      head_member_id: String(m.id),
+      home_cell_id: m.home_cell_id ? String(m.home_cell_id) : "",
+      group_id: m.group_id ? String(m.group_id) : "",
+      family_group_id: m.family_group_id ? String(m.family_group_id) : "",
+    };
   }
-  const headList = await headCandidates(db, scope, preMemberId);
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
     family: null as null | { id: number }, regions: scopedRegions(allRegions, scope, lang), lang,
@@ -424,14 +437,19 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`
-    SELECT f.*, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
-    FROM families f LEFT JOIN members head ON head.id = f.head_member_id
-    WHERE f.id = ${id}`)) as any[];
+  // The household row and both lookup lists are independent: one query window.
+  const [rowRows, allRegions, allOptions] = await Promise.all([
+    db.all(sql`
+      SELECT f.*, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
+      FROM families f LEFT JOIN members head ON head.id = f.head_member_id
+      WHERE f.id = ${id}`),
+    loadRegions(db),
+    loadAllOptions(db),
+  ]);
+  const [row] = rowRows as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
-  const allRegions = await loadRegions(db);
   const values: HFormValues = {
     name: row.name, address: row.address ?? "", township: row.township ?? "",
     phone: row.phone ?? "", region_id: String(row.region_id), notes: row.notes ?? "",
@@ -440,7 +458,6 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
     group_id: row.group_id != null ? String(row.group_id)
       : row.head_group_id != null ? String(row.head_group_id) : "",
   };
-  const allOptions = await loadAllOptions(db);
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
     family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
