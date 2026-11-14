@@ -134,16 +134,16 @@ type RoleInfo = {
 };
 
 async function loadRoles(db: DB): Promise<RoleInfo[]> {
-  const roleRows = await db
-    .select({ id: roles.id, name: roles.name, description: roles.description, isSystem: roles.isSystem })
-    .from(roles)
-    .orderBy(roles.id);
-  const permRows = await db.select({ roleId: rolePermissions.roleId, permission: rolePermissions.permission })
-    .from(rolePermissions);
-  const countRows = await db
-    .select({ roleId: userRoles.roleId, n: sql<number>`COUNT(*)` })
-    .from(userRoles)
-    .groupBy(userRoles.roleId);
+  const [roleRows, permRows, countRows] = await Promise.all([
+    db.select({ id: roles.id, name: roles.name, description: roles.description, isSystem: roles.isSystem })
+      .from(roles)
+      .orderBy(roles.id),
+    db.select({ roleId: rolePermissions.roleId, permission: rolePermissions.permission })
+      .from(rolePermissions),
+    db.select({ roleId: userRoles.roleId, n: sql<number>`COUNT(*)` })
+      .from(userRoles)
+      .groupBy(userRoles.roleId),
+  ]);
   return roleRows.map((r) => ({
     id: r.id,
     name: r.name,
@@ -645,7 +645,7 @@ async function optionsPage(c: any, type: string, opts: {
   const labelStored = isLabelOptionType(type);
   // Everything this tab needs, in one wait: regions, churches, the option list
   // and both usage counts (members, plus leadership slots for Home Cells).
-  const [stateListAll, churchRows, all, usageRows, positionRows] = await Promise.all([
+  const [stateListAll, churchRows, all, usageRows, positionRows, regionCount, ageGroups] = await Promise.all([
     loadRegionsLite(db, lang),
     loadRegionalChurches(db, { activeOnly: true, scopeAll: admin, stateIds: scope.stateIds }),
     loadAllOptions(db),
@@ -661,6 +661,9 @@ async function optionsPage(c: any, type: string, opts: {
           SELECT scope_id AS oid, COUNT(*) AS n FROM member_positions
           WHERE scope_type = 'home_cell' AND scope_id IS NOT NULL GROUP BY scope_id`)
       : Promise.resolve([] as { oid: number; n: number }[]),
+    // Tab counts ride along instead of costing two more waits.
+    db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`),
+    db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM age_groups`),
   ]);
   // State managers pick only among their own states; no "all states" choice.
   const stateList = admin ? stateListAll : stateListAll.filter((r) => scope.stateIds.includes(r.id));
@@ -701,9 +704,8 @@ async function optionsPage(c: any, type: string, opts: {
     parent: o.parentId ? labelById.get(o.parentId) ?? null : null,
     church: o.regionalChurchId ? churchById.get(o.regionalChurchId)?.name ?? null : null,
   }));
-  const regionCount = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM regions`);
   const types = admin
-    ? optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: await ageGroupCount(db) }, t("adm.ageTab"), lang)
+    ? optionTabs(all, { region: Number(regionCount[0]?.n ?? 0), ageGroup: Number(ageGroups[0]?.n ?? 0) }, t("adm.ageTab"), lang)
     : OPTION_TYPES.filter((k) => isRegionScopedType(k)).map((k) => {
         const entry = all.filter((o) => o.type === k && canManageOption(scope, effectiveRegion(o, byId)));
         return { key: k, label: typeLabel(lang, k), active: entry.some((o) => o.active === 1), count: entry.length };
