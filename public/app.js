@@ -1410,6 +1410,35 @@
   }
   initDatePickers(document);
 
+  // Confirm prompt built from DOM nodes rather than an HTML string: the text
+  // comes from a data-confirm attribute, and one day that attribute will carry
+  // a record name, so it must never be able to parse as markup.
+  function confirmBox(text, yesLabel, dismissAttr, cancelLabel) {
+    var box = document.createElement("div");
+    box.className = "modal-confirm";
+    var p = document.createElement("p");
+    p.style.margin = "0 0 4px";
+    p.textContent = text;
+    var actions = document.createElement("div");
+    actions.className = "actions";
+    actions.style.marginTop = "14px";
+    var no = document.createElement("button");
+    no.type = "button";
+    no.className = "btn secondary";
+    no.setAttribute(dismissAttr, "1");
+    no.textContent = cancelLabel || "Cancel";
+    var yes = document.createElement("button");
+    yes.type = "button";
+    yes.className = "btn danger";
+    yes.setAttribute("data-confirm-yes", "1");
+    yes.textContent = yesLabel;
+    actions.appendChild(no);
+    actions.appendChild(yes);
+    box.appendChild(p);
+    box.appendChild(actions);
+    return box;
+  }
+
   // Delete confirm modal (replaces window.confirm for data-confirm forms)
   document.addEventListener("submit", function (e) {
     var f = e.target;
@@ -1426,14 +1455,7 @@
       // the main form footer); remember that so Cancel restores the right state.
       f.setAttribute("data-confirm-was-hidden", f.hidden ? "1" : "0");
       f.hidden = true;
-      var box = document.createElement("div");
-      box.className = "modal-confirm";
-      box.innerHTML =
-        '<p style="margin:0 0 4px">' + text + "</p>" +
-        '<div class="actions" style="margin-top:14px">' +
-        '<button type="button" class="btn secondary" data-confirm-no="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
-        '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
-        "</div>";
+      var box = confirmBox(text, yesLabel, "data-confirm-no", modal.getAttribute("data-cancel"));
       bodyEl.appendChild(box);
       // Focus the safe choice, not the destructive one.
       var inlineNo = box.querySelector("[data-confirm-no]");
@@ -1441,12 +1463,8 @@
       return;
     }
     openModal(f.getAttribute("data-confirm-title") || modal.getAttribute("data-confirm-title") || "", "sm");
-    bodyEl.innerHTML =
-      '<p style="margin:0 0 4px">' + text + "</p>" +
-      '<div class="actions" style="margin-top:14px">' +
-      '<button type="button" class="btn secondary" data-close="1">' + (modal.getAttribute("data-cancel") || "Cancel") + "</button>" +
-      '<button type="button" class="btn danger" data-confirm-yes="1">' + yesLabel + "</button>" +
-      "</div>";
+    bodyEl.innerHTML = "";
+    bodyEl.appendChild(confirmBox(text, yesLabel, "data-close", modal.getAttribute("data-cancel")));
     var no = bodyEl.querySelector("[data-close]");
     if (no) no.focus();
   });

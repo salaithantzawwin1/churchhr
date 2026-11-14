@@ -546,8 +546,8 @@ function cellLanding(cellId: number, ok?: string): string {
   return ok ? `${base}&ok=${ok}` : base;
 }
 
-/** Active members offered for a Home Cell role: the cell's own members first,
- *  then the rest of its church, so a cell that is still forming can be staffed. */
+/** Active members offered for a Home Cell role: only that cell's own members,
+ *  so a role is never handed to somebody who belongs to another cell. */
 async function cellCandidates(
   db: DB,
   cell: { id: number; regionId: number; regionalChurchId: number | null },
