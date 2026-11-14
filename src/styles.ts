@@ -2186,7 +2186,9 @@ table.list-tbl.ph-tbl { min-width: 0; }
 /* Full leadership flow on Home Cell Structure: church-wide leaders flow down
    into state/cluster supervisor teams and their Home Cell leader nodes. */
 .org-flow { padding-bottom: 18px; }
-.org-flow-line { width: 2px; height: 22px; margin: 0 auto; background: var(--line); }
+/* Below the card row width the tree stacks and there is nothing to join to,
+   so the stem waits for the wide layout. */
+.org-flow-line { display: none; width: 2px; height: 18px; margin: 0 auto; background: var(--connector); border-radius: 2px; }
 .org-flow-state { margin-top: 6px; }
 .org-flow-state + .org-flow-state { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
 .org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
@@ -2195,7 +2197,6 @@ table.list-tbl.ph-tbl { min-width: 0; }
 /* Home Cell chooser inside a cluster: buttons on wide screens, a dropdown on
    phones, so only the chosen cell's structure is open at a time. */
 .hc-cells { display: grid; gap: 10px; padding-top: 14px; position: relative; }
-.hc-cells::before { content: ""; position: absolute; top: 0; left: 6%; right: 6%; height: 2px; background: var(--line); }
 .hc-cells-buttons { display: none; flex-wrap: wrap; gap: 8px; }
 .hc-cell-btn {
   display: flex; flex-direction: column; gap: 1px; min-width: 160px;
@@ -2231,7 +2232,31 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .hc-cell-select-label { display: grid; gap: 4px; max-width: 340px; }
 .hc-cell-select-label select { width: 100%; }
 @media (min-width: 961px) {
-  .hc-cells-buttons { display: flex; }
+  /* The Home Cell cards hang from the team on the same bus-and-stem
+     connectors: one stem out of the structure, a bus between the cards and a
+     stem down into each one, so the whole card reads as one hierarchy. */
+  .org-flow-line { display: block; }
+  .hc-cells { padding-top: 0; }
+  .hc-cells-buttons {
+    display: flex; align-items: flex-start; justify-content: center;
+    gap: 22px; padding-top: 28px; position: relative;
+  }
+  .hc-cells-buttons::before {
+    content: ""; position: absolute; top: 0; left: 50%; margin-left: -1px;
+    width: 2px; height: 14px; background: var(--connector); border-radius: 2px;
+  }
+  .hc-cell-branch { position: relative; }
+  .hc-cell-branch::before {
+    content: ""; position: absolute; top: -14px; left: 50%; margin-left: -1px;
+    width: 2px; height: 14px; background: var(--connector); border-radius: 2px;
+  }
+  .hc-cell-branch::after {
+    content: ""; position: absolute; top: -14px; height: 2px; left: -11px; right: -11px;
+    background: var(--connector); border-radius: 2px;
+  }
+  .hc-cell-branch:first-child::after { left: 50%; }
+  .hc-cell-branch:last-child::after { right: 50%; }
+  .hc-cell-branch:only-child::after { display: none; }
   .hc-cells-select { display: none; }
 }
 /* The chosen Home Cell's structure, drawn inside its own cluster card so the
@@ -2344,21 +2369,29 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   }
 }
 .org-flow-cluster-body { padding-top: 6px; }
+/* Cluster hierarchy: the pastor sits above the team, the supervisor under the
+   pastor and the assistant roles under the supervisor. The connectors are the
+   leadership tree's branches (org-branch-kids): a parent drops a stem into a
+   bus and every child hangs off that bus. */
+.org-flow-tree { width: 100%; }
 .org-flow-pastor { display: flex; justify-content: center; }
-.org-flow-cluster-team { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 4px 8px; }
-.org-flow-cluster-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
-.org-flow-cluster-team .org-node-lead { width: 190px; }
+.org-flow-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
+.org-flow-team .org-node-lead { width: 190px; }
 @media (max-width: 760px) {
   .org-flow-clusters { grid-template-columns: 1fr; }
-  .org-flow-cluster-team .org-node { width: 190px; }
-  .org-flow-cluster-team .org-node-lead { width: 205px; }
+  .org-flow-team .org-node { width: 190px; }
+  .org-flow-team .org-node-lead { width: 205px; }
 }
 @media (max-width: 520px) {
-  .org-flow-cluster-team { display: grid; grid-template-columns: 1fr; }
-  .org-flow-cluster-team .org-node,
-  .org-flow-cluster-team .org-node-lead { width: 100%; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
-  .org-flow-cluster-team .org-node .org-node-role { order: 1; }
-  .org-flow-cluster-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  .org-flow-team { flex-wrap: wrap; justify-content: center; }
+  .org-flow-team .org-node,
+  .org-flow-team .org-node-lead { width: 100%; max-width: 260px; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
+  .org-flow-team .org-node .org-node-role { order: 1; }
+  .org-flow-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  /* A wrapped row cannot draw one straight bus, so the stems go with it. */
+  .org-flow-team::before, .org-flow-team > .org-branch::before, .org-flow-team > .org-branch::after {
+    display: none;
+  }
 }
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }

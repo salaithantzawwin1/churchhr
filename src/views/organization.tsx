@@ -661,13 +661,27 @@ export function OrganizationPage(props: Common & {
           </span>
         </summary>
         <div class="org-flow-cluster-body">
-          <div class="org-flow-pastor">
-            {renderPersonNode(t("org.clusterPastor"), pastor, "md", true)}
-          </div>
-          <div class="org-flow-line" aria-hidden="true" />
-          <div class="org-flow-cluster-team">
-            {supervisor && renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
-            {assistants.map((def) => renderPersonNode(positionDefLabel(def, L), role(def.code), "sm"))}
+          {/* Pastor above the team, the team on its own bus. Drawn as branches
+              so every role hangs off a visible connector instead of floating
+              beside the others with no line between them. */}
+          <div class="org-branch org-flow-tree">
+            <div class="org-flow-pastor">
+              {renderPersonNode(t("org.clusterPastor"), pastor, "md", true)}
+            </div>
+            {(supervisor || assistants.length > 0) && (
+              <div class="org-branch-kids org-flow-team">
+                {supervisor && (
+                  <div class="org-branch">
+                    {renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
+                  </div>
+                )}
+                {assistants.map((def) => (
+                  <div class="org-branch">
+                    {renderPersonNode(positionDefLabel(def, L), role(def.code), "sm")}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div class="org-flow-line" aria-hidden="true" />
           {/* Choosing a Home Cell replaces the old all-at-once list: wide screens
@@ -676,23 +690,25 @@ export function OrganizationPage(props: Common & {
           <div class="hc-cells">
             <div class="hc-cells-buttons">
               {group.cells.map((cell) => (
-                <a
-                  class={`hc-cell-btn${cell.id === selectedCellId ? " is-active" : ""}`}
-                  href={cellsQuery(`&cell=${cell.id}#home-cell-panel`)}
-                  aria-current={cell.id === selectedCellId ? "true" : undefined}
-                >
-                  <span class="hc-cell-btn-name">{cell.label}</span>
-                  <span class="hc-cell-btn-meta">
-                    {cell.township ? `${cell.township} · ` : ""}{countLabel(t, "org.membersShort", cell.member_count)}
-                  </span>
-                  <span class="hc-cell-btn-fill">
-                    <span class="org-fill-track" aria-hidden="true">
-                      <span class="org-fill-bar"
-                        style={`width:${cellRows.all.length === 0 ? 0 : Math.round((cellFilled(cell) / cellRows.all.length) * 100)}%`} />
+                <div class="hc-cell-branch">
+                  <a
+                    class={`hc-cell-btn${cell.id === selectedCellId ? " is-active" : ""}`}
+                    href={cellsQuery(`&cell=${cell.id}#home-cell-panel`)}
+                    aria-current={cell.id === selectedCellId ? "true" : undefined}
+                  >
+                    <span class="hc-cell-btn-name">{cell.label}</span>
+                    <span class="hc-cell-btn-meta">
+                      {cell.township ? `${cell.township} · ` : ""}{countLabel(t, "org.membersShort", cell.member_count)}
                     </span>
-                    <span class="hc-cell-btn-fill-text"><b>{cellFilled(cell)}</b>/{cellRows.all.length} {t("org.rolesShort")}</span>
-                  </span>
-                </a>
+                    <span class="hc-cell-btn-fill">
+                      <span class="org-fill-track" aria-hidden="true">
+                        <span class="org-fill-bar"
+                          style={`width:${cellRows.all.length === 0 ? 0 : Math.round((cellFilled(cell) / cellRows.all.length) * 100)}%`} />
+                      </span>
+                      <span class="hc-cell-btn-fill-text"><b>{cellFilled(cell)}</b>/{cellRows.all.length} {t("org.rolesShort")}</span>
+                    </span>
+                  </a>
+                </div>
               ))}
             </div>
             {/* The fragment in the action keeps the panel in view after the jump. */}
