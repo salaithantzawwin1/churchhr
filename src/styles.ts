@@ -3010,7 +3010,7 @@ th { font-size: 13px; }
 .audit-ip { display: block; font-size: 11.5px; }
 .audit-detail details > summary { cursor: pointer; color: var(--muted); font-size: 12px;
   /* Rows are opened by tapping this line; 12px text left it 27px tall. */
-  display: list-item; min-height: 36px; padding: 6px 0; }
+  display: list-item; min-height: 36px; padding: 6px 0; overflow-wrap: anywhere; }
 .audit-detail details > summary:hover { color: var(--ink); }
 .audit-ua { margin-top: 6px; font-size: 11.5px; line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
 @media (max-width: 900px) {
@@ -3018,7 +3018,7 @@ th { font-size: 13px; }
   /* Beats the shared "table.list-tbl { min-width: 760px }" phone rule. */
   table.list-tbl.audit-tbl { display: block; min-width: 0; border: 0; background: transparent; }
   .audit-tbl thead { display: none; }
-  .audit-tbl tbody { display: grid; gap: 10px; }
+  .audit-tbl tbody { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
   .audit-tbl tr {
     display: block; padding: 12px 14px; background: var(--card);
     border: 1px solid var(--line); border-radius: var(--radius);
@@ -3035,6 +3035,11 @@ th { font-size: 13px; }
   .audit-tbl td.audit-action-cell, .audit-tbl td.audit-detail { display: block; text-align: left; }
   .audit-tbl td.audit-action-cell::before, .audit-tbl td.audit-detail::before { display: none; }
   .audit-tbl td.audit-when { justify-content: flex-start; }
+  /* Device + IP are nowrap in the table; on a 320px phone they pushed the
+     card past the screen edge. Let them break instead. */
+  .audit-tbl td.audit-device { white-space: normal; min-width: 0; }
+  /* The IP must stay on one line (it is short); the device text wraps. */
+  .audit-tbl .audit-ip { white-space: nowrap; }
 }
 
 /* ---------- township short codes ----------
@@ -3047,7 +3052,7 @@ th { font-size: 13px; }
   .codes-wrap { overflow: visible; border: 0; background: transparent; }
   table.list-tbl.codes-tbl { display: block; min-width: 0; border: 0; background: transparent; }
   .codes-tbl thead { display: none; }
-  .codes-tbl tbody { display: grid; gap: 10px; }
+  .codes-tbl tbody { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
   .codes-tbl tr {
     display: block; padding: 12px 14px; background: var(--card);
     border: 1px solid var(--line); border-radius: var(--radius);
@@ -3134,9 +3139,14 @@ th { font-size: 13px; }
   margin-top: 18px; padding: 12px 0 2px;
   background: var(--card); border-top: 1px solid var(--hairline);
 }
+/* Report form has three actions; when they wrap on a phone keep the rows
+   right-aligned so the primary never sits alone on the left. */
+.report-form-actions { justify-content: flex-end; }
 @media (max-width: 640px) {
   .form-actions-sticky { padding-bottom: max(2px, env(safe-area-inset-bottom)); }
-  .form-actions-sticky .btn { flex: 1; }
+  /* Size each button to its label: splitting the row 50/50 made the longer
+     primary wrap onto two or three lines. They only stack when they must. */
+  .form-actions-sticky .btn { flex: 1 1 auto; white-space: nowrap; }
 }
 
 /* ---------- member + admin lists: phone cards ---------- */

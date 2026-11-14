@@ -114,8 +114,8 @@ export function RegionPastorModal(props: {
         </label>
 
         <div class="actions">
-          <button class="btn" type="submit">{t("form.save")}</button>
           <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+          <button class="btn" type="submit">{t("form.save")}</button>
         </div>
       </form>
     </>

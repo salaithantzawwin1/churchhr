@@ -670,10 +670,10 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
         </div>
 
         <div class="actions form-actions-sticky">
-          <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
           {modal
             ? <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
             : <a class="btn secondary" href={edit ? `/members/${member!.id}` : "/members"}>{t("form.cancel")}</a>}
+          <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
         </div>
       </form>
     </>
@@ -1313,8 +1313,8 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
               <input type="hidden" name="action" value="commit" />
               <input type="hidden" name="csv_b64" value={report.csvB64} />
               <div class="actions">
-                <button class="btn" type="submit">{t("import.commit1")} {report.valid} {t("import.commit2")}</button>
                 <a class="btn secondary" href="/members/import">{t("form.cancel")}</a>
+                <button class="btn" type="submit">{t("import.commit1")} {report.valid} {t("import.commit2")}</button>
               </div>
               <p class="muted small">{t("import.keptOut")}</p>
             </form>

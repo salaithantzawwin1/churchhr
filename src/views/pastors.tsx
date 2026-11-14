@@ -281,8 +281,8 @@ export function PastorModal(props: {
           photoUrl={pastor ? pastorPhotoUrl(pastor) : undefined}
         />
         <div class="actions">
-          <button class="btn" type="submit">{pastor ? t("dept.save") : t("form.add")}</button>
           <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+          <button class="btn" type="submit">{pastor ? t("dept.save") : t("form.add")}</button>
         </div>
       </form>
     </>
@@ -678,8 +678,8 @@ export function PastorHistoryModal(props: {
           </label>
         </div>
         <div class="actions">
-          <button class="btn" type="submit">{t("org.historySave")}</button>
           <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+          <button class="btn" type="submit">{t("org.historySave")}</button>
         </div>
       </form>
     </>

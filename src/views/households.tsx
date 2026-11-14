@@ -150,9 +150,11 @@ export function HouseholdFormFragment(props: Common & {
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
           </div>
         </div>
-        <div class="actions">
-          <button class="btn" type="submit">{family ? t("form.save") : t("hh.createNext")}</button>
+        {/* Sticky like the member form: the submit is reachable without scrolling
+            a whole form first, Cancel sits before the primary action. */}
+        <div class="actions form-actions-sticky">
           <a class="btn secondary" href={family ? `/admin/households/${family.id}` : "/admin/households"}>{t("form.cancel")}</a>
+          <button class="btn" type="submit">{family ? t("form.save") : t("hh.createNext")}</button>
         </div>
       </form>
     </>
@@ -634,9 +636,9 @@ export function HouseholdAddMemberPage(props: Common & {
             </label>
           </div>
         </div>
-        <div class="actions">
-          <button class="btn" type="submit">{t("hh.addToHousehold")}</button>
+        <div class="actions form-actions-sticky">
           <a class="btn secondary" href={`/admin/households/${family.id}`}>{t("form.cancel")}</a>
+          <button class="btn" type="submit">{t("hh.addToHousehold")}</button>
         </div>
       </form>
     </Layout>

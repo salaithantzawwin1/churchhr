@@ -629,8 +629,8 @@ export function AddOptionForm(props: {
         {optionShortCodeField(props.type, props.shortCode, t)}
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.add")}</button>
       </div>
     </form>
   );
@@ -661,8 +661,8 @@ export function AddRegionForm(props: { lang?: Lang; errors?: string[]; modal?: b
         </label>
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.add")}</button>
       </div>
     </form>
   );
@@ -696,8 +696,8 @@ export function AddAgeGroupForm(props: { lang?: Lang; errors?: string[]; modal?:
         </label>
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.add")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.add")}</button>
       </div>
     </form>
   );
@@ -734,8 +734,8 @@ export function EditAgeGroupForm(props: {
         </label>
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.save")}</button>
       </div>
     </form>
   );
@@ -778,8 +778,8 @@ export function EditOptionForm(props: {
         {optionShortCodeField(props.type ?? "", props.shortCode, t)}
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.save")}</button>
       </div>
     </form>
   );
@@ -815,8 +815,8 @@ export function EditRegionForm(props: { id: number; lang?: Lang; errors?: string
         </label>
       </div>
       <div class="actions">
-        <button class="btn" type="submit">{t("form.save")}</button>
         {props.modal && <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>}
+        <button class="btn" type="submit">{t("form.save")}</button>
       </div>
     </form>
   );

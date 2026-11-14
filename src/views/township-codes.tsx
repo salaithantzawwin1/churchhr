@@ -77,8 +77,8 @@ export function TownshipCodesPage(props: {
           </div>
           <p class="muted small">{t("adm.shortCodeHint")}</p>
           <div class="actions">
-            <button class="btn" type="submit">{t("form.save")}</button>
             <a class="btn secondary" href="/admin/options?type=township">{t("form.cancel")}</a>
+            <button class="btn" type="submit">{t("form.save")}</button>
           </div>
         </form>
       )}

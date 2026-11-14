@@ -368,13 +368,13 @@ export function ReportFormPage(props: Common & {
         </div>
 
         <div class="actions report-form-actions">
-          <button class="btn" type="submit" name="intent" value="submit">
-            {editing ? t("rep.update") : t("rep.submit")}
-          </button>
+          <a class="btn secondary" href="/reports">{t("rep.cancel")}</a>
           <button class="btn secondary" type="submit" name="intent" value="draft" formnovalidate>
             {t("rep.draftSave")}
           </button>
-          <a class="btn secondary" href="/reports">{t("rep.cancel")}</a>
+          <button class="btn" type="submit" name="intent" value="submit">
+            {editing ? t("rep.update") : t("rep.submit")}
+          </button>
         </div>
         <p class="muted small report-draft-hint">{t("rep.draftHint")}</p>
       </form>
