@@ -322,6 +322,20 @@
     });
   }
 
+  /** A chained parent (Township under a Home Cell, Home Cell under a Family Group)
+   * belongs to one state, so picking it moves the state picker to that state:
+   * the two can never describe different states. Blank parent or all-states
+   * parent (no data-region) leaves the state picker alone. */
+  function pinRegionFromParent(form) {
+    var regionSel = form.querySelector("select[data-region-select]");
+    var parentSel = form.querySelector("select[data-parent-region]");
+    if (!regionSel || !parentSel || regionSel.disabled) return;
+    var picked = parentSel.options[parentSel.selectedIndex];
+    var region = picked ? picked.getAttribute("data-region") : "";
+    if (region && regionSel.value !== region) regionSel.value = region;
+    applyRegionFilters(form, true);
+  }
+
   function initRegionCascade(root) {
     Array.prototype.forEach.call(root.querySelectorAll("select[data-region-select]"), function (regionSel) {
       var form = regionSel.form;
@@ -329,6 +343,8 @@
       form.setAttribute("data-cascade", "1");
       applyRegionFilters(form, false);
       regionSel.addEventListener("change", function () { applyRegionFilters(form, true); });
+      var parentPick = form.querySelector("select[data-parent-region]");
+      if (parentPick) parentPick.addEventListener("change", function () { pinRegionFromParent(form); });
       // Chained pickers re-filter when their parent changes.
       var township = form.querySelector('select[name="township"]');
       if (township) township.addEventListener("change", function () { applyParentFilters(form, true); });

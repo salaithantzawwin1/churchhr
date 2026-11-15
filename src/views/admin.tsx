@@ -565,7 +565,7 @@ function optionParentField(
   return (
     <label class="field">
       <span class="lbl">{lbl}</span>
-      <select name="parent_id">
+      <select name="parent_id" data-region-filter="1" data-parent-region="1">
         <option value="">{t("adm.parentNone")}</option>
         {parentOptions.map((p) => (
           <option value={String(p.id)} selected={selected === String(p.id)} data-region={p.regionId === 0 ? "" : String(p.regionId)}>{p.label}</option>
