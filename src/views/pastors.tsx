@@ -2,6 +2,9 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { pastorName, type PastorRow } from "../pastors";
+import { ministryTenure, type PastorChildCount, type PastorChildRow } from "../pastor-children";
+import { PastorChildrenCard } from "./pastor-children";
+import { todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
 
@@ -23,6 +26,8 @@ export type PastorValues = {
   email: string;
   address: string;
   ordinationDate: string;
+  salvationDate: string;
+  ministryStartDate: string;
   notes: string;
   sortOrder: number;
   active: boolean;
@@ -44,6 +49,8 @@ function pastorValues(pastor?: PastorRow): PastorValues {
     email: pastor?.email ?? "",
     address: pastor?.address ?? "",
     ordinationDate: pastor?.ordinationDate ?? "",
+    salvationDate: pastor?.salvationDate ?? "",
+    ministryStartDate: pastor?.ministryStartDate ?? "",
     notes: pastor?.notes ?? "",
     sortOrder: pastor?.sortOrder ?? 0,
     active: pastor ? pastor.active === 1 : true,
@@ -155,6 +162,12 @@ function PastorFields(props: {
               placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
           </label>
           <label class="field">
+            <span class="lbl">{t("org.salvationDate")}</span>
+            <input type="text" name="salvation_date" value={values.salvationDate}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
+            <span class="field-hint">{t("org.salvationDateHint")}</span>
+          </label>
+          <label class="field">
             <span class="lbl">{t("org.pastorSpouse")}</span>
             {/* The directory can be long, so this is the same searchable picker
                 used for a cluster's pastor: type to filter, × to unlink. */}
@@ -206,6 +219,12 @@ function PastorFields(props: {
             <span class="lbl">{t("org.ordinationDate")}</span>
             <input type="text" name="ordination_date" value={values.ordinationDate}
               placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("org.ministryStart")}</span>
+            <input type="text" name="ministry_start_date" value={values.ministryStartDate}
+              placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
+            <span class="field-hint">{t("org.ministryStartHint")}</span>
           </label>
           <label class="field">
             <span class="lbl">{t("org.positionSort")}</span>
@@ -303,6 +322,8 @@ function displayName(pastor: PastorRow, L: Lang): string {
 export function PastorsPage(props: Common & {
   pastors: PastorRow[];
   regions: { id: number; name: string }[];
+  /** Active children per pastor, for the Hope School count and card chips. */
+  childCounts?: PastorChildCount[];
   q?: string;
   status?: "all" | "active" | "inactive";
   region?: number | null;
@@ -322,6 +343,9 @@ export function PastorsPage(props: Common & {
   const churchCount = new Set(pastors.map((p) => p.regionalChurchId).filter((id): id is number => id != null)).size;
   const filtered = q.trim().length > 0 || status !== "all" || region != null;
   const canUpdate = perms.has("options.manage");
+  const counts = new Map((props.childCounts ?? []).map((c) => [c.pastorId, c] as const));
+  const totalChildren = (props.childCounts ?? []).reduce((n, c) => n + Number(c.children), 0);
+  const totalHope = (props.childCounts ?? []).reduce((n, c) => n + Number(c.hopeSchool), 0);
 
   return (
     <Layout title={t("org.pastorsTitle")} lang={lang} user={user} perms={perms} active="/organization/pastors" flash={flash ?? null}>
@@ -346,6 +370,8 @@ export function PastorsPage(props: Common & {
         <div class="stat"><div class="n">{pastors.length}</div><div class="t">{t("org.pastorsStat")}</div></div>
         <div class="stat"><div class="n">{activeCount}</div><div class="t">{t("org.activePastors")}</div></div>
         <div class="stat"><div class="n">{churchCount}</div><div class="t">{t("org.pastorChurches")}</div></div>
+        <div class="stat"><div class="n">{totalChildren}</div><div class="t">{t("org.childrenTotal")}</div></div>
+        <div class="stat"><div class="n">{totalHope}</div><div class="t">{t("org.hopeSchoolChildren")}</div></div>
       </div>
 
       <form class="filters settings-filters" method="get" action="/organization/pastors" data-auto-submit="1">
@@ -389,6 +415,14 @@ export function PastorsPage(props: Common & {
                     </a>
                     <span class="hh-card-meta">
                       <span class="muted small">{pastor.position || t("org.pastor")}</span>
+                      {counts.get(pastor.id) ? (
+                        <span class="pastor-tag">
+                          {t("org.childrenShort")}: {Number(counts.get(pastor.id)!.children)}
+                          {Number(counts.get(pastor.id)!.hopeSchool) > 0
+                            ? ` · ${t("org.hopeShort")} ${Number(counts.get(pastor.id)!.hopeSchool)}`
+                            : ""}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 </div>
@@ -440,8 +474,9 @@ export function PastorDetailPage(props: Common & {
   pastor: PastorRow;
   history?: PastorHistoryRow[];
   historyRegions?: { id: number; name: string }[];
+  childRows?: PastorChildRow[];
 }) {
-  const { user, perms, flash, lang, pastor, history = [], historyRegions = [] } = props;
+  const { user, perms, flash, lang, pastor, history = [], historyRegions = [], childRows = [] } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const photo = pastorPhotoUrl(pastor);
@@ -455,6 +490,12 @@ export function PastorDetailPage(props: Common & {
     : pastor.maritalStatus === "married" ? t("org.married")
       : pastor.maritalStatus === "widowed" ? t("org.widowed")
         : pastor.maritalStatus === "divorced" ? t("org.divorced") : pastor.maritalStatus;
+  const tenure = ministryTenure(pastor.ministryStartDate ?? pastor.ordinationDate, todayInYangon());
+  const tenureText = tenure
+    ? tenure.years > 0
+      ? `${tenure.years} ${t("org.yearsUnit")}${tenure.months > 0 ? ` ${tenure.months} ${t("org.monthsUnit")}` : ""}`
+      : `${tenure.months} ${t("org.monthsUnit")}`
+    : null;
   const rows: [string, string | null][] = [
     [t("org.pastorTitle"), pastor.title],
     [t("org.pastorPosition"), pastor.position],
@@ -463,7 +504,10 @@ export function PastorDetailPage(props: Common & {
     [t("form.gender"), gender],
     [t("form.marital"), marital],
     [t("form.dob"), pastor.dateOfBirth],
+    [t("org.salvationDate"), pastor.salvationDate],
     [t("org.ordinationDate"), pastor.ordinationDate],
+    [t("org.ministryStart"), pastor.ministryStartDate],
+    [t("org.ministryYears"), tenureText],
     [t("detail.phone"), pastor.phone],
     [t("form.email"), pastor.email],
     [t("detail.address"), pastor.address],
@@ -534,6 +578,13 @@ export function PastorDetailPage(props: Common & {
           </div>
         </div>
       </div>
+
+      <PastorChildrenCard
+        pastorId={pastor.id}
+        rows={childRows}
+        canManage={canUpdate}
+        lang={L}
+      />
 
       <PastorHistoryCard
         pastorId={pastor.id}

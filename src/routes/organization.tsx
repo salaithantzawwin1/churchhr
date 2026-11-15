@@ -20,6 +20,11 @@ import { diffPositionDefs, loadPositionHistory, recordPositionHistory } from "..
 import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isConfigurableScope, isPastorPositionCode, positionDefLabel, type ConfigurablePositionScope, type PositionDefRow } from "../position-catalog";
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
+import {
+  childValues, loadPastorChild, loadPastorChildCounts, loadPastorChildren,
+  readChildForm, type PastorChildValues,
+} from "../pastor-children";
+import { PastorChildrenModal } from "../views/pastor-children";
 import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
 import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues } from "../pastor-history";
 import { positionTaken } from "../positions";
@@ -2149,6 +2154,8 @@ function pastorFormFields(body: Record<string, unknown>) {
     email: s(body.email).slice(0, 120),
     address: s(body.address).slice(0, 300),
     ordinationDate: parseDateFlexible(s(body.ordination_date)) ?? "",
+    salvationDate: parseDateFlexible(s(body.salvation_date)) ?? "",
+    ministryStartDate: parseDateFlexible(s(body.ministry_start_date)) ?? "",
     notes: s(body.notes).slice(0, 1000),
     spouseId: asInt(s(body.spouse_pastor_id)),
   };
@@ -2163,6 +2170,7 @@ organizationRoutes.get("/pastors", requireAnyPermission("pastors.view", "pastors
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
       lang={c.get("lang")}
       pastors={await loadPastors(db, { activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds })}
+      childCounts={await loadPastorChildCounts(db, scope)}
       regions={await orgRegions(db, scope, c.get("lang"))}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
       region={intParam(c.req.query("region"))}
@@ -2217,6 +2225,7 @@ organizationRoutes.get("/pastors/:id", requireAnyPermission("pastors.view", "pas
     <PastorDetailPage
       pastor={pastor}
       history={await loadPastorHistory(db, id)}
+      childRows={await loadPastorChildren(db, id)}
       historyRegions={await orgRegions(db, scope, c.get("lang"))}
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -2267,6 +2276,8 @@ organizationRoutes.post("/pastors", requirePermission("pastors.manage"), async (
     email: f.email,
     address: f.address,
     ordinationDate: f.ordinationDate,
+    salvationDate: f.salvationDate,
+    ministryStartDate: f.ministryStartDate,
     notes: f.notes,
     sortOrder,
     active: true,
@@ -2297,10 +2308,12 @@ organizationRoutes.post("/pastors", requirePermission("pastors.manage"), async (
   }
   await db.run(sql`
     INSERT INTO pastors (name, name_en, title, position, gender, marital_status, date_of_birth,
-                         region_id, regional_church_id, phone, email, address, ordination_date, notes, active, sort_order)
+                         region_id, regional_church_id, phone, email, address, ordination_date,
+                         salvation_date, ministry_start_date, notes, active, sort_order)
     VALUES (${f.name}, ${f.nameEn || null}, ${f.title || null}, ${f.position || null},
             ${f.gender}, ${f.maritalStatus}, ${f.dateOfBirth || null}, ${f.regionId}, ${f.churchId},
             ${f.phone || null}, ${f.email || null}, ${f.address || null}, ${f.ordinationDate || null},
+            ${f.salvationDate || null}, ${f.ministryStartDate || null},
             ${f.notes || null}, 1, ${sortOrder})`);
   const created = await db.all<{ id: number }>(sql`
     SELECT id FROM pastors WHERE name = ${f.name} AND region_id = ${f.regionId}
@@ -2342,6 +2355,8 @@ organizationRoutes.post("/pastors/:id", requirePermission("pastors.manage"), asy
     email: f.email,
     address: f.address,
     ordinationDate: f.ordinationDate,
+    salvationDate: f.salvationDate,
+    ministryStartDate: f.ministryStartDate,
     notes: f.notes,
     sortOrder,
     active: active === 1,
@@ -2378,6 +2393,8 @@ organizationRoutes.post("/pastors/:id", requirePermission("pastors.manage"), asy
            date_of_birth = ${f.dateOfBirth || null}, region_id = ${regionId},
            regional_church_id = ${f.churchId}, phone = ${f.phone || null}, email = ${f.email || null},
            address = ${f.address || null}, ordination_date = ${f.ordinationDate || null},
+           salvation_date = ${f.salvationDate || null},
+           ministry_start_date = ${f.ministryStartDate || null},
            notes = ${f.notes || null}, active = ${active}, sort_order = ${sortOrder},
            updated_at = unixepoch()
      WHERE id = ${id}`);
@@ -2399,6 +2416,9 @@ organizationRoutes.post("/pastors/:id/delete", requirePermission("pastors.manage
     SELECT COUNT(*) AS n FROM cluster_pastor_assignments WHERE pastor_id = ${id}`);
   if ((used[0]?.n ?? 0) > 0) return c.redirect("/organization/pastors?err=pastor-in-use", 303);
   await db.run(sql`UPDATE pastors SET spouse_pastor_id = NULL WHERE spouse_pastor_id = ${id}`);
+  // Children belong to the pastor; drop them with the record (the table's
+  // cascade also covers this, but an explicit delete keeps older rows tidy).
+  await db.run(sql`DELETE FROM pastor_children WHERE pastor_id = ${id}`);
   await db.run(sql`DELETE FROM pastors WHERE id = ${id}`);
   return c.redirect("/organization/pastors?ok=pastor-deleted", 303);
 });
@@ -2747,4 +2767,143 @@ organizationRoutes.post("/pastors/:id/history/:hid/delete", requirePermission("p
   if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
   await db.run(sql`DELETE FROM pastor_history WHERE id = ${hid} AND pastor_id = ${id}`);
   return c.redirect(`/organization/pastors/${id}?ok=pastor-history-deleted`, 303);
+});
+
+// ---------- pastor children ----------
+// Kept beside the service history: the church's Private Hope School needs a
+// yearly count of pastor children attending, so each child carries a grade and
+// a school year that is edited once a year, plus the school they attend.
+
+function pastorLabelOf(pastor: PastorRow, lang: string): string {
+  const name = pastorName(pastor, lang);
+  return pastor.title ? `${pastor.title} ${name}` : name;
+}
+
+/** Father/mother line for the child form: the pastor and the linked spouse.
+ *  A female pastor fills the mother slot and the spouse the father one. */
+function childParents(pastor: PastorRow, lang: string): { father: string; mother: string } {
+  const self = pastorLabelOf(pastor, lang);
+  const spouse = pastor.spousePastorId != null
+    ? (lang !== "mm" && pastor.spouseNameEn ? pastor.spouseNameEn : pastor.spouseName) ?? ""
+    : "";
+  return pastor.gender === "female"
+    ? { father: spouse, mother: self }
+    : { father: self, mother: spouse };
+}
+
+async function childPastor(c: any, id: number) {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const pastor = await loadPastor(db, id, {
+    activeOnly: false, scopeAll: scope.scopeAll, stateIds: scope.stateIds,
+  });
+  return { db, scope, pastor };
+}
+
+organizationRoutes.get("/pastors/:id/children/new", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/pastors/${id}`, 303);
+  return c.html(
+    <PastorChildrenModal
+      pastorId={id}
+      values={childValues()}
+      parents={childParents(pastor, c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/pastors/:id/children/:cid/edit", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const cid = intParam(c.req.param("cid"));
+  if (!id || !cid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const row = await loadPastorChild(db, id, cid);
+  if (!row) return c.redirect(`/organization/pastors/${id}?err=err-notfound`, 303);
+  if (!modalRequest(c)) return c.redirect(`/organization/pastors/${id}`, 303);
+  return c.html(
+    <PastorChildrenModal
+      pastorId={id}
+      childId={cid}
+      values={childValues(row)}
+      parents={childParents(pastor, c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.post("/pastors/:id/children", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readChildForm(body as Record<string, unknown>, t, { editing: false });
+  const modal = modalRequest(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+    return c.html(
+      <PastorChildrenModal pastorId={id} values={values} parents={childParents(pastor, lang)}
+        errors={errors} lang={lang} />,
+      422,
+    );
+  }
+  await db.run(sql`
+    INSERT INTO pastor_children (pastor_id, name, name_en, gender, date_of_birth, grade,
+                                 academic_year, at_hope_school, school, notes, active,
+                                 created_by, updated_at)
+    VALUES (${id}, ${data.name}, ${data.nameEn}, ${data.gender}, ${data.dateOfBirth}, ${data.grade},
+            ${data.academicYear}, ${data.atHopeSchool}, ${data.school}, ${data.notes}, ${data.active},
+            ${c.get("user").id}, unixepoch())`);
+  const landing = `/organization/pastors/${id}?ok=pastor-child-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+organizationRoutes.post("/pastors/:id/children/:cid/edit", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const cid = intParam(c.req.param("cid"));
+  if (!id || !cid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const row = await loadPastorChild(db, id, cid);
+  if (!row) return c.redirect(`/organization/pastors/${id}?err=err-notfound`, 303);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readChildForm(body as Record<string, unknown>, t, { editing: true });
+  const modal = modalRequest(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+    return c.html(
+      <PastorChildrenModal pastorId={id} childId={cid} values={values}
+        parents={childParents(pastor, lang)} errors={errors} lang={lang} />,
+      422,
+    );
+  }
+  await db.run(sql`
+    UPDATE pastor_children
+       SET name = ${data.name}, name_en = ${data.nameEn}, gender = ${data.gender},
+           date_of_birth = ${data.dateOfBirth}, grade = ${data.grade},
+           academic_year = ${data.academicYear}, at_hope_school = ${data.atHopeSchool},
+           school = ${data.school}, notes = ${data.notes}, active = ${data.active},
+           updated_at = unixepoch()
+     WHERE id = ${cid} AND pastor_id = ${id}`);
+  const landing = `/organization/pastors/${id}?ok=pastor-child-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+organizationRoutes.post("/pastors/:id/children/:cid/delete", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const cid = intParam(c.req.param("cid"));
+  if (!id || !cid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  await db.run(sql`DELETE FROM pastor_children WHERE id = ${cid} AND pastor_id = ${id}`);
+  return c.redirect(`/organization/pastors/${id}?ok=pastor-child-deleted`, 303);
 });

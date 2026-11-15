@@ -1754,6 +1754,14 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--card);
   color: var(--muted); font-size: 12px; line-height: 1.7;
 }
+
+/* Pastor children card: the Hope School count is the number the church tracks,
+   so it gets its own chips above the table. */
+.child-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+.child-stats .pastor-tag strong { color: var(--ink); font-weight: 700; }
+.child-table td { vertical-align: top; }
+.child-table .badge { white-space: nowrap; }
+.child-parents { margin: 0 0 12px; }
 .pastor-actions { gap: 8px; }
 .pastor-actions .btn { min-width: 86px; }
 .pastor-actions form.pastor-delete { display: flex; }

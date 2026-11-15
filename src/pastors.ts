@@ -16,6 +16,8 @@ export type PastorRow = {
   email: string | null;
   address: string | null;
   ordinationDate: string | null;
+  salvationDate: string | null;
+  ministryStartDate: string | null;
   notes: string | null;
   active: number;
   sortOrder: number;
@@ -53,6 +55,7 @@ export async function loadPastors(db: DB, opts: PastorFilter = {}): Promise<Past
            p.marital_status AS maritalStatus, p.date_of_birth AS dateOfBirth,
            p.region_id AS regionId, p.regional_church_id AS regionalChurchId,
            p.phone, p.email, p.address, p.ordination_date AS ordinationDate,
+           p.salvation_date AS salvationDate, p.ministry_start_date AS ministryStartDate,
            p.notes, p.active, p.sort_order AS sortOrder,
            r.name AS stateName, r.name_en AS stateNameEn,
            rc.name AS churchName, rc.name_en AS churchNameEn,
