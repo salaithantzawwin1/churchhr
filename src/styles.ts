@@ -1256,6 +1256,31 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   .gap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* The 7-day reports table does not fit a phone: the number columns scrolled out
+   of view behind the state name. On narrow screens each row becomes a line of
+   labelled values instead of a horizontally scrolling table. */
+@media (max-width: 640px) {
+  .rep-tbl-wrap { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+  table.list-tbl.dash-rep-tbl { min-width: 0; border: 0; background: transparent; }
+  .dash-rep-tbl thead { display: none; }
+  .dash-rep-tbl tbody { display: block; }
+  .dash-rep-tbl tr {
+    /* Fixed three-up metric row: flex wrapped "Pending review" onto its own
+       line at phone widths even when it would have fitted. */
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: baseline; gap: 4px 10px;
+    padding: 10px 2px; border-bottom: 1px solid var(--line);
+  }
+  .dash-rep-tbl tr:last-child { border-bottom: 0; padding-bottom: 0; }
+  /* Two classes + element outrank the shared .list-tbl padding further down. */
+  table.list-tbl.dash-rep-tbl td { padding: 0; border: 0; white-space: normal; font-size: 13px; vertical-align: baseline; }
+  table.list-tbl.dash-rep-tbl td.dash-rep-state { grid-column: 1 / -1; font-weight: 600; }
+  table.list-tbl.dash-rep-tbl td.num { display: inline-flex; align-items: baseline; gap: 6px; text-align: left; }
+  table.list-tbl.dash-rep-tbl td.num::before {
+    content: attr(data-label); color: var(--muted); font-size: 11.5px; font-weight: 500;
+  }
+}
+
 /* age-group distribution */
 .age-list { display: flex; flex-direction: column; gap: 12px; }
 /* Says what the bar length means: each bar is measured against the biggest age
@@ -1269,6 +1294,13 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .age-row .a-bar .m { background: var(--male); height: 100%; }
 .age-row .a-bar .f { background: var(--female); height: 100%; }
 .age-row .a-sub { display: flex; gap: 10px; margin-top: 4px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+/* Dot markers tie each count to the colour it has inside the bar above. */
+.age-row .a-sub .gm::before, .age-row .a-sub .gf::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 4px; vertical-align: 1px;
+}
+.age-row .a-sub .gm::before { background: var(--male); }
+.age-row .a-sub .gf::before { background: var(--female); }
 /* Age group rows double as a drill-down into the member list. */
 .age-row-link {
   display: block; color: inherit; text-decoration: none; padding: 5px 7px; margin: -5px -7px;
@@ -2771,8 +2803,9 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 @media (max-width: 640px) {
   .nav-admin {
     display: block; flex-basis: 100%; order: 20;
-    margin: 3px 0 0 7px; padding-left: 7px;
-    border-left: 1px solid rgba(255,255,255,.3);
+    /* No left rule: this row starts on its own line, so the divider only read
+       as a stray mark beside the label. */
+    margin: 3px 0 0;
   }
   /* Members is a primary destination: it stays on the same row as the other
      links, so only Administration gets its own labelled row. */

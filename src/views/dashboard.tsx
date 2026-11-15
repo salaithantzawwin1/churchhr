@@ -364,8 +364,8 @@ export function DashboardPage(props: {
           {data.reports.byState.length === 0 ? (
             <p class="muted small">{t("dash.repEmpty")}</p>
           ) : (
-            <div class="tbl-wrap">
-              <table class="list-tbl">
+            <div class="tbl-wrap rep-tbl-wrap">
+              <table class="list-tbl dash-rep-tbl">
                 <thead>
                   <tr>
                     <th>{t("dash.repState")}</th>
@@ -377,10 +377,10 @@ export function DashboardPage(props: {
                 <tbody>
                   {data.reports.byState.map((r) => (
                     <tr>
-                      <td>{stateName(r)}</td>
-                      <td class="num">{r.submitted}</td>
-                      <td class="num">{r.reviewed}</td>
-                      <td class="num">{r.pending}</td>
+                      <td class="dash-rep-state">{stateName(r)}</td>
+                      <td class="num" data-label={t("dash.repSubmitted")}>{r.submitted}</td>
+                      <td class="num" data-label={t("dash.repReviewed")}>{r.reviewed}</td>
+                      <td class="num" data-label={t("dash.repPending")}>{r.pending}</td>
                     </tr>
                   ))}
                 </tbody>
