@@ -533,6 +533,7 @@ export const KO: Record<string, string> = {
   "adm.errStateRequired": "주를 선택하세요 (또는 모든 주).",
   "adm.errStateBad": "잘못된 주입니다.",
   "adm.errRoleName": "역할 이름은 2자 이상이어야 합니다.",
+  "adm.errLastAdmin": "Super Admin 역할에서는 사용자 계정 관리와 역할 관리 권한을 제거할 수 없습니다.",
   "adm.errRoleDup": "이미 존재하는 역할 이름입니다.",
   "adm.roleSystemLocked": "시스템 역할 이름은 변경할 수 없습니다.",
   "adm.roleInUseLocked": "사용 중",

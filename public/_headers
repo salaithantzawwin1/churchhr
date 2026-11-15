@@ -1,0 +1,14 @@
+# Static assets served by the Workers assets layer. The HTML links to app.js,
+# the datepicker bundle and the stylesheet with ?v=<ASSET_V>, so a release
+# changes the URL instead of asking browsers to revalidate the same file on
+# every page view. styles.css is served by the Worker with the same policy.
+
+/app.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The logo has no version query, so it keeps a shorter life.
+/logo.png
+  Cache-Control: public, max-age=604800

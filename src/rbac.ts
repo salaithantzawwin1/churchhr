@@ -149,3 +149,8 @@ export function canManageStructure(
 
 /** Special region_id row meaning "every state". Kept out of FK constraints on purpose. */
 export const ALL_STATES_WILDCARD = 0;
+
+/** Seeded Super Admin role. It is the one role the seeded database guarantees
+ *  can manage accounts and roles, so the UI must never strip those rights from
+ *  it — there would be no way back in through the app. */
+export const SUPER_ADMIN_ROLE_ID = 1;

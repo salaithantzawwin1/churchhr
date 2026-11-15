@@ -164,7 +164,9 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   const access = resolved.access;
-  c.set("user", user);
+  // The navigation needs to know whether an account is state-limited: some
+  // admin pages are app-wide and only all-state accounts may open them.
+  c.set("user", { ...user, allStates: access.scopeAll });
   c.set("perms", access.perms);
   c.set("scopeAll", access.scopeAll);
   c.set("stateIds", access.stateIds);

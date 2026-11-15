@@ -154,6 +154,40 @@ describe("app-wide account and role settings", () => {
   });
 });
 
+describe("role and account safety", () => {
+  it("keeps account and role management on the seeded Super Admin role", async () => {
+    const res = await postAs("/admin/roles/1", ADMIN_ID, {
+      name: "Super Admin",
+      description: "",
+      permissions: "members.view",
+    });
+    expect(res.status).toBe(302);
+    const rows = await env.DB.prepare(
+      "SELECT permission FROM role_permissions WHERE role_id = 1",
+    ).all<{ permission: string }>();
+    const granted = new Set(rows.results.map((r) => r.permission));
+    expect(granted.has("users.manage")).toBe(true);
+    expect(granted.has("roles.manage")).toBe(true);
+  });
+
+  it("hides app-wide admin links from a state-scoped manager", async () => {
+    const scopedHtml = await (await getAs("/members", SCOPED_ADMIN_ID)).text();
+    expect(scopedHtml).not.toContain('href="/admin/users"');
+    const adminHtml = await (await getAs("/members", ADMIN_ID)).text();
+    expect(adminHtml).toContain('href="/admin/users"');
+  });
+
+  it("advertises prerender rules on HTML pages only", async () => {
+    const page = await fetchAs("/login", undefined);
+    expect(page.headers.get("speculation-rules")).toBe('"/speculation-rules.json"');
+    const rules = await SELF.fetch(`${HOST}/speculation-rules.json`);
+    expect(rules.status).toBe(200);
+    expect(rules.headers.get("content-type")).toContain("application/speculationrules+json");
+    const body = (await rules.json()) as { prerender?: unknown[] };
+    expect(Array.isArray(body.prerender)).toBe(true);
+  });
+});
+
 describe("dashboard structure scope", () => {
   it("only offers Home Cells and Townships inside the account's states", async () => {
     const res = await getAs("/", VIEWER_ID);

@@ -63,6 +63,41 @@ app.use("*", async (c, next) => {
   }
 });
 
+/** Chromium can pre-render the page behind a link while the pointer is still
+ * deciding, so the click paints a document that is already finished instead of
+ * waiting for the Worker and D1. The rules travel as a response header (not an
+ * inline script) so the strict Content-Security-Policy keeps applying, and
+ * browsers without support keep the app.js prefetch fallback. */
+const SPECULATION_RULES = JSON.stringify({
+  prerender: [{
+    where: {
+      and: [
+        { href_matches: "/*" },
+        { not: { href_matches: "/logout*" } },
+        { not: { href_matches: "/login*" } },
+        { not: { href_matches: "/healthz*" } },
+        { not: { href_matches: "/speculation-rules.json" } },
+        { not: { href_matches: "/styles.css*" } },
+        { not: { href_matches: "/app.js*" } },
+        { not: { href_matches: "/vendor/*" } },
+        { not: { href_matches: "/members/export*" } },
+        { not: { href_matches: "/reports/export*" } },
+        { not: { href_matches: "/members/*/photo*" } },
+        { not: { href_matches: "/organization/pastors/*/photo*" } },
+        { not: { href_matches: "/branding/photo*" } },
+      ],
+    },
+    eagerness: "moderate",
+  }],
+});
+
+app.use("*", async (c, next) => {
+  await next();
+  if ((c.res.headers.get("content-type") ?? "").startsWith("text/html")) {
+    c.header("Speculation-Rules", '"/speculation-rules.json"');
+  }
+});
+
 // One canonical origin: HTTPS on www. Local dev and workers.dev are left alone.
 app.use("*", async (c, next) => {
   // Cloudflare always adds CF-Ray; Wrangler dev does not, so dev keeps its local URL.
@@ -132,6 +167,14 @@ app.get("/styles.css", (c) => {
   }
   return c.body(CSS, 200, headers);
 });
+
+/** The prerender rules advertised by the Speculation-Rules header above. */
+app.get("/speculation-rules.json", (c) =>
+  c.body(SPECULATION_RULES, 200, {
+    "Content-Type": "application/speculationrules+json",
+    "Cache-Control": "public, max-age=3600",
+  }),
+);
 
 /** Public deploy probe: verifies the Worker, D1 connection and the migrations
  * this build needs, so a release can be checked without signing in. */

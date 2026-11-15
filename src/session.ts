@@ -10,6 +10,9 @@ export type SessionUser = {
   mustChangePassword: boolean;
   /** UI language saved on the account (null until the user picks one). */
   language: string | null;
+  /** True when the account may see every state. Optional so callers that only
+   *  need the identity (e.g. the login redirect check) stay unchanged. */
+  allStates?: boolean;
 };
 
 type SessionRow = {

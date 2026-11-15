@@ -1842,7 +1842,12 @@
     l.href = href;
     document.head.appendChild(l);
   }
+  // Chromium pre-renders links from the Speculation-Rules response header, so
+  // the plain document prefetch is only the fallback for other browsers.
+  var speculationRules = !!(window.HTMLScriptElement && HTMLScriptElement.supports
+    && HTMLScriptElement.supports("speculationrules"));
   document.addEventListener("pointerover", function (e) {
+    if (speculationRules) return;
     var a = e.target && e.target.closest ? e.target.closest("a[href^='/']") : null;
     if (!a || a.target || (a.origin && a.origin !== location.origin)) return;
     prefetch(a.getAttribute("href"));

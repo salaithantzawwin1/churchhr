@@ -14,7 +14,7 @@ import { hashPassword, parseIterations } from "../auth";
 import { destroyOtherSessions } from "../session";
 import { checkPasswordPolicy } from "../password";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
-import { PERMISSIONS, type Permission } from "../rbac";
+import { PERMISSIONS, SUPER_ADMIN_ROLE_ID, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
 import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
 import { Layout } from "../views/layout";
@@ -601,6 +601,13 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), requireAllStat
   const dup = await db.select({ id: roles.id }).from(roles)
     .where(and(eq(roles.name, name), ne(roles.id, role.id))).limit(1);
   if (dup[0]) return fail(t("adm.errRoleDup"));
+  // The seeded Super Admin role is the guaranteed way back into account and
+  // role management. Unchecking either right here would lock every account out
+  // of this page with no other role holding the permission to undo it.
+  if (role.id === SUPER_ADMIN_ROLE_ID) {
+    const required = ["users.manage", "roles.manage"] as const;
+    if (required.some((p) => !perms.includes(p))) return fail(t("adm.errLastAdmin"));
+  }
   if (name !== role.name || (description || null) !== role.description) {
     await db.update(roles).set({ name, description: description || null }).where(eq(roles.id, role.id));
   }
@@ -1542,7 +1549,7 @@ adminRoutes.post("/regions/:id/delete", requirePermission("options.manage"), asy
 // view with filters, so "who changed what, when, and from which device" can be
 // answered months later without database access.
 
-adminRoutes.get("/audit", requirePermission("audit.view"), async (c) => {
+adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const lang = c.get("lang");
   const q = c.req.query();
