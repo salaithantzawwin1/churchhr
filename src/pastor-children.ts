@@ -145,7 +145,10 @@ export async function loadChildReport(
 }
 
 /** School years that appear in the report, newest first. */
-export function reportYears(rows: ChildReportRow[]): string[] {
+type YearRow = { academicYear: string | null };
+type GradeRow = { grade: string | null };
+
+export function reportYears(rows: YearRow[]): string[] {
   return Array.from(new Set(rows.map((r) => r.academicYear).filter((y): y is string => Boolean(y))))
     .sort((a, b) => b.localeCompare(a));
 }
@@ -166,7 +169,7 @@ export function compareGrades(a: string, b: string): number {
 }
 
 /** Grades that appear in the report, in school order (KG before numbers). */
-export function reportGrades(rows: ChildReportRow[]): string[] {
+export function reportGrades(rows: GradeRow[]): string[] {
   return Array.from(new Set(rows.map((r) => r.grade).filter((g): g is string => Boolean(g))))
     .sort(compareGrades);
 }

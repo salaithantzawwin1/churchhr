@@ -65,6 +65,8 @@ export const FLASH_KEYS: Record<string, string> = {
   "pastor-deleted": "flash.pastorDeleted",
   "pastor-history-saved": "flash.pastorHistorySaved",
   "pastor-history-deleted": "flash.pastorHistoryDeleted",
+  "edu-saved": "flash.eduSaved",
+  "edu-deleted": "flash.eduDeleted",
   "pastor-child-saved": "flash.childSaved",
   "pastor-child-deleted": "flash.childDeleted",
   "pastor-name-required": "pastor-name-required",

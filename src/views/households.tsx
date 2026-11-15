@@ -2,6 +2,7 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
+import type { EnrolmentSummary } from "../student-enrolments";
 import { CardViewToggle } from "./view-toggle";
 import { regionCascadeSelects } from "./hh-cascade";
 import { optionLabel, optionText, qs } from "../util";
@@ -294,8 +295,9 @@ export function HouseholdsListPage(props: Common & {
   );
 }
 
-export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[] }) {
-  const { user, perms, flash, family, members: mems, lang } = props;
+export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[] }) {
+  const { user, perms, flash, family, members: mems, lang, enrolments = [] } = props;
+  const eduByMember = new Map(enrolments.map((e) => [e.memberId, e] as const));
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -411,6 +413,13 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
                       {S[m.status] ?? m.status}
                     </div>
                   </div>
+                  {eduByMember.get(m.id) ? (
+                    <span class="hh-edu" title={eduByMember.get(m.id)!.academicYear}>
+                      {[eduByMember.get(m.id)!.grade, eduByMember.get(m.id)!.schoolKind === "hope"
+                        ? t("edu.hopeShort")
+                        : (eduByMember.get(m.id)!.schoolName || t("edu.other"))].filter(Boolean).join(" · ")}
+                    </span>
+                  ) : null}
                   <span class="hh-rel">{RELATIONSHIPS[m.relationship]?.[L === "kr" ? "ko" : L] ?? m.relationship}</span>
                   {perms.has("members.update") && (
                     <div class="hh-member-actions">

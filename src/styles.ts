@@ -3557,4 +3557,24 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   a { color: #111; text-decoration: none; }
   .print-meta { margin: 0 0 10px; color: #333; font-size: 12px; }
 }
+
+/* Education card on a member page + the parent-type matrix on the report. */
+.edu-table td { vertical-align: middle; }
+.report-matrix-card { padding: 12px 16px 4px; }
+.report-matrix-card h2 { margin: 0 0 8px; font-size: 15px; }
+.report-matrix th, .report-matrix td { padding: 8px 12px; }
+.report-matrix td.num, .report-matrix th.num { text-align: right; }
+.report-total-row td { border-top: 1px solid var(--line-strong); }
+
+/* Household member row: the child's current class and school, kept short so it
+   never pushes the relationship label off a phone. */
+.hh-edu {
+  display: inline-flex; align-items: center; padding: 1px 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  color: var(--muted); font-size: 11.5px; white-space: nowrap;
+}
+@media print {
+  .hh-edu { border-color: #999; color: #111; }
+  .report-matrix-card { border: 1px solid #ccc; }
+}
 `; // end of stylesheet

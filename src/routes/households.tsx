@@ -5,6 +5,7 @@ import { getDb, type DB } from "../db/client";
 import { families, lookupOptions, memberHistory, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
+import { loadEnrolmentSummaries, type EnrolmentSummary } from "../student-enrolments";
 import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
 import { asInt, intParam, isFutureDate, normKey, parseDateFlexible, s } from "../util";
 import { getDict, type Lang } from "../i18n";
@@ -424,10 +425,12 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
   const mems = await householdMembers(db, id);
+  // One extra read so each child shows its current class and school.
+  const enrolments = await loadEnrolmentSummaries(db, mems.map((m: any) => Number(m.id)));
   return c.html(
     <HouseholdDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
-      family={row} members={mems} rows={[]} lang={c.get("lang")}
+      family={row} members={mems} rows={[]} enrolments={enrolments} lang={c.get("lang")}
     />,
   );
 });

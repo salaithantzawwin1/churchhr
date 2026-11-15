@@ -33,6 +33,10 @@ import {
 import { BLOOD_TYPES, GENDERS, MARITAL_STATUSES, STATUSES, normEnum } from "../enums";
 import { getDict, type Lang } from "../i18n";
 import {
+  enrolmentValues, loadEnrolment, loadMemberEnrolments, readEnrolmentForm,
+} from "../student-enrolments";
+import { EnrolmentModal } from "../views/student-education";
+import {
   ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MemberPositionForm, MemberPositionPage, MembersListPage,
   type Filters, type FormValues, type ImportReport, type MemberDetail,
 } from "../views/members";
@@ -1192,7 +1196,7 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   if (!Number.isInteger(id) || id < 1) return notFound();
   // The member, their history and the position labels are independent reads:
   // one query window instead of three.
-  const [row, historyRows, positionDefs] = await Promise.all([
+  const [row, historyRows, positionDefs, enrolments] = await Promise.all([
     loadMemberDetail(db, id),
     db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
       SELECT h.id, h.action, h.created_at, u.username AS actor_name
@@ -1201,12 +1205,13 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
       ORDER BY h.created_at DESC, h.id DESC
       LIMIT 100`),
     loadPositionDefs(db),
+    loadMemberEnrolments(db, id),
   ]);
   if (!row || !inScope(row, scope)) return notFound();
   return c.html(
     <MemberDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
-      history={historyRows as any} positionDefs={positionDefs} lang={c.get("lang")}
+      history={historyRows as any} positionDefs={positionDefs} enrolments={enrolments} lang={c.get("lang")}
     />,
   );
 });
@@ -1717,6 +1722,105 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
 
 // ---------- bulk actions on selected members ----------
 
+// ---------- Education (one row per school year, Hope School or outside) ----------
+
+const educationModal = (c: { req: { header: (name: string) => string | undefined } }) =>
+  c.req.header("X-Requested-With") === "modal";
+
+/** The member behind an education route, limited to the signed-in user's scope. */
+async function educationMember(db: DB, scope: Scope, id: number) {
+  if (!Number.isInteger(id) || id < 1) return null;
+  const row = await loadMemberDetail(db, id);
+  if (!row || !inScope(row, scope)) return null;
+  return row;
+}
+
+membersRoutes.get("/:id/education/new", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const member = await educationMember(db, scopeOf(c), id);
+  if (!member) return c.redirect("/members?err=err-notfound", 302);
+  if (!educationModal(c)) return c.redirect(`/members/${id}`, 303);
+  return c.html(<EnrolmentModal memberId={id} values={enrolmentValues()} lang={c.get("lang")} />);
+});
+
+membersRoutes.get("/:id/education/:eid/edit", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const eid = Number(c.req.param("eid"));
+  const member = await educationMember(db, scopeOf(c), id);
+  if (!member) return c.redirect("/members?err=err-notfound", 302);
+  const row = Number.isInteger(eid) && eid > 0 ? await loadEnrolment(db, id, eid) : null;
+  if (!row) return c.redirect(`/members/${id}?err=err-notfound`, 303);
+  if (!educationModal(c)) return c.redirect(`/members/${id}`, 303);
+  return c.html(
+    <EnrolmentModal memberId={id} enrolmentId={row.id} values={enrolmentValues(row)} lang={c.get("lang")} />,
+  );
+});
+
+membersRoutes.post("/:id/education", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const member = await educationMember(db, scopeOf(c), id);
+  if (!member) return c.redirect("/members?err=err-notfound", 302);
+  const lang = c.get("lang");
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readEnrolmentForm(body as Record<string, unknown>, getDict(lang));
+  const modal = educationModal(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/members/${id}?err=err-invalid`, 303);
+    return c.html(<EnrolmentModal memberId={id} values={values} errors={errors} lang={lang} />, 422);
+  }
+  await db.run(sql`
+    INSERT INTO student_enrolments (member_id, academic_year, grade, school_kind, school_name,
+                                    status, notes, created_by, updated_at)
+    VALUES (${id}, ${data.academicYear}, ${data.grade}, ${data.schoolKind}, ${data.schoolName},
+            ${data.status}, ${data.notes}, ${c.get("user").id}, unixepoch())`);
+  const landing = `/members/${id}?ok=edu-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+membersRoutes.post("/:id/education/:eid/edit", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const eid = Number(c.req.param("eid"));
+  const member = await educationMember(db, scopeOf(c), id);
+  if (!member) return c.redirect("/members?err=err-notfound", 302);
+  const current = Number.isInteger(eid) && eid > 0 ? await loadEnrolment(db, id, eid) : null;
+  if (!current) return c.redirect(`/members/${id}?err=err-notfound`, 303);
+  const lang = c.get("lang");
+  const body = await c.req.parseBody();
+  const { values, errors, data } = readEnrolmentForm(body as Record<string, unknown>, getDict(lang));
+  const modal = educationModal(c);
+  if (!data) {
+    if (!modal) return c.redirect(`/members/${id}?err=err-invalid`, 303);
+    return c.html(
+      <EnrolmentModal memberId={id} enrolmentId={current.id} values={values} errors={errors} lang={lang} />,
+      422,
+    );
+  }
+  await db.run(sql`
+    UPDATE student_enrolments
+    SET academic_year = ${data.academicYear}, grade = ${data.grade}, school_kind = ${data.schoolKind},
+        school_name = ${data.schoolName}, status = ${data.status}, notes = ${data.notes},
+        updated_at = unixepoch()
+    WHERE id = ${current.id} AND member_id = ${id}`);
+  const landing = `/members/${id}?ok=edu-saved`;
+  return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+membersRoutes.post("/:id/education/:eid/delete", requirePermission("members.update"), async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  const eid = Number(c.req.param("eid"));
+  const member = await educationMember(db, scopeOf(c), id);
+  if (!member) return c.redirect("/members?err=err-notfound", 302);
+  if (Number.isInteger(eid) && eid > 0) {
+    await db.run(sql`DELETE FROM student_enrolments WHERE id = ${eid} AND member_id = ${id}`);
+  }
+  return c.redirect(`/members/${id}?ok=edu-deleted`, 303);
+});
+
 membersRoutes.post("/:id/delete", requirePermission("members.delete"), async (c) => {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -1724,6 +1828,7 @@ membersRoutes.post("/:id/delete", requirePermission("members.delete"), async (c)
   if (!Number.isInteger(id) || id < 1) return c.redirect("/members?err=err-notfound", 302);
   const existing = await loadMemberDetail(db, id);
   if (!existing || !inScope(existing, scope)) return c.redirect("/members?err=err-notfound", 302);
+  await db.run(sql`DELETE FROM student_enrolments WHERE member_id = ${id}`);
   await db.delete(members).where(eq(members.id, id));
   await db.insert(memberHistory).values({
     memberId: id, actorId: c.get("user").id, action: "delete",

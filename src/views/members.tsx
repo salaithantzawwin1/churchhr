@@ -5,6 +5,8 @@ import type { OptionRow } from "../lookup";
 import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, pluralLabel, type Lang } from "../i18n";
+import type { EnrolmentRow } from "../student-enrolments";
+import { MemberEducationCard } from "./student-education";
 import { positionLabels } from "../positions";
 import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
@@ -1104,8 +1106,8 @@ export type MemberHistoryRow = {
   created_at: number;
 };
 
-export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[] }) {
-  const { user, perms, flash, m, lang, history = [], positionDefs } = props;
+export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[]; enrolments?: EnrolmentRow[] }) {
+  const { user, perms, flash, m, lang, history = [], positionDefs, enrolments = [] } = props;
   const t = getDict(lang ?? "en");
   const ACTION_LABELS: Record<string, { mm: string; en: string; ko: string; cls: string }> = {
     create: { mm: "ထည့်သွင်း", en: "Created", ko: "생성", cls: "active" },
@@ -1227,6 +1229,13 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
           </div>
         </div>
       ))}
+      <MemberEducationCard
+        memberId={m.id}
+        rows={enrolments}
+        canManage={perms.has("members.update")}
+        lang={L}
+      />
+
       <p class="muted small">{t("detail.updatedAt")}: {stamp(m.updated_at)}</p>
 
       <div class="card" style="margin-top:18px">
