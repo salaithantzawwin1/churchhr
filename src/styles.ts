@@ -3507,4 +3507,54 @@ select option { background: var(--surface-2); color: var(--ink); }
 html.is-navigating, html.is-navigating body { cursor: progress; }
 @keyframes nav-progress-slide { 0% { transform: translateX(-45%); } 100% { transform: translateX(285%); } }
 @media (prefers-reduced-motion: reduce) { .nav-progress.is-on::before { animation: none; width: 100%; } }
+
+/* Hope School children report: one card per grade, the year totals above it. */
+.report-groups { display: grid; gap: var(--space-3); }
+.report-group { padding: 0; overflow: hidden; }
+.report-group-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 12px; flex-wrap: wrap;
+  padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.report-group-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
+.report-group-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.report-table th {
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+  text-align: left; white-space: nowrap;
+}
+.report-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.report-table tbody tr:last-child td { border-bottom: 0; }
+.report-table .num { width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.report-table .nowrap { white-space: nowrap; }
+.report-parents a { display: block; color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.report-parents a:hover { text-decoration: underline; }
+.report-parents span { display: block; }
+.print-only { display: none; }
+
+/* Printing a report: drop the app chrome so the sheet starts with the table,
+   and flip the dark theme tokens to ink on white. */
+@media print {
+  .topbar, .footer, .filters, .page-head-actions, .print-hide, .nav-progress, .scroll-hint,
+  .pagination, .modal { display: none !important; }
+  .print-only { display: block; }
+  html, body { background: #fff !important; color: #111 !important; }
+  :root {
+    --bg: #fff; --surface: #fff; --surface-2: #fff; --surface-3: #fff;
+    --ink: #111; --muted: #555; --line: #c9c9c9; --link: #111; --th-bg: #f1f1f1;
+  }
+  .container { max-width: none; padding: 0; }
+  .card { box-shadow: none; border-color: #ccc; }
+  .tbl-wrap { overflow: visible !important; }
+  .report-table { font-size: 11px; }
+  .report-table thead { display: table-header-group; }
+  .report-table tr { break-inside: avoid; }
+  .badge, .badge.active, .badge.inactive { background: none !important; border: 1px solid #999; color: #111 !important; }
+  .pastor-tag { border: 1px solid #999; color: #111; background: none; }
+  .report-group { border: 1px solid #ccc; }
+  .report-group-head { background: none; }
+  a { color: #111; text-decoration: none; }
+  .print-meta { margin: 0 0 10px; color: #333; font-size: 12px; }
+}
 `; // end of stylesheet

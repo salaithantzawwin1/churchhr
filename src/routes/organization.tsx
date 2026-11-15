@@ -21,16 +21,18 @@ import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isC
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import {
-  childValues, loadPastorChild, loadPastorChildCounts, loadPastorChildren,
-  readChildForm, type PastorChildValues,
+  HOPE_SCHOOL, childValues, loadChildReport, loadPastorChild, loadPastorChildCounts,
+  loadPastorChildren, readChildForm, reportGrades, reportYears,
+  type ChildReportRow, type PastorChildValues,
 } from "../pastor-children";
+import { ChildReportPage, applyChildReportFilters, type ChildReportFilters } from "../views/child-report";
 import { PastorChildrenModal } from "../views/pastor-children";
 import { PastorsPage, PastorModal, PastorDetailPage, PastorHistoryModal, type PastorValues, type SpouseOption } from "../views/pastors";
 import { loadPastorHistory, loadPastorHistoryRow, readHistoryForm, historyValues } from "../pastor-history";
 import { positionTaken } from "../positions";
 import { buildCsv } from "../csv";
 import { getDict, type Lang } from "../i18n";
-import { asInt, intParam, parseDateFlexible, s, todayInYangon } from "../util";
+import { ageFromDate, asInt, intParam, parseDateFlexible, s, todayInYangon } from "../util";
 
 export const organizationRoutes = new Hono<AppEnv>();
 
@@ -2160,6 +2162,96 @@ function pastorFormFields(body: Record<string, unknown>) {
     spouseId: asInt(s(body.spouse_pastor_id)),
   };
 }
+
+/** Filters of the Hope School report; unknown values fall back to "all" so a
+ *  hand-edited URL never hides every row. */
+function childReportFilters(q: Record<string, string | undefined>): ChildReportFilters {
+  const year = (q.year ?? "").trim();
+  const grade = (q.grade ?? "").trim();
+  const school = q.school === "hope" || q.school === "other" ? q.school : "";
+  return {
+    year: /^\d{4}(-\d{4})?$/.test(year) ? year : "",
+    grade: grade.slice(0, 40),
+    school,
+  };
+}
+
+/** Same filters as a query string, so the CSV link and the pickers agree. */
+function childReportQuery(f: ChildReportFilters): string {
+  const params = new URLSearchParams();
+  if (f.year) params.set("year", f.year);
+  if (f.grade) params.set("grade", f.grade);
+  if (f.school) params.set("school", f.school);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+function childGenderLabel(row: ChildReportRow, t: (key: string) => string): string {
+  if (row.gender === "male") return t("org.male");
+  if (row.gender === "female") return t("org.female");
+  return "";
+}
+
+function childParentsLabel(row: ChildReportRow): string {
+  return [row.pastorName, row.spouseName].filter(Boolean).join(" · ");
+}
+
+organizationRoutes.get("/hope-school", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
+  const db = getDb(c.env);
+  const all = await loadChildReport(db, scopeOf(c));
+  const filters = childReportFilters(c.req.query());
+  return c.html(
+    <ChildReportPage
+      rows={applyChildReportFilters(all, filters)}
+      years={reportYears(all)}
+      grades={reportGrades(all)}
+      filters={filters}
+      csvHref={`/organization/hope-school.csv${childReportQuery(filters)}`}
+      user={c.get("user")} perms={c.get("perms")}
+      flash={flashFromQuery(c.req.query(), c.get("lang"))}
+      lang={c.get("lang")}
+    />,
+  );
+});
+
+organizationRoutes.get("/hope-school.csv", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
+  const db = getDb(c.env);
+  const lang = c.get("lang");
+  const t = getDict(lang);
+  const filters = childReportFilters(c.req.query());
+  const rows = applyChildReportFilters(await loadChildReport(db, scopeOf(c)), filters);
+  const schoolText = filters.school === "hope" ? t("org.childReportHopeOnly")
+    : filters.school === "other" ? t("org.childReportOthers")
+      : t("org.childReportAllSchools");
+  const csv = "\uFEFF" + buildCsv([
+    [t("org.childReport")],
+    [t("org.childAcademicYear"), filters.year || t("org.childReportAllYears")],
+    [t("org.childGrade"), filters.grade || t("org.childReportAllGrades")],
+    [t("org.childSchool"), schoolText],
+    [],
+    [t("org.childReportTotal"), String(rows.length)],
+    [t("org.hopeSchoolChildren"), String(rows.filter((r) => r.atHopeSchool === 1).length)],
+    [t("org.childReportBoys"), String(rows.filter((r) => r.gender === "male").length)],
+    [t("org.childReportGirls"), String(rows.filter((r) => r.gender === "female").length)],
+    [],
+    [
+      t("org.childReportNo"), t("org.childName"), t("org.childNameEn"), t("org.childGender"),
+      t("org.childDob"), t("org.childAge"), t("org.childGrade"), t("org.childAcademicYear"),
+      t("org.childReportParents"), t("org.childSchool"), t("org.childNotes"),
+    ],
+    ...rows.map((r, index) => [
+      String(index + 1), r.name, r.nameEn ?? "", childGenderLabel(r, t),
+      r.dateOfBirth ?? "", ageFromDate(r.dateOfBirth) ?? "", r.grade ?? "",
+      r.academicYear ?? "", childParentsLabel(r),
+      r.atHopeSchool === 1 ? HOPE_SCHOOL : r.school ?? "", r.notes ?? "",
+    ]),
+  ]);
+  return c.body(csv, 200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="hope-school-${filters.year || "all"}.csv"`,
+    "Cache-Control": "no-store",
+  });
+});
 
 organizationRoutes.get("/pastors", requireAnyPermission("pastors.view", "pastors.manage"), async (c) => {
   const db = getDb(c.env);

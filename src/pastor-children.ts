@@ -105,6 +105,72 @@ export async function loadPastorChildCounts(
     GROUP BY c.pastor_id`);
 }
 
+/** One line of the Hope School report: the child plus the parent details the
+ *  page and the CSV both print, so no second query is needed per row. */
+export type ChildReportRow = PastorChildRow & {
+  pastorName: string;
+  pastorNameEn: string | null;
+  pastorTitle: string | null;
+  spouseName: string | null;
+  spouseNameEn: string | null;
+  stateName: string;
+  stateNameEn: string | null;
+};
+
+/** Every active child of the active pastors inside the user's states. The report
+ *  is small enough to filter and group in memory, so the page and the CSV share
+ *  this one query. */
+export async function loadChildReport(
+  db: DB,
+  scope: { scopeAll: boolean; stateIds: number[] },
+): Promise<ChildReportRow[]> {
+  const conditions = [sql`c.active = 1`, sql`p.active = 1`];
+  if (!scope.scopeAll) {
+    if (scope.stateIds.length === 0) return [];
+    conditions.push(sql`p.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
+  return db.all<ChildReportRow>(sql`
+    SELECT c.id, c.pastor_id AS pastorId, c.name, c.name_en AS nameEn, c.gender,
+           c.date_of_birth AS dateOfBirth, c.grade, c.academic_year AS academicYear,
+           c.at_hope_school AS atHopeSchool, c.school, c.notes, c.active,
+           p.name AS pastorName, p.name_en AS pastorNameEn, p.title AS pastorTitle,
+           sp.name AS spouseName, sp.name_en AS spouseNameEn,
+           r.name AS stateName, r.name_en AS stateNameEn
+    FROM pastor_children c
+    JOIN pastors p ON p.id = c.pastor_id
+    LEFT JOIN pastors sp ON sp.id = p.spouse_pastor_id
+    JOIN regions r ON r.id = p.region_id
+    WHERE ${sql.join(conditions, sql` AND `)}
+    ORDER BY COALESCE(c.academic_year, '') DESC, c.date_of_birth DESC, c.id`);
+}
+
+/** School years that appear in the report, newest first. */
+export function reportYears(rows: ChildReportRow[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.academicYear).filter((y): y is string => Boolean(y))))
+    .sort((a, b) => b.localeCompare(a));
+}
+
+/** School order of a grade label: KG first, then 1, 2, …, then anything else
+ *  (e.g. "Year 11") by its number, so a grade list reads like a school. */
+function gradeOrder(label: string): number {
+  const text = label.trim().toUpperCase();
+  if (/^(KG|K\.?G\.?|KINDERGARTEN|PRE)/.test(text)) return 0;
+  const digits = /(\d{1,2})\s*$/.exec(text);
+  if (digits) return Number(digits[1]);
+  return 100;
+}
+
+export function compareGrades(a: string, b: string): number {
+  const diff = gradeOrder(a) - gradeOrder(b);
+  return diff !== 0 ? diff : a.localeCompare(b, "en", { numeric: true, sensitivity: "base" });
+}
+
+/** Grades that appear in the report, in school order (KG before numbers). */
+export function reportGrades(rows: ChildReportRow[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.grade).filter((g): g is string => Boolean(g))))
+    .sort(compareGrades);
+}
+
 export type ChildFormResult = {
   values: PastorChildValues;
   errors: string[];

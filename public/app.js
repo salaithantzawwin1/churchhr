@@ -1858,6 +1858,15 @@
     l.href = href;
     document.head.appendChild(l);
   }
+  // Report print buttons: one tap opens the browser dialog, where the @media
+  // print rules strip the navigation, filters and action buttons.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-print]"), function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      window.print();
+    });
+  });
+
   // Chromium pre-renders links from the Speculation-Rules response header, so
   // the plain document prefetch is only the fallback for other browsers.
   var speculationRules = !!(window.HTMLScriptElement && HTMLScriptElement.supports

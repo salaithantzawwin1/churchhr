@@ -362,6 +362,7 @@ export function PastorsPage(props: Common & {
               + {t("org.addPastor")}
             </a>
           )}
+          <a class="btn secondary" href="/organization/hope-school">{t("org.childReportOpen")}</a>
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
         </div>
       </div>
