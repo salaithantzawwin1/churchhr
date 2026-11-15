@@ -736,6 +736,9 @@ th.bar-col { width: 42%; }
   .modal-body form { gap: 11px; }
   .modal-body form .form-grid { gap: 11px 12px; }
   .modal-body .field-hint { margin-top: 3px; font-size: 12px; }
+  /* "Type — Add new" is long enough to wrap in a phone sheet; a slightly
+     smaller heading keeps it on one line and gives the fields the space. */
+  .modal-head h3 { font-size: 15.5px; line-height: 1.35; }
   .stat { padding: 12px 13px; gap: 6px; }
   .stat .n { font-size: 22px; }
   .stat .ico { width: 26px; height: 26px; }

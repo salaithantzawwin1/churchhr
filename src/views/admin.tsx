@@ -974,6 +974,9 @@ export function AdminOptionsPage(props: OptionsProps) {
   const canUpdateOption = canManageStructure(perms, "update");
   const canDeleteOption = canManageStructure(perms, "delete");
   const addTitle = `${isRegion ? t("adm.regionTab") : typeLabel} — ${t("adm.addOption")}`;
+  // The sheet's own button already says "Add", so its heading names the type
+  // only: "Township — Add new" wrapped mid-phrase in a phone-width modal.
+  const addModalTitle = isRegion ? t("adm.regionTab") : typeLabel;
   // Actions sit in the last column, which is off-screen on phones until the
   // table is swiped; the hint matches the member list's scroll affordance.
   const scrollHint = (
@@ -993,7 +996,7 @@ export function AdminOptionsPage(props: OptionsProps) {
           )}
           {/* Two- and three-field editors open small, option editors wider. */}
           {canCreateOption && (
-            <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addTitle}
+            <a class="btn js-add-modal" href={`/admin/options${qs({ type, add: "1" })}`} data-modal-title={addModalTitle}
               data-modal-size={isRegion || type === "age_group" ? "sm" : "md"}>
               + {t("adm.addOption")}
             </a>

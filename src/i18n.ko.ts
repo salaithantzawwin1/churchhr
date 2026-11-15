@@ -430,7 +430,7 @@ export const KO: Record<string, string> = {
   "hh.deleteTitle": "가정 삭제",
   "hh.deleteConfirm": "이 가정을 삭제하시겠습니까? 구성원은 성도 명부에 그대로 남습니다.",
   "adm.shortCode": "타운십 코드 약어",
-  "adm.shortCodeHint": "이 타운십의 가족 그룹 번호 앞에 붙는 코드 약어입니다 (예: INS → INS_FG001). 비워 두면 이름이나 코드에서 자동으로 만듭니다.",
+  "adm.shortCodeHint": "비워 두면 자동 생성 · 예: INS → INS_FG001",
   "adm.errShortCode": "코드 약어는 영문/숫자 2–8자여야 합니다.",
   "adm.errShortCodeDup": "같은 주의 다른 타운십이 이미 이 코드 약어를 사용합니다.",
   "hh.membersLink": "성도 목록 열기",
