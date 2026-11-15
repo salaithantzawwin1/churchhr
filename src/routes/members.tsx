@@ -474,6 +474,8 @@ membersRoutes.get("/export", requirePermission("members.export"), async (c) => {
   return c.body(csv, 200, {
     "Content-Type": "text/csv; charset=utf-8",
     "Content-Disposition": `attachment; filename="members-${today}.csv"`,
+    // Personal data: never let a browser or intermediary keep the export.
+    "Cache-Control": "no-store",
   });
 });
 

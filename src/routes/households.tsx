@@ -277,8 +277,10 @@ householdsRoutes.get("/new", requirePermission("members.create"), async (c) => {
   const [allRegions, allOptions, preMemberRows, headList] = await Promise.all([
     loadRegions(db),
     loadAllOptions(db),
+    // Scoped like the form itself: a hand-made ?member= for another state must
+    // not fill the household form with that member's address and phone.
     preMemberId
-      ? db.all(sql`SELECT * FROM members m WHERE m.id = ${preMemberId}`)
+      ? db.all(sql`SELECT * FROM members m WHERE m.id = ${preMemberId} AND ${scopeCondM(scope)}`)
       : Promise.resolve([] as any[]),
     headCandidates(db, scope, preMemberId),
   ]);

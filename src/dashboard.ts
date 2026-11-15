@@ -172,13 +172,21 @@ export async function loadDashboard(
   const filterRegionsP = db.all<{ id: number; name: string; name_en: string | null }>(
     sql`SELECT id, name, name_en FROM regions WHERE ${scopeR} ORDER BY id`,
   );
+  // The Home Cell and Township pickers follow the same row scope as the page:
+  // a state manager must not read the names of structures in other states.
+  // Region 0 options are shared with every state and stay visible.
+  const optionScope = scope.scopeAll
+    ? sql`1=1`
+    : scope.stateIds.length > 0
+      ? sql`(region_id = 0 OR region_id IN (${idList()}))`
+      : sql`region_id = 0`;
   const homeCellRowsP = db.all<{ id: number; label: string; region_id: number }>(sql`
     SELECT id, label, region_id FROM lookup_options
-    WHERE type = 'home_cell' AND active = 1
+    WHERE type = 'home_cell' AND active = 1 AND ${optionScope}
     ORDER BY sort_order, label`);
   const townshipRowsP = db.all<{ id: number; label: string; region_id: number }>(sql`
     SELECT id, label, region_id FROM lookup_options
-    WHERE type = 'township' AND active = 1
+    WHERE type = 'township' AND active = 1 AND ${optionScope}
     ORDER BY sort_order, label`);
 
   // Independent reads: issued together in one wait instead of eleven (~200ms

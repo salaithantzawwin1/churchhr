@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
@@ -29,6 +30,19 @@ import { loadBranding } from "../branding";
 import { BrandingPage } from "../views/branding";
 
 export const adminRoutes = new Hono<AppEnv>();
+
+/** Accounts, roles and the login branding are app-wide, so only an all-state
+ *  administrator may change them. Without this, an account that holds
+ *  users.manage but is limited to one state could list every account, reset a
+ *  global administrator's password, hand itself a wider role, or rewrite the
+ *  permissions of the seeded Super Admin role — the exact same rule
+ *  /organization already applies to church-wide settings. */
+const requireAllStates = createMiddleware<AppEnv>(async (c, next) => {
+  if (!c.get("scopeAll")) {
+    return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={c.get("lang")} />, 403);
+  }
+  await next();
+});
 
 /** Brand photos use the same browser resizer/cap as member photos. */
 const MAX_BRAND_PHOTO_BYTES = 400 * 1024;
@@ -234,7 +248,7 @@ async function homeCellOptions(db: DB, lang: Lang = "en"): Promise<{ id: number;
 
 // ---------- Login branding ----------
 
-adminRoutes.get("/branding", requirePermission("users.manage"), async (c) => {
+adminRoutes.get("/branding", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   return c.html(
     <BrandingPage
@@ -244,7 +258,7 @@ adminRoutes.get("/branding", requirePermission("users.manage"), async (c) => {
   );
 });
 
-adminRoutes.post("/branding", requirePermission("users.manage"), async (c) => {
+adminRoutes.post("/branding", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const body = await c.req.parseBody();
   const name = s(body.church_name);
@@ -264,7 +278,7 @@ adminRoutes.post("/branding", requirePermission("users.manage"), async (c) => {
   return c.redirect("/admin/branding?ok=branding-saved", 303);
 });
 
-adminRoutes.get("/users", requirePermission("users.manage"), async (c) => {
+adminRoutes.get("/users", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   // Independent reads issued together: one wait instead of four round-trips.
   const [usersList, roleList, regionsList, homeCells] = await Promise.all([
@@ -289,7 +303,7 @@ async function loadRegionsLite(db: DB, lang: Lang = "en"): Promise<{ id: number;
   return rows.map((r) => ({ id: r.id, name: lang !== "mm" && r.name_en ? r.name_en : r.name }));
 }
 
-adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) => {
+adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = Number(c.req.param("id"));
   const t = getDict(c.get("lang"));
@@ -319,7 +333,7 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), async (c) 
 });
 
 /** Bare create-user form for the js-add-modal fetch. */
-adminRoutes.get("/users/new", requirePermission("users.manage"), async (c) => {
+adminRoutes.get("/users/new", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const [roleList, regionsList, homeCells] = await Promise.all([
     loadRoles(db), loadRegionsLite(db, c.get("lang")), homeCellOptions(db, c.get("lang")),
@@ -401,7 +415,7 @@ async function userFail(
   );
 }
 
-adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
+adminRoutes.post("/users", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const roleList: { id: number; name: string }[] = (await loadRoles(db)) as any;
@@ -435,7 +449,7 @@ adminRoutes.post("/users", requirePermission("users.manage"), async (c) => {
   return c.redirect("/admin/users?ok=user-created", 302);
 });
 
-adminRoutes.post("/users/:id", requirePermission("users.manage"), async (c) => {
+adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const id = Number(c.req.param("id"));
   const me = c.get("user").id;
@@ -497,7 +511,7 @@ function validPerms(vals: string[]): Permission[] {
   return vals.filter((v): v is Permission => set.has(v));
 }
 
-adminRoutes.get("/roles", requirePermission("roles.manage"), async (c) => {
+adminRoutes.get("/roles", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   return c.html(
     <AdminRolesPage
@@ -509,14 +523,14 @@ adminRoutes.get("/roles", requirePermission("roles.manage"), async (c) => {
 });
 
 /** Bare new-role form for the js-add-modal fetch. */
-adminRoutes.get("/roles/new", requirePermission("roles.manage"), (c) => {
+adminRoutes.get("/roles/new", requirePermission("roles.manage"), requireAllStates, (c) => {
   const lang = c.get("lang");
   return c.html(
     <RoleFormFragment lang={lang} errors={!!c.req.query("errors") ? [] : []} values={{}} />,
   );
 });
 
-adminRoutes.post("/roles", requirePermission("roles.manage"), async (c) => {
+adminRoutes.post("/roles", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const body = await c.req.parseBody({ all: true });
   const name = s(body.name);
@@ -551,7 +565,7 @@ async function loadRoleOrRedirect(db: DB, rawId: string) {
 }
 
 /** Bare edit-role form for the js-edit-modal fetch. */
-adminRoutes.get("/roles/:id/edit", requirePermission("roles.manage"), async (c) => {
+adminRoutes.get("/roles/:id/edit", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const lang = c.get("lang");
   const role = await loadRoleOrRedirect(getDb(c.env), c.req.param("id"));
   if (!role) return c.redirect("/admin/roles?err=err-notfound", 302);
@@ -562,7 +576,7 @@ adminRoutes.get("/roles/:id/edit", requirePermission("roles.manage"), async (c) 
   );
 });
 
-adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
+adminRoutes.post("/roles/:id", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
@@ -596,7 +610,7 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), async (c) => {
   return c.redirect("/admin/roles?ok=role-updated", 302);
 });
 
-adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), async (c) => {
+adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
   if (!role) return c.redirect(errRedirect("/admin/roles", getDict(c.get("lang"))("adm.errNoRole")), 302);
