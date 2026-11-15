@@ -19,6 +19,9 @@ const REVIEWER_ID = 5;
 const OTHER_AUTHOR_ID = 6;
 /** Region-1 records manager: full member CRUD, for household scope checks. */
 const RECORDS_ID = 7;
+/** Region-1 structure manager: churches/clusters in its state, and options.manage
+ *  to prove church-wide departments and positions stay all-state only. */
+const STRUCT_ID = 8;
 
 /** user id -> the raw session token used in the Cookie header. */
 const sessions = new Map<number, string>();
@@ -73,6 +76,8 @@ async function idOf(sqlText: string, value: string): Promise<number> {
 const reportId = (title: string) => idOf("SELECT id FROM activity_reports WHERE title = ?", title);
 const familyId = (name: string) => idOf("SELECT id FROM families WHERE name = ?", name);
 const memberId = (name: string) => idOf("SELECT id FROM members WHERE name_english = ?", name);
+const churchId = (name: string) => idOf("SELECT id FROM regional_churches WHERE name = ?", name);
+const clusterId = (name: string) => idOf("SELECT id FROM supervision_clusters WHERE name = ?", name);
 
 beforeAll(async () => {
   const db = env.DB;
@@ -139,8 +144,26 @@ beforeAll(async () => {
     db.prepare("INSERT INTO members (name_english, region_id, family_id, relationship, created_by) VALUES ('Out Member', 2, (SELECT id FROM families WHERE name = 'Out-of-Scope Household'), 'other', 7)"),
     db.prepare("INSERT INTO members (name_english, region_id, relationship, created_by) VALUES ('In Member', 1, '', 7)"),
     db.prepare("INSERT INTO members (name_english, region_id, relationship, created_by) VALUES ('Delete Me Member', 1, '', 7)"),
+
+    // Organization scope fixtures: region-1 and region-2 churches and clusters.
+    db.prepare("INSERT INTO roles (id, name, description, is_system) VALUES (8, 'Scoped Structure Manager', 'test', 0)"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'members.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'structures.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'structures.create')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'structures.update')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'structures.delete')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (8, 'options.manage')"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (8, 'scopedstructures', 'x', 1, 0)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (8, 8)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (8, 1)"),
+    db.prepare("INSERT INTO regional_churches (name, region_id) VALUES ('In-Scope Church', 1)"),
+    db.prepare("INSERT INTO regional_churches (name, region_id) VALUES ('Out-of-Scope Church', 2)"),
+    db.prepare("INSERT INTO regional_churches (name, region_id) VALUES ('Delete Me Church', 1)"),
+    db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('In-Scope Cluster', 1)"),
+    db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Out-of-Scope Cluster', 2)"),
+    db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Delete Me Cluster', 1)"),
   ]);
-  for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID]) {
+  for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID, STRUCT_ID]) {
     sessions.set(id, await createSession(id));
   }
 });
@@ -473,5 +496,109 @@ describe("member scope", () => {
     const forcedCsv = await forced.text();
     expect(forcedCsv).not.toContain("Out Member");
     expect(forcedCsv.trim().split("\n")).toHaveLength(1);
+  });
+});
+
+describe("organization structure scope", () => {
+  it("lists only regional churches inside the account's states", async () => {
+    const res = await getAs("/organization/regional-churches", STRUCT_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("In-Scope Church");
+    expect(html).not.toContain("Out-of-Scope Church");
+  });
+
+  it("refuses the edit form for another state's church", async () => {
+    const id = await churchId("Out-of-Scope Church");
+    const res = await getAs(`/organization/regional-churches/${id}/edit`, STRUCT_ID);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toContain("err-notfound");
+  });
+
+  it("refuses updates and deletes of another state's church", async () => {
+    const id = await churchId("Out-of-Scope Church");
+    const upd = await postAs(`/organization/regional-churches/${id}`, STRUCT_ID, {
+      name: "Hijacked Church", region_id: "2", active: "1", sort_order: "0",
+    });
+    expect(upd.status).toBe(303);
+    expect(upd.headers.get("location")).toContain("err-notfound");
+
+    const del = await postAs(`/organization/regional-churches/${id}/delete`, STRUCT_ID);
+    expect(del.status).toBe(303);
+    expect(del.headers.get("location")).toContain("err-notfound");
+
+    const row = await env.DB.prepare("SELECT name FROM regional_churches WHERE id = ?")
+      .bind(id).first<{ name: string }>();
+    expect(row?.name).toBe("Out-of-Scope Church");
+  });
+
+  it("updates and deletes a church inside its own state", async () => {
+    const id = await churchId("In-Scope Church");
+    const upd = await postAs(`/organization/regional-churches/${id}`, STRUCT_ID, {
+      name: "In-Scope Church Renamed", region_id: "1", active: "1", sort_order: "0",
+    });
+    expect(upd.status).toBe(303);
+    expect(upd.headers.get("location")).toContain("ok=regional-updated");
+    const renamed = await env.DB.prepare("SELECT name FROM regional_churches WHERE id = ?")
+      .bind(id).first<{ name: string }>();
+    expect(renamed?.name).toBe("In-Scope Church Renamed");
+
+    const doomed = await churchId("Delete Me Church");
+    const del = await postAs(`/organization/regional-churches/${doomed}/delete`, STRUCT_ID);
+    expect(del.status).toBe(303);
+    expect(del.headers.get("location")).toContain("ok=regional-deleted");
+    expect(await env.DB.prepare("SELECT id FROM regional_churches WHERE id = ?").bind(doomed).first()).toBeNull();
+  });
+
+  it("lists only clusters inside the account's states", async () => {
+    const res = await getAs("/organization/clusters", STRUCT_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("In-Scope Cluster");
+    expect(html).not.toContain("Out-of-Scope Cluster");
+  });
+
+  it("refuses updates and deletes of another state's cluster", async () => {
+    const id = await clusterId("Out-of-Scope Cluster");
+    const upd = await postAs(`/organization/clusters/${id}`, STRUCT_ID, {
+      name: "Hijacked Cluster", region_id: "2", active: "1", sort_order: "0",
+    });
+    expect(upd.status).toBe(303);
+    expect(upd.headers.get("location")).toContain("err-notfound");
+
+    const del = await postAs(`/organization/clusters/${id}/delete`, STRUCT_ID);
+    expect(del.status).toBe(303);
+    expect(del.headers.get("location")).toContain("err-notfound");
+
+    const row = await env.DB.prepare("SELECT name FROM supervision_clusters WHERE id = ?")
+      .bind(id).first<{ name: string }>();
+    expect(row?.name).toBe("Out-of-Scope Cluster");
+  });
+
+  it("updates and deletes a cluster inside its own state", async () => {
+    const id = await clusterId("In-Scope Cluster");
+    const upd = await postAs(`/organization/clusters/${id}`, STRUCT_ID, {
+      name: "In-Scope Cluster Renamed", region_id: "1", active: "1", sort_order: "0",
+    });
+    expect(upd.status).toBe(303);
+    expect(upd.headers.get("location")).toContain("ok=cluster-updated");
+
+    const doomed = await clusterId("Delete Me Cluster");
+    const del = await postAs(`/organization/clusters/${doomed}/delete`, STRUCT_ID);
+    expect(del.status).toBe(303);
+    expect(del.headers.get("location")).toContain("ok=cluster-deleted");
+    expect(await env.DB.prepare("SELECT id FROM supervision_clusters WHERE id = ?").bind(doomed).first()).toBeNull();
+  });
+
+  it("keeps church-wide departments and positions on all-state accounts", async () => {
+    expect((await getAs("/organization/departments/new", STRUCT_ID)).status).toBe(403);
+    const created = await postAs("/organization/departments", STRUCT_ID, { name: "Hijacked Department" });
+    expect(created.status).toBe(403);
+    const dept = await env.DB.prepare("SELECT id FROM church_departments WHERE name = ?")
+      .bind("Hijacked Department").first();
+    expect(dept).toBeNull();
+
+    expect((await getAs("/organization/positions", STRUCT_ID)).status).toBe(403);
+    expect((await postAs("/organization/positions/1", STRUCT_ID, { name_english: "Hijacked" })).status).toBe(403);
   });
 });
