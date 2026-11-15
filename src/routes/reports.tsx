@@ -346,18 +346,18 @@ reportsRoutes.post("/:id/submit", requirePermission("reports.create"), async (c)
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) {
-    return c.redirect(`/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`, 302);
+    return c.redirect(`/reports?err=report-not-found`, 302);
   }
   const report = await loadReport(db, id);
-  if (!report) return c.redirect(`/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`, 302);
+  if (!report) return c.redirect(`/reports?err=report-not-found`, 302);
   if (report.author_id !== user.id) {
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
   if (report.status === "reviewed") {
-    return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
+    return c.redirect(`/reports/${id}?err=report-locked`, 302);
   }
   if (!report.title.trim() || !report.body.trim()) {
-    return c.redirect(`/reports/${id}/edit?err=${encodeURIComponent(t("rep.errBody"))}`, 302);
+    return c.redirect(`/reports/${id}/edit?err=report-body-required`, 302);
   }
   const now = Math.floor(Date.now() / 1000);
   await db
@@ -419,7 +419,7 @@ reportsRoutes.post("/", requirePermission("reports.create"), async (c) => {
     .where(and(eq(activityReports.authorId, user.id), eq(activityReports.reportDate, data.report_date)))
     .limit(1);
   if (existing[0]) {
-    return c.redirect(`/reports/${existing[0].id}?err=${encodeURIComponent(t("rep.dup"))}`, 302);
+    return c.redirect(`/reports/${existing[0].id}?err=report-duplicate`, 302);
   }
 
   try {
@@ -449,7 +449,7 @@ reportsRoutes.post("/", requirePermission("reports.create"), async (c) => {
       .from(activityReports)
       .where(and(eq(activityReports.authorId, user.id), eq(activityReports.reportDate, data.report_date)))
       .limit(1);
-    if (again[0]) return c.redirect(`/reports/${again[0].id}?err=${encodeURIComponent(t("rep.dup"))}`, 302);
+    if (again[0]) return c.redirect(`/reports/${again[0].id}?err=report-duplicate`, 302);
     throw err;
   }
 });
@@ -463,7 +463,7 @@ reportsRoutes.post("/:id/review", requirePermission("reports.review"), async (c)
   const lang = c.get("lang");
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
-  const listBack = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  const listBack = `/reports?err=report-not-found`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(listBack, 302);
 
   const rows = await db
@@ -481,7 +481,7 @@ reportsRoutes.post("/:id/review", requirePermission("reports.review"), async (c)
   const body = await c.req.parseBody();
   const note = s(body.review_note);
   if (note.length > MAX_TEXT) {
-    return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errNote"))}`, 302);
+    return c.redirect(`/reports/${id}?err=report-note-required`, 302);
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -507,7 +507,7 @@ reportsRoutes.get("/:id/edit", requireAnyPermission("reports.update", "reports.c
   const lang = c.get("lang");
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
-  const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  const back = `/reports?err=report-not-found`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
 
   const report = await loadReport(db, id);
@@ -516,7 +516,7 @@ reportsRoutes.get("/:id/edit", requireAnyPermission("reports.update", "reports.c
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
   if (report.status === "reviewed") {
-    return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
+    return c.redirect(`/reports/${id}?err=report-locked`, 302);
   }
 
   const regionList = await scopedRegions(db, scope, lang);
@@ -551,7 +551,7 @@ reportsRoutes.post("/:id/edit", requireAnyPermission("reports.update", "reports.
   const lang = c.get("lang");
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
-  const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  const back = `/reports?err=report-not-found`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
 
   const report = await loadReport(db, id);
@@ -560,7 +560,7 @@ reportsRoutes.post("/:id/edit", requireAnyPermission("reports.update", "reports.
     return c.html(<ForbiddenPage path={new URL(c.req.url).pathname} lang={lang} />, 403);
   }
   if (report.status === "reviewed") {
-    return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
+    return c.redirect(`/reports/${id}?err=report-locked`, 302);
   }
 
   const body = await c.req.parseBody();
@@ -621,7 +621,7 @@ reportsRoutes.post("/:id/edit", requireAnyPermission("reports.update", "reports.
       ))
       .returning({ id: activityReports.id });
     if (!updated[0]) {
-      return c.redirect(`/reports/${id}?err=${encodeURIComponent(t("rep.errEditReviewed"))}`, 302);
+      return c.redirect(`/reports/${id}?err=report-locked`, 302);
     }
     await db.insert(reportEdits).values({
       reportId: id,
@@ -657,7 +657,7 @@ reportsRoutes.post("/:id/delete", requireAnyPermission("reports.delete", "report
   const lang = c.get("lang");
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
-  const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  const back = `/reports?err=report-not-found`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
   const report = await loadReport(db, id);
   if (!report) return c.redirect(back, 302);
@@ -692,7 +692,7 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
   const lang = c.get("lang");
   const t = getDict(lang);
   const id = Number(c.req.param("id"));
-  const back = `/reports?err=${encodeURIComponent(t("rep.errNotFound"))}`;
+  const back = `/reports?err=report-not-found`;
   if (!Number.isInteger(id) || id < 1) return c.redirect(back, 302);
 
   // The report, its edit trail and the region labels are independent reads:

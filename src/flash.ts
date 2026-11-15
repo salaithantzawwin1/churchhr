@@ -102,6 +102,7 @@ const FLASH_KEYS: Record<string, string> = {
   "err-notfound": "flash.errNotfound",
   "err-perm": "flash.errPerm",
   "err-systemrole": "flash.errSystemrole",
+  "err-invalid": "flash.errInvalid",
   "err-used": "flash.errUsed",
   "bulk.updated": "flash.bulkUpdated",
   "bulk.deleted": "flash.bulkDeleted",
@@ -109,6 +110,14 @@ const FLASH_KEYS: Record<string, string> = {
   "bulk.noAction": "flash.bulkNoAction",
   "bulk.badDepartment": "flash.bulkBadDepartment",
   "bulk.badGroup": "flash.bulkBadGroup",
+  "bulk-failed": "flash.bulkFailed",
+  // Reports arrive as codes, not sentences, so a hand-typed ?err= value can
+  // never be echoed back as an in-app message.
+  "report-not-found": "rep.errNotFound",
+  "report-locked": "rep.errEditReviewed",
+  "report-body-required": "rep.errBody",
+  "report-duplicate": "rep.dup",
+  "report-note-required": "rep.errNote",
 };
 
 /** Message for a flash/err code, or the code itself when unknown. */
@@ -124,7 +133,9 @@ export function flashFromQuery(q: Record<string, string | undefined>, lang?: Lan
   const ok = q.ok;
   const err = q.err;
   if (ok && FLASH_KEYS[ok]) return { kind: "ok", text: t(FLASH_KEYS[ok]) };
+  // Only known codes reach the banner: the query string is user-controlled, so
+  // an unrecognised value must render nothing rather than arbitrary text
+  // inside the app's own chrome.
   if (err && FLASH_KEYS[err]) return { kind: "err", text: t(FLASH_KEYS[err]) };
-  if (err) return { kind: "err", text: err }; // fallback: literal message (escaped by JSX)
   return null;
 }

@@ -1632,8 +1632,9 @@ membersRoutes.post("/bulk", requirePermission("members.update"), async (c) => {
   }
   return c.redirect(`/members?ok=${encodeURIComponent(flash)}`, 302);
   } catch (e: any) {
-    const msg = String(e?.message ?? e ?? "unknown");
-    return c.redirect("/members?err=" + encodeURIComponent("bulk.failed: " + msg.slice(0, 120)), 302);
+    // The banner shows a translated code; the driver text stays in the log.
+    console.error("bulk member action failed:", e);
+    return c.redirect("/members?err=bulk-failed", 302);
   }
 });
 
