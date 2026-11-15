@@ -821,7 +821,7 @@ async function ensureOption(
     const fresh = await db.select().from(lookupOptions)
       .where(and(eq(lookupOptions.type, type), eq(lookupOptions.label, label), eq(lookupOptions.regionId, regionId))).limit(1);
     if (fresh[0]) return fresh[0].id;
-    throw new Error(`${renderMsg(msg("imp.cannotAddOption"), lang)}: ${label}`);
+    throw new Error(`${msg("imp.cannotAddOption")}: ${label}`);
   }
 }
 
@@ -956,8 +956,13 @@ membersRoutes.post("/import", requirePermission("members.import"), async (c) => 
     if (validRows.length > 0) report.csvB64 = b64encode(csvText);
     return c.html(<ImportPage user={c.get("user")} perms={c.get("perms")} report={report} error={null} lang={lang} />);
   } catch (e) {
-    const msgRaw = e instanceof Error ? e.message : msg("imp.failed");
-    return renderError(msgRaw);
+    // A message this import raised on purpose carries an "@key" that the page
+    // translates; anything else is a driver/D1 failure, which stays in the log
+    // so a raw SQL string never reaches the page.
+    const raw = e instanceof Error ? e.message : "";
+    const intended = raw.startsWith("@");
+    if (!intended) console.error("member import failed:", e);
+    return renderError(intended ? raw : msg("imp.failed"));
   }
 });
 

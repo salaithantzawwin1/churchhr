@@ -308,7 +308,7 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), requireAll
   const id = Number(c.req.param("id"));
   const t = getDict(c.get("lang"));
   if (!Number.isInteger(id) || id < 1 || id === c.get("user").id) {
-    return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
+    return c.redirect(errRedirect("/admin/users", "adm.errSelfEdit"), 302);
   }
   // Accounts, both selection sets and the picker options are independent: one
   // query window instead of seven round-trips.
@@ -320,7 +320,7 @@ adminRoutes.get("/users/:id/edit", requirePermission("users.manage"), requireAll
     homeCellOptions(db, c.get("lang")),
   ]);
   const target = usersList.find((u) => u.id === id);
-  if (!target) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
+  if (!target) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
   return c.html(
     <AdminUserEditPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -403,7 +403,7 @@ async function userFail(
   const t = getDict(c.get("lang"));
   const errors = p.errors.map((e) => (e.startsWith("adm.") ? t(e) : e));
   if (c.req.header("X-Requested-With") !== "modal") {
-    return c.redirect(errRedirect("/admin/users", errors.map(renderKey(t)).join(" ")), 302);
+    return c.redirect(errRedirect("/admin/users", p.errors.join(",")), 302);
   }
   return c.html(
     <UserFormFragment
@@ -455,7 +455,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   const me = c.get("user").id;
   const t = getDict(c.get("lang"));
   if (!Number.isInteger(id) || id < 1 || id === me) {
-    return c.redirect(errRedirect("/admin/users", t("adm.errSelfEdit")), 302);
+    return c.redirect(errRedirect("/admin/users", "adm.errSelfEdit"), 302);
   }
   const roleList: { id: number; name: string }[] = (await loadRoles(db)) as any;
   const allRegions = await loadRegionsLite(db, c.get("lang"));
@@ -463,7 +463,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   const p = parseUserBody(body, t);
   p.id = id;
   const target = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, id)).limit(1);
-  if (!target[0]) return c.redirect(errRedirect("/admin/users", t("adm.errNoAccount")), 302);
+  if (!target[0]) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
   const dup = await db.select({ id: users.id }).from(users)
     .where(eq(users.username, p.username)).limit(1);
   if (dup[0] && dup[0].id !== id) p.errors.push(t("adm.errDupUser"));
@@ -538,16 +538,16 @@ adminRoutes.post("/roles", requirePermission("roles.manage"), requireAllStates, 
   const perms = validPerms(multi(body.permissions));
   const t = getDict(c.get("lang"));
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const fail = (msg: string) =>
+  const fail = (key: string) =>
     fromModal
       ? c.html(
-          <RoleFormFragment lang={c.get("lang")} errors={[msg]} values={{ name, description, permissions: perms }} />,
+          <RoleFormFragment lang={c.get("lang")} errors={[renderKey(t)(key)]} values={{ name, description, permissions: perms }} />,
           400,
         )
-      : c.redirect(errRedirect("/admin/roles", msg), 302);
-  if (name.length < 2) return fail(t("adm.errRoleName"));
+      : c.redirect(errRedirect("/admin/roles", key), 302);
+  if (name.length < 2) return fail("adm.errRoleName");
   const dup = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, name)).limit(1);
-  if (dup[0]) return fail(t("adm.errRoleDup"));
+  if (dup[0]) return fail("adm.errRoleDup");
   const created = await db.insert(roles)
     .values({ name, description: description || null, isSystem: 0 })
     .returning({ id: roles.id });
@@ -580,33 +580,33 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), requireAllStat
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
-  if (!role) return c.redirect(errRedirect("/admin/roles", t("adm.errNoRole")), 302);
+  if (!role) return c.redirect(errRedirect("/admin/roles", "adm.errNoRole"), 302);
   const body = await c.req.parseBody({ all: true });
   const perms = validPerms(multi(body.permissions));
   // Seeded system roles keep their fixed names (the UI translates them by id).
   const name = role.isSystem === 1 ? role.name : (s(body.name) || role.name).trim();
   const description = s(body.description).trim();
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const fail = (msg: string) => {
+  const fail = (key: string) => {
     const info: AdminRoleRow = {
       id: role.id, name, description: description || role.description,
       is_system: role.isSystem, permissions: perms, user_count: 0,
     };
     return fromModal
-      ? c.html(<RoleFormFragment lang={c.get("lang")} edit existing={info} errors={[msg]} />, 400)
-      : c.redirect(errRedirect("/admin/roles", msg), 302);
+      ? c.html(<RoleFormFragment lang={c.get("lang")} edit existing={info} errors={[renderKey(t)(key)]} />, 400)
+      : c.redirect(errRedirect("/admin/roles", key), 302);
   };
-  if (name.length < 2 || name.length > 60) return fail(t("adm.errRoleName"));
-  if (description.length > 160) return fail(t("adm.errRoleDesc"));
+  if (name.length < 2 || name.length > 60) return fail("adm.errRoleName");
+  if (description.length > 160) return fail("adm.errRoleDesc");
   const dup = await db.select({ id: roles.id }).from(roles)
     .where(and(eq(roles.name, name), ne(roles.id, role.id))).limit(1);
-  if (dup[0]) return fail(t("adm.errRoleDup"));
+  if (dup[0]) return fail("adm.errRoleDup");
   // The seeded Super Admin role is the guaranteed way back into account and
   // role management. Unchecking either right here would lock every account out
   // of this page with no other role holding the permission to undo it.
   if (role.id === SUPER_ADMIN_ROLE_ID) {
     const required = ["users.manage", "roles.manage"] as const;
-    if (required.some((p) => !perms.includes(p))) return fail(t("adm.errLastAdmin"));
+    if (required.some((p) => !perms.includes(p))) return fail("adm.errLastAdmin");
   }
   if (name !== role.name || (description || null) !== role.description) {
     await db.update(roles).set({ name, description: description || null }).where(eq(roles.id, role.id));
@@ -620,7 +620,7 @@ adminRoutes.post("/roles/:id", requirePermission("roles.manage"), requireAllStat
 adminRoutes.post("/roles/:id/delete", requirePermission("roles.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
   const role = await loadRoleOrRedirect(db, c.req.param("id"));
-  if (!role) return c.redirect(errRedirect("/admin/roles", getDict(c.get("lang"))("adm.errNoRole")), 302);
+  if (!role) return c.redirect(errRedirect("/admin/roles", "adm.errNoRole"), 302);
   if (role.isSystem === 1) return c.redirect(errRedirect("/admin/roles", "err-systemrole"), 302);
   // A role that still grants rights to an account may not disappear: deleting it
   // would silently strip those users of every permission (and lock them out).
@@ -865,30 +865,30 @@ adminRoutes.post("/options", requireAnyPermission("options.manage", "structures.
   const churches = (await loadRegionalChurches(db, {
     activeOnly: true, scopeAll: isOptionsAdmin(scope), stateIds: scope.stateIds,
   })).map((church) => ({ id: church.id, name: regionalChurchName(church, c.get("lang")), regionId: church.regionId }));
-  const fail = (msg: string) =>
+  const fail = (key: string) =>
     fromModal
       ? c.html(
-          <AddOptionForm type={type} lang={c.get("lang")} errors={[msg]} value={label}
+          <AddOptionForm type={type} lang={c.get("lang")} errors={[renderKey(t)(key)]} value={label}
             regions={stateList} regionId={s(body.region_id)} parentId={s(body.parent_id)}
             churches={churches} churchId={s(body.regional_church_id)}
             shortCode={s(body.short_code)}
             lockRegion={!isOptionsAdmin(scope) && stateList.length === 1} allowAllStates={isOptionsAdmin(scope)} modal />,
           400,
         )
-      : c.redirect(errRedirect(back, msg), 302);
+      : c.redirect(errRedirect(back, key), 302);
   if (!canStructure(c, "create")) return forbidden(c);
   if (!canManageType(scope, type)) return forbidden(c);
-  if (!isOptionType(type)) return fail(t("adm.errOptionType"));
-  if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
+  if (!isOptionType(type)) return fail("adm.errOptionType");
+  if (label.length < 1 || label.length > 120) return fail("adm.errLabelRequired");
   const regionId = await parseRegionId(db, body.region_id);
-  if (regionId === false) return fail(t("adm.errStateBad"));
+  if (regionId === false) return fail("adm.errStateBad");
   const parentType = PARENT_TYPE[type];
   const parentId = await parseParentId(db, body.parent_id, parentType);
-  if (parentId === false) return fail(t("adm.errParentBad"));
+  if (parentId === false) return fail("adm.errParentBad");
   const all = await loadAllOptions(db);
   // Same label may exist per state (or once as an all-states option), so the
   // duplicate check is scoped to this region.
-  if (findOption(all, type, label, regionId)) return fail(t("adm.errLabelDup"));
+  if (findOption(all, type, label, regionId)) return fail("adm.errLabelDup");
   // A parented option inherits its parent's state; an all-states parent means
   // the child is all-states too unless a state was picked explicitly.
   let anchorRegion = regionId;
@@ -898,10 +898,10 @@ adminRoutes.post("/options", requireAnyPermission("options.manage", "structures.
   }
   // State managers may only anchor options inside their own states. When a
   // parent is chosen its state wins — verify that state, not the picked one.
-  if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
+  if (!canManageOption(scope, anchorRegion)) return fail("adm.errStateBad");
   // Township short code = prefix of its Family Group codes (INS -> INS_FG001).
   const rawShort = s(body.short_code);
-  if (type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail(t("adm.errShortCode"));
+  if (type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail("adm.errShortCode");
   let code = await nextOptionCode(db, type);
   const shortCode = type === "township" ? (rawShort.toUpperCase() || abbrevFromLabel(label) || null) : null;
   let familyTownship: OptionRow | null = null;
@@ -917,7 +917,7 @@ adminRoutes.post("/options", requireAnyPermission("options.manage", "structures.
     const clashShort = await db.all<{ id: number }>(
       sql`SELECT id FROM lookup_options WHERE type = 'township' AND region_id = ${anchorRegion} AND short_code = ${shortCode} LIMIT 1`,
     );
-    if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
+    if (clashShort[0]) return fail("adm.errShortCodeDup");
   }
   let regionalChurchId: number | null = null;
   if (type === "home_cell") {
@@ -926,7 +926,7 @@ adminRoutes.post("/options", requireAnyPermission("options.manage", "structures.
       const n = Number(rawChurch);
       if (!Number.isInteger(n) || n < 1 ||
           !churches.some((church) => church.id === n && church.regionId === anchorRegion)) {
-        return fail(t("adm.errChurchBad"));
+        return fail("adm.errChurchBad");
       }
       regionalChurchId = n;
     }
@@ -1108,7 +1108,7 @@ adminRoutes.post("/options/:id", requireAnyPermission("options.manage", "structu
   const churches = (await loadRegionalChurches(db, {
     activeOnly: true, scopeAll: admin, stateIds: scope.stateIds,
   })).map((church) => ({ id: church.id, name: regionalChurchName(church, c.get("lang")), regionId: church.regionId }));
-  const fail = (msg: string) => {
+  const fail = (key: string) => {
     const fp = {
       id, label, lang: c.get("lang"), type: current.type, regions: stateList, parentOptions, churches,
       lockRegion: !admin && stateList.length === 1,
@@ -1120,14 +1120,14 @@ adminRoutes.post("/options/:id", requireAnyPermission("options.manage", "structu
       churchId: s(body.regional_church_id),
     };
     return fromModal
-      ? c.html(<EditOptionForm {...fp} errors={[msg]} modal />, 400)
-      : c.redirect(errRedirect(back, msg), 302);
+      ? c.html(<EditOptionForm {...fp} errors={[renderKey(t)(key)]} modal />, 400)
+      : c.redirect(errRedirect(back, key), 302);
   };
-  if (label.length < 1 || label.length > 120) return fail(t("adm.errLabelRequired"));
-  if (regionId === false) return fail(t("adm.errStateBad"));
-  if (parentId === false) return fail(t("adm.errParentBad"));
+  if (label.length < 1 || label.length > 120) return fail("adm.errLabelRequired");
+  if (regionId === false) return fail("adm.errStateBad");
+  if (parentId === false) return fail("adm.errParentBad");
   const clash = findOption(allOpts, current.type, label, regionId);
-  if (clash && clash.id !== id) return fail(t("adm.errLabelDup"));
+  if (clash && clash.id !== id) return fail("adm.errLabelDup");
   let anchorRegion = regionId;
   if (parentId != null) {
     const parent = allOpts.find((o) => o.id === parentId);
@@ -1135,26 +1135,26 @@ adminRoutes.post("/options/:id", requireAnyPermission("options.manage", "structu
   }
   // State managers cannot move an option out of their own states (or onto an
   // all-states parent) — re-verify the target anchor before saving.
-  if (!canManageOption(scope, anchorRegion)) return fail(t("adm.errStateBad"));
+  if (!canManageOption(scope, anchorRegion)) return fail("adm.errStateBad");
   // Editable short code: normalize to UPPER, empty = clear. Uniqueness per
   // (type, region) is enforced by the partial unique index (0010)
   // surfaced here as a friendly duplicate error.
   const rawCode = s(body.code).toUpperCase().replace(/\s+/g, "");
-  if (rawCode && !/^[A-Z0-9._-]{2,16}$/.test(rawCode)) return fail(t("adm.errCodeBad"));
+  if (rawCode && !/^[A-Z0-9._-]{2,16}$/.test(rawCode)) return fail("adm.errCodeBad");
   if (rawCode) {
     const clashCode = await db.all<{ id: number }>(
       sql`SELECT id FROM lookup_options WHERE type = ${current.type} AND region_id = ${anchorRegion} AND code = ${rawCode} AND id <> ${id} LIMIT 1`,
     );
-    if (clashCode[0]) return fail(t("adm.errCodeDup"));
+    if (clashCode[0]) return fail("adm.errCodeDup");
   }
   const rawShort = s(body.short_code);
-  if (current.type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail(t("adm.errShortCode"));
+  if (current.type === "township" && rawShort && !/^[A-Za-z0-9]{2,8}$/.test(rawShort)) return fail("adm.errShortCode");
   const shortCode = current.type === "township" ? (rawShort.toUpperCase() || null) : current.shortCode;
   if (current.type === "township" && shortCode) {
     const clashShort = await db.all<{ id: number }>(
       sql`SELECT id FROM lookup_options WHERE type = 'township' AND region_id = ${anchorRegion} AND short_code = ${shortCode} AND id <> ${id} LIMIT 1`,
     );
-    if (clashShort[0]) return fail(t("adm.errShortCodeDup"));
+    if (clashShort[0]) return fail("adm.errShortCodeDup");
   }
   let regionalChurchId: number | null = current.regionalChurchId ?? null;
   if (current.type === "home_cell") {
@@ -1164,7 +1164,7 @@ adminRoutes.post("/options/:id", requireAnyPermission("options.manage", "structu
       const n = Number(rawChurch);
       if (!Number.isInteger(n) || n < 1 ||
           !churches.some((church) => church.id === n && church.regionId === anchorRegion)) {
-        return fail(t("adm.errChurchBad"));
+        return fail("adm.errChurchBad");
       }
       regionalChurchId = n;
     }
@@ -1295,16 +1295,16 @@ adminRoutes.post("/age-groups", requirePermission("options.manage"), async (c) =
   const minRaw = s(body.min_age);
   const maxRaw = s(body.max_age);
   const back = "/admin/options?type=age_group";
-  const fail = (msg: string) =>
+  const fail = (key: string) =>
     fromModal
-      ? c.html(<AddAgeGroupForm lang={c.get("lang")} errors={[msg]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
-      : c.redirect(errRedirect(back, msg), 302);
-  if (name.length < 1 || name.length > 60) return fail(t("adm.errAgeName"));
+      ? c.html(<AddAgeGroupForm lang={c.get("lang")} errors={[renderKey(t)(key)]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
+      : c.redirect(errRedirect(back, key), 302);
+  if (name.length < 1 || name.length > 60) return fail("adm.errAgeName");
   const range = parseAgeRange(minRaw, maxRaw);
-  if (!range) return fail(t("adm.errAgeRange"));
+  if (!range) return fail("adm.errAgeRange");
   const dup = await db.select({ id: ageGroups.id }).from(ageGroups).where(eq(ageGroups.name, name)).limit(1);
-  if (dup[0]) return fail(t("adm.errAgeNameDup"));
-  if (await ageRangeClash(db, range.min, range.max)) return fail(t("adm.errAgeOverlap"));
+  if (dup[0]) return fail("adm.errAgeNameDup");
+  if (await ageRangeClash(db, range.min, range.max)) return fail("adm.errAgeOverlap");
   await db.insert(ageGroups).values({ name, minAge: range.min, maxAge: range.max, sortOrder: range.min });
   return c.redirect(`${back}&ok=age-group-added`, 302);
 });
@@ -1348,16 +1348,16 @@ adminRoutes.post("/age-groups/:id", requirePermission("options.manage"), async (
   const name = s(body.name);
   const minRaw = s(body.min_age);
   const maxRaw = s(body.max_age);
-  const fail = (msg: string) =>
+  const fail = (key: string) =>
     fromModal
-      ? c.html(<EditAgeGroupForm id={id} lang={c.get("lang")} errors={[msg]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
-      : c.redirect(errRedirect(back, msg), 302);
-  if (name.length < 1 || name.length > 60) return fail(t("adm.errAgeName"));
+      ? c.html(<EditAgeGroupForm id={id} lang={c.get("lang")} errors={[renderKey(t)(key)]} values={{ name, min_age: minRaw, max_age: maxRaw }} modal />, 400)
+      : c.redirect(errRedirect(back, key), 302);
+  if (name.length < 1 || name.length > 60) return fail("adm.errAgeName");
   const range = parseAgeRange(minRaw, maxRaw);
-  if (!range) return fail(t("adm.errAgeRange"));
+  if (!range) return fail("adm.errAgeRange");
   const dup = await db.select({ id: ageGroups.id }).from(ageGroups).where(eq(ageGroups.name, name)).limit(1);
-  if (dup[0] && dup[0].id !== id) return fail(t("adm.errAgeNameDup"));
-  if (await ageRangeClash(db, range.min, range.max, id)) return fail(t("adm.errAgeOverlap"));
+  if (dup[0] && dup[0].id !== id) return fail("adm.errAgeNameDup");
+  if (await ageRangeClash(db, range.min, range.max, id)) return fail("adm.errAgeOverlap");
   await db.update(ageGroups)
     .set({ name, minAge: range.min, maxAge: range.max, sortOrder: range.min })
     .where(eq(ageGroups.id, id));
@@ -1433,16 +1433,16 @@ adminRoutes.post("/regions", requirePermission("options.manage"), async (c) => {
   const db = getDb(c.env);
   const t = getDict(c.get("lang"));
   const fromModal = c.req.header("X-Requested-With") === "modal";
-  const fail = (msg: string) =>
+  const fail = (key: string) =>
     fromModal
-      ? c.html(<AddRegionForm lang={c.get("lang")} errors={[msg]} values={{ name, name_en: nameEn }} modal />, 400)
-      : c.redirect(errRedirect(regionBack(), msg), 302);
+      ? c.html(<AddRegionForm lang={c.get("lang")} errors={[renderKey(t)(key)]} values={{ name, name_en: nameEn }} modal />, 400)
+      : c.redirect(errRedirect(regionBack(), key), 302);
   const body = await c.req.parseBody();
   const name = s(body.name);
   const nameEn = s(body.name_en);
-  if (name.length < 1 || name.length > 120) return fail(t("adm.errRegionName"));
+  if (name.length < 1 || name.length > 120) return fail("adm.errRegionName");
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
-  if (dup[0]) return fail(t("adm.errRegionDup"));
+  if (dup[0]) return fail("adm.errRegionDup");
   const slug = await uniqueRegionSlug(db, slugify(nameEn || name));
   const code = await nextRegionCode(db);
   await db.insert(regions).values({ name, nameEn: nameEn || name, slug, code });
@@ -1500,20 +1500,20 @@ adminRoutes.post("/regions/:id", requirePermission("options.manage"), async (c) 
   const nameEn = s(body.name_en);
   const fromModal = c.req.header("X-Requested-With") === "modal";
   const rawCode = s(body.code).toUpperCase().replace(/\s+/g, "");
-  const failWith = (v: { name: string; name_en: string; code: string }, msg: string) =>
+  const failWith = (v: { name: string; name_en: string; code: string }, key: string) =>
     fromModal
-      ? c.html(<EditRegionForm id={id} lang={c.get("lang")} values={v} errors={[msg]} modal />, 400)
-      : c.redirect(errRedirect(back, msg), 302);
+      ? c.html(<EditRegionForm id={id} lang={c.get("lang")} values={v} errors={[renderKey(t)(key)]} modal />, 400)
+      : c.redirect(errRedirect(back, key), 302);
   if (rawCode && !/^[A-Z0-9._-]{2,16}$/.test(rawCode)) return failWith({ name, name_en: nameEn, code: s(body.code) }, t("adm.errCodeBad"));
-  const fail = (msg: string) => failWith({ name, name_en: nameEn, code: rawCode }, msg);
-  if (name.length < 1 || name.length > 120) return fail(t("adm.errRegionName"));
+  const fail = (key: string) => failWith({ name, name_en: nameEn, code: rawCode }, key);
+  if (name.length < 1 || name.length > 120) return fail("adm.errRegionName");
   const dup = await db.select({ id: regions.id }).from(regions).where(eq(regions.name, name)).limit(1);
-  if (dup[0] && dup[0].id !== id) return fail(t("adm.errRegionDup"));
+  if (dup[0] && dup[0].id !== id) return fail("adm.errRegionDup");
   if (rawCode) {
     const clashCode = await db.all<{ id: number }>(
       sql`SELECT id FROM regions WHERE code = ${rawCode} AND id <> ${id} LIMIT 1`,
     );
-    if (clashCode[0]) return fail(t("adm.errCodeDup"));
+    if (clashCode[0]) return fail("adm.errCodeDup");
   }
   await db.update(regions).set({ name, nameEn: nameEn || name, code: rawCode || null }).where(eq(regions.id, id));
   return c.redirect(`${back}&ok=region-updated`, 302);

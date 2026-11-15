@@ -130,12 +130,27 @@ export function flashText(code: string | undefined | null, lang?: Lang): string 
 
 export function flashFromQuery(q: Record<string, string | undefined>, lang?: Lang): Flash {
   const t = getDict(normalizeLang(lang));
-  const ok = q.ok;
-  const err = q.err;
-  if (ok && FLASH_KEYS[ok]) return { kind: "ok", text: t(FLASH_KEYS[ok]) };
   // Only known codes reach the banner: the query string is user-controlled, so
   // an unrecognised value must render nothing rather than arbitrary text
-  // inside the app's own chrome.
-  if (err && FLASH_KEYS[err]) return { kind: "err", text: t(FLASH_KEYS[err]) };
+  // inside the app's own chrome. A dictionary key counts as known (the admin
+  // forms redirect with the key itself), and getDict echoes back keys it does
+  // not have, which is what lets an invented value fall through to nothing.
+  const one = (code: string): string | null => {
+    const key = FLASH_KEYS[code];
+    if (key) return t(key);
+    const text = t(code);
+    return text === code ? null : text;
+  };
+  const message = (code: string | undefined): string | null => {
+    if (!code) return null;
+    // A create/edit form can fail on several fields at once and then redirects
+    // with the keys joined by commas; anything still unrecognised is dropped.
+    const parts = code.split(",").map(one).filter((text): text is string => text !== null);
+    return parts.length > 0 ? parts.join(" ") : null;
+  };
+  const ok = message(q.ok);
+  if (ok) return { kind: "ok", text: ok };
+  const err = message(q.err);
+  if (err) return { kind: "err", text: err };
   return null;
 }
