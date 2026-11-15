@@ -267,6 +267,7 @@ export const KO: Record<string, string> = {
   "form.photoError": "이 이미지를 처리할 수 없습니다. 다른 파일을 선택하세요.",
   "photo.badType": "사진은 WebP 이미지여야 합니다.",
   "photo.tooLarge": "사진이 너무 큽니다(최대 400KB).",
+  "pastor-photo-invalid": "사진을 처리할 수 없습니다. 다른 사진을 선택하세요.",
   "form.contact": "연락처",
   "form.family": "가족 / 학력 / 직업",
   "form.church": "교회",

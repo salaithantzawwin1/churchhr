@@ -20,7 +20,7 @@ export function langFromQuery(q: Record<string, string | undefined>): Lang | nul
 type Dict = Record<string, string>;
 
 /** Myanmar (original strings). */
-const MM: Dict = {
+export const MM: Dict = {
   // brand / footer
   "app.name": "Church Member Registry",
   "app.tagline": "တိုင်းနဲ့ ပြည်နယ် အသင်းသား လူစာရင်း",
@@ -1217,7 +1217,7 @@ const MM: Dict = {
 };
 
 /** English. */
-const EN: Dict = {
+export const EN: Dict = {
   "app.name": "Church Member Registry",
   "app.tagline": "Church member registry by state & region",
   "nav.dashboard": "Dashboard",

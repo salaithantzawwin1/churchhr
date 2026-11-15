@@ -2,7 +2,9 @@ import type { Flash } from "./views/layout";
 import { getDict, normalizeLang, type Lang } from "./i18n";
 
 /** Flash code (query param) -> i18n dictionary key. */
-const FLASH_KEYS: Record<string, string> = {
+export const FLASH_KEYS: Record<string, string> = {
+  // The pastor photo error is stored under an unprefixed dictionary key.
+  "pastor-photo-invalid": "pastor-photo-invalid",
   "member-created": "flash.memberCreated",
   "report-created": "flash.reportCreated",
   "report-draft": "flash.reportDraftSaved",
