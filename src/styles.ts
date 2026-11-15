@@ -1020,15 +1020,13 @@ td.empty-state .small { margin-top: 4px; }
 /* A search field the width of the whole panel reads as a text area, so it takes
    half the row and the dropdowns fill the rest. */
 .filter-toolbar.members-filter input[type="search"] { width: 100%; grid-column: span 2; }
-.members-filter .filter-clear { grid-column: span 2; justify-self: start; }
-/* Keeps the last row's two columns filled when no filter is set. */
-.members-filter .filter-clear.is-placeholder { visibility: hidden; }
+/* One cell, so the link lands in the free slot of the last row instead of
+   starting a new one and re-opening the empty band under the panel. */
+.members-filter .filter-clear { grid-column: auto; justify-self: start; align-self: center; }
 @media (max-width: 900px) {
   .members-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-toolbar.members-filter input[type="search"],
   .members-filter .filter-clear { grid-column: 1 / -1; }
-  /* Two columns leave no empty cell to hold the link, so it steps out entirely. */
-  .members-filter .filter-clear.is-placeholder { display: none; }
 }
 @media (max-width: 640px) {
   .members-filter { padding: 10px; }

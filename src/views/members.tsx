@@ -114,6 +114,10 @@ const SORTABLE = new Set([
   "id", "name", "gender", "age", "phone", "state", "township", "marital",
   "homeCell", "role", "group", "familyGroup", "fellowship", "sector", "status", "school",
 ]);
+/* Columns that start hidden: the ones that are usually empty in a registry, or
+   that repeat the Home Cell grouping beside them and squeezed the Family Group
+   code into two lines. The column chooser brings any of them back. */
+const DEFAULT_HIDDEN_COLS = new Set(["group", "fellowship", "sector"]);
 const LIST_COLS = (t: (k: string) => string) => [
   { key: "id", label: t("members.thId") },
   { key: "name", label: t("members.thName") },
@@ -225,7 +229,7 @@ export function MembersListPage(props: ListProps) {
               <div class="col-menu">
                 {cols.map((c) => (
                   <label>
-                    <input type="checkbox" data-col={c.key} checked={c.key !== "id"} /> {c.label}
+                    <input type="checkbox" data-col={c.key} checked={c.key !== "id" && !DEFAULT_HIDDEN_COLS.has(c.key)} /> {c.label}
                   </label>
                 ))}
               </div>
@@ -306,10 +310,7 @@ export function MembersListPage(props: ListProps) {
         {f.missing && <input type="hidden" name="missing" value={f.missing} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
         {sort && <input type="hidden" name="dir" value={dir} />}
-        {/* Always rendered so the grid keeps its shape: hidden (not removed)
-            when nothing is filtered, which also keeps it out of the tab order. */}
-        <a class={filtered ? "filter-clear" : "filter-clear is-placeholder"} href="/members"
-          aria-hidden={filtered ? undefined : "true"}>{t("members.clear")}</a>
+        {filtered && <a class="filter-clear" href="/members">{t("members.clear")}</a>}
       </form>
       </details>
 
@@ -464,7 +465,7 @@ export function MembersListPage(props: ListProps) {
                     )}
                     {canDelete && (
                       <form method="post" action={`/members/${m.id}/delete`} data-confirm={t("detail.confirmDelete")}>
-                        <button class="btn sm danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}>
+                        <button class="btn sm outline-danger icon-btn" type="submit" title={t("members.delete")} aria-label={t("members.delete")}>
                           <TrashIcon />
                         </button>
                       </form>

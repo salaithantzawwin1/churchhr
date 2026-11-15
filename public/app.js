@@ -1017,6 +1017,7 @@
     var chooser = document.querySelector(".col-chooser");
     if (!table || !chooser) return;
     var KEY = "member-cols";
+    var DEFAULT_OFF = { group: 1, fellowship: 1, sector: 1 };
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
     var boxes = chooser.querySelectorAll("input[data-col]");
@@ -1037,8 +1038,8 @@
     Array.prototype.forEach.call(boxes, function (b) {
       var k = b.getAttribute("data-col");
       // Restore the saved choice when there is one; otherwise the markup default
-      // (everything except ID visible) applies.
-      b.checked = saved[k] === undefined ? k !== "id" : !!saved[k];
+      // (everything except ID and the usually-empty columns) applies.
+      b.checked = saved[k] === undefined ? (k !== "id" && !DEFAULT_OFF[k]) : !!saved[k];
       b.addEventListener("change", apply);
     });
     apply();
