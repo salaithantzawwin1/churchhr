@@ -1033,7 +1033,7 @@ export const KO: Record<string, string> = {
   "adm.errHomeCellBad": "선택한 홈셀 중 하나가 더 이상 존재하지 않습니다.",
   "adm.errHomeCellState": "선택한 홈셀 중 하나가 이 계정의 주/지역 범위를 벗어났습니다. 선택을 해제하거나 해당 주/지역을 범위에 추가하세요.",
   "adm.churchNone": "교회 없음",
-  "adm.churchHint": "이 홈셀을 양곤교회(본당) 같은 지역교회에 연결하세요.",
+  "adm.churchHint": "선택 사항 — 소속 지역교회.",
   "adm.errChurchBad": "선택한 지역교회가 이 주/지역에 속하지 않습니다.",
   "audit.title": "활동 로그",
   "audit.intro": "누가 무엇을 언제, 어느 기기나 주소에서 바꿨는지 확인합니다.",

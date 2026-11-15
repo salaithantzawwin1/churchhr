@@ -196,7 +196,7 @@ a { color: var(--link); }
   background: var(--count-bg); color: var(--ink); font-weight: 600;
 }
 .btn:not(.secondary) .count { background: rgba(255,255,255,.28); color: #fff; }
-.field-hint { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.field-hint { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.45; font-weight: 400; color: var(--muted); }
 th.num, td.num { text-align: right; }
 td.empty-state { text-align: center; padding: 30px 12px; color: var(--muted); }
 td.empty-state .small { margin-top: 4px; }
@@ -730,6 +730,12 @@ th.bar-col { width: 42%; }
   .btn { min-height: 40px; }
   .btn.sm { min-height: 34px; }
   .actions { gap: 8px; }
+  /* Modal forms on a phone: a tighter rhythm keeps a four-field option sheet
+     (label, state, township, church) plus its action bar in one view instead of
+     scrolling behind the sticky buttons. */
+  .modal-body form { gap: 11px; }
+  .modal-body form .form-grid { gap: 11px 12px; }
+  .modal-body .field-hint { margin-top: 3px; font-size: 12px; }
   .stat { padding: 12px 13px; gap: 6px; }
   .stat .n { font-size: 22px; }
   .stat .ico { width: 26px; height: 26px; }
