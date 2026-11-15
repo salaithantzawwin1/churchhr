@@ -2945,6 +2945,21 @@ th { font-size: 13px; }
 .modal-body form > .actions:last-child {
   margin-left: -24px; margin-right: -24px; margin-bottom: -22px; padding: 14px 24px;
 }
+/* Desktop: a three-field form should not be mostly chrome. The header and the
+   sticky bar are trimmed, and the bar sits flush with the card's bottom edge
+   instead of leaving a strip of body padding under it. Phones keep the roomier
+   values above so the touch targets stay large. */
+@media (min-width: 761px) {
+  .modal-head { padding: 13px 24px; }
+  .modal-head h3 { font-size: 17px; line-height: 1.3; }
+  .modal-body:has(> form > .actions:last-child) { padding-bottom: 0; }
+  /* The global form margin would otherwise leave a strip of card under the bar. */
+  .modal-body:has(> form > .actions:last-child) > form { margin-bottom: 0; }
+  .modal-body form > .actions:last-child {
+    margin-left: -24px; margin-right: -24px; margin-bottom: 0;
+    padding: 10px 24px; bottom: 0;
+  }
+}
 .flash { border-radius: var(--radius); }
 .footer { padding: 30px 16px 38px; font-size: 12.5px; }
 @media (max-width: 760px) {
