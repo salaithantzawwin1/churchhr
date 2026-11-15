@@ -11,6 +11,14 @@ const ADMIN_ID = 1;
 const SCOPED_ADMIN_ID = 2;
 /** Seeded Viewer role, assigned region 1: no admin permissions at all. */
 const VIEWER_ID = 3;
+/** Region-1 data entry: writes reports and members, no admin permissions. */
+const ENTRY_ID = 4;
+/** Region-1 report reviewer: reviews/edits/deletes reports in its own state. */
+const REVIEWER_ID = 5;
+/** Region-2 author: owns the out-of-scope report and household used below. */
+const OTHER_AUTHOR_ID = 6;
+/** Region-1 records manager: full member CRUD, for household scope checks. */
+const RECORDS_ID = 7;
 
 /** user id -> the raw session token used in the Cookie header. */
 const sessions = new Map<number, string>();
@@ -51,6 +59,21 @@ function postAs(path: string, userId: number, form: Record<string, string> = {})
   });
 }
 
+/** A report date in Myanmar time, so seeded rows land inside the app's default
+ *  "last 7 days" window. */
+function reportDay(daysAgo: number): string {
+  return new Date(Date.now() + 6.5 * 3_600_000 - daysAgo * 86_400_000).toISOString().slice(0, 10);
+}
+
+async function idOf(sqlText: string, value: string): Promise<number> {
+  const row = await env.DB.prepare(sqlText).bind(value).first<{ id: number }>();
+  if (!row) throw new Error(`missing seeded row: ${value}`);
+  return row.id;
+}
+const reportId = (title: string) => idOf("SELECT id FROM activity_reports WHERE title = ?", title);
+const familyId = (name: string) => idOf("SELECT id FROM families WHERE name = ?", name);
+const memberId = (name: string) => idOf("SELECT id FROM members WHERE name_english = ?", name);
+
 beforeAll(async () => {
   const db = env.DB;
   // The seeded admin still has "must change password" set; clear it so the
@@ -76,10 +99,48 @@ beforeAll(async () => {
     db.prepare("INSERT INTO lookup_options (type, label, active, sort_order, region_id) VALUES ('home_cell', 'Shared Cell C', 1, 3, 0)"),
     db.prepare("INSERT INTO lookup_options (type, label, active, sort_order, region_id) VALUES ('township', 'Scoped Township A', 1, 1, 1)"),
     db.prepare("INSERT INTO lookup_options (type, label, active, sort_order, region_id) VALUES ('township', 'Other Township B', 1, 2, 2)"),
+
+    // Report and household scope fixtures: a region-1 reviewer, a region-2
+    // author, a region-1 records manager and a region-1 data entry account.
+    db.prepare("INSERT INTO roles (id, name, description, is_system) VALUES (6, 'Scoped Report Reviewer', 'test', 0)"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (6, 'members.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (6, 'reports.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (6, 'reports.review')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (6, 'reports.update')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (6, 'reports.delete')"),
+    db.prepare("INSERT INTO roles (id, name, description, is_system) VALUES (7, 'Scoped Records Manager', 'test', 0)"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'dashboard.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.view')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.create')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.update')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.delete')"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (4, 'scopedentry', 'x', 1, 0)"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (5, 'scopedreviewer', 'x', 1, 0)"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (6, 'otherauthor', 'x', 1, 0)"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (7, 'scopedrecords', 'x', 1, 0)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (4, 3)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (5, 6)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (6, 3)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (7, 7)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (4, 1)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (5, 1)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (6, 2)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (7, 1)"),
+    // Reports: A is in scope, B is another state's, C is filed in region 1 by a
+    // region-2 author, D exists to be deleted by the scoped reviewer.
+    db.prepare("INSERT INTO activity_reports (report_date, author_id, region_id, title, body, status) VALUES (?, 4, 1, 'Report In Scope A', 'body', 'submitted')").bind(reportDay(1)),
+    db.prepare("INSERT INTO activity_reports (report_date, author_id, region_id, title, body, status) VALUES (?, 6, 2, 'Report Out Of Scope B', 'body', 'submitted')").bind(reportDay(1)),
+    db.prepare("INSERT INTO activity_reports (report_date, author_id, region_id, title, body, status) VALUES (?, 6, 1, 'Report In Scope C', 'body', 'submitted')").bind(reportDay(2)),
+    db.prepare("INSERT INTO activity_reports (report_date, author_id, region_id, title, body, status) VALUES (?, 4, 1, 'Report To Delete D', 'body', 'submitted')").bind(reportDay(3)),
+    // Households: one in region 1, one in region 2 that also owns a member.
+    db.prepare("INSERT INTO families (name, region_id, created_by) VALUES ('In-Scope Household', 1, 7)"),
+    db.prepare("INSERT INTO families (name, region_id, created_by) VALUES ('Out-of-Scope Household', 2, 7)"),
+    db.prepare("INSERT INTO members (name_english, region_id, family_id, relationship, created_by) VALUES ('Out Member', 2, (SELECT id FROM families WHERE name = 'Out-of-Scope Household'), 'other', 7)"),
+    db.prepare("INSERT INTO members (name_english, region_id, relationship, created_by) VALUES ('In Member', 1, '', 7)"),
   ]);
-  sessions.set(ADMIN_ID, await createSession(ADMIN_ID));
-  sessions.set(SCOPED_ADMIN_ID, await createSession(SCOPED_ADMIN_ID));
-  sessions.set(VIEWER_ID, await createSession(VIEWER_ID));
+  for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID]) {
+    sessions.set(id, await createSession(id));
+  }
 });
 
 describe("anonymous and expired sessions", () => {
@@ -200,5 +261,144 @@ describe("dashboard structure scope", () => {
     // Another state's structures must not leak into the filter pickers.
     expect(html).not.toContain("Other Cell B");
     expect(html).not.toContain("Other Township B");
+  });
+});
+
+describe("report scope for a state-limited reviewer", () => {
+  it("reads reports inside its state and refuses another state's report", async () => {
+    const inScope = await getAs(`/reports/${await reportId("Report In Scope A")}`, REVIEWER_ID);
+    expect(inScope.status).toBe(200);
+    const outOfScope = await getAs(`/reports/${await reportId("Report Out Of Scope B")}`, REVIEWER_ID);
+    expect(outOfScope.status).toBe(403);
+  });
+
+  it("cannot review a report from another state", async () => {
+    const id = await reportId("Report Out Of Scope B");
+    const res = await postAs(`/reports/${id}/review`, REVIEWER_ID, { review_note: "looks fine" });
+    expect(res.status).toBe(403);
+    const row = await env.DB.prepare("SELECT status FROM activity_reports WHERE id = ?")
+      .bind(id).first<{ status: string }>();
+    expect(row?.status).toBe("submitted");
+  });
+
+  it("reviews a report filed in its own state even when the author is elsewhere", async () => {
+    const id = await reportId("Report In Scope C");
+    const res = await postAs(`/reports/${id}/review`, REVIEWER_ID, { review_note: "checked" });
+    expect(res.status).toBe(302);
+    const row = await env.DB.prepare("SELECT status, reviewer_id FROM activity_reports WHERE id = ?")
+      .bind(id).first<{ status: string; reviewer_id: number }>();
+    expect(row?.status).toBe("reviewed");
+    expect(row?.reviewer_id).toBe(REVIEWER_ID);
+  });
+
+  it("refuses to edit a report written by someone else", async () => {
+    const id = await reportId("Report In Scope A");
+    const res = await postAs(`/reports/${id}/edit`, REVIEWER_ID, {
+      report_date: reportDay(1), region_id: "1", title: "Hijacked report", body: "x",
+    });
+    expect(res.status).toBe(403);
+    const row = await env.DB.prepare("SELECT title FROM activity_reports WHERE id = ?")
+      .bind(id).first<{ title: string }>();
+    expect(row?.title).toBe("Report In Scope A");
+  });
+
+  it("refuses a delete without the author right or reports.delete", async () => {
+    const id = await reportId("Report Out Of Scope B");
+    const res = await postAs(`/reports/${id}/delete`, ENTRY_ID);
+    expect(res.status).toBe(403);
+    const row = await env.DB.prepare("SELECT id FROM activity_reports WHERE id = ?").bind(id).first();
+    expect(row).not.toBeNull();
+  });
+
+  it("limits the team list and CSV export to the reviewer's states", async () => {
+    const list = await getAs("/reports?scope=team", REVIEWER_ID);
+    expect(list.status).toBe(200);
+    const html = await list.text();
+    expect(html).toContain("Report In Scope A");
+    expect(html).not.toContain("Report Out Of Scope B");
+
+    const csv = await getAs("/reports/export?scope=team", REVIEWER_ID);
+    expect(csv.status).toBe(200);
+    const text = await csv.text();
+    expect(text).toContain("Report In Scope A");
+    expect(text).not.toContain("Report Out Of Scope B");
+  });
+
+  it("lets a scoped manager delete a report inside its state", async () => {
+    const id = await reportId("Report To Delete D");
+    const res = await postAs(`/reports/${id}/delete`, REVIEWER_ID);
+    expect(res.status).toBe(302);
+    const row = await env.DB.prepare("SELECT id FROM activity_reports WHERE id = ?").bind(id).first();
+    expect(row).toBeNull();
+  });
+});
+
+describe("household scope", () => {
+  it("shows only households inside the account's states", async () => {
+    const res = await getAs("/admin/households", RECORDS_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("In-Scope Household");
+    expect(html).not.toContain("Out-of-Scope Household");
+  });
+
+  it("hides a household from another state", async () => {
+    const id = await familyId("Out-of-Scope Household");
+    const res = await getAs(`/admin/households/${id}`, RECORDS_ID);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("err-notfound");
+  });
+
+  it("refuses edits and deletes of another state's household", async () => {
+    const id = await familyId("Out-of-Scope Household");
+    const edit = await postAs(`/admin/households/${id}`, RECORDS_ID, {
+      name: "Hijacked Household", region_id: "2", township: "", phone: "", address: "", notes: "",
+    });
+    expect(edit.status).toBe(302);
+    expect(edit.headers.get("location")).toContain("err-notfound");
+
+    const del = await postAs(`/admin/households/${id}/delete`, RECORDS_ID);
+    expect(del.status).toBe(302);
+    expect(del.headers.get("location")).toContain("err-notfound");
+
+    const row = await env.DB.prepare("SELECT name FROM families WHERE id = ?")
+      .bind(id).first<{ name: string }>();
+    expect(row?.name).toBe("Out-of-Scope Household");
+  });
+
+  it("refuses attaching a member from another state", async () => {
+    const family = await familyId("In-Scope Household");
+    const member = await memberId("Out Member");
+    const res = await postAs(`/admin/households/${family}/attach`, RECORDS_ID, {
+      member_id: String(member), relationship: "spouse",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("err-notfound");
+    const row = await env.DB.prepare("SELECT family_id FROM members WHERE id = ?")
+      .bind(member).first<{ family_id: number | null }>();
+    expect(row?.family_id).not.toBe(family);
+  });
+
+  it("still attaches and detaches an in-scope member", async () => {
+    const family = await familyId("In-Scope Household");
+    const member = await memberId("In Member");
+
+    const attach = await postAs(`/admin/households/${family}/attach`, RECORDS_ID, {
+      member_id: String(member), relationship: "spouse",
+    });
+    expect(attach.status).toBe(302);
+    expect(attach.headers.get("location")).toContain("hh.attached");
+    const attached = await env.DB.prepare("SELECT family_id FROM members WHERE id = ?")
+      .bind(member).first<{ family_id: number | null }>();
+    expect(attached?.family_id).toBe(family);
+
+    const detach = await postAs(`/admin/households/${family}/detach`, RECORDS_ID, {
+      member_id: String(member),
+    });
+    expect(detach.status).toBe(302);
+    expect(detach.headers.get("location")).toContain("hh.detached");
+    const detached = await env.DB.prepare("SELECT family_id FROM members WHERE id = ?")
+      .bind(member).first<{ family_id: number | null }>();
+    expect(detached?.family_id).toBeNull();
   });
 });
