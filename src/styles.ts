@@ -1038,6 +1038,12 @@ td.empty-state .small { margin-top: 4px; }
     border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
   }
 }
+/* Myanmar labels are roughly twice as wide as Korean ones, so on a phone the
+   two-column grid cuts "အားလုံး" off five of the nine dropdowns. Below 480px
+   they take the full panel width instead, one control per row. */
+@media (max-width: 480px) {
+  html[lang="my"] .members-filter { grid-template-columns: minmax(0, 1fr); }
+}
 /* Table options sit with the other list actions instead of floating under the
    filters. */
 .page-head .actions .col-chooser { margin: 0; }
