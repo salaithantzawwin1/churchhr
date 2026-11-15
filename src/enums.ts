@@ -16,8 +16,8 @@ export const GENDERS_KR: Record<string, string> = {
 export const MARITAL_STATUSES: Record<string, string> = {
   single: "အလွတ်",
   married: "အိမ်ထောင်သည်",
-  widowed: "မုဆုံးရှင် (Widowed)",
-  divorced: "ကွာရှင်းသည် (Divorced)",
+  widowed: "မုဆုံးရှင်",
+  divorced: "ကွာရှင်းသည်",
 };
 
 export const MARITAL_STATUSES_EN: Record<string, string> = {
@@ -38,8 +38,8 @@ export const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export const STATUSES: Record<string, string> = {
   active: "Active",
-  moved: "ပြောင်းသွား (Moved)",
-  inactive: "ရပ်ထား (Inactive)",
+  moved: "ပြောင်းသွား",
+  inactive: "ရပ်ထား",
 };
 
 export const STATUSES_EN: Record<string, string> = {
