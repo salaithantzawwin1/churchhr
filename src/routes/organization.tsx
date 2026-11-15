@@ -2999,6 +2999,14 @@ organizationRoutes.post("/pastors/:id/children", requirePermission("pastors.mana
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
 });
 
+/** A member can back only one child row; refuse a second link politely instead
+ *  of letting the unique index surface as a 500. */
+async function memberAlreadyLinked(db: DB, memberId: number, childId: number): Promise<boolean> {
+  const rows = await db.all<{ id: number }>(sql`
+    SELECT id FROM pastor_children WHERE member_id = ${memberId} AND id != ${childId}`);
+  return rows.length > 0;
+}
+
 /** One-click link from a suggested member match. */
 organizationRoutes.post("/pastors/:id/children/:cid/link", requirePermission("pastors.manage"), async (c) => {
   const id = intParam(c.req.param("id"));
@@ -3009,6 +3017,9 @@ organizationRoutes.post("/pastors/:id/children/:cid/link", requirePermission("pa
   const body = await c.req.parseBody();
   const memberId = await validMemberId(db, asInt(s(body.member_id)));
   if (memberId == null) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+  if (await memberAlreadyLinked(db, memberId, cid)) {
+    return c.redirect(`/organization/pastors/${id}?err=pastor-child-link-taken`, 303);
+  }
   await db.run(sql`
     UPDATE pastor_children SET member_id = ${memberId}, updated_at = unixepoch()
      WHERE id = ${cid} AND pastor_id = ${id}`);
@@ -3039,6 +3050,9 @@ organizationRoutes.post("/pastors/:id/children/:cid/edit", requirePermission("pa
     );
   }
   const memberId = await validMemberId(db, data.memberId);
+  if (memberId != null && (await memberAlreadyLinked(db, memberId, cid))) {
+    return c.redirect(`/organization/pastors/${id}?err=pastor-child-link-taken`, 303);
+  }
   await db.run(sql`
     UPDATE pastor_children
        SET name = ${data.name}, name_en = ${data.nameEn}, gender = ${data.gender},

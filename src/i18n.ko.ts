@@ -1200,6 +1200,7 @@ export const KO: Record<string, string> = {
   "org.childLinkSuggest": "성도일 수 있음",
   "org.childLinkAction": "연결",
   "flash.childLinked": "자녀를 성도 기록과 연결했습니다.",
+  "flash.childLinkTaken": "이 성도는 이미 다른 자녀와 연결되어 있습니다.",
   "flash.eduSaved": "교육 기록을 저장했습니다.",
   "flash.eduDeleted": "교육 기록을 삭제했습니다.",
   "org.addChild": "자녀 추가",

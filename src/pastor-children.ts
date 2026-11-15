@@ -229,6 +229,7 @@ export async function loadChildLinkSuggestions(
              m.date_of_birth AS dob, m.gender
       FROM members m
       WHERE m.status != 'deleted' AND m.relationship IN ('son', 'daughter')
+        AND m.id NOT IN (SELECT member_id FROM pastor_children WHERE member_id IS NOT NULL)
       ORDER BY m.id`),
   ]);
   if (children.length === 0 || members.length === 0) return new Map();
