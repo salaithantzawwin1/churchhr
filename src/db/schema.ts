@@ -184,15 +184,15 @@ export function isRegionScopedType(type: string): boolean {
 }
 
 export const OPTION_TYPE_LABELS: Record<OptionType, string> = {
-  ethnicity: "လူမျိုး (Ethnicity)",
-  education: "ပညာရည် (Education)",
+  ethnicity: "လူမျိုး",
+  education: "ပညာရည်",
   home_cell: "Home Cell",
   family_group: "Family Group",
   fellowship_category: "Fellowship",
   sector: "ကဏ္ဍ",
   group: "Group",
-  township: "မြို့နယ် (Township)",
-  blood_type: "သွေးအမျိုးအစား (Blood Type)",
+  township: "မြို့နယ်",
+  blood_type: "သွေးအမျိုးအစား",
 };
 
 export const OPTION_TYPE_LABELS_KR: Record<OptionType, string> = {
