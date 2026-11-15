@@ -225,7 +225,7 @@ export function MembersListPage(props: ListProps) {
         <div class="actions" style="margin:0">
           <div class="col-chooser">
             <details>
-              <summary class="btn secondary sm">{t("members.cols")}</summary>
+              <summary class="btn secondary">{t("members.cols")}</summary>
               <div class="col-menu">
                 {cols.map((c) => (
                   <label>
