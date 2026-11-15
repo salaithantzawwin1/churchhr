@@ -608,7 +608,11 @@ th.bar-col { width: 42%; }
 .modal-body .card { margin-bottom: 14px; }
 /* Modal forms share one rhythm: fields stack with a steady gap, section
    headings group related choices, and the submit bar sticks to the bottom. */
-.modal-body form { display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; }
+/* A flex column's children keep a content-sized minimum by default, which
+   kept this form taller than the dialog and pushed its inner lists under the
+   pinned action bar. Allowing the form to shrink lets a scrollable list
+   such as the assign dialog's candidate list take the space that is left. */
+.modal-body form { display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; min-height: 0; }
 .modal-body form .form-grid { gap: 14px 16px; }
 .modal-body form > .actions { margin-top: 0; }
 .modal-body form > .actions:last-child {
@@ -3058,7 +3062,7 @@ th { font-size: 13px; }
    church's members, so one church never renders the whole registry. */
 .assign-search { margin-bottom: var(--space-3); }
 .assign-list {
-  display: grid; gap: 4px; max-height: 300px; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 4px; max-height: 300px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface-3);
 }
