@@ -79,11 +79,15 @@ export function AssignLeaderModal(props: {
   return (
     <>
       {error && <p class="flash err modal-error">{error}</p>}
-      <div class="position-hero">
+      <div class="position-hero assign-hero">
         <span class="position-avatar" aria-hidden="true">{churchName.trim().charAt(0) || "?"}</span>
         <div class="position-hero-main">
-          <div class="position-hero-title"><h4>{label}</h4></div>
-          <div class="position-hero-home">{t("org.assignFor")} <strong>{churchName}</strong></div>
+          {/* The dialog title already names the post, so the role and its scope
+              share one line instead of stacking into two. */}
+          <div class="assign-hero-line">
+            <strong class="assign-hero-role">{label}</strong>
+            <span class="position-hero-home">{t("org.assignFor")} <strong>{churchName}</strong></span>
+          </div>
           {currentName && (
             <div class="position-hero-home">
               {t("org.assignCurrently")}{" "}
@@ -128,13 +132,15 @@ export function AssignLeaderModal(props: {
         </div>
       )}
 
-      <form method="post" action={action} data-modal-ajax>
+      <form method="post" action={action} class="assign-form" data-modal-ajax>
         <input type="hidden" name="tab" value={tab} />
         <input type="hidden" name={scopeField} value={String(churchId)} />
         <input type="hidden" name="position" value={def.code} />
 
+        {/* The placeholder repeats this label, so it is only read out loud rather
+            than taking a line of its own in an already short dialog. */}
         <label class="field assign-search">
-          <span class="lbl">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
+          <span class="lbl sr-only">{pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")}</span>
           <input type="search" data-filter-list=".assign-list"
             placeholder={pastorDirectory ? t("org.assignSearchPastors") : t("org.assignSearch")} autocomplete="off" />
         </label>
@@ -175,7 +181,7 @@ export function AssignLeaderModal(props: {
         )}
 
         {allowMultiple && (
-          <label class="field">
+          <label class="field assign-priority">
             <span class="lbl">{t("org.priority")}</span>
             <input type="number" name="priority" min="1" max="99" value="1" />
             <span class="hint">{t("org.priorityHint")}</span>

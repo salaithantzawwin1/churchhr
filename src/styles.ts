@@ -592,6 +592,11 @@ th.bar-col { width: 42%; }
 .matrix td:first-child, .matrix th:first-child { text-align: left; }
 .err-list { color: var(--err-ink); margin: 6px 0; padding-left: 18px; }
 /* ---------- modals ---------- */
+/* Read out by screen readers, but not given a line of its own. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }
 .modal[hidden] { display: none; }
 .modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); }
@@ -3065,8 +3070,22 @@ th { font-size: 13px; }
 }
 
 /* Assign-leader dialog: a filter over a scrollable radio list of this
-   church's members, so one church never renders the whole registry. */
-.assign-search { margin-bottom: var(--space-3); }
+   church's members, so one church never renders the whole registry. The dialog
+   is short by nature, so its header, filter and priority row each stay a single
+   line tall and the list gets everything left over. */
+.modal-body form.assign-form { gap: 10px; }
+.assign-hero { align-items: center; gap: 9px; padding: 8px 11px; margin-bottom: 0; }
+.assign-hero .position-avatar { width: 30px; height: 30px; font-size: 14px; }
+.assign-hero-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1px 8px; min-width: 0; }
+.assign-hero-role { font-size: 13.5px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+.assign-hero .position-hero-home { font-size: 11.5px; }
+.assign-search { margin-bottom: 0; }
+label.field.assign-priority {
+  display: grid; grid-template-columns: max-content 96px; align-items: center;
+  gap: 2px 10px;
+}
+.assign-priority .lbl { margin: 0; }
+.assign-priority .hint { grid-column: 1 / -1; margin: 0; font-size: 11.5px; }
 .assign-list {
   display: grid; gap: 4px; max-height: 300px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius);
@@ -3084,7 +3103,7 @@ th { font-size: 13px; }
 .assign-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
-.assign-hint { margin: 0 0 var(--space-2); color: var(--muted); font-size: 12px; }
+.assign-hint { margin: 0; color: var(--muted); font-size: 11.5px; }
 .assign-list-clear { margin-top: var(--space-2); }
 
 /* Nested roles in the Home Cell and Department charts: children hang off their
