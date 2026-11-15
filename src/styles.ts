@@ -2707,7 +2707,11 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .member-role-inline .position-edit { margin-left: 0; }
 }
 .position-cell { white-space: nowrap; }
-.position-cell .position-edit { margin-left: 6px; font-size: 12px; }
+.position-cell .position-edit { margin-left: 4px; font-size: 12px; }
+/* Laptop widths squeeze this column, and a badge that broke its own name
+   ("Home Cell / Leader") made that row three lines tall while its neighbours
+   used two. The badge stays whole; the Change link moves to its own line. */
+.position-cell .badge { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .position-member { margin: 0 0 10px; font-size: 15px; }
 .position-form .actions { margin-top: 14px; }
 .badge.position { background: var(--chip-brand-bg); color: var(--link); }
