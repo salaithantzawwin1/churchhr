@@ -21,7 +21,7 @@ import { loadPositionDefs, codeFromEnglishName, defsForChurch, defsForScope, isC
 import { clusterName, loadRegionalChurches, loadSupervisionClusters, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { loadPastor, loadPastorOptions, loadPastors, pastorName, type PastorRow } from "../pastors";
 import {
-  HOPE_SCHOOL, childValues, loadPastorChild, loadPastorChildCounts,
+  HOPE_SCHOOL, childValues, loadChildLinkSuggestions, loadPastorChild, loadPastorChildCounts,
   loadPastorChildren, readChildForm, reportGrades, reportYears,
   type PastorChildValues,
 } from "../pastor-children";
@@ -2326,6 +2326,7 @@ organizationRoutes.get("/pastors/:id", requireAnyPermission("pastors.view", "pas
       pastor={pastor}
       history={await loadPastorHistory(db, id)}
       childRows={await loadPastorChildren(db, id)}
+      childSuggestions={await loadChildLinkSuggestions(db, scope)}
       historyRegions={await orgRegions(db, scope, c.get("lang"))}
       user={c.get("user")} perms={c.get("perms")}
       flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -2996,6 +2997,22 @@ organizationRoutes.post("/pastors/:id/children", requirePermission("pastors.mana
             ${c.get("user").id}, unixepoch())`);
   const landing = `/organization/pastors/${id}?ok=pastor-child-saved`;
   return modal ? c.json({ ok: true, redirect: landing }) : c.redirect(landing, 303);
+});
+
+/** One-click link from a suggested member match. */
+organizationRoutes.post("/pastors/:id/children/:cid/link", requirePermission("pastors.manage"), async (c) => {
+  const id = intParam(c.req.param("id"));
+  const cid = intParam(c.req.param("cid"));
+  if (!id || !cid) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const { db, pastor } = await childPastor(c, id);
+  if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
+  const body = await c.req.parseBody();
+  const memberId = await validMemberId(db, asInt(s(body.member_id)));
+  if (memberId == null) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
+  await db.run(sql`
+    UPDATE pastor_children SET member_id = ${memberId}, updated_at = unixepoch()
+     WHERE id = ${cid} AND pastor_id = ${id}`);
+  return c.redirect(`/organization/pastors/${id}?ok=pastor-child-linked`, 303);
 });
 
 organizationRoutes.post("/pastors/:id/children/:cid/edit", requirePermission("pastors.manage"), async (c) => {

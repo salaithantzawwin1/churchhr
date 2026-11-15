@@ -3582,4 +3582,11 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
    so the two rows are visibly the same person. */
 .child-member-tag { margin-left: 6px; font-size: 11.5px; text-decoration: none; }
 .child-member-tag:hover { border-color: var(--link); color: var(--link); }
+
+/* Suggested member match under a pastor child's name: the hint plus one button. */
+.child-link-suggest {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+  margin-top: 6px; padding: 4px 0 0;
+}
+.child-link-suggest .btn { padding: 2px 10px; font-size: 11.5px; }
 `; // end of stylesheet

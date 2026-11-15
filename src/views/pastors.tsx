@@ -2,7 +2,9 @@ import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { pastorName, type PastorRow } from "../pastors";
-import { ministryTenure, type PastorChildCount, type PastorChildRow } from "../pastor-children";
+import {
+  ministryTenure, type ChildLinkSuggestion, type PastorChildCount, type PastorChildRow,
+} from "../pastor-children";
 import { PastorChildrenCard } from "./pastor-children";
 import { todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
@@ -476,8 +478,12 @@ export function PastorDetailPage(props: Common & {
   history?: PastorHistoryRow[];
   historyRegions?: { id: number; name: string }[];
   childRows?: PastorChildRow[];
+  childSuggestions?: Map<number, ChildLinkSuggestion>;
 }) {
-  const { user, perms, flash, lang, pastor, history = [], historyRegions = [], childRows = [] } = props;
+  const {
+    user, perms, flash, lang, pastor, history = [], historyRegions = [], childRows = [],
+    childSuggestions,
+  } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const photo = pastorPhotoUrl(pastor);
@@ -584,6 +590,7 @@ export function PastorDetailPage(props: Common & {
         pastorId={pastor.id}
         rows={childRows}
         canManage={canUpdate}
+        suggestions={childSuggestions}
         lang={L}
       />
 

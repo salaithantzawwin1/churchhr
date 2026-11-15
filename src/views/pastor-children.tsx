@@ -2,6 +2,7 @@ import { getDict, type Lang } from "../i18n";
 import { ageFromDate } from "../util";
 import {
   HOPE_SCHOOL,
+  type ChildLinkSuggestion,
   type PastorChildRow,
   type PastorChildValues,
 } from "../pastor-children";
@@ -14,15 +15,21 @@ function childName(row: PastorChildRow, L: Lang): string {
   return L !== "mm" && row.nameEn ? row.nameEn : row.name;
 }
 
+function suggestedName(suggestion: ChildLinkSuggestion, L: Lang): string {
+  return L !== "mm" && suggestion.memberNameEn ? suggestion.memberNameEn : suggestion.memberName;
+}
+
 /** Children card on the pastor page: one row per child, with the Hope School
  *  total called out because the church counts those places every year. */
 export function PastorChildrenCard(props: {
   pastorId: number;
   rows: PastorChildRow[];
   canManage: boolean;
+  /** Suggested member matches for children that are not linked yet. */
+  suggestions?: Map<number, ChildLinkSuggestion>;
   lang: Lang;
 }) {
-  const { pastorId, rows, canManage, lang } = props;
+  const { pastorId, rows, canManage, lang, suggestions } = props;
   const t = getDict(lang);
   const activeRows = rows.filter((r) => r.active === 1);
   const hopeCount = activeRows.filter((r) => r.atHopeSchool === 1).length;
@@ -81,6 +88,17 @@ export function PastorChildrenCard(props: {
                         <a class="pastor-tag child-member-tag" href={`/members/${row.memberId}`}>
                           {t("org.childLinked")}
                         </a>
+                      )}
+                      {canManage && row.memberId == null && suggestions?.get(row.id) && (
+                        <form method="post" class="child-link-suggest"
+                          action={`/organization/pastors/${pastorId}/children/${row.id}/link`}>
+                          <input type="hidden" name="member_id" value={String(suggestions.get(row.id)!.memberId)} />
+                          <span class="muted small">
+                            {t("org.childLinkSuggest")}: {suggestedName(suggestions.get(row.id)!, lang)}
+                            {suggestions.get(row.id)!.memberDob ? ` · ${suggestions.get(row.id)!.memberDob}` : ""}
+                          </span>
+                          <button class="btn sm secondary" type="submit">{t("org.childLinkAction")}</button>
+                        </form>
                       )}
                       {row.notes && <div class="muted small">{row.notes}</div>}
                     </td>

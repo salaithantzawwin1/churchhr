@@ -180,6 +180,89 @@ export function reportGrades(rows: GradeRow[]): string[] {
     .sort(compareGrades);
 }
 
+/** A pastor child and a member row that look like the same person, so a clerk
+ *  can link them without retyping anything. */
+export type ChildLinkSuggestion = {
+  childId: number;
+  memberId: number;
+  memberName: string;
+  memberNameEn: string | null;
+  memberDob: string | null;
+  /** "name+dob" when the birth dates agree, "name" when only the name does. */
+  reason: "name+dob" | "name";
+};
+
+/** Names are compared without spaces, dots or separators, and across the
+ *  Myanmar and English spellings, so "မာရီ ဂရေ့စ်" meets "Grace". */
+function nameKey(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/[\s.,\-·'’]/g, "");
+}
+
+type MemberCandidate = {
+  id: number;
+  name: string | null;
+  nameEn: string | null;
+  dob: string | null;
+  gender: string;
+};
+
+/** One best member match per unlinked pastor child, limited to the signed-in
+ *  user's states. A different birth date or gender always disqualifies a pair,
+ *  so a suggested link is never a guess about identity. */
+export async function loadChildLinkSuggestions(
+  db: DB,
+  scope: { scopeAll: boolean; stateIds: number[] },
+): Promise<Map<number, ChildLinkSuggestion>> {
+  const conditions = [sql`p.active = 1`, sql`c.active = 1`, sql`c.member_id IS NULL`];
+  if (!scope.scopeAll) {
+    if (scope.stateIds.length === 0) return new Map();
+    conditions.push(sql`p.region_id IN (${sql.join(scope.stateIds.map((id) => sql`${id}`), sql`, `)})`);
+  }
+  const [children, members] = await Promise.all([
+    db.all<{ id: number; name: string; nameEn: string | null; dob: string | null; gender: string }>(sql`
+      SELECT c.id, c.name, c.name_en AS nameEn, c.date_of_birth AS dob, c.gender
+      FROM pastor_children c
+      JOIN pastors p ON p.id = c.pastor_id
+      WHERE ${sql.join(conditions, sql` AND `)}`),
+    db.all<MemberCandidate>(sql`
+      SELECT m.id, m.name_myanmar AS name, m.name_english AS nameEn,
+             m.date_of_birth AS dob, m.gender
+      FROM members m
+      WHERE m.status != 'deleted' AND m.relationship IN ('son', 'daughter')
+      ORDER BY m.id`),
+  ]);
+  if (children.length === 0 || members.length === 0) return new Map();
+
+  // A member may only be suggested once, so two children cannot claim one row.
+  const taken = new Set<number>();
+  const suggestions = new Map<number, ChildLinkSuggestion>();
+  for (const child of children) {
+    const childKeys = [nameKey(child.name), nameKey(child.nameEn)].filter(Boolean);
+    let best: { candidate: MemberCandidate; withDob: boolean } | null = null;
+    for (const member of members) {
+      if (taken.has(member.id)) continue;
+      const memberKeys = [nameKey(member.name), nameKey(member.nameEn)].filter(Boolean);
+      if (!memberKeys.some((key) => childKeys.includes(key))) continue;
+      if (child.dob && member.dob && child.dob !== member.dob) continue;
+      if (child.gender && member.gender && child.gender !== member.gender) continue;
+      const withDob = Boolean(child.dob && member.dob && child.dob === member.dob);
+      if (!best || (!best.withDob && withDob)) best = { candidate: member, withDob };
+      if (withDob) break;
+    }
+    if (!best) continue;
+    taken.add(best.candidate.id);
+    suggestions.set(child.id, {
+      childId: child.id,
+      memberId: best.candidate.id,
+      memberName: best.candidate.name ?? best.candidate.nameEn ?? "",
+      memberNameEn: best.candidate.nameEn,
+      memberDob: best.candidate.dob,
+      reason: best.withDob ? "name+dob" : "name",
+    });
+  }
+  return suggestions;
+}
+
 export type ChildFormResult = {
   values: PastorChildValues;
   errors: string[];
