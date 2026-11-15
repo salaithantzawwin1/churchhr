@@ -342,7 +342,7 @@ export function DashboardPage(props: {
       )}
 
       {perms.has("reports.view") && (
-        <section class="card dash-card" style="margin-bottom:14px">
+        <section class="card dash-card rep-card">
           <div class="dc-head">
             <h2>{t("dash.reports")}</h2>
             <a href="/reports">{t("dash.viewAll")} →</a>

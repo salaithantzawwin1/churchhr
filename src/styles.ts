@@ -1142,6 +1142,10 @@ td.empty-state .small { margin-top: 4px; }
    as two equal-height panels. */
 .dash-cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; align-items: stretch; margin-bottom: 14px; }
 .dash-card { margin: 0; padding: 16px 18px; border-radius: var(--radius-lg); display: flex; flex-direction: column; min-width: 0; }
+/* The reports card sits directly under the incomplete-records card, outside the
+   .dash-cols grid. Without its own top margin the two borders touched and the
+   section read as one panel; every other dashboard block keeps a 14px gutter. */
+.dash-card.rep-card { margin: 14px 0; }
 .dash-card .dc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .dash-card .dc-head h2 { margin: 0; font-size: 15px; }
 .dash-card .dc-head a { font-size: 12.5px; text-decoration: none; white-space: nowrap; }
