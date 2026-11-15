@@ -18,6 +18,8 @@ export type PastorChildRow = {
   school: string | null;
   notes: string | null;
   active: number;
+  /** Set when the child is also a member; the report then counts them once. */
+  memberId: number | null;
 };
 
 export type PastorChildValues = {
@@ -31,6 +33,7 @@ export type PastorChildValues = {
   school: string;
   notes: string;
   active: boolean;
+  memberId: string;
 };
 
 /** The school year a new record starts in: Sep–Aug, written 2026-2027. */
@@ -53,13 +56,15 @@ export function childValues(row?: PastorChildRow): PastorChildValues {
     school: row?.school ?? "",
     notes: row?.notes ?? "",
     active: row ? row.active === 1 : true,
+    memberId: row?.memberId != null ? String(row.memberId) : "",
   };
 }
 
 const SELECT_CHILD = sql`
   SELECT c.id, c.pastor_id AS pastorId, c.name, c.name_en AS nameEn, c.gender,
          c.date_of_birth AS dateOfBirth, c.grade, c.academic_year AS academicYear,
-         c.at_hope_school AS atHopeSchool, c.school, c.notes, c.active
+         c.at_hope_school AS atHopeSchool, c.school, c.notes, c.active,
+         c.member_id AS memberId
   FROM pastor_children c`;
 
 /** Newest school year first, then youngest child first. */
@@ -133,6 +138,7 @@ export async function loadChildReport(
     SELECT c.id, c.pastor_id AS pastorId, c.name, c.name_en AS nameEn, c.gender,
            c.date_of_birth AS dateOfBirth, c.grade, c.academic_year AS academicYear,
            c.at_hope_school AS atHopeSchool, c.school, c.notes, c.active,
+           c.member_id AS memberId,
            p.name AS pastorName, p.name_en AS pastorNameEn, p.title AS pastorTitle,
            sp.name AS spouseName, sp.name_en AS spouseNameEn,
            r.name AS stateName, r.name_en AS stateNameEn
@@ -188,6 +194,7 @@ export type ChildFormResult = {
     school: string | null;
     notes: string | null;
     active: number;
+    memberId: number | null;
   } | null;
 };
 
@@ -208,6 +215,7 @@ export function readChildForm(
     school: pick("school").slice(0, 120),
     notes: pick("notes").slice(0, 500),
     active: opts.editing ? pick("active") === "1" : true,
+    memberId: /^\d{1,9}$/.test(pick("member_id")) ? pick("member_id") : "",
   };
   const errors: string[] = [];
 
@@ -244,6 +252,7 @@ export function readChildForm(
       school,
       notes: values.notes || null,
       active: values.active ? 1 : 0,
+      memberId: values.memberId ? Number(values.memberId) : null,
     },
   };
 }

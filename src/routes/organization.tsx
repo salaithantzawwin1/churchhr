@@ -2891,6 +2891,35 @@ function childParents(pastor: PastorRow, lang: string): { father: string; mother
     : { father: self, mother: spouse };
 }
 
+/** Keep only ids that are real, live members, so a hand-edited form cannot
+ *  leave a pastor child pointing at nothing. */
+async function validMemberId(db: DB, id: number | null): Promise<number | null> {
+  if (id == null) return null;
+  const rows = await db.all<{ id: number }>(sql`
+    SELECT id FROM members WHERE id = ${id} AND status != 'deleted'`);
+  return rows[0]?.id ?? null;
+}
+
+/** Members who could be this child (relationship son or daughter), the pastor's
+ *  own state first, labelled with the birth date so namesakes stay apart. The
+ *  family may have moved, so the list is not limited to one state. */
+async function childMemberOptions(db: DB, regionId: number, lang: string) {
+  const rows = await db.all<{ id: number; name: string | null; nameEn: string | null; dob: string | null }>(sql`
+    SELECT m.id, m.name_myanmar AS name, m.name_english AS nameEn, m.date_of_birth AS dob
+    FROM members m
+    WHERE m.status != 'deleted' AND m.relationship IN ('son', 'daughter')
+    ORDER BY CASE WHEN m.region_id = ${regionId} THEN 0 ELSE 1 END,
+             COALESCE(NULLIF(m.name_myanmar, ''), m.name_english), m.id
+    LIMIT 500`);
+  return rows.map((row) => ({
+    id: row.id,
+    name: [
+      lang !== "mm" && row.nameEn ? row.nameEn : row.name ?? "",
+      row.dob ?? "",
+    ].filter(Boolean).join(" · "),
+  }));
+}
+
 async function childPastor(c: any, id: number) {
   const db = getDb(c.env);
   const scope = scopeOf(c);
@@ -2903,7 +2932,7 @@ async function childPastor(c: any, id: number) {
 organizationRoutes.get("/pastors/:id/children/new", requirePermission("pastors.manage"), async (c) => {
   const id = intParam(c.req.param("id"));
   if (!id) return c.redirect("/organization/pastors?err=err-notfound", 303);
-  const { pastor } = await childPastor(c, id);
+  const { db, pastor } = await childPastor(c, id);
   if (!pastor) return c.redirect("/organization/pastors?err=err-notfound", 303);
   if (!modalRequest(c)) return c.redirect(`/organization/pastors/${id}`, 303);
   return c.html(
@@ -2911,6 +2940,7 @@ organizationRoutes.get("/pastors/:id/children/new", requirePermission("pastors.m
       pastorId={id}
       values={childValues()}
       parents={childParents(pastor, c.get("lang"))}
+      memberOptions={await childMemberOptions(db, pastor.regionId, c.get("lang"))}
       lang={c.get("lang")}
     />,
   );
@@ -2931,6 +2961,7 @@ organizationRoutes.get("/pastors/:id/children/:cid/edit", requirePermission("pas
       childId={cid}
       values={childValues(row)}
       parents={childParents(pastor, c.get("lang"))}
+      memberOptions={await childMemberOptions(db, pastor.regionId, c.get("lang"))}
       lang={c.get("lang")}
     />,
   );
@@ -2950,15 +2981,17 @@ organizationRoutes.post("/pastors/:id/children", requirePermission("pastors.mana
     if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
     return c.html(
       <PastorChildrenModal pastorId={id} values={values} parents={childParents(pastor, lang)}
+        memberOptions={await childMemberOptions(db, pastor.regionId, lang)}
         errors={errors} lang={lang} />,
       422,
     );
   }
+  const memberId = await validMemberId(db, data.memberId);
   await db.run(sql`
-    INSERT INTO pastor_children (pastor_id, name, name_en, gender, date_of_birth, grade,
+    INSERT INTO pastor_children (pastor_id, member_id, name, name_en, gender, date_of_birth, grade,
                                  academic_year, at_hope_school, school, notes, active,
                                  created_by, updated_at)
-    VALUES (${id}, ${data.name}, ${data.nameEn}, ${data.gender}, ${data.dateOfBirth}, ${data.grade},
+    VALUES (${id}, ${memberId}, ${data.name}, ${data.nameEn}, ${data.gender}, ${data.dateOfBirth}, ${data.grade},
             ${data.academicYear}, ${data.atHopeSchool}, ${data.school}, ${data.notes}, ${data.active},
             ${c.get("user").id}, unixepoch())`);
   const landing = `/organization/pastors/${id}?ok=pastor-child-saved`;
@@ -2982,13 +3015,17 @@ organizationRoutes.post("/pastors/:id/children/:cid/edit", requirePermission("pa
     if (!modal) return c.redirect(`/organization/pastors/${id}?err=err-invalid`, 303);
     return c.html(
       <PastorChildrenModal pastorId={id} childId={cid} values={values}
-        parents={childParents(pastor, lang)} errors={errors} lang={lang} />,
+        parents={childParents(pastor, lang)}
+        memberOptions={await childMemberOptions(db, pastor.regionId, lang)}
+        errors={errors} lang={lang} />,
       422,
     );
   }
+  const memberId = await validMemberId(db, data.memberId);
   await db.run(sql`
     UPDATE pastor_children
        SET name = ${data.name}, name_en = ${data.nameEn}, gender = ${data.gender},
+           member_id = ${memberId},
            date_of_birth = ${data.dateOfBirth}, grade = ${data.grade},
            academic_year = ${data.academicYear}, at_hope_school = ${data.atHopeSchool},
            school = ${data.school}, notes = ${data.notes}, active = ${data.active},

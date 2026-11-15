@@ -3577,4 +3577,9 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   .hh-edu { border-color: #999; color: #111; }
   .report-matrix-card { border: 1px solid #ccc; }
 }
+
+/* "Member" chip beside a pastor child's name: a small link to the member record
+   so the two rows are visibly the same person. */
+.child-member-tag { margin-left: 6px; font-size: 11.5px; text-decoration: none; }
+.child-member-tag:hover { border-color: var(--link); color: var(--link); }
 `; // end of stylesheet

@@ -77,6 +77,11 @@ export function PastorChildrenCard(props: {
                       {row.nameEn && lang !== "mm" && row.name !== row.nameEn ? (
                         <span class="muted small"> ({row.name})</span>
                       ) : null}
+                      {row.memberId != null && (
+                        <a class="pastor-tag child-member-tag" href={`/members/${row.memberId}`}>
+                          {t("org.childLinked")}
+                        </a>
+                      )}
                       {row.notes && <div class="muted small">{row.notes}</div>}
                     </td>
                     <td>{[gender, age == null ? "" : `${age}`].filter(Boolean).join(" · ") || "—"}</td>
@@ -122,12 +127,15 @@ export function PastorChildrenModal(props: {
   childId?: number;
   values: PastorChildValues;
   parents: ChildParents;
+  /** Members of the pastor's state that this child could be (son / daughter). */
+  memberOptions?: { id: number; name: string }[];
   errors?: string[];
   lang: Lang;
 }) {
-  const { pastorId, childId, values: v, parents, errors = [], lang } = props;
+  const { pastorId, childId, values: v, parents, memberOptions = [], errors = [], lang } = props;
   const t = getDict(lang);
   const editing = childId != null;
+  const memberSelected = memberOptions.find((m) => String(m.id) === v.memberId);
   const action = editing
     ? `/organization/pastors/${pastorId}/children/${childId}/edit`
     : `/organization/pastors/${pastorId}/children`;
@@ -151,6 +159,26 @@ export function PastorChildrenModal(props: {
           <label class="field">
             <span class="lbl">{t("org.childNameEn")}</span>
             <input type="text" name="name_en" value={v.nameEn} maxlength={100} placeholder="e.g. Grace" />
+          </label>
+          <label class="field span-2">
+            <span class="lbl">{t("org.childMemberLink")}</span>
+            <div class="head-picker pastor-picker" data-search-picker
+              data-no-match={t("org.pastorNoMatch")}>
+              <input type="search" data-search-input value={memberSelected?.name ?? ""}
+                placeholder={t("org.childMemberSearch")} autocomplete="off" role="combobox"
+                aria-expanded="false" aria-label={t("org.childMemberLink")} />
+              <button type="button" class="head-clear" data-search-clear
+                aria-label={t("org.pastorClear")} hidden={!memberSelected}>×</button>
+              <select name="member_id" data-search-select>
+                <option value="">{t("org.childMemberNone")}</option>
+                {memberOptions.map((member) => (
+                  <option value={String(member.id)} selected={v.memberId === String(member.id)}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span class="field-hint">{t("org.childMemberHint")}</span>
           </label>
           <label class="field">
             <span class="lbl">{t("org.childGender")}</span>

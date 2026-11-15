@@ -247,7 +247,20 @@ export async function loadStudentReport(
     notes: row.notes,
   }));
 
+  // A child may be both a pastor's child and a member: the member's yearly
+  // enrolment is the better record, so skip the pastor row for that year.
+  const memberYears = new Map<number, Set<string>>();
+  for (const row of memberRows) {
+    const years = memberYears.get(row.studentId) ?? new Set<string>();
+    years.add(row.academicYear);
+    memberYears.set(row.studentId, years);
+  }
+
   for (const row of pastorRows) {
+    if (row.memberId != null) {
+      const years = memberYears.get(row.memberId);
+      if (years && (row.academicYear == null ? years.size > 0 : years.has(row.academicYear))) continue;
+    }
     students.push({
       key: `p${row.id}-${row.academicYear ?? ""}`,
       personType: "pastor",
