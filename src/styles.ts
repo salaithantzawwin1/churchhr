@@ -3589,4 +3589,7 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   margin-top: 6px; padding: 4px 0 0;
 }
 .child-link-suggest .btn { padding: 2px 10px; font-size: 11.5px; }
+
+/* Member list: the school in the latest recorded year, grade and year beneath. */
+.school-cell .school-meta { display: block; margin-top: 2px; }
 `; // end of stylesheet

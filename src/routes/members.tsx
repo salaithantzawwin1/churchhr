@@ -149,6 +149,7 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     familyGroup: q.family_group === "any" ? "any" : intParam(q.family_group),
     missing: (MISSING_FIELDS as readonly string[]).includes(q.missing ?? "")
       ? (q.missing as MissingField) : "",
+    school: q.school === "hope" || q.school === "other" ? q.school : "",
   };
 }
 
@@ -179,6 +180,11 @@ function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: nu
   else if (f.missing === "phone") cond = sql`${cond} AND (m.phone IS NULL OR m.phone = '')`;
   else if (f.missing === "dob") cond = sql`${cond} AND (m.date_of_birth IS NULL OR m.date_of_birth = '')`;
   if (f.fellowship) cond = sql`${cond} AND m.fellowship_category_id = ${f.fellowship}`;
+  // School filter looks at the same row the list shows: the latest school year.
+  if (f.school) {
+    cond = sql`${cond} AND (SELECT x.school_kind FROM student_enrolments x
+      WHERE x.member_id = m.id ORDER BY x.academic_year DESC, x.id DESC LIMIT 1) = ${f.school}`;
+  }
   // Same age bucket and population the dashboard card counts (active members
   // with a birth date), so the drilled-down total matches the number clicked.
   if (age) {
@@ -223,6 +229,7 @@ const SORT_EXPR: Record<string, string> = {
   fellowship: "fc.label",
   sector: "sec.label",
   status: "m.status",
+  school: "COALESCE(en.school_kind, '')",
 };
 
 /** Resolve the query-string sort into an ORDER BY fragment (default: newest first). */
@@ -257,9 +264,13 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
            m.home_cell_id, hc.label AS home_cell, gr.label AS group_label,
            fg.label AS family_group, fg.code AS family_group_code,
            fc.label AS fellowship, sec.label AS sector,
-           (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions
+           (SELECT GROUP_CONCAT(position, ',') FROM member_positions WHERE member_id = m.id) AS positions,
+           en.school_kind, en.school_name, en.grade AS school_grade, en.academic_year AS school_year
     FROM members m
     JOIN regions r ON r.id = m.region_id
+    LEFT JOIN student_enrolments en ON en.id = (
+      SELECT x.id FROM student_enrolments x WHERE x.member_id = m.id
+       ORDER BY x.academic_year DESC, x.id DESC LIMIT 1)
     LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
     LEFT JOIN lookup_options gr ON gr.id = m.group_id
     LEFT JOIN lookup_options fg ON fg.id = m.family_group_id

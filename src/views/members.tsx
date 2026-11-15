@@ -5,6 +5,7 @@ import type { OptionRow } from "../lookup";
 import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, pluralLabel, type Lang } from "../i18n";
+import { HOPE_SCHOOL } from "../pastor-children";
 import type { EnrolmentRow } from "../student-enrolments";
 import { MemberEducationCard } from "./student-education";
 import { positionLabels } from "../positions";
@@ -34,11 +35,19 @@ export type MemberListItem = {
   family_group_code?: string | null;
   fellowship: string | null;
   sector: string | null;
+  /** Latest enrolled school year, so the list can show and filter by school. */
+  school_kind?: "hope" | "other" | null;
+  school_name?: string | null;
+  school_grade?: string | null;
+  school_year?: string | null;
   has_photo?: number | boolean;
   updated_at?: number;
 };
 
 export type FilterMissing = "family_group" | "home_cell" | "phone" | "dob";
+
+/** School filter: the type of the member's most recent enrolled year. */
+export type FilterSchool = "hope" | "other" | "";
 
 export type Filters = {
   q: string;
@@ -55,6 +64,7 @@ export type Filters = {
   familyGroup: number | "any" | null;
   /** Dashboard drill-down: records still missing this detail. */
   missing: FilterMissing | "";
+  school: FilterSchool;
 };
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
@@ -82,13 +92,14 @@ function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, page: page ?? null,
+    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
+    page: page ?? null,
   });
 }
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing || f.school);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -101,7 +112,7 @@ function sortQs(f: Filters, sort: string, dir: string): string {
 /** Member list columns (data-col keys shared by <th>/<td> and the chooser JS). */
 const SORTABLE = new Set([
   "id", "name", "gender", "age", "phone", "state", "township", "marital",
-  "homeCell", "role", "group", "familyGroup", "fellowship", "sector", "status",
+  "homeCell", "role", "group", "familyGroup", "fellowship", "sector", "status", "school",
 ]);
 const LIST_COLS = (t: (k: string) => string) => [
   { key: "id", label: t("members.thId") },
@@ -111,6 +122,7 @@ const LIST_COLS = (t: (k: string) => string) => [
   { key: "phone", label: t("members.thPhone") },
   { key: "state", label: t("members.state") },
   { key: "township", label: t("members.township") },
+  { key: "school", label: t("members.thSchool") },
   { key: "marital", label: t("members.thMarital") },
   { key: "homeCell", label: t("members.thHomeCell") },
   { key: "role", label: t("org.position") },
@@ -147,7 +159,7 @@ export function MembersListPage(props: ListProps) {
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
     home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
-    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing,
+    age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
     sort: sort || null, dir: sort ? dir : null,
   };
   const withoutFilter = (key: keyof typeof activeParams) => `/members${qs({ ...activeParams, [key]: null })}`;
@@ -159,6 +171,12 @@ export function MembersListPage(props: ListProps) {
   }
   if (f.gender && G[f.gender]) chips.push({ label: G[f.gender]!, href: withoutFilter("gender") });
   if (f.status && S[f.status]) chips.push({ label: S[f.status]!, href: withoutFilter("status") });
+  if (f.school) {
+    chips.push({
+      label: f.school === "hope" ? t("edu.hope") : t("edu.other"),
+      href: withoutFilter("school"),
+    });
+  }
   if (f.homeCell) {
     const cell = homeCells.find((o) => o.id === f.homeCell);
     if (cell) chips.push({ label: cell.label, href: withoutFilter("home_cell") });
@@ -244,6 +262,11 @@ export function MembersListPage(props: ListProps) {
           {Object.entries(S).map(([k, v]) => (
             <option value={k} selected={f.status === k}>{v}</option>
           ))}
+        </select>
+        <select name="school" aria-label={t("members.thSchool")}>
+          <option value="">{t("members.allSchools")}</option>
+          <option value="hope" selected={f.school === "hope"}>{t("edu.hope")}</option>
+          <option value="other" selected={f.school === "other"}>{t("edu.other")}</option>
         </select>
         <select name="age_group" aria-label={t("dash.ageGroups")}>
           <option value="">{t("members.allAges")}</option>
@@ -397,6 +420,22 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="phone" data-label={colLabel("phone")}>{m.phone ?? ""}</td>
                 <td data-col="state" data-label={colLabel("state")}>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
                 <td data-col="township" data-label={colLabel("township")}>{m.township ?? ""}</td>
+                <td data-col="school" data-label={colLabel("school")} class="school-cell">
+                  {m.school_kind ? (
+                    <>
+                      {m.school_kind === "hope" ? (
+                        <span class="badge active">{HOPE_SCHOOL}</span>
+                      ) : (
+                        <span>{m.school_name || t("edu.other")}</span>
+                      )}
+                      <span class="muted small school-meta">
+                        {[m.school_grade, m.school_year].filter(Boolean).join(" · ")}
+                      </span>
+                    </>
+                  ) : (
+                    <span class="muted small">—</span>
+                  )}
+                </td>
                 <td data-col="marital" data-label={colLabel("marital")}>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell" data-label={colLabel("homeCell")}>{m.home_cell ?? ""}</td>
                 <td data-col="role" class="position-cell" data-label={colLabel("role")}>
