@@ -1648,17 +1648,23 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-section-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .org-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: auto; padding-top: 8px; }
 .org-card-actions .org-card-link { margin-top: 0; padding-top: 0; }
-.org-collapse { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); overflow: hidden; }
+/* Collapsible section head, not a form control: the boxed bar read as an empty
+   input field, so the label is a heading with its chevron beside it and the rule
+   underneath carries the grouping. */
+.org-collapse { border: 0; border-radius: 0; background: transparent; overflow: visible; }
 .org-collapse-summary {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  min-height: 44px; padding: 10px 14px; cursor: pointer; list-style: none;
-  font-size: 13px; font-weight: 600; color: var(--muted);
+  display: flex; align-items: center; justify-content: flex-start; gap: 7px;
+  min-height: 40px; padding: 4px 2px; cursor: pointer; list-style: none;
+  font-size: 15px; font-weight: 600; color: var(--ink);
+  border-bottom: 1px solid var(--line);
 }
+.org-collapse-summary:hover { color: var(--link); }
+.org-collapse-summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-xs); }
 .org-collapse-summary::-webkit-details-marker { display: none; }
-.org-collapse-summary .chev { font-size: 12px; transition: transform .15s ease; }
+.org-collapse-summary .chev { font-size: 10px; color: var(--muted); transition: transform .15s ease; }
 .org-collapse[open] > .org-collapse-summary .chev { transform: rotate(180deg); }
-.org-collapse-body { padding: 0 14px 14px; }
-.org-collapse-hint { font-weight: 400; }
+.org-collapse-body { padding: 12px 2px 0; }
+.org-collapse-hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
 .org-main-church .org-collapse { margin-top: 16px; }
 .org-main-cells .org-collapse-body { padding-bottom: 4px; }
 .org-main-township + .org-main-township { margin-top: 8px; }
