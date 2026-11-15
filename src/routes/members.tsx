@@ -317,7 +317,7 @@ const FORM_KEYS = [
 
 type Validated = { values: FormValues; errors: string[]; data: Record<string, string | number | null> | null };
 
-function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[], departments: { id: number }[] = []): Validated {
+function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[], departments: { id: number }[] = [], regions: { id: number }[] = []): Validated {
   const v: FormValues = {};
   for (const k of FORM_KEYS) v[k] = s(body[k]);
   const errors: string[] = [];
@@ -327,7 +327,9 @@ function readAndValidate(body: Record<string, unknown>, scope: Scope, options: O
   const regionId = asInt(v.region_id);
   let regionOk = false;
   if (regionId === null) errors.push(msg("val.state"));
-  else if (scope.scopeAll) regionOk = true;
+  // Scope-all may pick any state, but only one that still exists: an id from a
+  // hand-edited form reached the insert and failed its foreign key (HTTP 500).
+  else if (scope.scopeAll) regionOk = regions.length === 0 || regions.some((r) => r.id === regionId);
   else regionOk = scope.stateIds.includes(regionId);
   if (regionId !== null && !regionOk) errors.push(msg("val.scope"));
 
@@ -1146,10 +1148,10 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const fromModal = s(body.from_modal) === "1" || c.req.header("X-Requested-With") === "modal";
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments);
+  const allRegions = await loadRegions(db);
+  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
   const photo = parsePhoto(body);
   if (photo.error) errors.push(photo.error);
-  const allRegions = await loadRegions(db);
   const render = (status: 400 | 200) =>
     c.html(
       fromModal
@@ -1474,7 +1476,10 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
         updatedBy: c.get("user").id,
       }).where(eq(members.id, id));
     }
-  } catch {
+  } catch (err) {
+    // The slot conflict is the usual cause, but any failure lands here: keep the
+    // real cause in the log instead of losing it behind the shown message.
+    console.error("member position save failed:", err);
     return renderError(t("flash.positionTaken"));
   }
   await db.insert(memberHistory).values({
@@ -1655,10 +1660,10 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const fromModal = s(body.from_modal) === "1";
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments);
+  const allRegions = await loadRegions(db);
+  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
   const photo = parsePhoto(body);
   if (photo.error) errors.push(photo.error);
-  const allRegions = await loadRegions(db);
   if (!data || photo.error) {
     const formProps = {
       user: c.get("user"), perms: c.get("perms"), values,
