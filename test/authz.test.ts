@@ -114,6 +114,7 @@ beforeAll(async () => {
     db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.create')"),
     db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.update')"),
     db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.delete')"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (7, 'members.export')"),
     db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (4, 'scopedentry', 'x', 1, 0)"),
     db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (5, 'scopedreviewer', 'x', 1, 0)"),
     db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (6, 'otherauthor', 'x', 1, 0)"),
@@ -137,6 +138,7 @@ beforeAll(async () => {
     db.prepare("INSERT INTO families (name, region_id, created_by) VALUES ('Out-of-Scope Household', 2, 7)"),
     db.prepare("INSERT INTO members (name_english, region_id, family_id, relationship, created_by) VALUES ('Out Member', 2, (SELECT id FROM families WHERE name = 'Out-of-Scope Household'), 'other', 7)"),
     db.prepare("INSERT INTO members (name_english, region_id, relationship, created_by) VALUES ('In Member', 1, '', 7)"),
+    db.prepare("INSERT INTO members (name_english, region_id, relationship, created_by) VALUES ('Delete Me Member', 1, '', 7)"),
   ]);
   for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID]) {
     sessions.set(id, await createSession(id));
@@ -400,5 +402,76 @@ describe("household scope", () => {
     const detached = await env.DB.prepare("SELECT family_id FROM members WHERE id = ?")
       .bind(member).first<{ family_id: number | null }>();
     expect(detached?.family_id).toBeNull();
+  });
+});
+
+describe("member scope", () => {
+  it("reads an in-scope member and hides another state's member", async () => {
+    const inScope = await getAs(`/members/${await memberId("In Member")}`, RECORDS_ID);
+    expect(inScope.status).toBe(200);
+    expect(await inScope.text()).toContain("In Member");
+
+    const outOfScope = await getAs(`/members/${await memberId("Out Member")}`, RECORDS_ID);
+    expect(outOfScope.status).toBe(302);
+    expect(outOfScope.headers.get("location")).toContain("err-notfound");
+  });
+
+  it("refuses an edit to another state's member and stores nothing", async () => {
+    const id = await memberId("Out Member");
+    const res = await postAs(`/members/${id}`, RECORDS_ID, {
+      name_english: "Hijacked Member", region_id: "2", status: "active",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("err-notfound");
+    const row = await env.DB.prepare("SELECT name_english FROM members WHERE id = ?")
+      .bind(id).first<{ name_english: string }>();
+    expect(row?.name_english).toBe("Out Member");
+  });
+
+  it("edits an in-scope member", async () => {
+    const id = await memberId("In Member");
+    const res = await postAs(`/members/${id}`, RECORDS_ID, {
+      name_english: "In Member Renamed", region_id: "1", status: "active",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("ok=member-updated");
+    const row = await env.DB.prepare("SELECT name_english FROM members WHERE id = ?")
+      .bind(id).first<{ name_english: string }>();
+    expect(row?.name_english).toBe("In Member Renamed");
+  });
+
+  it("refuses deleting another state's member and keeps the row", async () => {
+    const id = await memberId("Out Member");
+    const res = await postAs(`/members/${id}/delete`, RECORDS_ID);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("err-notfound");
+    const row = await env.DB.prepare("SELECT id FROM members WHERE id = ?").bind(id).first();
+    expect(row).not.toBeNull();
+  });
+
+  it("deletes an in-scope member", async () => {
+    const id = await memberId("Delete Me Member");
+    const res = await postAs(`/members/${id}/delete`, RECORDS_ID);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("ok=member-deleted");
+    const row = await env.DB.prepare("SELECT id FROM members WHERE id = ?").bind(id).first();
+    expect(row).toBeNull();
+  });
+
+  it("exports only the account's states even when asked for another state", async () => {
+    const res = await getAs("/members/export", RECORDS_ID);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/csv");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const csv = await res.text();
+    expect(csv).toContain("In Member");
+    expect(csv).not.toContain("Out Member");
+
+    // A foreign state filter cannot widen the export past the account scope.
+    const forced = await getAs("/members/export?state=2", RECORDS_ID);
+    expect(forced.status).toBe(200);
+    const forcedCsv = await forced.text();
+    expect(forcedCsv).not.toContain("Out Member");
+    expect(forcedCsv.trim().split("\n")).toHaveLength(1);
   });
 });
