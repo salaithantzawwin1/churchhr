@@ -149,14 +149,6 @@ a { color: var(--link); }
 }
 .topbar .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .topbar .who form { margin: 0; }
-/* A phone cannot fit the theme button, three languages, the name and Sign Out
-   on one line; tighten the gaps and cut the name short rather than let the
-   topbar make the whole page scroll sideways. */
-@media (max-width: 560px) {
-  .topbar .who { gap: 6px; }
-  .topbar .who-link { max-width: 88px; padding: 4px; }
-  .topbar .langswitch a { padding: 0 5px; }
-}
 .container { max-width: 1100px; margin: 22px auto; padding: 0 16px; }
 .footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 26px 10px 34px; }
 .card {
@@ -848,6 +840,14 @@ th.bar-col { width: 42%; }
 }
 .topbar .who form .btn:hover { background: var(--btn2-hover); filter: none; }
 .topbar .langswitch a { min-height: 36px; display: inline-flex; align-items: center; }
+/* A phone cannot fit the theme button, three languages, the name and Sign Out
+   on one line; tighten the gaps and cut the name short rather than let the
+   topbar make the whole page scroll sideways. */
+@media (max-width: 560px) {
+  .topbar .who { gap: 6px; }
+  .topbar .who-link { max-width: 88px; padding: 4px; }
+  .topbar .langswitch a { padding: 0 5px; }
+}
 .topbar .who-link { display: inline-flex; align-items: center; min-height: 36px; }
 
 /* Between tablet and desktop the nav needs its own row; keeping it inline
