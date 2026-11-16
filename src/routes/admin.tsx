@@ -356,13 +356,14 @@ function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) 
   const roleIds = ints(multi(body.roles));
   const statesRaw = ints(multi(body.states));
   const homeCellsRaw = ints(multi(body.home_cells));
-  const displayName = s(body.display_name).trim().slice(0, 80);
+  // Kept unsliced: an over-long name must fail validation, not be cut short.
+  const displayName = s(body.display_name).trim();
   const allStates = s(body.all_states) === "1";
   const active = s(body.active) === "1" ? 1 : 0;
   const mustChange = s(body.must_change) === "1" ? 1 : 0;
   const errors: string[] = [];
   if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
-  if (s(body.display_name).trim().length > 80) errors.push(t("adm.errDisplayName"));
+  if (displayName.length > 80) errors.push(t("adm.errDisplayName"));
   return { id: undefined as number | undefined, username, displayName, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
 }
 

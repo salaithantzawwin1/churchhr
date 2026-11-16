@@ -205,6 +205,9 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="muted" data-label="ID">{u.id}</td>
                 <td data-label={t("profile.username")}>
                   {u.username}
+                  {u.display_name && (
+                    <span class="muted small" style="display:block">{u.display_name}</span>
+                  )}
                   {u.id === user.id && (
                     <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
                   )}
