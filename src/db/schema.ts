@@ -46,6 +46,8 @@ export const users = sqliteTable("users", {
   lockedUntil: integer("locked_until").notNull().default(0),
   /** UI language chosen by this account (mm | en | kr); NULL until they switch. */
   language: text("language"),
+  /** Optional full name; empty means reports credit the username. */
+  displayName: text("display_name"),
   createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
 });
 

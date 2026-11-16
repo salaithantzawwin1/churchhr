@@ -34,6 +34,8 @@ function localizedRoleNames(names: string, lang?: Lang): string {
 export type AdminUserRow = {
   id: number;
   username: string;
+  /** Optional full name from 0047; empty falls back to the username. */
+  display_name: string;
   active: number;
   must_change_password: number;
   created_at: number;
@@ -63,6 +65,7 @@ function stateSummary(u: AdminUserRow & { state_names?: string }, regions: { id:
 function userForm(v: {
   id?: number;
   username: string;
+  displayName: string;
   allStates: boolean;
   selectedRoles: number[];
   selectedStates: number[];
@@ -82,6 +85,11 @@ function userForm(v: {
           <span class="lbl">Username {v.id === undefined && "*"}</span>
           <input type="text" name="username" value={v.username} required={v.id === undefined}
             pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("adm.displayName")}</span>
+          <input type="text" name="display_name" value={v.displayName} maxlength={80}
+            autocomplete="off" placeholder={t("adm.displayNameHint")} />
         </label>
         <label class="field">
           <span class="lbl">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</span>
@@ -152,7 +160,7 @@ function userForm(v: {
  * reused by error responses inside the same modal. */
 export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
-  values: { id?: number; username: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
+  values: { id?: number; username: string; displayName: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
   roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string; regionId?: number }[];
 }) {
@@ -235,7 +243,7 @@ export function AdminUsersPage(props: UsersProps) {
           {editErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ id: editUser.id, username: editUser.username, allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
         </div>
       )}
 
@@ -256,7 +264,7 @@ export function AdminUserEditPage(props: Common & {
   if (modal) {
     return (
       <UserFormFragment lang={lang} errors={editErrors}
-        values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+        values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
         roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
     );
   }
@@ -271,7 +279,7 @@ export function AdminUserEditPage(props: Common & {
           <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
         )}
         <UserFormFragment lang={lang} errors={editErrors}
-          values={{ id: u.id, username: u.username, allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+          values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
           roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
       </div>
     </Layout>

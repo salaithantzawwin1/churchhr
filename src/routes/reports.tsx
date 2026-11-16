@@ -80,7 +80,8 @@ async function loadReport(db: DB, id: number): Promise<ReportDetail | undefined>
            ar.challenges, ar.prayer_requests, ar.next_steps, ar.review_note,
            ar.created_at, ar.updated_at, ar.reviewed_at,
            r.name AS state_name, r.name_en AS state_name_en,
-           u.username AS author_name, rv.username AS reviewer_name
+           COALESCE(NULLIF(u.display_name, ''), u.username) AS author_name,
+           COALESCE(NULLIF(rv.display_name, ''), rv.username) AS reviewer_name
     FROM activity_reports ar
     JOIN regions r ON r.id = ar.region_id
     JOIN users u ON u.id = ar.author_id
@@ -232,7 +233,7 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
     SELECT ar.id, ar.report_date, ar.title, ar.status, ar.township,
            ar.author_id, ar.region_id, ar.attendance, ar.new_contacts, ar.follow_ups,
            r.name AS state_name, r.name_en AS state_name_en,
-           u.username AS author_name
+           COALESCE(NULLIF(u.display_name, ''), u.username) AS author_name
     FROM activity_reports ar
     JOIN regions r ON r.id = ar.region_id
     JOIN users u ON u.id = ar.author_id
@@ -250,7 +251,7 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
     : [];
   const authorRowsP = team
     ? db.all<{ id: number; username: string }>(sql`
-        SELECT DISTINCT u.id, u.username
+        SELECT DISTINCT u.id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username
         FROM activity_reports ar JOIN users u ON u.id = ar.author_id
         WHERE ${scopeCond(scope)}
         ORDER BY u.username`)

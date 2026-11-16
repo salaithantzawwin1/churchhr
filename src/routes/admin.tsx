@@ -178,9 +178,9 @@ let warnedMissingUserLanguage = false;
 
 async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
   const stateCol = lang !== "mm" ? "COALESCE(r3.name_en, r3.name)" : "r3.name";
-  const query = (languageCol: string) => db.all<AdminUserRow & { state_ids: string | null }>(
+  const query = (cols: string) => db.all<AdminUserRow & { state_ids: string | null }>(
     sql.raw(`
-    SELECT u.id, u.username, u.active, u.must_change_password, ${languageCol}u.created_at,
+    SELECT u.id, u.username, ${cols}u.active, u.must_change_password, u.created_at,
       COALESCE((
         SELECT group_concat(r2.name, ', ')
         FROM user_roles ur JOIN roles r2 ON r2.id = ur.role_id
@@ -194,16 +194,17 @@ async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
       (SELECT group_concat(sa.region_id) FROM user_state_assignments sa WHERE sa.user_id = u.id) AS state_ids
     FROM users u ORDER BY u.id`),
   );
-  let rows: (AdminUserRow & { state_ids: string | null })[];
-  try {
-    rows = await query("u.language, ");
-  } catch (err) {
-    // Deploy-before-migration safety: the users page still loads without 0013.
-    if (!warnedMissingUserLanguage) {
-      console.warn("account language unavailable on users page (run D1 migrations):", err);
-      warnedMissingUserLanguage = true;
+  let rows: (AdminUserRow & { state_ids: string | null })[] = [];
+  // Deploy-before-migration safety: try the newest columns first and fall back
+  // when 0047 or 0013 has not been applied yet.
+  for (const cols of ["COALESCE(u.display_name, '') AS display_name, u.language, ", "u.language, ", "COALESCE(u.display_name, '') AS display_name, ", ""]) {
+    try { rows = await query(cols); break; }
+    catch (err) {
+      if (!warnedMissingUserLanguage) {
+        console.warn("optional user columns unavailable on users page (run D1 migrations):", err);
+        warnedMissingUserLanguage = true;
+      }
     }
-    rows = await query("");
   }
   return rows.map((r: any) => ({
     ...r,
@@ -341,7 +342,7 @@ adminRoutes.get("/users/new", requirePermission("users.manage"), requireAllState
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={[]}
-      values={{ username: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
+      values={{ username: "", displayName: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
       roles={roleList as any} regions={regionsList}
       homeCells={homeCells}
     />,
@@ -355,12 +356,14 @@ function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) 
   const roleIds = ints(multi(body.roles));
   const statesRaw = ints(multi(body.states));
   const homeCellsRaw = ints(multi(body.home_cells));
+  const displayName = s(body.display_name).trim().slice(0, 80);
   const allStates = s(body.all_states) === "1";
   const active = s(body.active) === "1" ? 1 : 0;
   const mustChange = s(body.must_change) === "1" ? 1 : 0;
   const errors: string[] = [];
   if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
-  return { id: undefined as number | undefined, username, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
+  if (s(body.display_name).trim().length > 80) errors.push(t("adm.errDisplayName"));
+  return { id: undefined as number | undefined, username, displayName, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
 }
 
 async function validateAssignments(
@@ -395,7 +398,7 @@ async function validateAssignments(
  * been clobbered by the earlier validate call in a separate DB pool. */
 async function userFail(
   c: any,
-  p: { username: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; homeCellsRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
+  p: { username: string; displayName: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; homeCellsRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
   roleList: { id: number; name: string }[],
   regionList: { id: number; name: string }[],
   homeCellList: { id: number; name: string }[],
@@ -408,7 +411,7 @@ async function userFail(
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={errors}
-      values={{ id: p.id, username: p.username, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, homeCellIds: p.homeCellsRaw, active: p.active, mustChange: p.mustChange }}
+      values={{ id: p.id, username: p.username, displayName: p.displayName, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, homeCellIds: p.homeCellsRaw, active: p.active, mustChange: p.mustChange }}
       roles={roleList} regions={regionList} homeCells={homeCellList}
     />,
     400,
@@ -436,7 +439,7 @@ adminRoutes.post("/users", requirePermission("users.manage"), requireAllStates, 
 
   const passwordHash = await hashPassword(p.password, parseIterations(c.env.PBKDF2_ITERATIONS));
   const created = await db.insert(users)
-    .values({ username: p.username, passwordHash, active: p.active, mustChangePassword: p.mustChange })
+    .values({ username: p.username, displayName: p.displayName, passwordHash, active: p.active, mustChangePassword: p.mustChange })
     .returning({ id: users.id });
   const newId = created[0]!.id;
   for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: newId, roleId });
@@ -480,7 +483,8 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   }
 
   const updates: Record<string, string | number> = {
-    username: p.username, active: p.active, mustChangePassword: p.mustChange,
+    username: p.username, displayName: p.displayName,
+    active: p.active, mustChangePassword: p.mustChange,
   };
   if (p.newPassword) {
     updates.passwordHash = await hashPassword(p.newPassword, parseIterations(c.env.PBKDF2_ITERATIONS));
