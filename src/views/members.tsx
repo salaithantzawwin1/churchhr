@@ -2,7 +2,7 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
-import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
+import { ageFromDate, formatPhone, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, pluralLabel, type Lang } from "../i18n";
 import { HOPE_SCHOOL } from "../pastor-children";
@@ -418,7 +418,7 @@ export function MembersListPage(props: ListProps) {
                 </td>
                 <td data-col="gender" data-label={colLabel("gender")}>{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
                 <td data-col="age" data-label={colLabel("age")}>{ageFromDate(m.date_of_birth) ?? ""}</td>
-                <td data-col="phone" data-label={colLabel("phone")}>{m.phone ?? ""}</td>
+                <td data-col="phone" data-label={colLabel("phone")}>{formatPhone(m.phone)}</td>
                 <td data-col="state" data-label={colLabel("state")}>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
                 <td data-col="township" data-label={colLabel("township")}>{m.township ?? ""}</td>
                 <td data-col="school" data-label={colLabel("school")} class="school-cell">
@@ -1183,7 +1183,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
     {
       title: t("form.contact"),
       rows: [
-        [t("detail.phone"), m.phone ?? ""],
+        [t("detail.phone"), formatPhone(m.phone)],
         [t("detail.nrc"), m.nrc_number ?? ""],
         [t("detail.languages"), m.languages ?? ""],
         [t("detail.address"), m.address ?? ""],

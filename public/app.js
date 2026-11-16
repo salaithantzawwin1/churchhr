@@ -1502,12 +1502,40 @@
         minDate: parseValue(input.getAttribute("min")),
       });
 
+      // setDate() re-renders the calendar and fires its own changeDate. While
+      // we are only syncing the calendar with the field's value that is not a
+      // user pick: treating it as one would rewrite the input and, on a
+      // data-auto-submit filter, submit the page the moment a field is opened.
+      var syncing = false;
+
       pop.addEventListener("changeDate", function (e) {
+        if (syncing) return;
         var date = e.detail && e.detail.date;
         if (!date) return;
         setValue(input, date);
         closeDatePicker();
       });
+
+      // A grey day belongs to the month before or after the one on screen.
+      // Tapping it means "that date", not "flip the calendar", so choose it
+      // directly; outside min/max the calendar keeps its own month flip.
+      pop.addEventListener("click", function (e) {
+        var cell = e.target && e.target.closest ? e.target.closest(".datepicker-cell.day") : null;
+        if (!cell || cell.classList.contains("disabled")) return;
+        var step = cell.classList.contains("next") ? 1 : cell.classList.contains("prev") ? -1 : 0;
+        if (!step) return;
+        var view = dp.picker && dp.picker.viewDate;
+        var day = parseInt(cell.textContent, 10);
+        if (!view || !day) return;
+        var date = new Date(view.getFullYear(), view.getMonth() + step, day);
+        var min = parseValue(input.getAttribute("min"));
+        var max = parseValue(input.getAttribute("max"));
+        if ((min && date < min) || (max && date > max)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setValue(input, date);
+        closeDatePicker();
+      }, true);
 
       function show() {
         dp.setOptions({
@@ -1515,8 +1543,11 @@
           minDate: parseValue(input.getAttribute("min")),
         });
         var current = parseValue(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
-        else dp.setDate({ clear: true, render: true, silent: true });
+        syncing = true;
+        try {
+          if (current) dp.setDate(current, { render: true });
+          else dp.setDate({ clear: true, render: true });
+        } finally { syncing = false; }
         // Set the open state after setDate: rendering the calendar can fire its
         // own changeDate, and closing must not leave a visible popover behind.
         if (dpPop && dpPop !== pop) dpPop.hidden = true;
@@ -1535,7 +1566,9 @@
       input.addEventListener("input", function () {
         if (dpPop !== pop) return;
         var current = parseValue(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
+        if (!current) return;
+        syncing = true;
+        try { dp.setDate(current, { render: true }); } finally { syncing = false; }
       });
 
       // Optional "Today" shortcut, for dates that usually mean now (a daily

@@ -5,7 +5,7 @@ import { getDict, type Lang } from "../i18n";
 import type { EnrolmentSummary } from "../student-enrolments";
 import { CardViewToggle } from "./view-toggle";
 import { regionCascadeSelects } from "./hh-cascade";
-import { optionLabel, optionText, qs } from "../util";
+import { formatPhone, optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { EditIcon, RemoveUserIcon, TrashIcon } from "./action-icons";
 
@@ -371,7 +371,9 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
           <div class="hh-facts">
             <div class="hh-fact wide">
               <span class="hh-fact-label">{t("detail.phone")}</span>
-              <span class="hh-fact-value">{family.phone ? <a href={`tel:${family.phone}`}>{family.phone}</a> : "—"}</span>
+              <span class="hh-fact-value">{family.phone
+                ? <a href={`tel:${family.phone.replace(/[^\d+]/g, "")}`}>{formatPhone(family.phone)}</a>
+                : "—"}</span>
             </div>
             <div class="hh-fact wide">
               <span class="hh-fact-label">{t("detail.address")}</span>
@@ -516,7 +518,7 @@ export function HouseholdSearchMemberPage(props: Common & {
                     <div class="hh-pick-meta">
                       {secondary && secondary !== primary && <span>{secondary} · </span>}
                       {isEn && m.state_name_en ? m.state_name_en : m.state_name}
-                      {m.phone && <span> · {m.phone}</span>}
+                      {m.phone && <span> · {formatPhone(m.phone)}</span>}
                     </div>
                     <div style="margin-top:4px">
                       {m.family_id

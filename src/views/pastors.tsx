@@ -6,7 +6,7 @@ import {
   ministryTenure, type ChildLinkSuggestion, type PastorChildCount, type PastorChildRow,
 } from "../pastor-children";
 import { PastorChildrenCard } from "./pastor-children";
-import { todayInYangon } from "../util";
+import { formatPhone, todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
 
@@ -441,7 +441,7 @@ export function PastorsPage(props: Common & {
                   </div>
                   <div class="hh-fact wide">
                     <span class="hh-fact-label">{t("detail.phone")}</span>
-                    <span class="hh-fact-value">{pastor.phone || pastor.email || "—"}</span>
+                    <span class="hh-fact-value">{formatPhone(pastor.phone) || pastor.email || "—"}</span>
                   </div>
                   {pastor.spousePastorId != null && (
                     <div class="hh-fact wide">
@@ -515,7 +515,7 @@ export function PastorDetailPage(props: Common & {
     [t("org.ordinationDate"), pastor.ordinationDate],
     [t("org.ministryStart"), pastor.ministryStartDate],
     [t("org.ministryYears"), tenureText],
-    [t("detail.phone"), pastor.phone],
+    [t("detail.phone"), formatPhone(pastor.phone)],
     [t("form.email"), pastor.email],
     [t("detail.address"), pastor.address],
     [t("detail.notes"), pastor.notes],

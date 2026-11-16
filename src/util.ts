@@ -120,3 +120,28 @@ export function qs(params: Record<string, string | number | null | undefined>): 
   }
   return parts.length ? `?${parts.join("&")}` : "";
 }
+
+/** A Myanmar mobile number written the way people say it: 09 254 194 192 for
+ *  the nine-digit numbers and 09 516 6682 for the older seven-digit ones.
+ *  Anything that is not a 09 number (a landline, an extension, a foreign
+ *  number) and an empty value come back untouched, so this is display only —
+ *  the stored value stays exactly as it was entered. */
+export function formatPhone(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  let local = digits;
+  // +95 9 …, 0095 9 … and 09 … all name the same national number.
+  if (local.startsWith("959")) local = "09" + local.slice(3);
+  else if (local.startsWith("00959")) local = "09" + local.slice(5);
+  if (!/^09\d{5,9}$/.test(local)) return raw;
+  const rest = local.slice(2);
+  const groups: string[] = [];
+  for (let i = 0; i < rest.length; i += 3) groups.push(rest.slice(i, i + 3));
+  // A single trailing digit joins the group before it: 5166682 → 516 6682.
+  if (groups.length > 1 && groups[groups.length - 1]!.length === 1) {
+    const tail = groups.pop()!;
+    groups[groups.length - 1] = groups[groups.length - 1]! + tail;
+  }
+  return "09 " + groups.join(" ");
+}
