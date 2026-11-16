@@ -52,6 +52,10 @@ const ENTITY_KEYS: Record<string, string> = {
   trash: "audit.e.trash",
 };
 
+/** An action prefix is usually the record type, except sign-ins: they are
+ *  written as login.success but belong to the session entity. */
+const PREFIX_ENTITY: Record<string, string> = { login: "session" };
+
 const VERB_KEYS: Record<string, string> = {
   create: "audit.v.create",
   update: "audit.v.update",
@@ -148,16 +152,27 @@ export function AuditLogPage(props: Common & {
     const qs = params.toString();
     return qs ? `/admin/audit?${qs}` : "/admin/audit";
   };
+  // A filter name in words: the record type's dictionary label, or its token
+  // spaced out (regional_church → Regional church) when it has none.
+  const humanize = (key: string) => key.replace(/[_-]+/g, " ").replace(/^./, (ch) => ch.toUpperCase());
+  const entityLabel = (key: string) => (ENTITY_KEYS[key] ? t(ENTITY_KEYS[key]!) : humanize(key));
+  const actionGroupLabel = (key: string) => entityLabel(PREFIX_ENTITY[key] ?? key);
+
+  // Offer only action groups that name a record type. "admin" and
+  // "organization" are left over from routes the classifier never matched; their
+  // rows stay reachable through the entity filter. A group that is already
+  // filtering stays in the list so the select agrees with the URL.
+  const actionOptions = actionGroups.filter((group) => ENTITY_KEYS[PREFIX_ENTITY[group] ?? group]);
+  if (filters.action && !actionOptions.includes(filters.action)) actionOptions.push(filters.action);
+
   // Prefix each chip with its own filter name: a household filter and a
   // household action group would otherwise read as two identical chips.
   const chips: { label: string; href: string }[] = [];
   if (filters.entity) {
-    const name = ENTITY_KEYS[filters.entity] ? t(ENTITY_KEYS[filters.entity]!) : filters.entity;
-    chips.push({ label: `${t("audit.entity")} · ${name}`, href: without("entity") });
+    chips.push({ label: `${t("audit.entity")} · ${entityLabel(filters.entity)}`, href: without("entity") });
   }
   if (filters.action) {
-    const name = auditActionLabel(t, `${filters.action}.create`).split(" · ")[0] || filters.action;
-    chips.push({ label: `${t("audit.what")} · ${name}`, href: without("action") });
+    chips.push({ label: `${t("audit.what")} · ${actionGroupLabel(filters.action)}`, href: without("action") });
   }
   if (filters.entityId) chips.push({ label: `#${filters.entityId}`, href: without("entity_id") });
 
@@ -179,11 +194,9 @@ export function AuditLogPage(props: Common & {
         </select>
         <select name="action" aria-label={t("audit.what")}>
           <option value="">{t("audit.allActions")}</option>
-          {actionGroups.map((group) => (
+          {actionOptions.map((group) => (
             <option value={group} selected={filters.action === group}>
-              {/* A group without a dictionary entry (admin, login …) shows its
-                  own name rather than the "login.create" probe key. */}
-              {ENTITY_KEYS[group] ? t(ENTITY_KEYS[group]!) : group}
+              {actionGroupLabel(group)}
             </option>
           ))}
         </select>
@@ -191,7 +204,7 @@ export function AuditLogPage(props: Common & {
           <option value="">{t("audit.allEntities")}</option>
           {entities.map((name) => (
             <option value={name} selected={filters.entity === name}>
-              {ENTITY_KEYS[name] ? t(ENTITY_KEYS[name]!) : name}
+              {entityLabel(name)}
             </option>
           ))}
         </select>
