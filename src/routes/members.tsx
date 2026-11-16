@@ -1209,7 +1209,7 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   if (!Number.isInteger(id) || id < 1) return notFound();
   // The member, their history and the position labels are independent reads:
   // one query window instead of three.
-  const [row, historyRows, positionDefs, enrolments] = await Promise.all([
+  const [row, historyRows, positionDefs, enrolments, auditRows] = await Promise.all([
     loadMemberDetail(db, id),
     db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
       SELECT h.id, h.action, h.created_at,
@@ -1220,12 +1220,21 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
       LIMIT 100`),
     loadPositionDefs(db),
     loadMemberEnrolments(db, id),
+    // The audit trail for this member, written by the request middleware. Only
+    // readers of the audit page see who changed the record.
+    c.get("perms").has("audit.view")
+      ? db.all<{ at: number; username: string | null; action: string; summary: string | null }>(sql`
+          SELECT at, username, action, summary FROM audit_log
+          WHERE entity = 'member' AND entity_id = ${String(id)}
+          ORDER BY at DESC, id DESC LIMIT 8`)
+      : Promise.resolve([] as { at: number; username: string | null; action: string; summary: string | null }[]),
   ]);
   if (!row || !inScope(row, scope)) return notFound();
   return c.html(
     <MemberDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
       history={historyRows as any} positionDefs={positionDefs} enrolments={enrolments} lang={c.get("lang")}
+      audit={auditRows}
     />,
   );
 });

@@ -21,6 +21,11 @@ export type AuditRow = {
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
+/** One audit row as a detail page shows it (household, member …). */
+export type ActivityRow = {
+  at: number; username: string | null; action: string; summary: string | null;
+};
+
 /** Action keys are "entity.verb" (member.update, login.failed …). The page shows
  * "<entity> · <verb>" so one dictionary entry covers every route in a family;
  * an unknown key is shown raw instead of being hidden. */
@@ -143,18 +148,16 @@ export function AuditLogPage(props: Common & {
     const qs = params.toString();
     return qs ? `/admin/audit?${qs}` : "/admin/audit";
   };
+  // Prefix each chip with its own filter name: a household filter and a
+  // household action group would otherwise read as two identical chips.
   const chips: { label: string; href: string }[] = [];
   if (filters.entity) {
-    chips.push({
-      label: ENTITY_KEYS[filters.entity] ? t(ENTITY_KEYS[filters.entity]!) : filters.entity,
-      href: without("entity"),
-    });
+    const name = ENTITY_KEYS[filters.entity] ? t(ENTITY_KEYS[filters.entity]!) : filters.entity;
+    chips.push({ label: `${t("audit.entity")} · ${name}`, href: without("entity") });
   }
   if (filters.action) {
-    chips.push({
-      label: auditActionLabel(t, `${filters.action}.create`).split(" · ")[0] || filters.action,
-      href: without("action"),
-    });
+    const name = auditActionLabel(t, `${filters.action}.create`).split(" · ")[0] || filters.action;
+    chips.push({ label: `${t("audit.what")} · ${name}`, href: without("action") });
   }
   if (filters.entityId) chips.push({ label: `#${filters.entityId}`, href: without("entity_id") });
 

@@ -135,9 +135,9 @@ a { color: var(--link); }
   min-width: 200px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: 0 14px 34px rgba(2, 8, 23, .25);
-  /* Wide screens have no JS clamp, so a long menu could run past the bottom of
-     the window; scroll inside the menu instead. */
-  max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain;
+  /* Fallback cap for the wide layout without JS; app.js measures the real
+     space below the trigger so the menu only scrolls when it must. */
+  max-height: calc(100dvh - 70px); overflow-y: auto; overscroll-behavior: contain;
 }
 .topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
@@ -1519,16 +1519,16 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .hh-photo-field .photo-preview { border-radius: var(--radius); }
 /* Household detail → the trail for this household (who changed what, when). */
-.hh-audit-list { list-style: none; margin: 0; padding: 0; }
-.hh-audit-list li {
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-list li {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
   padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13px;
 }
-.hh-audit-list li:first-child { border-top: 0; }
-.hh-audit-when { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.hh-audit-what { font-weight: 600; }
-.hh-audit-summary { color: var(--muted); overflow-wrap: anywhere; }
-.hh-audit-who { margin-left: auto; color: var(--muted); font-size: 12px; }
+.activity-list li:first-child { border-top: 0; }
+.activity-when { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.activity-what { font-weight: 600; }
+.activity-summary { color: var(--muted); overflow-wrap: anywhere; }
+.activity-who { margin-left: auto; color: var(--muted); font-size: 12px; }
 /* A record id is a short number: give its filter less width than a search box. */
 .filters label.field.audit-id-filter { flex: 0 1 130px; min-width: 110px; max-width: 150px; }
 

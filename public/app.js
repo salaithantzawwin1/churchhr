@@ -73,6 +73,18 @@
       menu.style.maxHeight = "";
       menu.style.overflowY = "";
     }
+    // Height, at every width: the wide layout is positioned by CSS but still
+    // needs to stop at the bottom of the window, and the exact space depends on
+    // where the summary sits (topbar height, zoom, wrapped rows).
+    function fit(d) {
+      if (!d.open) return;
+      var summary = d.querySelector("summary");
+      var menu = menuFor(d);
+      if (!summary || !menu) return;
+      var r = summary.getBoundingClientRect();
+      menu.style.maxHeight = Math.max(120, window.innerHeight - r.bottom - 18) + "px";
+      menu.style.overflowY = "auto";
+    }
     function position(d) {
       if (!narrow || !narrow.matches || !d.open) return;
       var summary = d.querySelector("summary");
@@ -87,14 +99,17 @@
       menu.style.right = "auto";
       menu.style.width = Math.round(width) + "px";
       menu.style.minWidth = "0";
-      menu.style.maxHeight = Math.max(120, window.innerHeight - r.bottom - 18) + "px";
-      menu.style.overflowY = "auto";
+      fit(d);
     }
 
     menus.forEach(function (d) {
       d.addEventListener("toggle", function () {
-        if (d.open) position(d);
-        else if (narrow && !narrow.matches) clearPosition(d);
+        if (d.open) {
+          position(d);
+          fit(d);
+        } else if (narrow && !narrow.matches) {
+          clearPosition(d);
+        }
       });
     });
     document.addEventListener("click", function (e) {
@@ -121,7 +136,12 @@
       if (narrow.addEventListener) narrow.addEventListener("change", onChange);
       else if (narrow.addListener) narrow.addListener(onChange);
     }
-    window.addEventListener("resize", function () { menus.forEach(position); });
+    window.addEventListener("resize", function () {
+      menus.forEach(function (d) {
+        position(d);
+        fit(d);
+      });
+    });
     window.addEventListener("scroll", function () {
       menus.forEach(function (d) { if (d.open) d.open = false; });
     }, { passive: true });

@@ -13,6 +13,7 @@ import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForC
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
 import { EditIcon, TrashIcon } from "./action-icons";
+import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
 
 export type MemberListItem = {
   id: number;
@@ -1172,8 +1173,11 @@ export type MemberHistoryRow = {
   created_at: number;
 };
 
-export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[]; enrolments?: EnrolmentRow[] }) {
-  const { user, perms, flash, m, lang, history = [], positionDefs, enrolments = [] } = props;
+export function MemberDetailPage(props: Common & {
+  m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[];
+  enrolments?: EnrolmentRow[]; audit?: ActivityRow[];
+}) {
+  const { user, perms, flash, m, lang, history = [], positionDefs, enrolments = [], audit = [] } = props;
   const t = getDict(lang ?? "en");
   const ACTION_LABELS: Record<string, { mm: string; en: string; ko: string; cls: string }> = {
     create: { mm: "ထည့်သွင်း", en: "Created", ko: "생성", cls: "active" },
@@ -1328,6 +1332,32 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
           </div>
         )}
       </div>
+
+      {/* Last on the page: the member's own record comes first, the trail of
+          who changed it last. Same card as the household detail page. */}
+      {perms.has("audit.view") && (
+        <div class="card" style="margin-top:18px">
+          <div class="section-head">
+            <h2>{t("activity.recent")}</h2>
+            <a class="btn sm secondary"
+              href={`/admin/audit?entity=member&entity_id=${m.id}`}>{t("activity.all")}</a>
+          </div>
+          {audit.length === 0 ? (
+            <p class="muted small">{t("activity.empty")}</p>
+          ) : (
+            <ul class="activity-list">
+              {audit.map((r) => (
+                <li>
+                  <span class="activity-when">{auditStamp(r.at)}</span>
+                  <span class="activity-what">{auditActionLabel(t, r.action)}</span>
+                  {r.summary && <span class="activity-summary">{r.summary}</span>}
+                  <span class="activity-who">{r.username || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </Layout>
   );
 }
