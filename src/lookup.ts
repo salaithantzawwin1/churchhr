@@ -1,6 +1,6 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { DB } from "./db/client";
-import { lookupOptions, members, OPTION_TYPES, type OptionType } from "./db/schema";
+import { lookupOptions, members, OPTION_TYPES, supervisionClusters, type OptionType } from "./db/schema";
 
 /** region_id wildcard: the option is available in every State/Region. */
 export const ALL_STATES = 0;
@@ -21,6 +21,11 @@ export type OptionRow = {
   code: string | null;
   /** Township short code used as the prefix of its Family Group codes (INS_FG001…). */
   shortCode: string | null;
+  /** Supervision cluster a Home Cell sits in; null when it has none yet. */
+  supervisionClusterId?: number | null;
+  /** Cluster name in Myanmar and English, so the form can show it per language. */
+  clusterName?: string | null;
+  clusterNameEn?: string | null;
 };
 
 export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
@@ -31,8 +36,11 @@ export async function loadAllOptions(db: DB): Promise<OptionRow[]> {
       regionId: lookupOptions.regionId, parentId: lookupOptions.parentId,
       regionalChurchId: lookupOptions.regionalChurchId,
       code: lookupOptions.code, shortCode: lookupOptions.shortCode,
+      supervisionClusterId: lookupOptions.supervisionClusterId,
+      clusterName: supervisionClusters.name, clusterNameEn: supervisionClusters.nameEn,
     })
     .from(lookupOptions)
+    .leftJoin(supervisionClusters, eq(lookupOptions.supervisionClusterId, supervisionClusters.id))
     .orderBy(asc(lookupOptions.type), asc(lookupOptions.sortOrder), asc(lookupOptions.label))) as OptionRow[];
 }
 

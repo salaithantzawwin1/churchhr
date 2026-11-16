@@ -3426,17 +3426,33 @@ label.field.assign-priority {
   position: sticky; bottom: 0; z-index: 6;
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   justify-content: flex-end;
-  margin-top: 18px; padding: 11px 0;
+  margin-top: 18px; padding: 11px var(--card-pad-x);
   background: var(--card); border-top: 1px solid var(--hairline);
 }
+/* On a wide screen the buttons sat flush against the card edge, which the fields
+   above do not do. A phone has less room, so it gets a smaller inset and the
+   buttons lose some side padding to keep the row on one line. In the modal the
+   bar sets its own inset. */
+@media (max-width: 640px) {
+  .form-actions-sticky { padding-left: 12px; padding-right: 12px; }
+}
+/* The supervision cluster of the chosen Home Cell: read-only, so it reads as a
+   quiet line under the select rather than as another field. */
+.cluster-hint { margin-top: 2px; }
+.cluster-hint::before { content: "◦ "; opacity: .6; }
 /* Report form has three actions; when they wrap on a phone keep the rows
    right-aligned so the primary never sits alone on the left. */
 .report-form-actions { justify-content: flex-end; }
 @media (max-width: 640px) {
   .form-actions-sticky { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
   /* Size each button to its label: splitting the row 50/50 made the longer
-     primary wrap onto two or three lines. They only stack when they must. */
-  .form-actions-sticky .btn { flex: 1 1 auto; white-space: nowrap; }
+     primary wrap onto two or three lines. They only stack when they must, and a
+     button alone on the second row keeps its own width (a growing one would
+     stretch across the bar). */
+  .form-actions-sticky .btn {
+    flex: 0 1 auto; white-space: nowrap;
+    padding-left: 12px; padding-right: 12px;
+  }
 }
 
 /* ---------- member + admin lists: phone cards ---------- */

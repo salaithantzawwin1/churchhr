@@ -505,6 +505,8 @@ function opts(
   townshipLabelById?: Map<number, string>,
   /** Family Groups show their label only; the generated code is long/redundant. */
   labelOnly = false,
+  /** Home Cells: cluster id -> display name, read out under the field. */
+  clusterLabelById?: Map<number, string>,
 ) {
   return (
     <>
@@ -519,7 +521,9 @@ function opts(
         return (
           <option value={String(o.id)} selected={selected === String(o.id)}
             data-region={o.regionId === 0 ? "" : String(o.regionId)}
-            data-parent={parent}>{labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}</option>
+            data-parent={parent}
+            data-cluster={clusterLabelById && o.type === "home_cell" ? (clusterLabelById.get(o.id) ?? "") : undefined}>
+            {labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}</option>
         );
       })}
     </>
@@ -583,6 +587,14 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const townshipLabelById = new Map(
     (options.township ?? []).map((o) => [o.id, o.label] as const),
   );
+  // A cell belongs to at most one supervision cluster, so that cluster is not
+  // something to pick here — the form only states which one the cell is in.
+  const clusterLabelById = new Map(
+    (options.home_cell ?? [])
+      .filter((o) => o.clusterName || o.clusterNameEn)
+      .map((o) => [o.id, ((isEn ? o.clusterNameEn || o.clusterName : o.clusterName) ?? "")] as const),
+  );
+  const cellCluster = v.home_cell_id ? (clusterLabelById.get(Number(v.home_cell_id)) ?? "") : "";
   return (
     <>
       {errors.length > 0 && (
@@ -712,7 +724,14 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                 )}
               </select>
             </label>
-            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById)}</select></label>
+            <label class="field">
+              <span class="lbl">{t("form.homeCell")}</span>
+              <select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById, false, clusterLabelById)}</select>
+              {/* Read-only: the cluster follows from the cell, it is not a choice. */}
+              <span class="hint cluster-hint" data-cluster-hint="1" data-label={t("form.cluster")} hidden={!cellCluster}>
+                {cellCluster ? `${t("form.cluster")}: ${cellCluster}` : ""}
+              </span>
+            </label>
             <label class="field">
               <span class="lbl">{t("form.department")}</span>
               <select name="department_id">

@@ -372,6 +372,7 @@
       if (keepSelection && current && !matched) sel.value = "";
     });
     applyParentFilters(form, keepSelection);
+    syncClusterHints(form);
   }
 
   /** Narrow data-parent-filter selects by the currently visible parent selection,
@@ -398,6 +399,23 @@
         if (show && o.value === current) matched = true;
       });
       if (keepSelection && current && !matched) sel.value = "";
+    });
+    syncClusterHints(form);
+  }
+
+  /** A Home Cell belongs to at most one supervision cluster, and that cluster is
+   * not picked per member: the form shows it as read-only text under the field,
+   * taken from a data-cluster attribute on the chosen option. A cell without a
+   * cluster, or no cell at all, shows nothing. */
+  function syncClusterHints(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll("[data-cluster-hint]"), function (hint) {
+      var sel = hint.parentNode && hint.parentNode.querySelector('select[name="home_cell_id"]');
+      if (!sel) return;
+      var picked = sel.options[sel.selectedIndex];
+      var name = picked && picked.value ? picked.getAttribute("data-cluster") || "" : "";
+      var label = hint.getAttribute("data-label") || "";
+      hint.textContent = name ? label + ": " + name : "";
+      hint.hidden = !name;
     });
   }
 
@@ -432,6 +450,13 @@
     });
   }
   initRegionCascade(document);
+  syncClusterHints(document);
+  // The modal form is inserted after load, and a cell can be picked (or reset by
+  // the state cascade) at any time, so follow the change from the top.
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (el && el.tagName === "SELECT" && el.name === "home_cell_id") syncClusterHints(document);
+  });
 
   // Member-list scope (Home Cell) chips follow the State scope ticks: a cell is
   // only offered for the states this account may see. A cell that is already
