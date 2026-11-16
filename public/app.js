@@ -1451,7 +1451,16 @@
     if (!initDatePickers.bound) {
       initDatePickers.bound = true;
       document.addEventListener("click", function (e) {
-        if (dpPop && !dpPop.contains(e.target) && e.target !== dpInput) closeDatePicker();
+        if (!dpPop) return;
+        if (e.target === dpInput) return;
+        // Picking a year or a month re-renders the calendar, which detaches the
+        // clicked cell before the event reaches the document: contains() would
+        // then report "outside" and close the calendar the moment a year is
+        // chosen. composedPath() is recorded at dispatch, so it still names the
+        // calendar the click started in.
+        var path = e.composedPath ? e.composedPath() : null;
+        if (path ? path.indexOf(dpPop) > -1 : dpPop.contains(e.target)) return;
+        closeDatePicker();
       });
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && dpPop) closeDatePicker();
