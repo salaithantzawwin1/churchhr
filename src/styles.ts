@@ -3319,11 +3319,7 @@ label.field.assign-priority {
 .report-head-main { min-width: 0; }
 .report-head h1 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .report-head h1 .badge { font-size: 12px; font-weight: 600; padding: 3px 10px; }
-.report-byline {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
-  margin: 6px 0 0; font-size: 13px; color: var(--muted);
-}
-.report-byline .sep { color: var(--line-strong); }
+.report-byline { margin: 6px 0 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 /* Three fixed columns turn six facts into two clean rows (the auto-fit grid
    left STATUS alone on a second row) and drop the per-item dividers that ended
    at different lengths instead of closing the row. */
@@ -3340,7 +3336,7 @@ label.field.assign-priority {
      full-width tap targets instead of squeezing the labels. */
   .report-head .actions { gap: 8px; }
   .report-head .actions .btn,
-  .report-head .actions form { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .report-head .actions form { flex: 0 1 calc(50% - 4px); min-width: 0; }
   .report-head .actions form .btn { width: 100%; }
   .report-head .actions .btn { min-height: 44px; padding: 9px 10px; font-size: 13.5px; }
 }

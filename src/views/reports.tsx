@@ -387,7 +387,6 @@ export function ReportFormPage(props: Common & {
 
 export function ReportDetailPage(props: Common & {
   report: ReportDetail;
-  canCreate: boolean;
   canReview: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -397,20 +396,22 @@ export function ReportDetailPage(props: Common & {
   backHref?: string;
 }) {
   const {
-    user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false, canDelete = false,
+    user, perms, flash, lang, report: r, canReview, canEdit = false, canDelete = false,
     edits = [], regionNames = {}, backHref = "/reports",
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   // Date, place and author sit under the title, so the grid only carries the
-  // timestamps that belong to the report's lifecycle.
-  const facts: [string, string][] = [
-    [t("rep.date"), r.report_date],
-    [t("rep.createdAt"), stamp(r.created_at)],
-    [t("rep.updatedAt"), stamp(r.updated_at)],
-  ];
+  // timestamps that belong to the report's lifecycle. The date is not repeated
+  // and an edit that never happened is not listed twice with the same minute.
+  const submitted = stamp(r.created_at);
+  const updated = stamp(r.updated_at);
+  const facts: [string, string][] = [[t("rep.createdAt"), submitted]];
+  if (updated && updated !== submitted) facts.push([t("rep.updatedAt"), updated]);
   if (r.reviewer_name) facts.push([t("rep.reviewer"), r.reviewer_name]);
   if (r.reviewed_at) facts.push([t("rep.reviewedAt"), stamp(r.reviewed_at)]);
+  const place = [stateName(r, L), r.township].filter(Boolean).join(" · ");
+  const byline = [r.report_date, place, r.author_name].filter(Boolean).join(" · ");
   const counts: [string, string][] = [
     [t("rep.attendance"), r.attendance == null ? "" : String(r.attendance)],
     [t("rep.newContacts"), r.new_contacts == null ? "" : String(r.new_contacts)],
@@ -427,20 +428,13 @@ export function ReportDetailPage(props: Common & {
               {statusLabel(t, r.status)}
             </span>
           </h1>
-          <p class="report-byline">
-            <span>{r.report_date}</span>
-            <span class="sep" aria-hidden="true">·</span>
-            <span>{stateName(r, L)}{r.township ? ` · ${r.township}` : ""}</span>
-            <span class="sep" aria-hidden="true">·</span>
-            <span>{r.author_name}</span>
-          </p>
+          <p class="report-byline">{byline}</p>
         </div>
         <div class="actions" style="margin:0">
           <a class="btn secondary" href={backHref}>{t("rep.backToList")}</a>
           {canEdit && (
             <a class={`btn${canReview ? " secondary" : ""}`} href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>
           )}
-          {canCreate && <a class="btn secondary" href="/reports/new">{t("rep.new")}</a>}
           {canDelete && (
             <form method="post" action={`/reports/${r.id}/delete`} data-confirm={t("rep.confirmDelete")}>
               <button class="btn outline-danger" type="submit">{t("members.delete")}</button>
@@ -464,9 +458,9 @@ export function ReportDetailPage(props: Common & {
       {/* Reviewers act here first: the panel sits above the report, so the note
           and the review button are on screen without scrolling. */}
       {canReview ? (
-        <div class="card detail-card review-panel">
+        <div class="card detail-card">
           <h2>{t("rep.review")}</h2>
-          <p class="muted small">{t("rep.reviewHint")}</p>
+          {r.status !== "reviewed" && <p class="muted small">{t("rep.reviewHint")}</p>}
           <form method="post" action={`/reports/${r.id}/review`}>
             <label class="field">
               <span class="lbl">{t("rep.reviewNote")}</span>

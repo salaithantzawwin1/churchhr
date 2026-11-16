@@ -728,7 +728,7 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
   return c.html(
     <ReportDetailPage
       user={user} perms={perms} flash={flashFromQuery(c.req.query(), lang)} lang={lang}
-      report={report} canCreate={perms.has("reports.create")}
+      report={report}
       canEdit={own && (perms.has("reports.update") || perms.has("reports.create")) && report.status !== "reviewed"}
       // Mirror of the delete route: author while editable, or a scoped manager.
       canDelete={
