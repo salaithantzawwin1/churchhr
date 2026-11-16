@@ -1073,6 +1073,7 @@ export const KO: Record<string, string> = {
   "adm.errChurchBad": "선택한 지역교회가 이 주/지역에 속하지 않습니다.",
   "audit.title": "활동 로그",
   "audit.intro": "누가 무엇을 언제, 어느 기기나 주소에서 바꿨는지 확인합니다.",
+  "audit.search": "검색",
   "audit.searchPlaceholder": "사용자, 작업, IP, 경로 검색…",
   "audit.who": "사용자",
   "audit.what": "작업",

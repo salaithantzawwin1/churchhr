@@ -197,29 +197,41 @@ export function AuditLogPage(props: Common & {
         </div>
       </div>
 
-      <form class="filters settings-filters" method="get" action="/admin/audit" data-auto-submit="1">
-        <input type="search" name="q" value={filters.q} placeholder={t("audit.searchPlaceholder")}
-          aria-label={t("audit.searchPlaceholder")} enterkeyhint="search" />
-        <select name="user" aria-label={t("audit.who")}>
-          <option value="">{t("audit.allUsers")}</option>
-          {users.map((name) => <option value={name} selected={filters.user === name}>{name}</option>)}
-        </select>
-        <select name="action" aria-label={t("audit.what")}>
-          <option value="">{t("audit.allActions")}</option>
-          {actionOptions.map((group) => (
-            <option value={group} selected={filters.action === group}>
-              {actionGroupLabel(group)}
-            </option>
-          ))}
-        </select>
-        <select name="entity" aria-label={t("audit.entity")}>
-          <option value="">{t("audit.allEntities")}</option>
-          {entities.map((name) => (
-            <option value={name} selected={filters.entity === name}>
-              {entityLabel(name)}
-            </option>
-          ))}
-        </select>
+      <form class="filters settings-filters audit-filters" method="get" action="/admin/audit" data-auto-submit="1">
+        <label class="field audit-q">
+          <span class="lbl">{t("audit.search")}</span>
+          <input type="search" name="q" value={filters.q} placeholder={t("audit.searchPlaceholder")}
+            enterkeyhint="search" />
+        </label>
+        <label class="field">
+          <span class="lbl">{t("audit.who")}</span>
+          <select name="user">
+            <option value="">{t("audit.allUsers")}</option>
+            {users.map((name) => <option value={name} selected={filters.user === name}>{name}</option>)}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("audit.what")}</span>
+          <select name="action">
+            <option value="">{t("audit.allActions")}</option>
+            {actionOptions.map((group) => (
+              <option value={group} selected={filters.action === group}>
+                {actionGroupLabel(group)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label class="field">
+          <span class="lbl">{t("audit.entity")}</span>
+          <select name="entity">
+            <option value="">{t("audit.allEntities")}</option>
+            {entities.map((name) => (
+              <option value={name} selected={filters.entity === name}>
+                {entityLabel(name)}
+              </option>
+            ))}
+          </select>
+        </label>
         <label class="field audit-id-filter">
           <span class="lbl">{t("audit.entityId")}</span>
           <input type="search" name="entity_id" value={filters.entityId}
@@ -235,7 +247,7 @@ export function AuditLogPage(props: Common & {
           <input type="text" name="to" value={filters.to}
             placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" data-datepicker="1" />
         </label>
-        <div class="actions">
+        <div class="actions audit-actions">
           <button class="btn sm secondary" type="submit">{t("audit.apply")}</button>
           <a class="filter-clear" href="/admin/audit">{t("audit.clear")}</a>
         </div>

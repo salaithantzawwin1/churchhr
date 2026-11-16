@@ -3291,6 +3291,23 @@ label.field.assign-priority {
 /* ---------- audit log ----------
    One row per change: when, who, what, device/IP, and the raw request behind
    it. On a phone each row becomes a labelled card. */
+/* The audit filters hold seven controls plus the actions, which flexed onto a
+   ragged second line with the date range split off. They sit on a fixed grid:
+   search spans two cells, and the actions take the rest of the second row. */
+@media (min-width: 641px) {
+  .audit-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 12px; align-items: end; }
+  .audit-filters > .field { flex: none; min-width: 0; max-width: none; }
+  .audit-filters .audit-q { grid-column: span 2; }
+  .audit-filters .actions { grid-column: span 2; margin: 0; justify-content: flex-end; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+  .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audit-filters .audit-q, .audit-filters .actions { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .audit-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .audit-filters .actions { grid-column: 1 / -1; display: flex; gap: 10px; margin: 0; }
+}
 .audit-tbl td { vertical-align: top; }
 .audit-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }
 .audit-user { font-weight: 600; white-space: nowrap; }
