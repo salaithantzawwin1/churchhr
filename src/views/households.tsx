@@ -98,7 +98,7 @@ export function HouseholdFormFragment(props: Common & {
         {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("hh.cardHeading")}</h2>
-          <div class="photo-field" data-photo-field data-initial={initial}
+          <div class="photo-field hh-photo-field" data-photo-field data-initial={initial}
             data-processing={t("form.photoProcessing")} data-ready={t("form.photoReady")}
             data-error={t("form.photoError")}>
             <div class="photo-preview">
@@ -159,8 +159,11 @@ export function HouseholdFormFragment(props: Common & {
                 </div>
               </label>
             )}
-            <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
-              <input type="text" name="name" required value={v.name ?? ""} /></label>
+            {/* The hint sits under the input: inside the label it wrapped to a
+                second line and pushed this column's input below its neighbour. */}
+            <label class="field"><span class="lbl">{t("hh.name")}</span>
+              <input type="text" name="name" required value={v.name ?? ""} />
+              <span class="field-hint">{t("hh.nameHint")}</span></label>
             {regionCascadeSelects({
               lang: props.lang ?? "en",
               regions,
@@ -177,7 +180,7 @@ export function HouseholdFormFragment(props: Common & {
             })}
             <p class="hint" style="grid-column:1/-1;margin:0">{t("hh.familyGroupAuto")}</p>
 
-            <label class="field"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
+            <label class="field" style="grid-column:1/-1"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
           </div>
@@ -360,7 +363,7 @@ export function HouseholdDetailPage(props: Common & {
         </div>
         <div class="actions hh-page-actions">
           {perms.has("members.update") && (
-            <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")} data-modal-size="md">{t("members.edit")}</a>
+            <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")}>{t("members.edit")}</a>
           )}
           {perms.has("members.delete") && (
             <form method="post" action={`/admin/households/${family.id}/delete`}
@@ -374,10 +377,10 @@ export function HouseholdDetailPage(props: Common & {
 
       <div class="hh-detail-grid">
         <section class="card hh-panel">
-          {props.photoUrl && (
-            <img class="hh-photo" src={props.photoUrl} alt={family.name} />
-          )}
-          <h2>{t("hh.cardHeading")}</h2>
+          <div class="hh-panel-head">
+            <h2>{t("hh.cardHeading")}</h2>
+            {props.photoUrl && <img class="hh-photo" src={props.photoUrl} alt={family.name} loading="lazy" />}
+          </div>
           <div class="hh-facts">
             <div class="hh-fact">
               <span class="hh-fact-label">{t("hh.head")}</span>

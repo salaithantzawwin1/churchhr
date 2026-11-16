@@ -1503,11 +1503,26 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .hh-avatar svg { width: 20px; height: 20px; display: block; }
 .hh-avatar img { width: 100%; height: 100%; object-fit: cover; }
-/* Family photo on the household detail card. Sources are square (500×500). */
+/* Family photo on the household detail card. Every stored photo is a 500×500
+   square (the browser centre-crops before upload), so a square frame shows the
+   whole picture for a portrait, a group or a landscape shot alike. The frame is
+   a thumbnail beside the heading, not a banner: a wide frame would cut the top
+   and bottom off every photo. */
+.hh-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin: 0 0 12px; }
+.hh-panel-head h2 { margin-bottom: 0; }
 .hh-photo {
-  display: block; width: 100%; height: 200px; object-fit: cover;
+  flex: none; display: block; width: 124px; height: 124px; object-fit: cover;
   border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--chip-bg); margin: 0 0 14px;
+  background: var(--chip-bg);
+}
+.hh-photo-field .photo-preview { border-radius: var(--radius); }
+/* In a modal the picker has to earn its height: a smaller preview and no
+   paragraph of guidance, since the status line still reports the result. */
+.modal-body .hh-photo-field { gap: 12px; padding-bottom: 12px; margin-bottom: 12px; }
+.modal-body .hh-photo-field .photo-preview { width: 68px; height: 68px; font-size: 24px; }
+.modal-body .hh-photo-field .hint { display: none; }
+@media (max-width: 480px) {
+  .hh-photo { width: 96px; height: 96px; }
 }
 .hh-card-name {
   display: block; color: var(--ink); font-size: 16px; font-weight: 600;
