@@ -822,7 +822,7 @@ export const MM: Dict = {
   "audit.e.report": "အစီရင်ခံစာ",
   "audit.e.pastor": "သင်းအုပ်ဆရာ",
   "audit.e.user": "အသုံးပြုသူ",
-  "audit.e.role": "ရာထူး",
+  "audit.e.role": "အခန်းကဏ္ဍ",
   "audit.e.option": "ရွေးချယ်မှု",
   "audit.e.settings": "ဆက်တင်",
   "audit.e.household": "အိမ်ထောင်",
