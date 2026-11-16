@@ -333,6 +333,7 @@ export const MM: Dict = {
   "form.choose": "ရွေးချယ်ပါ",
   "form.add": "ထည့်မည်",
   "form.save": "သိမ်းမည်",
+  "form.addAnother": "သိမ်း၍ အသစ်ထည့်မည်",
   "form.cancel": "ပယ်ဖျက်မည်",
   "form.invalid": "ဖြည့်စွက်မှု မှားယွင်းနေပါသည်:",
   // member detail
@@ -1645,6 +1646,7 @@ export const EN: Dict = {
   "form.choose": "Select…",
   "form.add": "Add",
   "form.save": "Save",
+  "form.addAnother": "Save and add new",
   "form.cancel": "Cancel",
   "form.invalid": "The form has errors:",
   "detail.name": "Name (Myanmar)",

@@ -314,6 +314,7 @@ export const KO: Record<string, string> = {
   "form.choose": "선택…",
   "form.add": "추가",
   "form.save": "저장",
+  "form.addAnother": "저장 후 새로 추가",
   "form.cancel": "취소",
   "form.invalid": "양식에 오류가 있습니다:",
   "detail.name": "이름 (미얀마어)",

@@ -1194,6 +1194,8 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
     snapshotJson: JSON.stringify(data),
   });
   if (fromModal) return c.redirect(`/members/${id}?ok=member-created`, 303);
+  // "Save and add new" from the new-member page loops back to a blank form.
+  if (s(body.intent) === "add_another") return c.redirect("/members/new", 303);
   return c.redirect(`/members/${id}?ok=member-created`, 302);
 });
 

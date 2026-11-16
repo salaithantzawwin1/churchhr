@@ -737,6 +737,13 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           {modal
             ? <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
             : <a class="btn secondary" href={edit ? `/members/${member!.id}` : "/members"}>{t("form.cancel")}</a>}
+          {/* Entering a batch of new members: save this one and come straight
+              back to an empty form instead of the new member's page. */}
+          {!modal && !edit && (
+            <button class="btn secondary" type="submit" name="intent" value="add_another" formnovalidate={false}>
+              {t("form.addAnother")}
+            </button>
+          )}
           <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
         </div>
       </form>

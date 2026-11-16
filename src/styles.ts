@@ -3424,15 +3424,16 @@ label.field.assign-priority {
    action follows the viewport instead of living at the very bottom. */
 .form-actions-sticky {
   position: sticky; bottom: 0; z-index: 6;
-  display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;
-  margin-top: 18px; padding: 12px 0 2px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: flex-end;
+  margin-top: 18px; padding: 11px 0;
   background: var(--card); border-top: 1px solid var(--hairline);
 }
 /* Report form has three actions; when they wrap on a phone keep the rows
    right-aligned so the primary never sits alone on the left. */
 .report-form-actions { justify-content: flex-end; }
 @media (max-width: 640px) {
-  .form-actions-sticky { padding-bottom: max(2px, env(safe-area-inset-bottom)); }
+  .form-actions-sticky { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
   /* Size each button to its label: splitting the row 50/50 made the longer
      primary wrap onto two or three lines. They only stack when they must. */
   .form-actions-sticky .btn { flex: 1 1 auto; white-space: nowrap; }
