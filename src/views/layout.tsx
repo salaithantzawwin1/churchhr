@@ -178,7 +178,7 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
             </span>
             {user && (
               <>
-                <a class="who-link" href="/profile" title={t("nav.profile")}>{user.username}</a>
+                <a class="who-link" href="/profile" title={t("nav.profile")}>{user.displayName || user.username}</a>
                 <form method="post" action="/logout">
                   <button class="btn sm secondary" type="submit">{t("nav.logout")}</button>
                 </form>

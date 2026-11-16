@@ -42,6 +42,12 @@ export function forgetSession(token: string | null | undefined): void {
  * session of that account is patched, not just the one that made the switch, so
  * a second device signed in as the same user follows along at once instead of
  * showing the old language until its cache entry expires. */
+export function rememberDisplayName(userId: number, displayName: string | null): void {
+  for (const hit of sessionCache.values()) {
+    if (hit.value.user.id === userId) hit.value.user.displayName = displayName;
+  }
+}
+
 function rememberLanguage(userId: number, language: string): void {
   for (const hit of sessionCache.values()) {
     if (hit.value.user.id === userId) hit.value.user.language = language;
@@ -51,6 +57,7 @@ function rememberLanguage(userId: number, language: string): void {
 type SessionAccessRow = {
   id: number;
   username: string;
+  displayName: string | null;
   mustChangePassword: number;
   active: number;
   language: string | null;
@@ -61,15 +68,16 @@ type SessionAccessRow = {
 
 /** One statement: the live session's user plus its permission and scope sets. */
 async function querySessionAccess(
-  db: DB, tokenHash: string, opts: { language: boolean; cells: boolean },
+  db: DB, tokenHash: string, opts: { language: boolean; cells: boolean; displayName: boolean },
 ): Promise<SessionAccessRow | undefined> {
   const language = opts.language ? sql`u.language` : sql`NULL`;
+  const displayName = opts.displayName ? sql`u.display_name` : sql`NULL`;
   const cells = opts.cells
     ? sql`(SELECT GROUP_CONCAT(home_cell_id) FROM user_home_cell_assignments WHERE user_id = u.id)`
     : sql`NULL`;
   const rows = await db.all<SessionAccessRow>(sql`
     SELECT u.id, u.username, u.must_change_password AS mustChangePassword, u.active,
-      ${language} AS language,
+      ${language} AS language, ${displayName} AS displayName,
       (SELECT GROUP_CONCAT(rp.permission) FROM role_permissions rp
          WHERE rp.role_id IN (SELECT role_id FROM user_roles WHERE user_id = u.id)) AS perms,
       (SELECT GROUP_CONCAT(region_id) FROM user_state_assignments WHERE user_id = u.id) AS states,
@@ -91,12 +99,16 @@ async function loadSessionAccess(db: DB, token: string): Promise<SessionAccess |
   // have yet instead of failing every request.
   let withLanguage = true;
   let withCells = true;
+  let withDisplayName = true;
   for (;;) {
     try {
-      row = await querySessionAccess(db, tokenHash, { language: withLanguage, cells: withCells });
+      row = await querySessionAccess(db, tokenHash, {
+        language: withLanguage, cells: withCells, displayName: withDisplayName,
+      });
       break;
     } catch (err) {
       if (withCells) { withCells = false; continue; }
+      if (withDisplayName) { withDisplayName = false; continue; }
       if (withLanguage) { withLanguage = false; continue; }
       throw err;
     }
@@ -108,6 +120,7 @@ async function loadSessionAccess(db: DB, token: string): Promise<SessionAccess |
     user: {
       id: row.id,
       username: row.username,
+      displayName: row.displayName ?? null,
       mustChangePassword: row.mustChangePassword === 1,
       language: row.language ?? null,
     },

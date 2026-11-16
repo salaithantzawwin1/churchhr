@@ -7,7 +7,7 @@ import {
   ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, OPTION_TYPES, regions,
   rolePermissions, roles, userHomeCellAssignments, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
-import { clearAccessCache, requireAnyPermission, requirePermission } from "../middleware";
+import { clearAccessCache, rememberDisplayName, requireAnyPermission, requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
@@ -505,6 +505,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   for (const homeCellId of p.homeCellsRaw) {
     await db.insert(userHomeCellAssignments).values({ userId: id, homeCellId });
   }
+  rememberDisplayName(id, p.displayName || null);
   clearAccessCache();
   return c.redirect("/admin/users?ok=user-updated", 302);
 });

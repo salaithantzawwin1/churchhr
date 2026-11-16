@@ -21,7 +21,7 @@ import { LoginPage, ProfilePage } from "../views/auth";
 import { getDict } from "../i18n";
 import type { Flash } from "../views/layout";
 import { loadBranding } from "../branding";
-import { clearAccessCache, forgetSession } from "../middleware";
+import { clearAccessCache, forgetSession, rememberDisplayName } from "../middleware";
 
 const MAX_FAILED_ATTEMPTS = 10;
 const LOCK_SECONDS = 600;
@@ -242,6 +242,8 @@ profileRoutes.post("/profile/name", async (c) => {
   if (name.length > 80) return c.redirect("/profile?err=name", 302);
   const db = getDb(c.env);
   await db.update(users).set({ displayName: name }).where(eq(users.id, user.id));
+  // The topbar reads the cached session, so show the new name at once.
+  rememberDisplayName(user.id, name || null);
   return c.redirect("/profile?ok=name", 302);
 });
 

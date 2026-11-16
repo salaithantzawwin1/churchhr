@@ -74,7 +74,8 @@ export async function loadPositionHistory(
   return db.all<PositionHistoryRow>(sql`
     SELECT h.id, h.entity, h.action, h.scope_type AS scopeType, h.code,
            h.position_def_id AS positionDefId, h.member_id AS memberId,
-           h.actor_id AS actorId, u.username AS actorName,
+           h.actor_id AS actorId,
+           COALESCE(NULLIF(u.display_name, ''), u.username) AS actorName,
            COALESCE(NULLIF(m.name_myanmar, ''), m.name_english) AS memberName,
            h.summary, h.changes_json AS changesJson, h.created_at AS createdAt
     FROM position_history h

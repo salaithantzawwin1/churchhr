@@ -1210,7 +1210,8 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   const [row, historyRows, positionDefs, enrolments] = await Promise.all([
     loadMemberDetail(db, id),
     db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
-      SELECT h.id, h.action, h.created_at, u.username AS actor_name
+      SELECT h.id, h.action, h.created_at,
+             COALESCE(NULLIF(u.display_name, ''), u.username) AS actor_name
       FROM member_history h JOIN users u ON u.id = h.actor_id
       WHERE h.member_id = ${id}
       ORDER BY h.created_at DESC, h.id DESC
