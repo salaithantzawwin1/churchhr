@@ -131,10 +131,13 @@ a { color: var(--link); }
 .nav-admin .chev { font-size: 10px; line-height: 1; transition: transform .15s ease; }
 .nav-admin[open] .chev { transform: rotate(180deg); }
 .nav-admin .nav-menu {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
   min-width: 200px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: 0 14px 34px rgba(2, 8, 23, .25);
+  /* Wide screens have no JS clamp, so a long menu could run past the bottom of
+     the window; scroll inside the menu instead. */
+  max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain;
 }
 .topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
@@ -3275,6 +3278,9 @@ label.field.assign-priority {
   margin-left: 6px; padding: 1px 7px; border-radius: 999px;
   background: var(--chip-bg); color: var(--muted); font-size: 11.5px;
 }
+/* A record with a detail page: the chip is the way into it. */
+a.audit-entity.is-link { color: var(--link); text-decoration: none; }
+a.audit-entity.is-link:hover { background: var(--chip-brand-bg); text-decoration: underline; }
 .audit-summary { display: block; margin-top: 2px; }
 .audit-device { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .audit-ip { display: block; font-size: 11.5px; }

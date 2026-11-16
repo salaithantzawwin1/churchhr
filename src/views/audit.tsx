@@ -79,6 +79,19 @@ export function auditActionLabel(t: (key: string) => string, action: string): st
   return action;
 }
 
+/** Detail page for a trail entry, when the record has one. Reports and pastors
+ *  are included because their pages already read better than the raw id. */
+function entityHref(entity: string | null, entityId: string | null): string | null {
+  if (!entity || !entityId || !/^\d+$/.test(entityId)) return null;
+  switch (entity) {
+    case "household": return `/admin/households/${entityId}`;
+    case "member": return `/members/${entityId}`;
+    case "report": return `/reports/${entityId}`;
+    case "pastor": return `/organization/pastors/${entityId}`;
+    default: return null;
+  }
+}
+
 const YANGON_OFFSET_SECONDS = 6.5 * 3600;
 
 /** "2026-11-12 18:04" in Myanmar time, with seconds when the day is not shown. */
@@ -115,6 +128,35 @@ export function AuditLogPage(props: Common & {
     const qs = params.toString();
     return qs ? `/admin/audit?${qs}` : "/admin/audit";
   };
+  // Active filters as one-tap chips: each drops a single condition while the
+  // rest (including the date window) stay in place.
+  const without = (drop: string) => {
+    const params = new URLSearchParams();
+    const all: Record<string, string> = {
+      q: filters.q, user: filters.user, action: filters.action,
+      entity: filters.entity, entity_id: filters.entityId,
+      from: filters.from, to: filters.to,
+    };
+    for (const [key, value] of Object.entries(all)) {
+      if (value && key !== drop) params.set(key, value);
+    }
+    const qs = params.toString();
+    return qs ? `/admin/audit?${qs}` : "/admin/audit";
+  };
+  const chips: { label: string; href: string }[] = [];
+  if (filters.entity) {
+    chips.push({
+      label: ENTITY_KEYS[filters.entity] ? t(ENTITY_KEYS[filters.entity]!) : filters.entity,
+      href: without("entity"),
+    });
+  }
+  if (filters.action) {
+    chips.push({
+      label: auditActionLabel(t, `${filters.action}.create`).split(" · ")[0] || filters.action,
+      href: without("action"),
+    });
+  }
+  if (filters.entityId) chips.push({ label: `#${filters.entityId}`, href: without("entity_id") });
 
   return (
     <Layout title={t("audit.title")} lang={lang} user={user} perms={perms} active="/admin/audit" flash={flash ?? null}>
@@ -169,6 +211,17 @@ export function AuditLogPage(props: Common & {
         </div>
       </form>
 
+      {chips.length > 0 && (
+        <div class="filter-chips" aria-label={t("dash.activeFilters")}>
+          {chips.map((c) => (
+            <a class="filter-chip" href={c.href} aria-label={`${t("dash.removeFilter")}: ${c.label}`}>
+              {c.label}<span class="chip-x" aria-hidden="true">×</span>
+            </a>
+          ))}
+          <a class="filter-clear-all" href="/admin/audit">{t("dash.clearAll")}</a>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div class="card org-empty">
           <p class="muted">{t("audit.empty")}</p>
@@ -186,7 +239,9 @@ export function AuditLogPage(props: Common & {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {rows.map((r) => {
+                const href = entityHref(r.entity, r.entity_id);
+                return (
                 <tr>
                   <td class="audit-when" data-label={t("audit.when")}>{stamp(r.at)}</td>
                   <td data-label={t("audit.who")}>
@@ -196,7 +251,9 @@ export function AuditLogPage(props: Common & {
                     <span class={`audit-action${r.action.includes("delete") || r.action.includes("failed") || r.action.includes("locked") ? " is-warn" : ""}`}>
                       {auditActionLabel(t, r.action)}
                     </span>
-                    {r.entity_id && <span class="audit-entity">#{r.entity_id}</span>}
+                    {r.entity_id && (href
+                      ? <a class="audit-entity is-link" href={href}>#{r.entity_id}</a>
+                      : <span class="audit-entity">#{r.entity_id}</span>)}
                     {r.summary && <span class="muted small audit-summary">{r.summary}</span>}
                   </td>
                   <td data-label={t("audit.device")} class="audit-device">
@@ -213,7 +270,8 @@ export function AuditLogPage(props: Common & {
                     </details>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
