@@ -441,30 +441,6 @@ export function HouseholdDetailPage(props: Common & {
         </section>
       </div>
 
-      {perms.has("audit.view") && (
-        <section class="card hh-panel">
-          <div class="section-head">
-            <h2>{t("hh.activity")}</h2>
-            <a class="btn sm secondary"
-              href={`/admin/audit?action=household&q=${encodeURIComponent(family.name)}`}>{t("hh.activityAll")}</a>
-          </div>
-          {audit.length === 0 ? (
-            <p class="muted small" style="margin:0">{t("hh.activityEmpty")}</p>
-          ) : (
-            <ul class="hh-audit-list">
-              {audit.map((r) => (
-                <li>
-                  <span class="hh-audit-when">{stamp(r.at)}</span>
-                  <span class="hh-audit-what">{auditActionLabel(t, r.action)}</span>
-                  {r.summary && <span class="hh-audit-summary">{r.summary}</span>}
-                  <span class="hh-audit-who">{r.username || "—"}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
       <section class="card hh-panel hh-members-panel">
         <div class="section-head">
           <h2>{t("hh.members")}<span class="count-pill">{mems.length}</span></h2>
@@ -521,6 +497,33 @@ export function HouseholdDetailPage(props: Common & {
           </div>
         )}
       </section>
+
+      {/* Last, after the members: the trail is reference material, not the
+          household's day-to-day content. */}
+      {perms.has("audit.view") && (
+        <section class="card hh-panel hh-activity-panel">
+          <div class="section-head">
+            <h2>{t("hh.activity")}</h2>
+            {/* entity + id, not the name: two households can share a name. */}
+            <a class="btn sm secondary"
+              href={`/admin/audit?entity=household&entity_id=${family.id}`}>{t("hh.activityAll")}</a>
+          </div>
+          {audit.length === 0 ? (
+            <p class="muted small" style="margin:0">{t("hh.activityEmpty")}</p>
+          ) : (
+            <ul class="hh-audit-list">
+              {audit.map((r) => (
+                <li>
+                  <span class="hh-audit-when">{stamp(r.at)}</span>
+                  <span class="hh-audit-what">{auditActionLabel(t, r.action)}</span>
+                  {r.summary && <span class="hh-audit-summary">{r.summary}</span>}
+                  <span class="hh-audit-who">{r.username || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </Layout>
   );
 }

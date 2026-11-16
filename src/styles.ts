@@ -1526,6 +1526,8 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .hh-audit-what { font-weight: 600; }
 .hh-audit-summary { color: var(--muted); overflow-wrap: anywhere; }
 .hh-audit-who { margin-left: auto; color: var(--muted); font-size: 12px; }
+/* A record id is a short number: give its filter less width than a search box. */
+.filters label.field.audit-id-filter { flex: 0 1 130px; min-width: 110px; max-width: 150px; }
 
 /* In a modal the picker has to earn its height: a smaller preview and no
    paragraph of guidance, since the status line still reports the result. */
@@ -1603,7 +1605,8 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .hh-detail-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
 .hh-detail-grid .card { height: 100%; margin-bottom: 0; }
 .hh-panel h2 { margin-bottom: 12px; }
-.hh-members-panel { margin-top: 16px; }
+/* Same rhythm as every other card: the page gap, not a one-off 16px. */
+.hh-members-panel { margin-top: var(--card-gap); }
 .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .section-head h2 { display: flex; align-items: center; gap: 7px; margin: 0; }
 .hh-member-list { display: flex; flex-direction: column; gap: 8px; }

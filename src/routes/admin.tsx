@@ -1592,6 +1592,10 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const search = (q.q ?? "").trim().slice(0, 80);
   const who = (q.user ?? "").trim().slice(0, 60);
   const group = /^[a-z_]{1,30}$/.test(q.action ?? "") ? q.action! : "";
+  // Entity + record id narrow the trail to one row's history: a household name
+  // is not unique, so searching by name alone can pull in unrelated entries.
+  const entity = /^[a-z_]{1,30}$/.test(q.entity ?? "") ? q.entity! : "";
+  const entityId = (q.entity_id ?? "").trim().slice(0, 20);
   // Default to the last 30 days: an unfiltered log is both slow to scan and
   // leaves the date fields empty on first visit.
   const today = todayInYangon();
@@ -1604,6 +1608,8 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const where = [sql`1=1`];
   if (who) where.push(sql`username = ${who}`);
   if (group) where.push(sql`action LIKE ${group + ".%"}`);
+  if (entity) where.push(sql`entity = ${entity}`);
+  if (entityId) where.push(sql`entity_id = ${entityId}`);
   if (search) {
     const like = `%${search}%`;
     where.push(sql`(username LIKE ${like} OR action LIKE ${like} OR path LIKE ${like}
@@ -1632,6 +1638,8 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const groupRows = await db.all<{ g: string }>(sql`
     SELECT DISTINCT substr(action, 1, instr(action, '.') - 1) AS g
     FROM audit_log WHERE instr(action, '.') > 0 ORDER BY g`);
+  const entityRows = await db.all<{ e: string }>(sql`
+    SELECT DISTINCT entity FROM audit_log WHERE entity IS NOT NULL ORDER BY entity`);
 
   return c.html(
     <AuditLogPage
@@ -1639,7 +1647,8 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
       rows={rows} total={total} page={page} pages={pages}
       users={userRows.map((r) => r.username)}
       actionGroups={groupRows.map((r) => r.g).filter(Boolean)}
-      filters={{ q: search, user: who, action: group, from, to }}
+      entities={entityRows.map((r) => r.e).filter(Boolean)}
+      filters={{ q: search, user: who, action: group, entity, entityId, from, to }}
     />,
   );
 });

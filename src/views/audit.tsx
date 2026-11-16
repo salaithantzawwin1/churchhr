@@ -93,9 +93,13 @@ export function AuditLogPage(props: Common & {
   pages: number;
   users: string[];
   actionGroups: string[];
-  filters: { q: string; user: string; action: string; from: string; to: string };
+  entities: string[];
+  filters: {
+    q: string; user: string; action: string; entity: string; entityId: string;
+    from: string; to: string;
+  };
 }) {
-  const { user, perms, flash, lang, rows, total, page, pages, users, actionGroups, filters } = props;
+  const { user, perms, flash, lang, rows, total, page, pages, users, actionGroups, entities, filters } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const link = (nextPage: number) => {
@@ -103,6 +107,8 @@ export function AuditLogPage(props: Common & {
     if (filters.q) params.set("q", filters.q);
     if (filters.user) params.set("user", filters.user);
     if (filters.action) params.set("action", filters.action);
+    if (filters.entity) params.set("entity", filters.entity);
+    if (filters.entityId) params.set("entity_id", filters.entityId);
     if (filters.from) params.set("from", filters.from);
     if (filters.to) params.set("to", filters.to);
     if (nextPage > 1) params.set("page", String(nextPage));
@@ -134,6 +140,19 @@ export function AuditLogPage(props: Common & {
             </option>
           ))}
         </select>
+        <select name="entity" aria-label={t("audit.entity")}>
+          <option value="">{t("audit.allEntities")}</option>
+          {entities.map((name) => (
+            <option value={name} selected={filters.entity === name}>
+              {ENTITY_KEYS[name] ? t(ENTITY_KEYS[name]!) : name}
+            </option>
+          ))}
+        </select>
+        <label class="field audit-id-filter">
+          <span class="lbl">{t("audit.entityId")}</span>
+          <input type="search" name="entity_id" value={filters.entityId}
+            placeholder={t("audit.entityIdPlaceholder")} inputmode="numeric" autocomplete="off" />
+        </label>
         <label class="field">
           <span class="lbl">{t("audit.from")}</span>
           <input type="text" name="from" value={filters.from}
