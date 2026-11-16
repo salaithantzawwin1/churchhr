@@ -76,7 +76,6 @@ const VERB_KEYS: Record<string, string> = {
   review: "audit.v.review",
   submit: "audit.v.submit",
   login: "audit.v.login",
-  logout: "audit.v.logout",
   password: "audit.v.password",
   failed: "audit.v.failed",
   locked: "audit.v.locked",

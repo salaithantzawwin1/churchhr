@@ -1611,9 +1611,14 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   if (entity) where.push(sql`entity = ${entity}`);
   if (entityId) where.push(sql`entity_id = ${entityId}`);
   if (search) {
-    const like = `%${search}%`;
-    where.push(sql`(username LIKE ${like} OR action LIKE ${like} OR path LIKE ${like}
-      OR summary LIKE ${like} OR entity_id LIKE ${like} OR device LIKE ${like} OR ip LIKE ${like})`);
+    // % and _ are LIKE wildcards, so a search for "100%" or "a_b" matches the
+    // characters typed instead of matching everything.
+    const escaped = search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const like = `%${escaped}%`;
+    where.push(sql`(username LIKE ${like} ESCAPE '\\' OR action LIKE ${like} ESCAPE '\\'
+      OR path LIKE ${like} ESCAPE '\\' OR summary LIKE ${like} ESCAPE '\\'
+      OR entity_id LIKE ${like} ESCAPE '\\' OR device LIKE ${like} ESCAPE '\\'
+      OR ip LIKE ${like} ESCAPE '\\')`);
   }
   if (fromTs) where.push(sql`at >= ${fromTs}`);
   if (toTs) where.push(sql`at <= ${toTs}`);
