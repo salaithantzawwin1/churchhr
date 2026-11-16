@@ -1,3 +1,4 @@
+import { CapsHint, PwToggle } from "./auth";
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
@@ -34,8 +35,9 @@ function localizedRoleNames(names: string, lang?: Lang): string {
 export type AdminUserRow = {
   id: number;
   username: string;
-  /** Optional full name from 0047; empty falls back to the username. */
-  display_name: string;
+  /** Optional full name from 0047; empty (or missing before the migration)
+   *  falls back to the username. */
+  display_name?: string;
   active: number;
   must_change_password: number;
   created_at: number;
@@ -66,6 +68,8 @@ function userForm(v: {
   id?: number;
   username: string;
   displayName: string;
+  /** Saved UI language (mm | en | kr); an empty string follows the browser. */
+  language: string;
   allStates: boolean;
   selectedRoles: number[];
   selectedStates: number[];
@@ -80,26 +84,49 @@ function userForm(v: {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
   return (
     <form method="post" action={action} data-flash-ok={v.id ? "user-updated" : "user-created"}>
-      <div class="form-grid">
-        <label class="field">
-          <span class="lbl">Username {v.id === undefined && "*"}</span>
-          <input type="text" name="username" value={v.username} required={v.id === undefined}
-            pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
-        </label>
-        <label class="field">
-          <span class="lbl">{t("adm.displayName")}</span>
-          <input type="text" name="display_name" value={v.displayName} maxlength={80}
-            autocomplete="off" placeholder={t("adm.displayNameHint")} />
-        </label>
-        <label class="field">
-          <span class="lbl">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</span>
-          <input type="password" name={v.id === undefined ? "password" : "new_password"}
-            placeholder={v.id === undefined ? t("adm.min8") : t("adm.leaveBlank")}
-            autocomplete="new-password"
-            data-strength="1"
-            data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} /> 
-        </label>
-      </div>
+      <fieldset class="form-section">
+        <legend>{t("adm.accountSection")}</legend>
+        <div class="form-grid">
+          <label class="field">
+            <span class="lbl">Username {v.id === undefined && "*"}</span>
+            <input type="text" name="username" value={v.username} required={v.id === undefined}
+              pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("profile.displayName")}</span>
+            <input type="text" name="display_name" value={v.displayName} maxlength={80}
+              autocomplete="off" placeholder={t("adm.displayNameHint")} />
+          </label>
+          <label class="field">
+            <span class="lbl">{t("nav.language")}</span>
+            <select name="language">
+              <option value="" selected={!v.language}>{t("adm.languageAuto")}</option>
+              <option value="mm" selected={v.language === "mm"}>မြန်မာ</option>
+              <option value="en" selected={v.language === "en"}>English</option>
+              <option value="kr" selected={v.language === "kr"}>한국어</option>
+            </select>
+            <span class="hint">{t("adm.languageHint")}</span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="form-section">
+        <legend>{t("adm.passwordSection")}</legend>
+        <p class="hint">{v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit")}</p>
+        <div class="field">
+          <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
+          <div class="pw-row">
+            <span class="pw-wrap">
+              <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
+                autocomplete="new-password"
+                data-strength="1"
+                data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
+              <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+            </span>
+            <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+          </div>
+          <CapsHint label={t("pw.capsLock")} />
+        </div>
+      </fieldset>
       <fieldset class="form-section">
         <legend>{t("nav.roles")}</legend>
         <div class="check-grid">
@@ -160,7 +187,7 @@ function userForm(v: {
  * reused by error responses inside the same modal. */
 export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
-  values: { id?: number; username: string; displayName: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
+  values: { id?: number; username: string; displayName: string; language: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
   roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string; regionId?: number }[];
 }) {
@@ -197,7 +224,7 @@ export function AdminUsersPage(props: UsersProps) {
       <div class="tbl-wrap">
         <table class="admin-tbl">
           <thead>
-            <tr><th>ID</th><th>{t("profile.username")}</th><th>{t("nav.roles")}</th><th>{t("nav.language")}</th><th>{t("adm.stateScope")}</th><th>{t("members.status")}</th><th></th></tr>
+            <tr><th>ID</th><th>{t("profile.username")}</th><th>{t("profile.displayName")}</th><th>{t("nav.roles")}</th><th>{t("nav.language")}</th><th>{t("adm.stateScope")}</th><th>{t("members.status")}</th><th></th></tr>
           </thead>
           <tbody>
             {users.map((u) => (
@@ -205,12 +232,12 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="muted" data-label="ID">{u.id}</td>
                 <td data-label={t("profile.username")}>
                   {u.username}
-                  {u.display_name && (
-                    <span class="muted small" style="display:block">{u.display_name}</span>
-                  )}
                   {u.id === user.id && (
                     <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
                   )}
+                </td>
+                <td class={u.display_name ? undefined : "muted"} data-label={t("profile.displayName")}>
+                  {u.display_name || "—"}
                 </td>
                 <td data-label={t("nav.roles")}>{localizedRoleNames(u.role_names, lang) || "—"}</td>
                 <td data-label={t("nav.language")}>
@@ -246,7 +273,7 @@ export function AdminUsersPage(props: UsersProps) {
           {editErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", language: editUser.language ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
         </div>
       )}
 
@@ -267,7 +294,7 @@ export function AdminUserEditPage(props: Common & {
   if (modal) {
     return (
       <UserFormFragment lang={lang} errors={editErrors}
-        values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+        values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", language: u.language ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
         roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
     );
   }
@@ -282,7 +309,7 @@ export function AdminUserEditPage(props: Common & {
           <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
         )}
         <UserFormFragment lang={lang} errors={editErrors}
-          values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
+          values={{ id: u.id, username: u.username, displayName: u.display_name ?? "", language: u.language ?? "", allStates: u.allStates, selectedRoles: u.selectedRoles, selectedStates: u.selectedStates, homeCellIds: u.selectedHomeCells ?? [], active: u.active, mustChange: u.must_change_password }}
           roles={roles} regions={regions} homeCells={props.homeCells ?? []} />
       </div>
     </Layout>

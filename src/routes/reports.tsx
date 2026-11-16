@@ -254,7 +254,7 @@ reportsRoutes.get("/", requirePermission("reports.view"), async (c) => {
         SELECT DISTINCT u.id, COALESCE(NULLIF(u.display_name, ''), u.username) AS username
         FROM activity_reports ar JOIN users u ON u.id = ar.author_id
         WHERE ${scopeCond(scope)}
-        ORDER BY u.username`)
+        ORDER BY username`)
     : [];
 
   // Count, page rows, the review backlog and the author filter are independent:

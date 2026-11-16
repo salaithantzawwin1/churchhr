@@ -4,12 +4,12 @@ import { getDict, type Lang } from "../i18n";
 import { brandMarkSrc, type Branding } from "../branding";
 
 /** Warning shown under a password field while Caps Lock is on (public/app.js). */
-function CapsHint({ label }: { label: string }) {
+export function CapsHint({ label }: { label: string }) {
   return <span class="caps-hint" hidden>{label}</span>;
 }
 
 /** Show/hide control for a password input; behaviour lives in public/app.js. */
-function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string; hideLabel: string }) {
+export function PwToggle({ id, showLabel, hideLabel }: { id: string; showLabel: string; hideLabel: string }) {
   return (
     <button
       type="button"
@@ -130,7 +130,7 @@ export function ProfilePage({
           <div class="field">
             <label class="lbl" for="display_name">{t("profile.displayName")}</label>
             <input type="text" name="display_name" id="display_name" value={displayName}
-              maxlength={80} autocomplete="name" placeholder={t("profile.namePlaceholder")} />
+              maxlength={80} autocomplete="name" />
           </div>
           <div class="actions">
             <button class="btn secondary" type="submit">{t("profile.saveName")}</button>

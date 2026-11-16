@@ -7,7 +7,7 @@ import {
   ageGroups, isRegionScopedType, lookupOptions, OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, OPTION_TYPES, regions,
   rolePermissions, roles, userHomeCellAssignments, userRoles, userStateAssignments, users, type OptionType,
 } from "../db/schema";
-import { clearAccessCache, rememberDisplayName, requireAnyPermission, requirePermission } from "../middleware";
+import { clearAccessCache, requireAnyPermission, requirePermission } from "../middleware";
 import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
@@ -174,7 +174,7 @@ function typeLabel(lang: Lang, type: OptionType): string {
   return labels[type];
 }
 
-let warnedMissingUserLanguage = false;
+let warnedMissingUserColumns = false;
 
 async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
   const stateCol = lang !== "mm" ? "COALESCE(r3.name_en, r3.name)" : "r3.name";
@@ -200,9 +200,9 @@ async function loadAdminUsers(db: DB, lang: Lang): Promise<AdminUserRow[]> {
   for (const cols of ["COALESCE(u.display_name, '') AS display_name, u.language, ", "u.language, ", "COALESCE(u.display_name, '') AS display_name, ", ""]) {
     try { rows = await query(cols); break; }
     catch (err) {
-      if (!warnedMissingUserLanguage) {
+      if (!warnedMissingUserColumns) {
         console.warn("optional user columns unavailable on users page (run D1 migrations):", err);
-        warnedMissingUserLanguage = true;
+        warnedMissingUserColumns = true;
       }
     }
   }
@@ -342,7 +342,7 @@ adminRoutes.get("/users/new", requirePermission("users.manage"), requireAllState
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={[]}
-      values={{ username: "", displayName: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
+      values={{ username: "", displayName: "", language: "", allStates: false, selectedRoles: [], selectedStates: [], homeCellIds: [], active: 1, mustChange: 1 }}
       roles={roleList as any} regions={regionsList}
       homeCells={homeCells}
     />,
@@ -358,13 +358,14 @@ function parseUserBody(body: Record<string, unknown>, t: (k: string) => string) 
   const homeCellsRaw = ints(multi(body.home_cells));
   // Kept unsliced: an over-long name must fail validation, not be cut short.
   const displayName = s(body.display_name).trim();
+  const language = ["mm", "en", "kr"].includes(s(body.language)) ? s(body.language) : "";
   const allStates = s(body.all_states) === "1";
   const active = s(body.active) === "1" ? 1 : 0;
   const mustChange = s(body.must_change) === "1" ? 1 : 0;
   const errors: string[] = [];
   if (!/^[A-Za-z0-9_.\-]{3,32}$/.test(username)) errors.push(t("adm.errUsername"));
   if (displayName.length > 80) errors.push(t("adm.errDisplayName"));
-  return { id: undefined as number | undefined, username, displayName, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
+  return { id: undefined as number | undefined, username, displayName, language, password, newPassword, roleIds, statesRaw, homeCellsRaw, allStates, active, mustChange, errors };
 }
 
 async function validateAssignments(
@@ -399,7 +400,7 @@ async function validateAssignments(
  * been clobbered by the earlier validate call in a separate DB pool. */
 async function userFail(
   c: any,
-  p: { username: string; displayName: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; homeCellsRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
+  p: { username: string; displayName: string; language: string; allStates: boolean; roleIds: number[]; statesRaw: number[]; homeCellsRaw: number[]; active: number; mustChange: number; errors: string[]; id: number | undefined },
   roleList: { id: number; name: string }[],
   regionList: { id: number; name: string }[],
   homeCellList: { id: number; name: string }[],
@@ -412,7 +413,7 @@ async function userFail(
   return c.html(
     <UserFormFragment
       lang={c.get("lang")} errors={errors}
-      values={{ id: p.id, username: p.username, displayName: p.displayName, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, homeCellIds: p.homeCellsRaw, active: p.active, mustChange: p.mustChange }}
+      values={{ id: p.id, username: p.username, displayName: p.displayName, language: p.language, allStates: p.allStates, selectedRoles: p.roleIds, selectedStates: p.statesRaw, homeCellIds: p.homeCellsRaw, active: p.active, mustChange: p.mustChange }}
       roles={roleList} regions={regionList} homeCells={homeCellList}
     />,
     400,
@@ -440,7 +441,7 @@ adminRoutes.post("/users", requirePermission("users.manage"), requireAllStates, 
 
   const passwordHash = await hashPassword(p.password, parseIterations(c.env.PBKDF2_ITERATIONS));
   const created = await db.insert(users)
-    .values({ username: p.username, displayName: p.displayName, passwordHash, active: p.active, mustChangePassword: p.mustChange })
+    .values({ username: p.username, displayName: p.displayName, language: p.language, passwordHash, active: p.active, mustChangePassword: p.mustChange })
     .returning({ id: users.id });
   const newId = created[0]!.id;
   for (const roleId of p.roleIds) await db.insert(userRoles).values({ userId: newId, roleId });
@@ -484,7 +485,7 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   }
 
   const updates: Record<string, string | number> = {
-    username: p.username, displayName: p.displayName,
+    username: p.username, displayName: p.displayName, language: p.language,
     active: p.active, mustChangePassword: p.mustChange,
   };
   if (p.newPassword) {
@@ -505,7 +506,6 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   for (const homeCellId of p.homeCellsRaw) {
     await db.insert(userHomeCellAssignments).values({ userId: id, homeCellId });
   }
-  rememberDisplayName(id, p.displayName || null);
   clearAccessCache();
   return c.redirect("/admin/users?ok=user-updated", 302);
 });

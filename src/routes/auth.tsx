@@ -211,13 +211,10 @@ profileRoutes.post("/logout", async (c) => {
   return c.redirect("/login", 302);
 });
 
-profileRoutes.get("/profile", async (c) => {
+profileRoutes.get("/profile", (c) => {
   const user = c.get("user");
   const t = getDict(c.get("lang"));
   const q = c.req.query();
-  const db = getDb(c.env);
-  const [own] = await db.select({ displayName: users.displayName }).from(users)
-    .where(eq(users.id, user.id)).limit(1);
   let flash: Flash = null;
   if (q.ok === "name") flash = { kind: "ok", text: t("profile.nameSaved") };
   else if (q.err === "name") flash = { kind: "err", text: t("profile.nameTooLong") };
@@ -228,7 +225,7 @@ profileRoutes.get("/profile", async (c) => {
   else if (q.err === "policy") flash = { kind: "err", text: `${t("profile.errPolicy")}` };
   else if (q.err === "mismatch") flash = { kind: "err", text: t("profile.errMismatch") };
   return c.html(
-    <ProfilePage username={user.username} displayName={own?.displayName ?? ""}
+    <ProfilePage username={user.username} displayName={user.displayName ?? ""}
       mustChange={user.mustChangePassword} flash={flash} lang={c.get("lang")} />,
   );
 });

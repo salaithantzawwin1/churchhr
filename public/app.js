@@ -165,6 +165,35 @@
     input.focus();
   });
 
+  // "Generate" beside a password field: a random password that satisfies the
+  // policy (length plus four character classes), shown in the field so the admin
+  // can copy it before handing the account over.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest("[data-gen-password]") : null;
+    if (!btn) return;
+    var input = document.getElementById(btn.getAttribute("data-gen-password"));
+    if (!input) return;
+    e.preventDefault();
+    var groups = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*"];
+    var seed = new Uint32Array(16);
+    (window.crypto || window.msCrypto).getRandomValues(seed);
+    var chars = groups.map(function (g, i) { return g[seed[i] % g.length]; });
+    var all = groups.join("");
+    for (var i = chars.length; i < 14; i++) chars.push(all[seed[i] % all.length]);
+    for (var j = chars.length - 1; j > 0; j--) {
+      var k = seed[j] % (j + 1);
+      var t = chars[j]; chars[j] = chars[k]; chars[k] = t;
+    }
+    input.value = chars.join("");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    // Tick "must change password": a generated password is a handover, not a keeper.
+    var mustChange = document.querySelector('input[name="must_change"]');
+    if (mustChange) mustChange.checked = true;
+    // Reveal it through the field's own show/hide control so it can be copied.
+    var toggle = input.closest(".pw-wrap") && input.closest(".pw-wrap").querySelector("[data-pw-toggle]");
+    if (toggle && toggle.getAttribute("aria-pressed") !== "true") toggle.click();
+  });
+
   // Members list bulk actions: checkboxes fill the hidden ids field and show
   // the floating bulk bar; the header checkbox toggles the page.
   (function initBulkBar() {

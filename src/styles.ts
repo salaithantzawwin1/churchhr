@@ -482,6 +482,15 @@ html[lang="my"] .auth-brand-name { line-height: 1.6; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .pw-toggle:hover { background: var(--chip-bg); color: var(--ink); }
+/* An admin password field next to its Generate button; the button drops below
+   the field on a phone so neither is squeezed. */
+.pw-row { display: flex; align-items: flex-start; gap: 8px; }
+.pw-row .pw-wrap { flex: 1 1 auto; min-width: 0; }
+.pw-row .btn { flex: none; white-space: nowrap; }
+@media (max-width: 480px) {
+  .pw-row { flex-wrap: wrap; }
+  .pw-row .btn { width: 100%; }
+}
 .pw-toggle svg { width: 17px; height: 17px; display: block; }
 .pw-toggle .ico-eye-off { display: none; }
 .pw-toggle[aria-pressed="true"] .ico-eye { display: none; }
