@@ -411,13 +411,27 @@ export function ReportDetailPage(props: Common & {
   if (r.reviewer_name) facts.push([t("rep.reviewer"), r.reviewer_name]);
   if (r.reviewed_at) facts.push([t("rep.reviewedAt"), stamp(r.reviewed_at)]);
   const place = [stateName(r, L), r.township].filter(Boolean).join(" · ");
-  const byline = [r.report_date, place, r.author_name].filter(Boolean).join(" · ");
+  const byline = [r.report_date, place, `${t("rep.by")} ${r.author_name}`].filter(Boolean).join(" · ");
+  // The counters are always shown: a blank one is information the reviewer
+  // needs, not a section that quietly disappears.
   const counts: [string, string][] = [
     [t("rep.attendance"), r.attendance == null ? "" : String(r.attendance)],
     [t("rep.newContacts"), r.new_contacts == null ? "" : String(r.new_contacts)],
     [t("rep.followUps"), r.follow_ups == null ? "" : String(r.follow_ups)],
   ];
-  const hasCounts = counts.some(([, value]) => value !== "");
+  const reviewForm = (
+    <form method="post" action={`/reports/${r.id}/review`}>
+      <label class="field">
+        <span class="lbl">{t("rep.reviewNote")}</span>
+        <textarea name="review_note" maxLength={1000} style="min-height:100px">{r.review_note ?? ""}</textarea>
+      </label>
+      <div class="actions">
+        <button class="btn" type="submit">
+          {r.status === "reviewed" ? t("rep.reviewUpdate") : t("rep.reviewAction")}
+        </button>
+      </div>
+    </form>
+  );
   return (
     <Layout title={r.title} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
       <div class="page-head report-head">
@@ -430,11 +444,12 @@ export function ReportDetailPage(props: Common & {
           </h1>
           <p class="report-byline">{byline}</p>
         </div>
-        <div class="actions" style="margin:0">
+        <div class="actions print-hide" style="margin:0">
           <a class="btn secondary" href={backHref}>{t("rep.backToList")}</a>
           {canEdit && (
             <a class={`btn${canReview ? " secondary" : ""}`} href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>
           )}
+          <button class="btn secondary" type="button" data-print>{t("rep.print")}</button>
           {canDelete && (
             <form method="post" action={`/reports/${r.id}/delete`} data-confirm={t("rep.confirmDelete")}>
               <button class="btn outline-danger" type="submit">{t("members.delete")}</button>
@@ -455,24 +470,34 @@ export function ReportDetailPage(props: Common & {
         </div>
       )}
 
-      {/* Reviewers act here first: the panel sits above the report, so the note
-          and the review button are on screen without scrolling. */}
-      {canReview ? (
-        <div class="card detail-card">
+      {/* Reviewers act here first. A pending review is a disclosure: open on a
+          desktop, folded to its summary on a phone (public/app.js) so the report
+          stays in view. A finished review keeps a compact summary instead. */}
+      {r.status === "reviewed" ? (
+        <div class="card detail-card review-done">
           <h2>{t("rep.review")}</h2>
-          {r.status !== "reviewed" && <p class="muted small">{t("rep.reviewHint")}</p>}
-          <form method="post" action={`/reports/${r.id}/review`}>
-            <label class="field">
-              <span class="lbl">{t("rep.reviewNote")}</span>
-              <textarea name="review_note" maxLength={1000} style="min-height:100px">{r.review_note ?? ""}</textarea>
-            </label>
-            <div class="actions">
-              <button class="btn" type="submit">
-                {r.status === "reviewed" ? t("rep.reviewUpdate") : t("rep.reviewAction")}
-              </button>
-            </div>
-          </form>
+          <p class="review-meta">
+            <strong>{r.reviewer_name ?? "—"}</strong>
+            {r.reviewed_at && <span> · {stamp(r.reviewed_at)}</span>}
+          </p>
+          {r.review_note
+            ? <div class="report-body">{r.review_note}</div>
+            : <p class="muted small">{t("rep.noReviewNote")}</p>}
+          {canReview && (
+            <details class="review-update">
+              <summary>{t("rep.reviewUpdate")}</summary>
+              {reviewForm}
+            </details>
+          )}
         </div>
+      ) : canReview ? (
+        <details class="card detail-card review-panel" open data-collapse-on-phone>
+          <summary>
+            <span class="review-title">{t("rep.review")}</span>
+          </summary>
+          <p class="muted small">{t("rep.reviewHint")}</p>
+          {reviewForm}
+        </details>
       ) : r.review_note ? (
         <div class="card detail-card">
           <h2>{t("rep.reviewNote")}</h2>
@@ -493,45 +518,41 @@ export function ReportDetailPage(props: Common & {
         <p class="muted small report-tz">{t("rep.timezone")}</p>
       </div>
 
-      <div class="card detail-card">
-        <h2>{t("rep.body")}</h2>
-        <div class="report-body">{r.body}</div>
+      <div class="stat-grid report-stats">
+        {counts.map(([label, value]) => (
+          <div class="stat">
+            <div class={`n${value ? "" : " is-empty"}`}>{value || "—"}</div>
+            <div class="t">{label}</div>
+          </div>
+        ))}
       </div>
 
-      {hasCounts && (
-        <div class="card detail-card">
-          <h2>{t("rep.numbers")}</h2>
-          <div class="detail-grid">
-            {counts.map(([label, value]) => (
-              <div class="detail-item">
-                <span class="k">{label}</span>
-                <span class={`v${value ? "" : " empty"}`}>{value || "—"}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {r.challenges && (
-        <div class="card detail-card">
-          <h2>{t("rep.challenges")}</h2>
-          <div class="report-body">{r.challenges}</div>
-        </div>
-      )}
-
-      {r.prayer_requests && (
-        <div class="card detail-card">
-          <h2>{t("rep.prayer")}</h2>
-          <div class="report-body">{r.prayer_requests}</div>
-        </div>
-      )}
-
-      {r.next_steps && (
-        <div class="card detail-card">
-          <h2>{t("rep.nextSteps")}</h2>
-          <div class="report-body">{r.next_steps}</div>
-        </div>
-      )}
+      {/* One document instead of four boxes: the narrative leads, the optional
+          fields follow under their own headings, separated by a hairline. */}
+      <div class="card detail-card report-doc">
+        <section class="report-section">
+          <h2>{t("rep.body")}</h2>
+          <div class="report-body">{r.body}</div>
+        </section>
+        {r.challenges && (
+          <section class="report-section">
+            <h3>{t("rep.challenges")}</h3>
+            <div class="report-body">{r.challenges}</div>
+          </section>
+        )}
+        {r.prayer_requests && (
+          <section class="report-section">
+            <h3>{t("rep.prayer")}</h3>
+            <div class="report-body">{r.prayer_requests}</div>
+          </section>
+        )}
+        {r.next_steps && (
+          <section class="report-section">
+            <h3>{t("rep.nextSteps")}</h3>
+            <div class="report-body">{r.next_steps}</div>
+          </section>
+        )}
+      </div>
 
 {edits.length > 0 && (
         <div class="card detail-card">

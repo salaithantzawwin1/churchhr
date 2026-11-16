@@ -1859,6 +1859,15 @@
     l.href = href;
     document.head.appendChild(l);
   }
+  // A phone should open on the report, not on a tall review form: the pending
+  // review panel ships open for desktop reviewers and folds to its summary on
+  // small screens, where one tap opens it again.
+  if (window.matchMedia && window.matchMedia("(max-width: 640px)").matches) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-collapse-on-phone]"), function (d) {
+      d.open = false;
+    });
+  }
+
   // Report print buttons: one tap opens the browser dialog, where the @media
   // print rules strip the navigation, filters and action buttons.
   Array.prototype.forEach.call(document.querySelectorAll("[data-print]"), function (btn) {

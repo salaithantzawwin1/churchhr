@@ -3341,6 +3341,33 @@ label.field.assign-priority {
   .report-head .actions .btn { min-height: 44px; padding: 9px 10px; font-size: 13.5px; }
 }
 
+/* ---------- report detail: counters, document, review panel ---------- */
+.report-stats { margin-bottom: var(--card-gap); }
+.report-stats .stat .n { font-size: 24px; }
+.report-stats .stat .n.is-empty { color: var(--muted); font-weight: 500; }
+/* The four narrative fields read as one document: one card, section headings
+   and a hairline between sections instead of four boxes with their own padding. */
+.report-doc .report-section + .report-section {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line);
+}
+.report-doc .report-section h2 { margin: 0 0 8px; }
+.report-doc .report-section h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.report-doc .report-body { max-width: 68ch; font-size: 15.5px; line-height: 1.7; }
+/* Pending review is a disclosure: open on desktop, folded on phones. */
+.review-panel > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.review-panel > summary::-webkit-details-marker { display: none; }
+.review-panel > summary .review-title { font-size: 17px; font-weight: 700; }
+.review-panel > summary::after { content: "▾"; color: var(--muted); font-size: 11px; }
+.review-panel[open] > summary::after { content: "▴"; }
+.review-panel[open] > summary { margin-bottom: 8px; }
+/* Finished review: who, when and the note they left. */
+.review-meta { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.review-meta strong { color: var(--ink); font-weight: 600; }
+.review-done .report-body { max-width: 68ch; }
+.review-update { margin-top: 12px; }
+.review-update > summary { cursor: pointer; font-size: 13.5px; color: var(--link); }
+.review-update[open] > summary { margin-bottom: 10px; }
+
 /* ---------- reports: review flag, drafts ---------- */
 .review-flag {
   display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px;
@@ -3690,6 +3717,8 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   color: var(--muted); font-size: 11.5px; white-space: nowrap;
 }
 @media print {
+  .report-doc .report-body { max-width: none; }
+  .report-doc .report-section + .report-section { border-top: 1px solid #ccc; }
   .hh-edu { border-color: #999; color: #111; }
   .report-matrix-card { border: 1px solid #ccc; }
 }
