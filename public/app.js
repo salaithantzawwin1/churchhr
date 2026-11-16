@@ -1405,16 +1405,35 @@
       var now = new Date();
       return new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
     }
+    // The visible area, which on a phone is smaller than the window while the
+    // soft keyboard is open; a calendar placed against innerHeight then sits
+    // behind the keyboard and looks dead.
+    function viewHeight() {
+      return (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    }
+    function viewTop() {
+      return (window.visualViewport && window.visualViewport.offsetTop) || 0;
+    }
     function place() {
       if (!dpPop || !dpInput) return;
       var rect = dpInput.getBoundingClientRect();
+      var width = dpPop.offsetWidth;
       var height = dpPop.offsetHeight;
-      var left = Math.max(8, Math.min(rect.left, window.innerWidth - dpPop.offsetWidth - 8));
+      var viewW = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+      var viewH = viewHeight();
+      var offsetTop = viewTop();
+      var left = Math.max(8, Math.min(rect.left, viewW - width - 8));
       var top = rect.bottom + 6;
-      // Flip above the field when there is no room below it.
-      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+      // Flip above the field when there is no room below it, then keep the
+      // calendar inside the visible area.
+      if (top + height > offsetTop + viewH - 8) {
+        top = Math.max(offsetTop + 8, Math.min(rect.top - height - 6, offsetTop + viewH - height - 8));
+      }
       dpPop.style.left = left + "px";
       dpPop.style.top = top + "px";
+      // A calendar taller than the space left (a small phone in landscape)
+      // scrolls inside itself instead of running off the screen.
+      dpPop.style.maxHeight = Math.max(200, viewH - 16) + "px";
     }
     function setValue(input, date) {
       input.value = date ? iso(date) : "";
@@ -1441,6 +1460,18 @@
       // The popover is placed against the viewport, so keep it attached to its
       // field while the page (or a dialog body) scrolls under it.
       window.addEventListener("scroll", function () { if (dpPop) place(); }, true);
+      // The soft keyboard opening, or a phone toolbar collapsing, resizes the
+      // visual viewport without a window resize on iOS.
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () { if (dpPop) place(); });
+        window.visualViewport.addEventListener("scroll", function () { if (dpPop) place(); });
+      }
+      // Web fonts and late images move the form under the calendar after it has
+      // been placed; settle it once the page has finished loading.
+      window.addEventListener("load", function () { if (dpPop) place(); });
+      if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+        document.fonts.ready.then(function () { if (dpPop) place(); });
+      }
     }
 
     // Text date fields carry data-datepicker: they keep the same ISO value the
@@ -1484,6 +1515,9 @@
         dpInput = input;
         pop.hidden = false;
         place();
+        // Re-place once the browser has reflowed anything that shifted while
+        // the calendar was being built (a hint line, a wrapped label).
+        window.setTimeout(function () { if (dpPop === pop) place(); }, 250);
       }
       input.addEventListener("focus", show);
       // Picking a date closes the calendar but leaves the field focused, so a
