@@ -83,6 +83,7 @@ const SPECULATION_RULES = JSON.stringify({
         { not: { href_matches: "/members/export*" } },
         { not: { href_matches: "/reports/export*" } },
         { not: { href_matches: "/members/*/photo*" } },
+        { not: { href_matches: "/admin/households/*/photo*" } },
         { not: { href_matches: "/organization/pastors/*/photo*" } },
         { not: { href_matches: "/branding/photo*" } },
       ],

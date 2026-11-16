@@ -358,6 +358,7 @@ export const KO: Record<string, string> = {
   "hh.editTitle": "가정 수정",
   "hh.editHeading": "가정 수정",
   "hh.cardHeading": "가정 정보",
+  "hh.photo": "가족 사진",
   "hh.head": "가장",
   "hh.members": "가정 구성원",
   "hh.memberCount": "구성원",

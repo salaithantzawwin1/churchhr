@@ -16,7 +16,7 @@ export type HealthResult = {
  * 0015 members.photo, 0016 activity_reports, 0017 report_edits, 0018 families
  * placement, 0019 member_positions, 0021 church_departments, 0022 member
  * departments, 0023 position catalogue and regional churches, 0024 position
- * change history). */
+ * change history, 0048 families.photo). */
 export async function checkHealth(env: Bindings): Promise<HealthResult> {
   const started = Date.now();
   let db: "ok" | "error" = "ok";
@@ -29,6 +29,7 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
       "SELECT short_code FROM lookup_options LIMIT 1",
       "SELECT photo FROM members LIMIT 1",
       "SELECT home_cell_id, family_group_id FROM families LIMIT 1",
+      "SELECT photo FROM families LIMIT 1",
       "SELECT title FROM activity_reports LIMIT 1",
       "SELECT report_id FROM report_edits LIMIT 1",
       "SELECT position, department_id FROM member_positions LIMIT 1",

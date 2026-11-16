@@ -35,6 +35,59 @@ const RELATIONSHIPS = [
 ] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];
 
+/** Family photos reuse the member pipeline: the browser centre-crops, encodes
+ *  500×500 WebP and posts it as a data URL in the hidden photo_data field. */
+const MAX_PHOTO_BYTES = 400 * 1024;
+
+type PhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
+
+function parsePhoto(body: Record<string, unknown>, msg: (key: string) => string): PhotoInput {
+  if (s(body.photo_remove) === "1") return { bytes: null, touched: true, error: null };
+  const raw = s(body.photo_data);
+  if (!raw) return { bytes: null, touched: false, error: null };
+  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
+  if (!match) return { bytes: null, touched: true, error: msg("photo.badType") };
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(match[1]!.replace(/\s+/g, ""));
+    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+  } catch {
+    return { bytes: null, touched: true, error: msg("photo.badType") };
+  }
+  if (bytes.length > MAX_PHOTO_BYTES) return { bytes: null, touched: true, error: msg("photo.tooLarge") };
+  const webp = bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  if (!webp) return { bytes: null, touched: true, error: msg("photo.badType") };
+  return { bytes, touched: true, error: null };
+}
+
+async function savePhoto(db: DB, familyId: number, bytes: Uint8Array | null): Promise<void> {
+  // D1 binds ArrayBuffer for BLOB values (a bare Uint8Array is not portable).
+  const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
+  await db.run(sql`UPDATE families SET photo = ${value} WHERE id = ${familyId}`);
+}
+
+/** Small checksum for the photo ETag: families has no updated_at column, and
+ *  the browser re-encodes on every save, so the bytes are the validator. */
+function photoHash(bytes: Uint8Array): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i += 1) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+const photoUrlOf = (family: { id: number; has_photo?: number | boolean }) =>
+  family.has_photo ? `/admin/households/${family.id}/photo` : undefined;
+
+/** The household columns the routes read. The photo BLOB is deliberately left
+ *  out: pages only need has_photo, and /:id/photo serves the bytes. */
+const FAMILY_COLS = sql`f.id, f.name, f.head_member_id, f.address, f.township, f.phone,
+    f.home_cell_id, f.group_id, f.family_group_id, f.region_id, f.notes,
+    f.created_by, f.created_at, (f.photo IS NOT NULL) AS has_photo`;
+
 /** nrc-like helpers borrowed pattern from members.tsx; kept local to route. */
 async function loadRegions(db: DB) {
   return (await db
@@ -223,6 +276,7 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   const regionCond = region ? sql`AND f.region_id = ${region}` : sql``;
   const rowsP = db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
+           (f.photo IS NOT NULL) AS has_photo,
            r.name AS state_name, r.name_en AS state_name_en,
            head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
            head.phone AS head_phone,
@@ -334,6 +388,8 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     }
   }
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const photo = parsePhoto(body, (k) => getDict(c.get("lang"))(k));
+  if (photo.error) errors.push(photo.error);
   const allOptions = await loadAllOptions(db);
   const headList = await headCandidates(db, scope, null);
   const render = (status: 400 | 200) => {
@@ -345,7 +401,7 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
-  if (!data) return render(400);
+  if (!data || photo.error) return render(400);
 
   // Optional existing member becomes the head and is attached to the new family.
   let head: any = null;
@@ -371,6 +427,7 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     })
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
+  if (photo.touched) await savePhoto(db, familyId, photo.bytes);
 
   if (head) {
     const now = Math.floor(Date.now() / 1000);
@@ -412,7 +469,7 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
   const [row] = await db.all(sql`
-    SELECT f.*, r.name AS state_name, r.name_en AS state_name_en,
+    SELECT ${FAMILY_COLS}, r.name AS state_name, r.name_en AS state_name_en,
       head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
       hc.label AS home_cell_label,
       fg.label AS family_group_label, fg.code AS family_group_code
@@ -431,8 +488,34 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
     <HouseholdDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       family={row} members={mems} rows={[]} enrolments={enrolments} lang={c.get("lang")}
+      photoUrl={photoUrlOf(row)}
     />,
   );
+});
+
+// ---------- GET /admin/households/:id/photo ----------
+
+householdsRoutes.get("/:id/photo", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.notFound();
+  const rows = await db.all<{ photo: ArrayBuffer | number[] | null; region_id: number }>(sql`
+    SELECT photo, region_id FROM families WHERE id = ${id}`);
+  const row = rows[0];
+  if (!row?.photo || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) return c.notFound();
+  // D1 returns BLOBs as byte arrays through the driver; wrap them for Response.
+  const photo = Array.isArray(row.photo) ? Uint8Array.from(row.photo) : new Uint8Array(row.photo);
+  const etag = `W/"household-${id}-${photo.byteLength}-${photoHash(photo)}"`;
+  const headers: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Content-Length": String(photo.byteLength),
+    "Cache-Control": "private, no-cache",
+    "ETag": etag,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (c.req.header("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(photo, { headers });
 });
 
 // ---------- GET /admin/households/:id/edit ----------
@@ -445,7 +528,7 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   // The household row and both lookup lists are independent: one query window.
   const [rowRows, allRegions, allOptions] = await Promise.all([
     db.all(sql`
-      SELECT f.*, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
+      SELECT ${FAMILY_COLS}, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
       FROM families f LEFT JOIN members head ON head.id = f.head_member_id
       WHERE f.id = ${id}`),
     loadRegions(db),
@@ -466,7 +549,7 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
     family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-    options: hhFormOptions(allOptions),
+    options: hhFormOptions(allOptions), photoUrl: photoUrlOf(row),
   };
   if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
   return c.html(<HouseholdFormPage {...opts} />);
@@ -479,7 +562,7 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [row] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -487,17 +570,20 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   const allRegions = await loadRegions(db);
   const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const td = (k: string) => getDict(c.get("lang"))(k);
+  const photo = parsePhoto(body, td);
+  if (photo.error) errors.push(photo.error);
   const allOptions = await loadAllOptions(db);
   const render = (status: 400 | 200) => {
     const opts = {
       user: c.get("user"), perms: c.get("perms"), values, errors,
       family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-      options: hhFormOptions(allOptions),
+      options: hhFormOptions(allOptions), photoUrl: photoUrlOf(row),
     };
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
-  if (!data) return render(400);
+  if (!data || photo.error) return render(400);
   const placement = await householdPlacement(db, row);
   const homeCellId = data.home_cell_id ?? placement.homeCellId;
   const groupId = data.group_id ?? placement.groupId;
@@ -512,6 +598,7 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   await ensureHouseholdFamilyGroup(
     db, id, data.region_id, homeCellId, placement.familyGroupId, groupId, allOptions,
   );
+  if (photo.touched) await savePhoto(db, id, photo.bytes);
   const next = `/admin/households/${id}?ok=hh.updated`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
@@ -524,7 +611,7 @@ householdsRoutes.post("/:id/delete", requirePermission("members.delete"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [row] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -540,7 +627,7 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.*, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS}, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -605,7 +692,7 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const lang = c.get("lang");
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -732,7 +819,7 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -804,7 +891,7 @@ householdsRoutes.post("/:id/detach", requirePermission("members.update"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }

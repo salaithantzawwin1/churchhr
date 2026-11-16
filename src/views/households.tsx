@@ -62,6 +62,7 @@ export type HeadCandidate = {
 export function HouseholdFormPage(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; members?: HeadCandidate[];
+  photoUrl?: string;
 }) {
   const { user, perms, lang } = props;
   const t = getDict(lang ?? "en");
@@ -79,8 +80,12 @@ export function HouseholdFormFragment(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; modal?: boolean;
   options?: Record<string, OptionRow[]>; members?: HeadCandidate[];
+  /** Existing family photo, shown with the member-photo picker markup. */
+  photoUrl?: string;
 }) {
   const { values: v, errors, family, regions, modal } = props;
+  const photoUrl = props.photoUrl;
+  const initial = (v.name ?? "").trim().charAt(0) || "H";
   const t = getDict(props.lang ?? "en");
   const action = family ? `/admin/households/${family.id}` : "/admin/households";
   return (
@@ -93,6 +98,32 @@ export function HouseholdFormFragment(props: Common & {
         {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("hh.cardHeading")}</h2>
+          <div class="photo-field" data-photo-field data-initial={initial}
+            data-processing={t("form.photoProcessing")} data-ready={t("form.photoReady")}
+            data-error={t("form.photoError")}>
+            <div class="photo-preview">
+              <img data-photo-img src={photoUrl} alt="" hidden={!photoUrl} />
+              <span data-photo-fallback hidden={!!photoUrl}>{initial}</span>
+            </div>
+            <div class="photo-controls">
+              <span class="lbl">{t("hh.photo")}</span>
+              <div class="photo-actions">
+                <label class="btn sm secondary photo-pick">
+                  {t("form.photoChoose")}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input hidden />
+                </label>
+                {photoUrl && (
+                  <label class="muted small">
+                    <input type="checkbox" name="photo_remove" value="1" data-photo-remove />
+                    {t("form.photoRemove")}
+                  </label>
+                )}
+              </div>
+              <p class="hint">{t("form.photoHint")}</p>
+              <p class="photo-status" data-photo-status role="status"></p>
+              <input type="hidden" name="photo_data" data-photo-data />
+            </div>
+          </div>
           <div class="form-grid">
             {family === null && (
               <label class="field" style="grid-column:1/-1">
@@ -251,7 +282,11 @@ export function HouseholdsListPage(props: Common & {
             return (
               <article class="hh-card">
                 <div class="hh-card-head">
-                  <span class="hh-avatar" aria-hidden="true"><HouseGlyph /></span>
+                  <span class="hh-avatar" aria-hidden="true">
+                    {f.has_photo
+                      ? <img src={`/admin/households/${f.id}/photo`} alt="" loading="lazy" />
+                      : <HouseGlyph />}
+                  </span>
                   <div class="hh-card-title">
                     <a href={`/admin/households/${f.id}`} title={f.name}>{f.name}</a>
                     <span class="hh-card-meta">
@@ -295,7 +330,9 @@ export function HouseholdsListPage(props: Common & {
   );
 }
 
-export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[] }) {
+export function HouseholdDetailPage(props: Common & {
+  family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[]; photoUrl?: string;
+}) {
   const { user, perms, flash, family, members: mems, lang, enrolments = [] } = props;
   const eduByMember = new Map(enrolments.map((e) => [e.memberId, e] as const));
   const t = getDict(lang ?? "en");
@@ -337,6 +374,9 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
 
       <div class="hh-detail-grid">
         <section class="card hh-panel">
+          {props.photoUrl && (
+            <img class="hh-photo" src={props.photoUrl} alt={family.name} />
+          )}
           <h2>{t("hh.cardHeading")}</h2>
           <div class="hh-facts">
             <div class="hh-fact">

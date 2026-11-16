@@ -1503,6 +1503,12 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .hh-avatar svg { width: 20px; height: 20px; display: block; }
 .hh-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Family photo on the household detail card. Sources are square (500×500). */
+.hh-photo {
+  display: block; width: 100%; height: 200px; object-fit: cover;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--chip-bg); margin: 0 0 14px;
+}
 .hh-card-name {
   display: block; color: var(--ink); font-size: 16px; font-weight: 600;
   line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
