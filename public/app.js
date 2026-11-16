@@ -194,6 +194,56 @@
     if (toggle && toggle.getAttribute("aria-pressed") !== "true") toggle.click();
   });
 
+  // Copy a value the server shows only once (a temporary password) and say so
+  // on the button, so the admin knows the clipboard took it.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest("[data-copy-text]") : null;
+    if (!btn) return;
+    e.preventDefault();
+    var text = btn.getAttribute("data-copy-text") || "";
+    var done = btn.getAttribute("data-copy-done") || "Copied";
+    var label = btn.textContent;
+    var status = document.querySelector("[data-copy-status]");
+    var timer = null;
+    var feedback = function (message) {
+      btn.textContent = message;
+      if (status) status.textContent = message;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        btn.textContent = label;
+        if (status) status.textContent = "";
+      }, 2000);
+    };
+    // Older browsers (and non-secure origins) have no Clipboard API; a hidden
+    // textarea plus execCommand still copies on every platform the app targets.
+    var fallback = function () {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.top = "-1000px";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+      document.body.removeChild(area);
+      if (ok) return feedback(done);
+      // Still make it copyable by hand: select the value that is on screen.
+      var value = document.querySelector(".temp-pw");
+      if (value && window.getSelection && document.createRange) {
+        var range = document.createRange();
+        range.selectNodeContents(value);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { feedback(done); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
   // Members list bulk actions: checkboxes fill the hidden ids field and show
   // the floating bulk bar; the header checkbox toggles the page.
   (function initBulkBar() {

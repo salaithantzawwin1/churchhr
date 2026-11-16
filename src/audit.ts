@@ -97,7 +97,7 @@ export function classify(method: string, path: string): MutationInfo | null {
       if (!third) return { action: `${entity}.create`, entity, entityId: null };
       if (third === "new") return { action: `${entity}.create`, entity, entityId: null };
       if (id && fourth === "delete") return { action: `${entity}.delete`, entity, entityId: id };
-      if (id && (fourth === "reset" || fourth === "password")) return { action: `${entity}.password`, entity, entityId: id };
+      if (id && (fourth === "reset" || fourth === "password" || fourth === "reset-password")) return { action: `${entity}.password`, entity, entityId: id };
       if (id && !fourth) return { action: `${entity}.update`, entity, entityId: id };
       if (!id && third) return { action: `${entity}.update`, entity, entityId: null };
     }

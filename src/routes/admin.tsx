@@ -12,7 +12,7 @@ import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { destroyOtherSessions } from "../session";
-import { checkPasswordPolicy } from "../password";
+import { checkPasswordPolicy, generateTempPassword } from "../password";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
 import { PERMISSIONS, SUPER_ADMIN_ROLE_ID, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
@@ -20,7 +20,7 @@ import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
 import { Layout } from "../views/layout";
 import {
   AddAgeGroupForm, AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
-  EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, UserFormFragment,
+  EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, TempPasswordPage, UserFormFragment,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
@@ -508,6 +508,34 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   }
   clearAccessCache();
   return c.redirect("/admin/users?ok=user-updated", 302);
+});
+
+/** One-time temporary password for another account. The hash is stored and the
+ *  forced-change flag set, every live session of that account is dropped, and
+ *  the plain value is only ever written into this response — never into the
+ *  database, the audit trail, or the logs. */
+adminRoutes.post("/users/:id/reset-password", requirePermission("users.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1 || id === c.get("user").id) {
+    return c.redirect(errRedirect("/admin/users", "adm.errResetSelf"), 302);
+  }
+  const target = await db.select({ id: users.id, username: users.username })
+    .from(users).where(eq(users.id, id)).limit(1);
+  if (!target[0]) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword, parseIterations(c.env.PBKDF2_ITERATIONS));
+  await db.update(users).set({ passwordHash, mustChangePassword: 1 }).where(eq(users.id, id));
+  // A password the holder no longer knows must not keep any device signed in.
+  await destroyOtherSessions(db, id, null);
+  clearAccessCache();
+  c.header("Cache-Control", "no-store");
+  return c.html(
+    <TempPasswordPage
+      user={c.get("user")} perms={c.get("perms")} flash={null}
+      username={target[0].username} tempPassword={tempPassword} lang={c.get("lang")}
+    />,
+  );
 });
 
 // ---------- Roles ----------

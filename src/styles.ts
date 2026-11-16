@@ -3060,8 +3060,11 @@ th { font-size: 13px; }
   .card { padding: 18px 18px; }
   .stat { padding: 18px 20px; min-height: 108px; }
   .stat .n { font-size: 31px; }
+  /* Match the body's real 22px/24px padding: the fixed 18px insets left a
+     strip of card colour down both sides of the phone save bar. */
   .modal-body form > .actions:last-child {
-    margin-left: -18px; margin-right: -18px; margin-bottom: -22px; padding: 13px 18px;
+    margin-left: -24px; margin-right: -24px; margin-bottom: -22px; bottom: -22px;
+    padding: 13px 24px;
   }
 }
 /* ---------- label typography per language ----------
@@ -3766,4 +3769,18 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 
 /* Member list: the school in the latest recorded year, grade and year beneath. */
 .school-cell .school-meta { display: block; margin-top: 2px; }
+
+/* Temporary password shown once after an admin reset: monospaced, with a Copy
+   button beside it that wraps under the value on a narrow phone. */
+.temp-pw-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 8px; }
+@media (max-width: 420px) { .temp-pw-row .btn { flex: 1 1 100%; } }
+.temp-pw {
+  margin: 0; padding: 12px 14px; max-width: 32ch;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  background: var(--field-bg); font-size: 18px; line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .04em; overflow-wrap: anywhere; user-select: all;
+}
+/* The row action names what it does, so it never needs a hidden label. */
+.admin-tbl .row-reset-form .btn { white-space: nowrap; }
 `; // end of stylesheet

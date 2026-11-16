@@ -147,6 +147,7 @@ function userForm(v: {
             <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> <span>{t("adm.mustChange")}</span>
           </label>
         </div>
+        <p class="hint">{t("adm.mustChangeHint")}</p>
       </fieldset>
         </section>
         <section class="modal-form-pane" data-tab-pane="access" role="tabpanel">
@@ -273,6 +274,11 @@ export function AdminUsersPage(props: UsersProps) {
                            data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
                            title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
                       : <span class="muted" title={t("adm.selfEdit")}>—</span>}
+                    {u.id !== user.id && (
+                      <form method="post" action={`/admin/users/${u.id}/reset-password`} class="row-reset-form">
+                        <button class="btn sm secondary" type="submit">{t("adm.resetPassword")}</button>
+                      </form>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -291,6 +297,32 @@ export function AdminUsersPage(props: UsersProps) {
         </div>
       )}
 
+    </Layout>
+  );
+}
+
+/** The temporary password is rendered exactly once, straight from the reset
+ *  request's response: it is never stored, put in a URL, or listed again. */
+export function TempPasswordPage(props: Common & { username: string; tempPassword: string }) {
+  const t = getDict(props.lang ?? "en");
+  return (
+    <Layout title={t("adm.resetTitle")} lang={props.lang} user={props.user} perms={props.perms}
+      active="/admin/users" flash={props.flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.resetTitle")}</h1>
+        <a class="btn secondary" href="/admin/users">{t("members.toList")}</a>
+      </div>
+      <div class="card">
+        <p>{t("adm.resetFor")} <strong>{props.username}</strong></p>
+        <div class="temp-pw-row">
+          <p class="temp-pw">{props.tempPassword}</p>
+          <button type="button" class="btn secondary"
+            data-copy-text={props.tempPassword} data-copy-done={t("adm.copied")}>{t("adm.copy")}</button>
+        </div>
+        {/* The button itself flips to "Copied"; this line only announces it. */}
+        <p class="sr-only" aria-live="polite" data-copy-status></p>
+        <p class="hint">{t("adm.resetOnce")}</p>
+      </div>
     </Layout>
   );
 }
