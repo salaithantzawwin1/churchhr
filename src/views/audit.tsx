@@ -181,7 +181,9 @@ export function AuditLogPage(props: Common & {
           <option value="">{t("audit.allActions")}</option>
           {actionGroups.map((group) => (
             <option value={group} selected={filters.action === group}>
-              {auditActionLabel(t, `${group}.create`).split(" · ")[0] || group}
+              {/* A group without a dictionary entry (admin, login …) shows its
+                  own name rather than the "login.create" probe key. */}
+              {ENTITY_KEYS[group] ? t(ENTITY_KEYS[group]!) : group}
             </option>
           ))}
         </select>

@@ -1639,7 +1639,7 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
     SELECT DISTINCT substr(action, 1, instr(action, '.') - 1) AS g
     FROM audit_log WHERE instr(action, '.') > 0 ORDER BY g`);
   const entityRows = await db.all<{ e: string }>(sql`
-    SELECT DISTINCT entity FROM audit_log WHERE entity IS NOT NULL ORDER BY entity`);
+    SELECT DISTINCT entity AS e FROM audit_log WHERE entity IS NOT NULL ORDER BY entity`);
 
   return c.html(
     <AuditLogPage
