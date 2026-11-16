@@ -1795,6 +1795,13 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .modal-form-panes { min-width: 0; }
 .modal-form-pane[hidden] { display: none; }
 .modal-form-pane .cluster-section-head { margin-bottom: 10px; }
+/* Account form: two short tabbed panes keep the sheet narrow and the Save bar
+   in view; sections inside a pane keep a small gap of their own. */
+.user-form .form-section + .form-section { margin-top: 14px; }
+.user-form .field > .hint { margin: 4px 0 0; }
+/* The modal body is a flex column, so the tab bar must not be squeezed to a
+   sliver: let it and the panes keep their natural height and scroll the sheet. */
+.user-form > .position-tabs, .user-form > .modal-form-panes { flex: none; }
 .modal-form-pane .cluster-cell-groups { margin-top: 0; }
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }

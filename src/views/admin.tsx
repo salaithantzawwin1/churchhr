@@ -83,7 +83,17 @@ function userForm(v: {
 }, t: (k: string) => string) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
   return (
-    <form method="post" action={action} data-flash-ok={v.id ? "user-updated" : "user-created"}>
+    <form method="post" action={action} class="user-form" data-flash-ok={v.id ? "user-updated" : "user-created"}>
+      {/* Two short panes instead of one long sheet: identity and password on
+          Account, everything about what the account may see on Access. */}
+      <div class="position-tabs modal-form-tabs" data-tabs role="tablist" aria-label={t("adm.accountSection")}>
+        <button type="button" role="tab" class="position-tab active" data-tab-target="account"
+          aria-selected="true">{t("adm.accountSection")}</button>
+        <button type="button" role="tab" class="position-tab" data-tab-target="access"
+          aria-selected="false">{t("adm.accessTab")}</button>
+      </div>
+      <div class="modal-form-panes" data-tabs-body>
+        <section class="modal-form-pane" data-tab-pane="account" role="tabpanel">
       <fieldset class="form-section">
         <legend>{t("adm.accountSection")}</legend>
         <div class="form-grid">
@@ -128,6 +138,19 @@ function userForm(v: {
         </div>
       </fieldset>
       <fieldset class="form-section">
+        <legend>{t("members.status")}</legend>
+        <div class="check-grid">
+          <label class="check-chip">
+            <input type="checkbox" name="active" value="1" checked={v.active === 1} /> <span>{t("adm.active")}</span>
+          </label>
+          <label class="check-chip">
+            <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> <span>{t("adm.mustChange")}</span>
+          </label>
+        </div>
+      </fieldset>
+        </section>
+        <section class="modal-form-pane" data-tab-pane="access" role="tabpanel">
+      <fieldset class="form-section">
         <legend>{t("nav.roles")}</legend>
         <div class="check-grid">
           {props.roles.map((r) => (
@@ -165,17 +188,8 @@ function userForm(v: {
         </div>
         <p class="hint" data-cell-scope-empty hidden>{t("adm.noCellForState")}</p>
       </fieldset>
-      <fieldset class="form-section">
-        <legend>{t("members.status")}</legend>
-        <div class="check-grid">
-          <label class="check-chip">
-            <input type="checkbox" name="active" value="1" checked={v.active === 1} /> <span>{t("adm.active")}</span>
-          </label>
-          <label class="check-chip">
-            <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> <span>{t("adm.mustChange")}</span>
-          </label>
-        </div>
-      </fieldset>
+        </section>
+      </div>
       <div class="actions">
         <button class="btn" type="submit">{v.id ? t("form.save") : t("adm.create")}</button>
       </div>

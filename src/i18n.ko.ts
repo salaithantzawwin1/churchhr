@@ -536,6 +536,7 @@ export const KO: Record<string, string> = {
   "adm.errUsername": "사용자 이름은 3–32자의 영문/숫자여야 합니다.",
   "adm.displayNameHint": "보고서에 사용자 이름 대신 표시됩니다.",
   "adm.accountSection": "계정 정보",
+  "adm.accessTab": "접근 권한",
   "adm.languageAuto": "자동 (브라우저)",
   "adm.languageHint": "이 계정이 로그인 후 보게 될 언어입니다.",
   "adm.passwordSection": "비밀번호",
