@@ -113,6 +113,12 @@ describe("auditActionLabel", () => {
     expect(auditActionLabel(t, "login.locked")).toBe("audit.g.signins · audit.v.locked");
   });
 
+  it("gives a sign-out its own label", () => {
+    // Regression: the session prefix is the sign-in's name, so a logout row used
+    // to read "Sign-in · signed out" next to the sign-in rows.
+    expect(auditActionLabel(t, "session.logout")).toBe("audit.e.signOut");
+  });
+
   it("labels ordinary entity actions", () => {
     expect(auditActionLabel(t, "member.update")).toBe("audit.e.member · audit.v.update");
     expect(auditActionLabel(t, "household.photo")).toBe("audit.e.household · audit.v.photo");

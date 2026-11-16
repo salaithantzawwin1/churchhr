@@ -47,7 +47,9 @@ const ENTITY_KEYS: Record<string, string> = {
   age_group: "audit.e.ageGroup",
   fellowship: "audit.e.fellowship",
   group: "audit.e.group",
-  session: "audit.e.session",
+  // Only session.logout is written under this prefix: the session's own name is
+  // the sign-out, not the sign-in that login.* rows describe.
+  session: "audit.e.signOut",
   // Sign-ins are written as login.* but stored under the session entity; the
   // action prefix is what the row shows, so it needs a name of its own.
   login: "audit.g.signins",
@@ -82,6 +84,9 @@ const VERB_KEYS: Record<string, string> = {
 };
 
 export function auditActionLabel(t: (key: string) => string, action: string): string {
+  // The verb would only repeat the label ("Sign-out · signed out"), so a sign-out
+  // reads as its own action.
+  if (action === "session.logout") return t("audit.e.signOut");
   const [entity, ...rest] = action.split(".");
   const verb = rest.join(".");
   const entityLabel = ENTITY_KEYS[entity] ? t(ENTITY_KEYS[entity]!) : "";
