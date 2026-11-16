@@ -3333,10 +3333,11 @@ label.field.assign-priority {
   .detail-grid.report-facts { grid-template-columns: 1fr; }
   .report-head h1 { font-size: 19px; }
   /* Four header buttons do not fit one 390px row: pair them two-by-two with
-     full-width tap targets instead of squeezing the labels. */
+     full-width tap targets instead of squeezing the labels. Growing lets an
+     odd button count (a submitted report hides Edit) fill the last row alone. */
   .report-head .actions { gap: 8px; }
   .report-head .actions .btn,
-  .report-head .actions form { flex: 0 1 calc(50% - 4px); min-width: 0; }
+  .report-head .actions form { flex: 1 1 calc(50% - 4px); min-width: 0; }
   .report-head .actions form .btn { width: 100%; }
   .report-head .actions .btn { min-height: 44px; padding: 9px 10px; font-size: 13.5px; }
 }
@@ -3719,6 +3720,15 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 @media print {
   .report-doc .report-body { max-width: none; }
   .report-doc .report-section + .report-section { border-top: 1px solid #ccc; }
+  /* Keep a heading with its prose and never split one section across sheets. */
+  .report-doc .report-section { break-inside: avoid; }
+  .report-doc h2, .report-doc h3 { break-after: avoid; }
+  /* A sheet carries the report, not the app: the review form is screen-only,
+     and a counter row with nothing but em dashes drops out of the print. */
+  .review-panel, .review-update { display: none !important; }
+  .report-stats, .report-stats .stat { break-inside: avoid; }
+  .report-stats .stat.is-empty { display: none; }
+  .report-stats:not(:has(.stat:not(.is-empty))) { display: none !important; }
   .hh-edu { border-color: #999; color: #111; }
   .report-matrix-card { border: 1px solid #ccc; }
 }

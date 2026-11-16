@@ -520,7 +520,7 @@ export function ReportDetailPage(props: Common & {
 
       <div class="stat-grid report-stats">
         {counts.map(([label, value]) => (
-          <div class="stat">
+          <div class={`stat${value ? "" : " is-empty"}`}>
             <div class={`n${value ? "" : " is-empty"}`}>{value || "—"}</div>
             <div class="t">{label}</div>
           </div>
