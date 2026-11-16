@@ -312,7 +312,10 @@ export function TempPasswordPage(props: Common & { username: string; tempPasswor
         <h1>{t("adm.resetTitle")}</h1>
         <a class="btn secondary" href="/admin/users">{t("members.toList")}</a>
       </div>
-      <div class="card">
+      {/* The page is the answer to a POST: the script points this history entry
+          at the list, so a refresh shows the list instead of re-issuing a
+          password. */}
+      <div class="card" data-reset-result="/admin/users">
         <p>{t("adm.resetFor")} <strong>{props.username}</strong></p>
         <div class="temp-pw-row">
           <p class="temp-pw">{props.tempPassword}</p>

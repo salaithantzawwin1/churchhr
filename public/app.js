@@ -1264,6 +1264,16 @@
   }
   initTabs(document);
 
+  // A one-time password page is the response to a POST. Aim its history entry
+  // at the list, so refreshing reloads the list (a GET) instead of resubmitting
+  // the form and issuing a second password.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-reset-result]"), function (el) {
+    var target = el.getAttribute("data-reset-result");
+    if (!target || !window.history || !window.history.replaceState) return;
+    if (location.pathname + location.search === target) return;
+    try { window.history.replaceState(null, "", target); } catch (err) { /* keep the POST address */ }
+  });
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
