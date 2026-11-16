@@ -82,7 +82,7 @@ export function auditActionLabel(t: (key: string) => string, action: string): st
 const YANGON_OFFSET_SECONDS = 6.5 * 3600;
 
 /** "2026-11-12 18:04" in Myanmar time, with seconds when the day is not shown. */
-function stamp(unix: number): string {
+export function stamp(unix: number): string {
   return new Date((unix + YANGON_OFFSET_SECONDS) * 1000).toISOString().slice(0, 16).replace("T", " ");
 }
 

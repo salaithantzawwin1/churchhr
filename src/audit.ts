@@ -200,7 +200,9 @@ export function auditMutations() {
     const note = c.get("auditNote");
     if (!info && !note?.action) return;
     const action = note?.action ?? info!.action;
-    const entity = note?.entity ?? action.split(".")[0] ?? info!.entity;
+    // Prefer the classified entity: the action prefix is not always the entity
+    // (login.success is a session, account.update is a user).
+    const entity = note?.entity ?? info?.entity ?? action.split(".")[0] ?? null;
     // Create routes redirect to the new record; keep its id in the entry so the
     // trail says which row was added, not just that something was.
     let entityId = note?.entityId ?? info?.entityId ?? null;

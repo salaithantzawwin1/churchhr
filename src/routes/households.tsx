@@ -484,12 +484,22 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   }
   const mems = await householdMembers(db, id);
   // One extra read so each child shows its current class and school.
-  const enrolments = await loadEnrolmentSummaries(db, mems.map((m: any) => Number(m.id)));
+  const [enrolments, auditRows] = await Promise.all([
+    loadEnrolmentSummaries(db, mems.map((m: any) => Number(m.id))),
+    // The trail for this household, written by the request middleware. Only
+    // readers of the audit page see who changed it.
+    c.get("perms").has("audit.view")
+      ? db.all<{ at: number; username: string | null; action: string; summary: string | null }>(sql`
+          SELECT at, username, action, summary FROM audit_log
+          WHERE entity = 'household' AND entity_id = ${String(id)}
+          ORDER BY at DESC, id DESC LIMIT 8`)
+      : Promise.resolve([] as { at: number; username: string | null; action: string; summary: string | null }[]),
+  ]);
   return c.html(
     <HouseholdDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       family={row} members={mems} rows={[]} enrolments={enrolments} lang={c.get("lang")}
-      photoUrl={photoUrlOf(row)}
+      photoUrl={photoUrlOf(row)} audit={auditRows}
     />,
   );
 });

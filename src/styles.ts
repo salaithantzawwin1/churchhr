@@ -1515,6 +1515,18 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   border-radius: var(--radius);
 }
 .hh-photo-field .photo-preview { border-radius: var(--radius); }
+/* Household detail → the trail for this household (who changed what, when). */
+.hh-audit-list { list-style: none; margin: 0; padding: 0; }
+.hh-audit-list li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13px;
+}
+.hh-audit-list li:first-child { border-top: 0; }
+.hh-audit-when { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.hh-audit-what { font-weight: 600; }
+.hh-audit-summary { color: var(--muted); overflow-wrap: anywhere; }
+.hh-audit-who { margin-left: auto; color: var(--muted); font-size: 12px; }
+
 /* In a modal the picker has to earn its height: a smaller preview and no
    paragraph of guidance, since the status line still reports the result. */
 .modal-body .hh-photo-field { gap: 12px; padding-bottom: 12px; margin-bottom: 12px; }

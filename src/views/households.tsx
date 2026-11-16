@@ -8,6 +8,12 @@ import { regionCascadeSelects } from "./hh-cascade";
 import { formatPhone, optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { EditIcon, RemoveUserIcon, TrashIcon } from "./action-icons";
+import { auditActionLabel, stamp } from "./audit";
+
+/** One audit row, as shown on the household detail page. */
+export type HouseholdAuditRow = {
+  at: number; username: string | null; action: string; summary: string | null;
+};
 
 /** Household relationships: stored key -> label per UI language. */
 const RELATIONSHIPS: Record<string, { mm: string; en: string; ko: string }> = {
@@ -335,8 +341,9 @@ export function HouseholdsListPage(props: Common & {
 
 export function HouseholdDetailPage(props: Common & {
   family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[]; photoUrl?: string;
+  audit?: HouseholdAuditRow[];
 }) {
-  const { user, perms, flash, family, members: mems, lang, enrolments = [] } = props;
+  const { user, perms, flash, family, members: mems, lang, enrolments = [], audit = [] } = props;
   const eduByMember = new Map(enrolments.map((e) => [e.memberId, e] as const));
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
@@ -433,6 +440,30 @@ export function HouseholdDetailPage(props: Common & {
           </div>
         </section>
       </div>
+
+      {perms.has("audit.view") && (
+        <section class="card hh-panel">
+          <div class="section-head">
+            <h2>{t("hh.activity")}</h2>
+            <a class="btn sm secondary"
+              href={`/admin/audit?action=household&q=${encodeURIComponent(family.name)}`}>{t("hh.activityAll")}</a>
+          </div>
+          {audit.length === 0 ? (
+            <p class="muted small" style="margin:0">{t("hh.activityEmpty")}</p>
+          ) : (
+            <ul class="hh-audit-list">
+              {audit.map((r) => (
+                <li>
+                  <span class="hh-audit-when">{stamp(r.at)}</span>
+                  <span class="hh-audit-what">{auditActionLabel(t, r.action)}</span>
+                  {r.summary && <span class="hh-audit-summary">{r.summary}</span>}
+                  <span class="hh-audit-who">{r.username || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section class="card hh-panel hh-members-panel">
         <div class="section-head">
