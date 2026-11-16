@@ -3291,22 +3291,35 @@ label.field.assign-priority {
 /* ---------- audit log ----------
    One row per change: when, who, what, device/IP, and the raw request behind
    it. On a phone each row becomes a labelled card. */
-/* The audit filters hold seven controls plus the actions, which flexed onto a
-   ragged second line with the date range split off. They sit on a fixed grid:
-   search spans two cells, and the actions take the rest of the second row. */
-@media (min-width: 641px) {
-  .audit-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 12px; align-items: end; }
-  .audit-filters > .field { flex: none; min-width: 0; max-width: none; }
-  .audit-filters .audit-q { grid-column: span 2; }
-  .audit-filters .actions { grid-column: span 2; margin: 0; justify-content: flex-end; }
+/* The audit filters hold seven controls plus the actions. They sit on the same
+   card-and-grid pattern as the member filters: five even columns, the search
+   spanning two of them, and the buttons filling the tail of the second row, so
+   no field is narrower than its neighbours and no band of empty space is left. */
+.audit-filter {
+  display: grid; gap: 10px 12px; align-items: end;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 14px 16px; margin-bottom: 0;
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: var(--radius);
 }
-@media (min-width: 641px) and (max-width: 900px) {
-  .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .audit-filters .audit-q, .audit-filters .actions { grid-column: 1 / -1; }
+.audit-filter > .field { flex: none; min-width: 0; max-width: none; margin: 0; }
+.audit-filter .field > input, .audit-filter .field > select {
+  width: 100%; max-width: none; height: 40px;
+}
+.audit-filter .audit-q { grid-column: span 2; }
+.audit-filter .actions {
+  grid-column: span 2; margin: 0; display: flex; align-items: center;
+  gap: 10px; justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .audit-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audit-filter .audit-q, .audit-filter .actions { grid-column: 1 / -1; }
 }
 @media (max-width: 640px) {
-  .audit-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .audit-filters .actions { grid-column: 1 / -1; display: flex; gap: 10px; margin: 0; }
+  .audit-filter { padding: 12px; }
+  /* The panel is collapsible behind its summary at this width, so it tucks
+     under the summary instead of rounding its own top corners. */
+  .filter-box[open] > form.audit-filter { border-top: 0; border-radius: 0 0 var(--radius) var(--radius); }
 }
 .audit-tbl td { vertical-align: top; }
 .audit-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }

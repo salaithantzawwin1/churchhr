@@ -197,7 +197,17 @@ export function AuditLogPage(props: Common & {
         </div>
       </div>
 
-      <form class="filters settings-filters audit-filters" method="get" action="/admin/audit" data-auto-submit="1">
+      <details class={chips.length > 0 ? "filter-box filter-toolbar-box has-filters" : "filter-box filter-toolbar-box"} open>
+      <summary>
+        <span>{t("audit.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+        {chips.length > 0 && (
+          <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>
+            {chips.map((c) => c.label).join(" · ")}
+          </span>
+        )}
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <form class="filter-toolbar audit-filter" method="get" action="/admin/audit" data-auto-submit="1">
         <label class="field audit-q">
           <span class="lbl">{t("audit.search")}</span>
           <input type="search" name="q" value={filters.q} placeholder={t("audit.searchPlaceholder")}
@@ -251,7 +261,8 @@ export function AuditLogPage(props: Common & {
           <button class="btn sm secondary" type="submit">{t("audit.apply")}</button>
           <a class="filter-clear" href="/admin/audit">{t("audit.clear")}</a>
         </div>
-      </form>
+        </form>
+      </details>
 
       {chips.length > 0 && (
         <div class="filter-chips" aria-label={t("dash.activeFilters")}>
