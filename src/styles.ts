@@ -228,6 +228,9 @@ th .sort-ind { font-size: 11px; }
 /* Admin tables keep their Edit/Delete buttons on one line; on phones the
    self-edit note is allowed to wrap inside the pinned action column. */
 .admin-tbl .row-actions { white-space: nowrap; }
+/* A full name is one value: keep it on one line and let the wrapper scroll
+   rather than stack the words into a column of syllables. */
+.admin-tbl .cell-name { white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--row-hover); }
 .muted { color: var(--muted); }

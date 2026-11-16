@@ -236,7 +236,7 @@ export function AdminUsersPage(props: UsersProps) {
                     <span class="badge" style="margin-left:6px" title={t("adm.selfEdit")}>{t("adm.you")}</span>
                   )}
                 </td>
-                <td class={u.display_name ? undefined : "muted"} data-label={t("profile.displayName")}>
+                <td class={`cell-name${u.display_name ? "" : " muted"}`} data-label={t("profile.displayName")}>
                   {u.display_name || "—"}
                 </td>
                 <td data-label={t("nav.roles")}>{localizedRoleNames(u.role_names, lang) || "—"}</td>
