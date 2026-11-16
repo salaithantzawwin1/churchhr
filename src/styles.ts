@@ -3314,6 +3314,37 @@ label.field.assign-priority {
   .timeline-item { padding-left: 16px; }
 }
 
+/* Report detail head: the status chip and the who/when/where line sit under the
+   title, so the facts grid is free to hold only the report's timestamps. */
+.report-head-main { min-width: 0; }
+.report-head h1 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.report-head h1 .badge { font-size: 12px; font-weight: 600; padding: 3px 10px; }
+.report-byline {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  margin: 6px 0 0; font-size: 13px; color: var(--muted);
+}
+.report-byline .sep { color: var(--line-strong); }
+/* Three fixed columns turn six facts into two clean rows (the auto-fit grid
+   left STATUS alone on a second row) and drop the per-item dividers that ended
+   at different lengths instead of closing the row. */
+.detail-grid.report-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; }
+.detail-grid.report-facts .detail-item { border-bottom: 0; padding: 6px 0 12px; }
+.report-tz { margin: 2px 0 0; }
+@media (max-width: 760px) {
+  .detail-grid.report-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .detail-grid.report-facts { grid-template-columns: 1fr; }
+  .report-head h1 { font-size: 19px; }
+  /* Four header buttons do not fit one 390px row: pair them two-by-two with
+     full-width tap targets instead of squeezing the labels. */
+  .report-head .actions { gap: 8px; }
+  .report-head .actions .btn,
+  .report-head .actions form { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .report-head .actions form .btn { width: 100%; }
+  .report-head .actions .btn { min-height: 44px; padding: 9px 10px; font-size: 13.5px; }
+}
+
 /* ---------- reports: review flag, drafts ---------- */
 .review-flag {
   display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px;

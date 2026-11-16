@@ -693,6 +693,7 @@ export const KO: Record<string, string> = {
   "rep.createdAt": "제출 시각",
   "rep.updatedAt": "수정 시각",
   "rep.review": "검토",
+  "rep.timezone": "시각은 미얀마 시간(UTC+6:30) 기준입니다.",
   "rep.reviewHint": "메모를 남기고 이 보고서를 검토 완료로 표시하세요.",
   "rep.reviewAction": "검토 완료로 표시",
   "rep.reviewUpdate": "검토 수정",

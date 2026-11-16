@@ -128,6 +128,9 @@ export function ReportsListPage(props: Common & {
     from, to, scope: withTeam ? "team" : null, status: status || null,
     author: withTeam && authorId ? String(authorId) : null,
   });
+  // The detail page's back button returns to this exact filtered view instead
+  // of the unfiltered list.
+  const listHref = `/reports${linkQs(range.from, range.to)}`;
   const needsReviewHref = `/reports${qs({
     from: range.from, to: range.to, scope: team ? "team" : null, status: "submitted",
     author: team && authorId ? String(authorId) : null,
@@ -251,7 +254,7 @@ export function ReportsListPage(props: Common & {
                 <tr>
                   <td class="report-date" data-label={t("rep.date")}>{r.report_date}</td>
                   <td class="cell-wrap report-title" data-label={t("rep.titleField")}>
-                    <a href={`/reports/${r.id}`}>{r.title}</a>
+                    <a href={`/reports/${r.id}${qs({ back: listHref })}`}>{r.title}</a>
                   </td>
                   <td data-label={t("rep.state")}>{stateName(r, L)}</td>
                   <td data-label={t("rep.township")}>{r.township ?? ""}</td>
@@ -390,20 +393,21 @@ export function ReportDetailPage(props: Common & {
   canDelete?: boolean;
   edits?: ReportEdit[];
   regionNames?: Record<number, string>;
+  /** The filtered list this page was opened from, used by the back button. */
+  backHref?: string;
 }) {
   const {
     user, perms, flash, lang, report: r, canCreate, canReview, canEdit = false, canDelete = false,
-    edits = [], regionNames = {},
+    edits = [], regionNames = {}, backHref = "/reports",
   } = props;
   const L = lang ?? "en";
   const t = getDict(L);
+  // Date, place and author sit under the title, so the grid only carries the
+  // timestamps that belong to the report's lifecycle.
   const facts: [string, string][] = [
     [t("rep.date"), r.report_date],
-    [t("rep.state"), stateName(r, L)],
-    [t("rep.township"), r.township ?? ""],
-    [t("rep.author"), r.author_name],
     [t("rep.createdAt"), stamp(r.created_at)],
-    [t("rep.status"), statusLabel(t, r.status)],
+    [t("rep.updatedAt"), stamp(r.updated_at)],
   ];
   if (r.reviewer_name) facts.push([t("rep.reviewer"), r.reviewer_name]);
   if (r.reviewed_at) facts.push([t("rep.reviewedAt"), stamp(r.reviewed_at)]);
@@ -415,18 +419,31 @@ export function ReportDetailPage(props: Common & {
   const hasCounts = counts.some(([, value]) => value !== "");
   return (
     <Layout title={r.title} lang={lang} user={user} perms={perms} active="/reports" flash={flash ?? null}>
-      <div class="page-head">
-        <h1>
-          {r.title}
-          <span class="count-pill">{r.report_date}</span>
-        </h1>
+      <div class="page-head report-head">
+        <div class="report-head-main">
+          <h1>
+            {r.title}
+            <span class={`badge${r.status === "reviewed" ? " active" : r.status === "submitted" ? " warn" : ""}`}>
+              {statusLabel(t, r.status)}
+            </span>
+          </h1>
+          <p class="report-byline">
+            <span>{r.report_date}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span>{stateName(r, L)}{r.township ? ` · ${r.township}` : ""}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <span>{r.author_name}</span>
+          </p>
+        </div>
         <div class="actions" style="margin:0">
-          <a class="btn secondary" href="/reports">{t("rep.backToList")}</a>
-          {canEdit && <a class="btn secondary" href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>}
-          {canCreate && <a class="btn" href="/reports/new">{t("rep.new")}</a>}
+          <a class="btn secondary" href={backHref}>{t("rep.backToList")}</a>
+          {canEdit && (
+            <a class={`btn${canReview ? " secondary" : ""}`} href={`/reports/${r.id}/edit`}>{t("rep.edit")}</a>
+          )}
+          {canCreate && <a class="btn secondary" href="/reports/new">{t("rep.new")}</a>}
           {canDelete && (
             <form method="post" action={`/reports/${r.id}/delete`} data-confirm={t("rep.confirmDelete")}>
-              <button class="btn danger" type="submit">{t("members.delete")}</button>
+              <button class="btn outline-danger" type="submit">{t("members.delete")}</button>
             </form>
           )}
         </div>
@@ -444,9 +461,34 @@ export function ReportDetailPage(props: Common & {
         </div>
       )}
 
+      {/* Reviewers act here first: the panel sits above the report, so the note
+          and the review button are on screen without scrolling. */}
+      {canReview ? (
+        <div class="card detail-card review-panel">
+          <h2>{t("rep.review")}</h2>
+          <p class="muted small">{t("rep.reviewHint")}</p>
+          <form method="post" action={`/reports/${r.id}/review`}>
+            <label class="field">
+              <span class="lbl">{t("rep.reviewNote")}</span>
+              <textarea name="review_note" maxLength={1000} style="min-height:100px">{r.review_note ?? ""}</textarea>
+            </label>
+            <div class="actions">
+              <button class="btn" type="submit">
+                {r.status === "reviewed" ? t("rep.reviewUpdate") : t("rep.reviewAction")}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : r.review_note ? (
+        <div class="card detail-card">
+          <h2>{t("rep.reviewNote")}</h2>
+          <div class="report-body">{r.review_note}</div>
+        </div>
+      ) : null}
+
       <div class="card detail-card">
         <h2>{t("rep.details")}</h2>
-        <div class="detail-grid">
+        <div class="detail-grid report-facts">
           {facts.map(([label, value]) => (
             <div class="detail-item">
               <span class="k">{label}</span>
@@ -454,6 +496,7 @@ export function ReportDetailPage(props: Common & {
             </div>
           ))}
         </div>
+        <p class="muted small report-tz">{t("rep.timezone")}</p>
       </div>
 
       <div class="card detail-card">
@@ -496,30 +539,7 @@ export function ReportDetailPage(props: Common & {
         </div>
       )}
 
-      {canReview ? (
-        <div class="card detail-card">
-          <h2>{t("rep.review")}</h2>
-          <p class="muted small">{t("rep.reviewHint")}</p>
-          <form method="post" action={`/reports/${r.id}/review`}>
-            <label class="field">
-              <span class="lbl">{t("rep.reviewNote")}</span>
-              <textarea name="review_note" maxLength={1000} style="min-height:100px">{r.review_note ?? ""}</textarea>
-            </label>
-            <div class="actions">
-              <button class="btn" type="submit">
-                {r.status === "reviewed" ? t("rep.reviewUpdate") : t("rep.reviewAction")}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : r.review_note ? (
-        <div class="card detail-card">
-          <h2>{t("rep.reviewNote")}</h2>
-          <div class="report-body">{r.review_note}</div>
-        </div>
-      ) : null}
-
-      {edits.length > 0 && (
+{edits.length > 0 && (
         <div class="card detail-card">
           <h2>{t("rep.history")}</h2>
           <p class="muted small">{t("rep.historyHint")}</p>
@@ -567,7 +587,6 @@ export function ReportDetailPage(props: Common & {
         </div>
       )}
 
-      <p class="muted small">{t("rep.updatedAt")}: {stamp(r.updated_at)}</p>
     </Layout>
   );
 }

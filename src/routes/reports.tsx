@@ -718,6 +718,12 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
   for (const row of regionRows) {
     regionNames[row.id] = lang !== "mm" && row.nameEn ? row.nameEn : row.name;
   }
+  // The list passes its own filtered URL so the back button restores the range,
+  // scope, status and author instead of dropping back to the unfiltered list.
+  // Only paths inside /reports are accepted, so the parameter cannot be used as
+  // an open redirect.
+  const backParam = c.req.query("back") ?? "";
+  const backHref = backParam.startsWith("/reports") ? backParam : "/reports";
 
   return c.html(
     <ReportDetailPage
@@ -730,7 +736,7 @@ reportsRoutes.get("/:id", requirePermission("reports.view"), async (c) => {
         (perms.has("reports.delete") && inScope)
       }
       canReview={perms.has("reports.review") && inScope}
-      edits={editRows} regionNames={regionNames}
+      edits={editRows} regionNames={regionNames} backHref={backHref}
     />,
   );
 });
