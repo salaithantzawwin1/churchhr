@@ -52,9 +52,13 @@ const ENTITY_KEYS: Record<string, string> = {
   trash: "audit.e.trash",
 };
 
-/** An action prefix is usually the record type, except sign-ins: they are
- *  written as login.success but belong to the session entity. */
-const PREFIX_ENTITY: Record<string, string> = { login: "session" };
+/** Action prefixes that are not record types: sign-ins are written under
+ *  login.* and sign-outs under session.*, so each gets its own filter name
+ *  instead of both reading as the session entity. */
+const ACTION_GROUP_LABELS: Record<string, string> = {
+  login: "audit.g.signins",
+  session: "audit.g.signouts",
+};
 
 const VERB_KEYS: Record<string, string> = {
   create: "audit.v.create",
@@ -156,13 +160,14 @@ export function AuditLogPage(props: Common & {
   // spaced out (regional_church → Regional church) when it has none.
   const humanize = (key: string) => key.replace(/[_-]+/g, " ").replace(/^./, (ch) => ch.toUpperCase());
   const entityLabel = (key: string) => (ENTITY_KEYS[key] ? t(ENTITY_KEYS[key]!) : humanize(key));
-  const actionGroupLabel = (key: string) => entityLabel(PREFIX_ENTITY[key] ?? key);
+  const actionGroupLabel = (key: string) =>
+    ACTION_GROUP_LABELS[key] ? t(ACTION_GROUP_LABELS[key]!) : entityLabel(key);
 
   // Offer only action groups that name a record type. "admin" and
   // "organization" are left over from routes the classifier never matched; their
   // rows stay reachable through the entity filter. A group that is already
   // filtering stays in the list so the select agrees with the URL.
-  const actionOptions = actionGroups.filter((group) => ENTITY_KEYS[PREFIX_ENTITY[group] ?? group]);
+  const actionOptions = actionGroups.filter((group) => ACTION_GROUP_LABELS[group] || ENTITY_KEYS[group]);
   if (filters.action && !actionOptions.includes(filters.action)) actionOptions.push(filters.action);
 
   // Prefix each chip with its own filter name: a household filter and a

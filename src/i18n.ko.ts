@@ -1113,6 +1113,8 @@ export const KO: Record<string, string> = {
   "audit.e.fellowship": "친교 모임",
   "audit.e.group": "그룹",
   "audit.e.session": "로그인",
+  "audit.g.signins": "로그인",
+  "audit.g.signouts": "로그아웃",
   "audit.e.account": "계정",
   "audit.e.trash": "휴지통",
   "audit.v.create": "생성",
