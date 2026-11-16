@@ -16,6 +16,7 @@ import { isDefinedForScope, isPastorPositionCode, loadPositionDefs, positionDefL
 import { recordPositionHistory } from "../position-history";
 import { loadRegionalChurches, loadSupervisionClusters } from "../org-units";
 import { loadDepartments } from "../departments";
+import { parsePhoto } from "../photo";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
 function multi(v: unknown): string[] {
@@ -1022,34 +1023,6 @@ function inScope(row: { region_id: number; home_cell_id?: number | null }, scope
   return true;
 }
 
-/** Client-side canvas output is small; keep a hard cap on what reaches D1. */
-const MAX_PHOTO_BYTES = 400 * 1024;
-
-type PhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
-
-/** Reads the hidden photo_data field produced by the browser resizer. */
-function parsePhoto(body: Record<string, unknown>): PhotoInput {
-  const remove = s(body.photo_remove) === "1";
-  if (remove) return { bytes: null, touched: true, error: null };
-  const raw = s(body.photo_data);
-  if (!raw) return { bytes: null, touched: false, error: null };
-  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
-  if (!match) return { bytes: null, touched: true, error: msg("photo.badType") };
-  let bytes: Uint8Array;
-  try {
-    const bin = atob(match[1]!.replace(/\s+/g, ""));
-    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
-  } catch {
-    return { bytes: null, touched: true, error: msg("photo.badType") };
-  }
-  if (bytes.length > MAX_PHOTO_BYTES) return { bytes: null, touched: true, error: msg("photo.tooLarge") };
-  const webp = bytes.length >= 12 &&
-    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
-  if (!webp) return { bytes: null, touched: true, error: msg("photo.badType") };
-  return { bytes, touched: true, error: null };
-}
-
 async function savePhoto(db: DB, id: number, bytes: Uint8Array | null): Promise<void> {
   // D1 binds ArrayBuffer for BLOB values (a bare Uint8Array is not portable).
   const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
@@ -1165,7 +1138,7 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
   const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
-  const photo = parsePhoto(body);
+  const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
   const render = (status: 400 | 200) =>
     c.html(
@@ -1690,7 +1663,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
   const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
-  const photo = parsePhoto(body);
+  const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
   if (!data || photo.error) {
     const formProps = {

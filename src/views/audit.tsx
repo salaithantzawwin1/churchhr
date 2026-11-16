@@ -48,6 +48,9 @@ const ENTITY_KEYS: Record<string, string> = {
   fellowship: "audit.e.fellowship",
   group: "audit.e.group",
   session: "audit.e.session",
+  // Sign-ins are written as login.* but stored under the session entity; the
+  // action prefix is what the row shows, so it needs a name of its own.
+  login: "audit.g.signins",
   account: "audit.e.account",
   trash: "audit.e.trash",
 };
