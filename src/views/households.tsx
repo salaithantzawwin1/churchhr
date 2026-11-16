@@ -377,34 +377,38 @@ export function HouseholdDetailPage(props: Common & {
 
       <div class="hh-detail-grid">
         <section class="card hh-panel">
-          <div class="hh-panel-head">
-            <h2>{t("hh.cardHeading")}</h2>
-            {props.photoUrl && <img class="hh-photo" src={props.photoUrl} alt={family.name} loading="lazy" />}
-          </div>
-          <div class="hh-facts">
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("hh.head")}</span>
-              <span class="hh-fact-value">
-                {headName
-                  ? (family.head_member_id ? <a href={`/members/${family.head_member_id}`}>{headName}</a> : headName)
-                  : "—"}
-              </span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("detail.state")}</span>
-              <span class="hh-fact-value">{stateName}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("hh.townshipLabel")}</span>
-              <span class="hh-fact-value">{family.township || "—"}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("form.homeCell")}</span>
-              <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("detail.familyGroup")}</span>
-              <span class="hh-fact-value">{optionLabel(family.family_group_code, family.family_group_label) || "—"}</span>
+          <h2>{t("hh.cardHeading")}</h2>
+          {/* The stored photo is a 500×500 square, so a square frame shows it
+              whole — a portrait, a group or a landscape shot alike. */}
+          <div class={props.photoUrl ? "hh-summary has-photo" : "hh-summary"}>
+            {props.photoUrl && (
+              <img class="hh-photo" src={props.photoUrl} alt={family.name} loading="lazy" />
+            )}
+            <div class="hh-facts">
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("hh.head")}</span>
+                <span class="hh-fact-value">
+                  {headName
+                    ? (family.head_member_id ? <a href={`/members/${family.head_member_id}`}>{headName}</a> : headName)
+                    : "—"}
+                </span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("detail.state")}</span>
+                <span class="hh-fact-value">{stateName}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("hh.townshipLabel")}</span>
+                <span class="hh-fact-value">{family.township || "—"}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("form.homeCell")}</span>
+                <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("detail.familyGroup")}</span>
+                <span class="hh-fact-value">{optionLabel(family.family_group_code, family.family_group_label) || "—"}</span>
+              </div>
             </div>
           </div>
         </section>

@@ -1505,15 +1505,14 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .hh-avatar img { width: 100%; height: 100%; object-fit: cover; }
 /* Family photo on the household detail card. Every stored photo is a 500×500
    square (the browser centre-crops before upload), so a square frame shows the
-   whole picture for a portrait, a group or a landscape shot alike. The frame is
-   a thumbnail beside the heading, not a banner: a wide frame would cut the top
-   and bottom off every photo. */
-.hh-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin: 0 0 12px; }
-.hh-panel-head h2 { margin-bottom: 0; }
+   whole picture for a portrait, a group or a landscape shot alike; contain keeps
+   an unexpected shape uncropped inside the frame. */
+.hh-summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.hh-summary.has-photo { grid-template-columns: 216px minmax(0, 1fr); }
 .hh-photo {
-  flex: none; display: block; width: 124px; height: 124px; object-fit: cover;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--chip-bg);
+  display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain;
+  background: var(--chip-bg); border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 .hh-photo-field .photo-preview { border-radius: var(--radius); }
 /* In a modal the picker has to earn its height: a smaller preview and no
@@ -1521,8 +1520,9 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .modal-body .hh-photo-field { gap: 12px; padding-bottom: 12px; margin-bottom: 12px; }
 .modal-body .hh-photo-field .photo-preview { width: 68px; height: 68px; font-size: 24px; }
 .modal-body .hh-photo-field .hint { display: none; }
-@media (max-width: 480px) {
-  .hh-photo { width: 96px; height: 96px; }
+@media (max-width: 720px) {
+  .hh-summary.has-photo { grid-template-columns: 1fr; }
+  .hh-photo { max-width: 260px; margin: 0 auto; }
 }
 .hh-card-name {
   display: block; color: var(--ink); font-size: 16px; font-weight: 600;

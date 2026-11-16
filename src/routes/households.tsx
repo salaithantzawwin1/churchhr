@@ -428,6 +428,7 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
   if (photo.touched) await savePhoto(db, familyId, photo.bytes);
+  c.set("auditNote", { summary: data.name });
 
   if (head) {
     const now = Math.floor(Date.now() / 1000);
@@ -599,6 +600,11 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
     db, id, data.region_id, homeCellId, placement.familyGroupId, groupId, allOptions,
   );
   if (photo.touched) await savePhoto(db, id, photo.bytes);
+  // The edit form saves the photo too, so the route says which kind of save
+  // this was; the trail keeps "household.photo" apart from "household.update".
+  c.set("auditNote", photo.touched
+    ? { action: "household.photo", summary: data.name }
+    : { summary: data.name });
   const next = `/admin/households/${id}?ok=hh.updated`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
@@ -615,6 +621,8 @@ householdsRoutes.post("/:id/delete", requirePermission("members.delete"), async 
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  // Read before the row goes: the trail names the household that was removed.
+  c.set("auditNote", { summary: row.name });
   await db.update(members).set({ householdId: null, relationship: "" }).where(eq(members.householdId, id));
   await db.delete(families).where(eq(families.id, id));
   return c.redirect("/admin/households?ok=hh.deleted", 302);
@@ -696,6 +704,11 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  // Adding a member is a household change; the URL alone would be classified
+  // as an admin.* mutation instead.
+  c.set("auditNote", {
+    action: "household.update", entity: "household", entityId: String(id), summary: family.name,
+  });
   const body = await c.req.parseBody();
   const relationship = s(body.relationship);
   const rel = (RELATIONSHIPS as readonly string[]).includes(relationship) ? relationship : "other";
@@ -823,6 +836,7 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  c.set("auditNote", { summary: family.name });
   const body = await c.req.parseBody();
   const memberId = intParam(s(body.member_id));
   const rel = s(body.relationship);
@@ -895,6 +909,7 @@ householdsRoutes.post("/:id/detach", requirePermission("members.update"), async 
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  c.set("auditNote", { summary: family.name });
   const body = await c.req.parseBody();
   const memberId = intParam(s(body.member_id));
   if (!memberId) return c.redirect(`/admin/households/${id}?err=hh.noMember`, 302);

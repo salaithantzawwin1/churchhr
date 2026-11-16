@@ -1,3 +1,4 @@
+import type { AuditNote } from "./audit";
 import type { Lang } from "./i18n";
 import type { SessionUser } from "./session";
 
@@ -18,5 +19,7 @@ export type AppEnv = {
     stateIds: number[];
     /** Home Cells the account's member list is limited to (empty = no limit). */
     homeCellIds: number[];
+    /** Set by a route that knows more than the URL says (see src/audit.ts). */
+    auditNote: AuditNote | undefined;
   };
 };
