@@ -149,6 +149,14 @@ a { color: var(--link); }
 }
 .topbar .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .topbar .who form { margin: 0; }
+/* A phone cannot fit the theme button, three languages, the name and Sign Out
+   on one line; tighten the gaps and cut the name short rather than let the
+   topbar make the whole page scroll sideways. */
+@media (max-width: 560px) {
+  .topbar .who { gap: 6px; }
+  .topbar .who-link { max-width: 88px; padding: 4px; }
+  .topbar .langswitch a { padding: 0 5px; }
+}
 .container { max-width: 1100px; margin: 22px auto; padding: 0 16px; }
 .footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 26px 10px 34px; }
 .card {
@@ -2231,7 +2239,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 
 /* ---------- supervision + regional cards on the organization page ---------- */
 .org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--field-bg); border: 1px dashed var(--line); }
-.org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+.org-supervision-title { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
 .org-supervision .org-mini-list { margin: 0; }
 .org-unassigned { margin-top: 4px; }
 
@@ -2334,7 +2342,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
   color: inherit; text-decoration: none; font-size: 13px;
 }
 .hc-cell-btn-name { font-weight: 600; color: var(--link); }
-.hc-cell-btn-meta { font-size: 11.5px; color: var(--muted); }
+.hc-cell-btn-meta { font-size: 12px; color: var(--muted); }
 .hc-cell-btn-fill .org-fill-track { width: 40px; height: 4px; }
 a.hc-cell-btn:hover { border-color: var(--brand); }
 a.hc-cell-btn.is-active { border-color: var(--brand); background: var(--chip-brand-bg); }
@@ -2350,14 +2358,21 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-fill-track { display: block; width: 52px; height: 5px; border-radius: 999px; background: var(--field-bg); overflow: hidden; }
 .org-fill-bar { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
 .org-fill-bar.is-full { background: var(--ok-ink); }
-.org-fill-text { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.org-fill-text { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .org-fill-text b { color: var(--ink); font-weight: 700; }
-.hc-cell-btn-fill { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.hc-cell-btn-fill { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 12px; }
 .hc-cell-btn-fill b { color: var(--ink); font-weight: 700; }
 .hc-cell-btn-fill-text { white-space: nowrap; }
 /* A vacant role row is the action: it opens the assign dialog for this cell. */
-.org-tree-action { color: inherit; text-decoration: none; cursor: pointer; }
+.org-tree-action { color: inherit; text-decoration: none; cursor: pointer; position: relative; padding-right: 30px; }
+.org-tree-action::after {
+  content: "→"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 13px; transition: transform .15s ease, color .15s ease;
+}
 .org-tree-action:hover { border-color: var(--link); background: var(--chip-brand-bg); }
+.org-tree-action:hover::after, .org-tree-action:focus-visible::after {
+  color: var(--link); transform: translateY(-50%) translateX(2px);
+}
 .org-tree-action:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hc-cell-select-label { display: grid; gap: 4px; max-width: 340px; }
 .hc-cell-select-label select { width: 100%; }
@@ -2448,7 +2463,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: var(--row-alt, rgba(15,23,42,.025)); font-size: 12.5px; line-height: 1.45;
 }
-.org-tree-role .org-role-label { font-size: 10.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.org-tree-role .org-role-label { font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
 .org-tree-role a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .org-tree-role a:hover { color: var(--link); text-decoration: underline; }
 .org-tree-node.is-lead > .org-tree-role { border-color: var(--brand); background: var(--chip-brand-bg); }
@@ -2484,6 +2499,13 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-flow-cluster-name { margin: 2px 0 0; font-size: 15px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .org-flow-cluster-meta { display: flex; align-items: center; gap: 8px; flex: none; }
 .org-flow-chev { color: var(--muted); font-size: 12px; line-height: 1; transition: transform .15s ease; }
+/* On a phone the meta row (bar, counts, chevron) used to squeeze the cluster
+   name into a 56px column: give the name its own line and the meta the next. */
+@media (max-width: 420px) {
+  .org-flow-cluster-head { flex-wrap: wrap; }
+  .org-flow-cluster-title { flex: 1 1 100%; }
+  .org-flow-cluster-meta { flex: 1 1 100%; justify-content: space-between; }
+}
 .org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
 /* An open cluster takes the whole row, so its supervisor and Home Cells read as
    one structure instead of a narrow column with empty space beside it. */
@@ -2603,7 +2625,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-node-action:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 .org-node-lead { width: 240px; }
 .org-node-role {
-  color: var(--muted); font-size: 10.5px; font-weight: 650; letter-spacing: .045em;
+  color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: .04em;
   line-height: 1.45; text-transform: uppercase;
 }
 .org-node-name {

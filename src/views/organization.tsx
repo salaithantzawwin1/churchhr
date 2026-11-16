@@ -613,15 +613,30 @@ export function OrganizationPage(props: Common & {
     );
   };
 
-  const renderPersonNode = (role: string, leader: OrgLeader | null, size: "lg" | "md" | "sm", lead = false) => (
-    <div class={`org-node${lead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`}>
-      <LeaderAvatar leader={leader} size={size} />
-      <span class="org-node-role">{role}</span>
-      <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
-    </div>
-  );
+  // A vacant supervision slot is actionable: it opens the vacancy report for its
+  // scope, which lists the same gap together with the way to fill it, so the
+  // tree is never a dead end. A filled slot keeps linking to the person.
+  const renderPersonNode = (role: string, leader: OrgLeader | null, size: "lg" | "md" | "sm", lead = false, vacantHref?: string) => {
+    const cls = `org-node${lead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`;
+    const body = (
+      <>
+        <LeaderAvatar leader={leader} size={size} />
+        <span class="org-node-role">{role}</span>
+        <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+      </>
+    );
+    if (!leader && vacantHref) {
+      return (
+        <a class={`${cls} org-node-action`} href={vacantHref}
+          aria-label={`${t("org.assignLeader")} · ${role}`}>{body}</a>
+      );
+    }
+    return <div class={cls}>{body}</div>;
+  };
 
-  const renderSupervisionGroup = (group: SupervisionGroup) => {
+  // defaultOpen: the first cluster is drawn open, so the page shows the
+  // structure it is about instead of a row of collapsed cards.
+  const renderSupervisionGroup = (group: SupervisionGroup, defaultOpen = false) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
       ? clusterRole(group.id, position)
@@ -640,9 +655,12 @@ export function OrganizationPage(props: Common & {
     const rolesPercent = rolesAll === 0 ? 0 : Math.round((rolesFilled / rolesAll) * 100);
     // Stable card identity: the client swaps this card after a save.
     const clusterKey = group.kind === "cluster" ? `cluster:${group.id}` : `township:${group.id ?? "none"}`;
+    // The vacancy report is scoped the same way the group is.
+    const vacantHref = `/organization/vacancies?scope=${group.kind === "cluster" ? "cluster" : "township"}`;
+    const isOpen = openCell != null || (defaultOpen && !selectedCellId);
     return (
       <details class={`org-flow-cluster${openCell ? " is-active" : ""}`}
-        open={openCell != null} data-cluster-key={clusterKey}>
+        open={isOpen} data-cluster-key={clusterKey}>
         <summary class="org-flow-cluster-head">
           <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
@@ -666,18 +684,18 @@ export function OrganizationPage(props: Common & {
               beside the others with no line between them. */}
           <div class="org-branch org-flow-tree">
             <div class="org-flow-pastor">
-              {renderPersonNode(t("org.clusterPastor"), pastor, "md", true)}
+              {renderPersonNode(t("org.clusterPastor"), pastor, "md", true, vacantHref)}
             </div>
             {(supervisor || assistants.length > 0) && (
               <div class="org-branch-kids org-flow-team">
                 {supervisor && (
                   <div class="org-branch">
-                    {renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
+                    {renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true, vacantHref)}
                   </div>
                 )}
                 {assistants.map((def) => (
                   <div class="org-branch">
-                    {renderPersonNode(positionDefLabel(def, L), role(def.code), "sm")}
+                    {renderPersonNode(positionDefLabel(def, L), role(def.code), "sm", false, vacantHref)}
                   </div>
                 ))}
               </div>
@@ -857,14 +875,15 @@ export function OrganizationPage(props: Common & {
             {countLabel(t, "org.cells", state.cells.length)} · {countLabel(t, "org.membersShort", stateMembers)}
           </span>
         </div>
-        {[...churchGroups.values()].map((churchGroup) => (
+        {[...churchGroups.values()].map((churchGroup, churchIndex) => (
           <div class="org-church-block">
             <div class="org-church-block-head">
               <h3>{churchGroup.name}</h3>
               <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
             </div>
             <div class="org-flow-clusters">
-              {supervisionGroups(churchGroup.cells, clusters, L).map(renderSupervisionGroup)}
+              {supervisionGroups(churchGroup.cells, clusters, L)
+                .map((group, groupIndex) => renderSupervisionGroup(group, churchIndex === 0 && groupIndex === 0))}
             </div>
           </div>
         ))}
@@ -882,7 +901,7 @@ export function OrganizationPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs tabs-wrap">
+        <nav class="tabs" aria-label={t("nav.organization")}>
           <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
           <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization?tab=church"
@@ -893,7 +912,7 @@ export function OrganizationPage(props: Common & {
             aria-current={tab === "home-cells" ? "page" : undefined}>{t("org.cellsTab")}</a>
           <a class={`btn sm ${tab === "family-groups" ? "" : "secondary"}`} href="/organization?tab=family-groups"
             aria-current={tab === "family-groups" ? "page" : undefined}>{t("org.fgTab")}</a>
-        </div>
+        </nav>
       </div>
 
       <div class="stat-grid org-stats">
