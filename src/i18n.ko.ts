@@ -493,7 +493,7 @@ export const KO: Record<string, string> = {
   "adm.copy": "복사",
   "adm.copied": "복사됨",
   "adm.resetFor": "임시 비밀번호 대상:",
-  "adm.resetOnce": "한 번만 표시됩니다 — 지금 복사해 계정 사용자에게 전달하세요. 다음 로그인 시 본인이 새 비밀번호를 설정해야 합니다.",
+  "adm.resetOnce": "한 번만 표시됩니다 — 지금 복사해 계정 사용자에게 전달하세요. 다음 로그인 시 본인이 새 비밀번호를 설정해야 하며, 로그인된 다른 기기에서는 로그아웃됩니다.",
   "adm.errResetSelf": "내 비밀번호는 여기에서 재설정할 수 없습니다 — 프로필 페이지에서 변경하세요.",
   "adm.selfEdit": "(내 계정은 수정할 수 없습니다)",
   "adm.createHeading": "새 계정 만들기",
