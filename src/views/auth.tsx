@@ -100,11 +100,13 @@ export function LoginPage({ error, username, lang, flash, remember, branding }: 
 
 export function ProfilePage({
   username,
+  displayName,
   mustChange,
   flash,
   lang,
 }: {
   username: string;
+  displayName: string;
   mustChange: boolean;
   flash?: Flash;
   lang?: Lang;
@@ -122,6 +124,18 @@ export function ProfilePage({
             {t("profile.mustChange")}
           </div>
         )}
+        <h2>{t("profile.nameHeading")}</h2>
+        <p class="muted small">{t("profile.nameHint")}</p>
+        <form method="post" action="/profile/name">
+          <div class="field">
+            <label class="lbl" for="display_name">{t("profile.displayName")}</label>
+            <input type="text" name="display_name" id="display_name" value={displayName}
+              maxlength={80} autocomplete="name" placeholder={t("profile.namePlaceholder")} />
+          </div>
+          <div class="actions">
+            <button class="btn secondary" type="submit">{t("profile.saveName")}</button>
+          </div>
+        </form>
         <h2>{t("profile.changePassword")}</h2>
         <form method="post" action="/profile">
           <div class="field">

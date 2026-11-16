@@ -211,20 +211,38 @@ profileRoutes.post("/logout", async (c) => {
   return c.redirect("/login", 302);
 });
 
-profileRoutes.get("/profile", (c) => {
+profileRoutes.get("/profile", async (c) => {
   const user = c.get("user");
   const t = getDict(c.get("lang"));
   const q = c.req.query();
+  const db = getDb(c.env);
+  const [own] = await db.select({ displayName: users.displayName }).from(users)
+    .where(eq(users.id, user.id)).limit(1);
   let flash: Flash = null;
-  if (q.ok) flash = { kind: "ok", text: t("profile.changed") };
+  if (q.ok === "name") flash = { kind: "ok", text: t("profile.nameSaved") };
+  else if (q.err === "name") flash = { kind: "err", text: t("profile.nameTooLong") };
+  else if (q.ok) flash = { kind: "ok", text: t("profile.changed") };
   else if (q.msg === "change") flash = { kind: "warn", text: t("profile.mustChange") };
   else if (q.err === "wrong") flash = { kind: "err", text: t("profile.errWrong") };
   else if (q.err === "weak") flash = { kind: "err", text: t("profile.errWeak") };
   else if (q.err === "policy") flash = { kind: "err", text: `${t("profile.errPolicy")}` };
   else if (q.err === "mismatch") flash = { kind: "err", text: t("profile.errMismatch") };
   return c.html(
-    <ProfilePage username={user.username} mustChange={user.mustChangePassword} flash={flash} lang={c.get("lang")} />,
+    <ProfilePage username={user.username} displayName={own?.displayName ?? ""}
+      mustChange={user.mustChangePassword} flash={flash} lang={c.get("lang")} />,
   );
+});
+
+/** Anyone may rename themselves: the byline and the review credit prefer this
+ * name over the login handle, while admin edits cover other accounts. */
+profileRoutes.post("/profile/name", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.parseBody();
+  const name = String(body.display_name ?? "").trim();
+  if (name.length > 80) return c.redirect("/profile?err=name", 302);
+  const db = getDb(c.env);
+  await db.update(users).set({ displayName: name }).where(eq(users.id, user.id));
+  return c.redirect("/profile?ok=name", 302);
 });
 
 profileRoutes.post("/profile", async (c) => {
