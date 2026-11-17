@@ -2024,6 +2024,20 @@
     }, 5000);
   })();
 
+  // Sticky section headings must clear the real topbar height: on a narrow
+  // phone the nav wraps to three rows, so a hardcoded offset hid the heading.
+  (function syncStickyTop() {
+    var topbar = document.querySelector(".topbar");
+    if (!topbar) return;
+    function update() {
+      var h = Math.ceil(topbar.getBoundingClientRect().height) + 2;
+      document.documentElement.style.setProperty("--sticky-top", h + "px");
+    }
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("load", update);
+  })();
+
   // Home Cell structure reads one cluster at a time: opening a card collapses the
   // others, so two half-filled structures are never side by side. The cluster
   // holding the chosen Home Cell is pinned open so the selection never loses its
@@ -2040,7 +2054,17 @@
   document.addEventListener("toggle", function (e) {
     var el = e.target;
     if (!el || el.tagName !== "DETAILS") return;
-    if (!el.classList || !el.classList.contains("org-flow-cluster")) return;
+    if (!el.classList) return;
+    // Regions & Churches behaves the same way, without a pinned card: one
+    // region open at a time keeps the long team and church lists readable.
+    if (el.classList.contains("org-region-group")) {
+      if (!el.open) return;
+      Array.prototype.forEach.call(document.querySelectorAll("details.org-region-group[open]"), function (other) {
+        if (other !== el) other.open = false;
+      });
+      return;
+    }
+    if (!el.classList.contains("org-flow-cluster")) return;
     var pinned = el.classList.contains("is-active");
     if (!el.open) {
       // Clicking the chosen cluster's header must not hide its structure.

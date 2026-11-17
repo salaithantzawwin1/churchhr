@@ -3729,7 +3729,7 @@ select option { background: var(--surface-2); color: var(--ink); }
    far below the fold, so each card starts collapsed except the first. */
 .org-region-group {
   border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--card); overflow: hidden;
+  background: var(--card); overflow: hidden; overflow: clip;
 }
 .org-region-group > summary {
   display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px;
@@ -3738,6 +3738,12 @@ select option { background: var(--surface-2); color: var(--ink); }
 }
 .org-region-group > summary::-webkit-details-marker { display: none; }
 .org-region-group > summary:hover { background: var(--surface-2); }
+/* The open region's team and church cards are tall; keep its heading in view
+   below the site topbar while scrolling through them. */
+.org-region-group[open] > summary {
+  position: sticky; top: var(--sticky-top); z-index: 4;
+  border-bottom: 1px solid var(--line);
+}
 .org-region-group-head h3 { margin: 0; font-size: 16px; }
 .org-region-group-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
 .org-region-chev { color: var(--muted); font-size: 11px; transition: transform .15s ease; }
