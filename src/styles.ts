@@ -1787,11 +1787,15 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-all-vacancy:hover { border-color: var(--brand); }
 .org-all-vacancy-n { font-size: 24px; font-weight: 700; line-height: 1.1; }
 .org-all-links { display: flex; flex-wrap: wrap; gap: 8px; }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .org-all-grid { grid-template-columns: 1fr; }
   .org-all-vacancy-grid { grid-template-columns: 1fr; }
   .org-all-row { grid-template-columns: 1fr; }
   .org-all-row-team { justify-content: flex-start; }
+}
+@media (max-width: 380px) {
+  .org-all-coverage-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .org-all-coverage-row .org-all-progress { grid-column: 1 / -1; grid-row: 2; }
 }
 /* Main Church sits under its region: keep the regional team visible above the
    church chart instead of making the reader jump to Regions & Churches. */
@@ -3984,4 +3988,25 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 }
 /* The row action names what it does, so it never needs a hidden label. */
 .admin-tbl .row-reset-form .btn { white-space: nowrap; }
+
+/* Phones: the topbar controls and primary links should use the available width
+   instead of stacking into four tall rows. The signed-in name is deliberately
+   ellipsized rather than cut at an arbitrary character. */
+@media (max-width: 560px) {
+  .topbar { padding: 8px 10px; gap: 6px 8px; }
+  .topbar .brand img { width: 30px; height: 30px; }
+  .topbar .who { gap: 4px; margin-left: auto; }
+  .topbar .langswitch { font-size: 11px; padding: 2px; }
+  .topbar .langswitch a { padding: 2px 4px; min-height: 30px; }
+  .topbar .who-link {
+    display: block; flex: 0 0 auto; max-width: 82px; padding: 5px 2px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .topbar .who form .btn { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+  .topbar nav { row-gap: 1px; }
+  .topbar nav a, .topbar nav .nav-admin > summary { padding: 5px 7px; font-size: 12.5px; }
+}
+@media (max-width: 360px) {
+  .topbar .who-link { max-width: 56px; }
+}
 `; // end of stylesheet
