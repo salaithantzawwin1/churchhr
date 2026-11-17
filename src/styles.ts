@@ -1767,10 +1767,13 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-all-coverage-total { color: var(--ink); font-size: 22px; font-weight: 700; }
 .org-all-coverage-list { gap: 7px; }
 .org-all-coverage-row {
-  display: grid; grid-template-columns: minmax(90px, 1fr) minmax(70px, 1.4fr) auto;
+  display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(60px, 1fr) auto;
   align-items: center; gap: 8px;
 }
-.org-all-coverage-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.org-all-coverage-name { min-width: 0; font-size: 12.5px; line-height: 1.3; overflow-wrap: anywhere; }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .org-all-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .org-all-progress {
   width: 100%; height: 7px; appearance: none; border: 0; border-radius: 999px;
   overflow: hidden; background: var(--line); color: var(--brand);

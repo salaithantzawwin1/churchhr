@@ -1069,7 +1069,7 @@ export function OrganizationPage(props: Common & {
       </div>
 
       {tab === "all" ? (
-        <div class="stat-grid org-stats">
+        <div class="stat-grid org-stats org-all-stats">
           <div class="stat"><div class="n">{regions.length}</div><div class="t">{t("org.allRegions")}</div></div>
           <div class="stat"><div class="n">{regionalChurches.length}</div><div class="t">{t("org.churchesTitle")}</div></div>
           <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
