@@ -924,7 +924,7 @@ export function OrganizationPage(props: Common & {
       <div class="page-head org-page-head">
         <div>
           <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span></h1>
-          <p class="page-sub">{t("org.intro")}</p>
+          <p class="page-sub">{tab === "main" ? t("org.mainIntro") : t("org.intro")}</p>
         </div>
       </div>
 
@@ -1187,6 +1187,8 @@ export function OrganizationPage(props: Common & {
         ) : mainChurches.map((church) => {
           const churchCells = cells.filter((c) => c.regional_church_id === church.id);
           const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
+          const mainRegion = regions.find((r) => r.id === church.regionId) ?? null;
+          const regionHref = `/organization?tab=regional${mainRegion ? `&region=${mainRegion.id}` : ""}`;
           return (
             <section class="card org-chart org-main-church">
               <div class="org-section-head">
@@ -1197,6 +1199,7 @@ export function OrganizationPage(props: Common & {
                   </p>
                 </div>
                 <div class="org-section-actions">
+                  <a class="btn secondary sm" href={`/members?church=${church.id}`}>{t("org.viewAllMembers")}</a>
                   {canManagePositions && (
                     <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
                   )}
@@ -1205,6 +1208,39 @@ export function OrganizationPage(props: Common & {
                   )}
                 </div>
               </div>
+              {mainRegion && (
+                <div class="org-main-region">
+                  <div class="org-main-region-head">
+                    <span class="org-mini-role">{t("org.regionTeam")}</span>
+                    <a class="org-card-link" href={regionHref}>
+                      {L !== "mm" && mainRegion.nameEn ? mainRegion.nameEn : mainRegion.name}
+                      <span aria-hidden="true">→</span>
+                    </a>
+                  </div>
+                  <div class="org-main-region-team">
+                    {regionalRows.all.map((def) => {
+                      const team = regionalTeam(mainRegion.id, def.code);
+                      return (
+                        <div class="org-main-region-role">
+                          <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                          {team.length === 0 ? (
+                            <span class="muted small">{t("org.vacant")}</span>
+                          ) : (
+                            <span class="org-main-region-holders">
+                              {team.map((person) => (
+                                <span class="org-mini-person">
+                                  <LeaderAvatar leader={person} size="sm" />
+                                  <LeaderLink leader={person} empty={t("org.vacant")} />
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {renderChurchChart(church, "main")}
               {churchCells.length > 0 && (
                 <details class="org-collapse org-main-cells">

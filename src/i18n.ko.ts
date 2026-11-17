@@ -760,6 +760,8 @@ export const KO: Record<string, string> = {
   "org.churchesTitle": "교회",
   "org.noChurchGroup": "교회 미지정",
   "org.mainChurch": "중앙 교회",
+  "org.mainIntro": "중앙 교회의 리더십과 홈셀을 확인하세요.",
+  "org.viewAllMembers": "전체 성도 보기",
   "org.cellsTab": "홈셀 구조",
   "org.regionalTab": "지역 및 교회",
   "org.mainChurchEmpty": "아직 주 교회가 지정되지 않았습니다. 교회를 만들고 주 교회로 지정하세요.",

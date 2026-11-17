@@ -56,6 +56,8 @@ export type Filters = {
   gender: string;
   status: string;
   homeCell: number | null;
+  /** Filter from a church overview: members whose Home Cell belongs to it. */
+  church: number | null;
   department: number | null;
   group: number | null;
   fellowship: number | null;
@@ -79,6 +81,8 @@ type ListProps = Common & {
   dir: "asc" | "desc";
   regions: { id: number; name: string }[];
   homeCells: OptionRow[];
+  /** Name of the church behind the optional church filter, for its chip. */
+  churchName?: string | null;
   departments: DepartmentRow[];
   groups: OptionRow[];
   fellowships: OptionRow[];
@@ -92,7 +96,7 @@ type ListProps = Common & {
 function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    home_cell: f.homeCell, church: f.church, department: f.department, group: f.group, fellowship: f.fellowship,
     age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
     page: page ?? null,
   });
@@ -100,7 +104,7 @@ function filterQs(f: Filters, page?: number): string {
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing || f.school);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.church || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing || f.school);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -139,7 +143,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs, ageGroups } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, churchName, departments, groups, fellowships, lang, positionDefs, ageGroups } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   // Korean uses the English data labels (region names etc.); only MM differs.
@@ -163,7 +167,7 @@ export function MembersListPage(props: ListProps) {
   /** Current list query, used to build "remove this filter" links. */
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    home_cell: f.homeCell, church: f.church, department: f.department, group: f.group, fellowship: f.fellowship,
     age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
     sort: sort || null, dir: sort ? dir : null,
   };
@@ -186,6 +190,7 @@ export function MembersListPage(props: ListProps) {
     const cell = homeCells.find((o) => o.id === f.homeCell);
     if (cell) chips.push({ label: cell.label, href: withoutFilter("home_cell") });
   }
+  if (f.church) chips.push({ label: churchName ?? t("org.church"), href: withoutFilter("church") });
   if (f.department) {
     const department = departments.find((d) => d.id === f.department);
     if (department) chips.push({ label: departmentName(department, L), href: withoutFilter("department") });
@@ -307,6 +312,7 @@ export function MembersListPage(props: ListProps) {
             <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
           ))}
         </select>
+        {f.church && <input type="hidden" name="church" value={String(f.church)} />}
         {f.familyGroup && <input type="hidden" name="family_group" value={String(f.familyGroup)} />}
         {f.missing && <input type="hidden" name="missing" value={f.missing} />}
         {sort && <input type="hidden" name="sort" value={sort} />}

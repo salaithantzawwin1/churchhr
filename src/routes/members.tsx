@@ -143,6 +143,7 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     gender: q.gender && q.gender in GENDERS ? q.gender : "",
     status: q.status && q.status in STATUSES ? q.status : "",
     homeCell: intParam(q.home_cell),
+    church: intParam(q.church),
     department: intParam(q.department),
     group: intParam(q.group),
     fellowship: intParam(q.fellowship),
@@ -172,6 +173,11 @@ function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: nu
   if (f.gender) cond = sql`${cond} AND m.gender = ${f.gender}`;
   if (f.status) cond = sql`${cond} AND m.status = ${f.status}`;
   if (f.homeCell) cond = sql`${cond} AND m.home_cell_id = ${f.homeCell}`;
+  if (f.church) {
+    cond = sql`${cond} AND m.home_cell_id IN (
+      SELECT id FROM lookup_options
+      WHERE type = 'home_cell' AND active = 1 AND regional_church_id = ${f.church})`;
+  }
   if (f.department) cond = sql`${cond} AND m.department_id = ${f.department}`;
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
   if (f.familyGroup === "any") cond = sql`${cond} AND m.family_group_id IS NOT NULL`;
@@ -282,7 +288,12 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
 
   // Reference lists and the page rows are independent: one wait, not six.
-  const [rows, allRegions, allOptions, departments, positionDefs, ageGroups] = await Promise.all([
+  const churchNameP = f.church
+    ? db.all<{ name: string; name_en: string | null }>(
+      sql`SELECT name, name_en FROM regional_churches WHERE id = ${f.church} LIMIT 1`,
+    )
+    : Promise.resolve([] as { name: string; name_en: string | null }[]);
+  const [rows, allRegions, allOptions, departments, positionDefs, ageGroups, churchRows] = await Promise.all([
     rowsP,
     loadRegions(db),
     loadAllOptions(db),
@@ -292,7 +303,11 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     db.all<{ id: number; name: string; min_age: number; max_age: number }>(
       sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
     ),
+    churchNameP,
   ]);
+  const churchName = churchRows[0]
+    ? c.get("lang") === "mm" ? churchRows[0].name : churchRows[0].name_en ?? churchRows[0].name
+    : null;
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -301,6 +316,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
       dir={c.req.query("dir") === "desc" ? "desc" : "asc"}
       regions={scopedRegions(allRegions, scope, c.get("lang"))}
       homeCells={optionsOfType(allOptions, "home_cell")}
+      churchName={churchName}
       departments={departments}
       groups={optionsOfType(allOptions, "group")}
       fellowships={optionsOfType(allOptions, "fellowship_category")}

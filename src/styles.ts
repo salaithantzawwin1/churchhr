@@ -1741,6 +1741,24 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-collapse-body { padding: 12px 2px 0; }
 .org-collapse-hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
 .org-main-church .org-collapse { margin-top: 16px; }
+/* Main Church sits under its region: keep the regional team visible above the
+   church chart instead of making the reader jump to Regions & Churches. */
+.org-main-region {
+  margin: 0 0 16px; padding: 11px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.org-main-region-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px;
+}
+.org-main-region-team {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 7px 14px;
+}
+.org-main-region-role { min-width: 0; }
+.org-main-region-role .org-mini-role { display: block; margin-bottom: 3px; }
+.org-main-region-holders { display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .org-main-cells .org-collapse-body { padding-bottom: 4px; }
 .org-main-township + .org-main-township { margin-top: 8px; }
 .org-region-groups { display: grid; gap: 16px; }
