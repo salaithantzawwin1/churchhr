@@ -929,7 +929,7 @@ export function OrganizationPage(props: Common & {
       </div>
 
       <div class="page-toolbar">
-        <nav class="tabs" aria-label={t("nav.organization")}>
+        <nav class="tabs tabs-wrap" aria-label={t("nav.organization")}>
           <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
           <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization?tab=church"
