@@ -34,12 +34,14 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/organization", label: t("nav.organization"), perm: "members.view" },
     { href: "/reports", label: t("nav.reports"), perm: "reports.view" },
   ];
-  // People records sit under one "Members" heading: the list, households and
-  // the pastor directory (each gated by its own permission).
+  // People records sit under one "Members" heading: the list, households, the
+  // pastor directory and the Hope School report on both sets of children (each
+  // gated by its own permission).
   const MEMBER_NAV: { href: string; label: string; perm: Permission[] }[] = [
     { href: "/members", label: t("nav.members"), perm: ["members.view"] },
     { href: "/admin/households", label: t("nav.households"), perm: ["members.view"] },
     { href: "/organization/pastors", label: t("nav.pastors"), perm: ["pastors.view", "pastors.manage"] },
+    { href: "/organization/hope-school", label: t("org.childReportOpen"), perm: ["pastors.view", "pastors.manage", "members.view"] },
   ];
   /** allStatesOnly marks app-wide pages: the server refuses them to a
    *  state-limited account, so the navigation must not offer them either. */

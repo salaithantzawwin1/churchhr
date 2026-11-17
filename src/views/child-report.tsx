@@ -80,7 +80,7 @@ export function ChildReportPage(props: Common & {
 
   return (
     <Layout title={t("org.childReport")} lang={lang} user={user} perms={perms}
-      active="/organization/pastors" flash={flash ?? null}>
+      active="/organization/hope-school" flash={flash ?? null}>
       <div class="page-head">
         <div>
           <h1>{t("org.childReport")}<span class="count-pill">{rows.length}</span></h1>
@@ -89,7 +89,10 @@ export function ChildReportPage(props: Common & {
         <div class="page-head-actions print-hide">
           <a class="btn secondary" href={csvHref}>{t("org.childReportCsv")}</a>
           <button class="btn secondary" type="button" data-print>{t("org.childReportPrint")}</button>
-          <a class="btn secondary" href="/organization/pastors">{t("dept.back")}</a>
+          {/* Back goes to a page this viewer can actually open: the pastors
+              directory needs pastors.view, which a members-only viewer lacks. */}
+          <a class="btn secondary" href={perms.has("pastors.view") || perms.has("pastors.manage")
+            ? "/organization/pastors" : "/members"}>{t("dept.back")}</a>
         </div>
       </div>
 
