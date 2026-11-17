@@ -668,16 +668,25 @@ export function RegionalChurchesPage(props: Common & {
         {cells.length === 0 ? (
           <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
         ) : (
-          <div class="regional-attached">
-            {attachedGroups.map((group) => (
-              <div class="regional-township-line">
-                <span class="town">{group.name}</span>
-                {group.cells.map((cell) => (
-                  <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
-                ))}
-              </div>
-            ))}
-          </div>
+          /* Closed by default so a church stays one readable row until its
+             cells are actually asked for. */
+          <details class="regional-attached">
+            <summary>
+              <span class="chev" aria-hidden="true">▾</span>
+              <span>{t("org.cells")}</span>
+              <span class="regional-attached-count">{cells.length}</span>
+            </summary>
+            <div class="regional-attached-body">
+              {attachedGroups.map((group) => (
+                <div class="regional-township-line">
+                  <span class="town">{group.name}</span>
+                  {group.cells.map((cell) => (
+                    <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </details>
         )}
 
         {canUpdate && (

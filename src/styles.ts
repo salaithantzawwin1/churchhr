@@ -2206,6 +2206,22 @@ table.list-tbl.ph-tbl { min-width: 0; }
 }
 
 .regional-attached { display: grid; gap: 6px; margin-top: 10px; }
+/* Home Cell list on a church card: a disclosure row that starts closed. */
+details.regional-attached { display: block; }
+.regional-attached > summary {
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; list-style: none;
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+}
+.regional-attached > summary::-webkit-details-marker { display: none; }
+.regional-attached > summary:hover { color: var(--link); }
+.regional-attached > summary .chev { color: var(--muted); font-size: 11px; transition: transform .15s ease; }
+.regional-attached[open] > summary .chev { transform: rotate(180deg); }
+.regional-attached-count {
+  padding: 1px 7px; border-radius: 999px; background: var(--chip-bg);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+}
+.regional-attached-body { display: grid; gap: 6px; margin-top: 8px; }
 .regional-attached-empty { margin: 8px 0 0; }
 .regional-township-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 8px; font-size: 12.5px; }
 .regional-township-line .town { font-weight: 600; }
