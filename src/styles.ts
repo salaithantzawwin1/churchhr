@@ -75,6 +75,8 @@ body {
   font-family: "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
   font-size: 15px; line-height: 1.6;
 }
+/* Sticky rows must clear the site topbar (two rows on a phone). */
+:root { --sticky-top: 64px; }
 a { color: var(--link); }
 /* Manual theme toggle (topbar): moon icon while light, sun while dark —
    appearance driven purely by the effective theme so no extra JS state. */
@@ -690,6 +692,7 @@ th.bar-col { width: 42%; }
 }
 /* ---------- responsive: small laptop / tablet (≤900px) ---------- */
 @media (max-width: 900px) {
+  :root { --sticky-top: 112px; }
   .topbar { padding: 8px 12px; gap: 8px 10px; }
   .topbar .brand { font-size: 14.5px; min-width: 0; }
   .topbar .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -2317,7 +2320,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .dept-inactive { opacity: .75; }
 .dept-row .actions { margin-top: 12px; }
 /* ---------- organization chart ---------- */
-.org-chart { margin-bottom: var(--card-gap); padding: var(--card-pad-y) var(--card-pad-x) var(--space-6); overflow: hidden; }
+.org-chart { margin-bottom: var(--card-gap); padding: var(--card-pad-y) var(--card-pad-x) var(--space-6); overflow: hidden; overflow: clip; }
 
 /* Home Cell hierarchy: supervisor team, then cell leaders, grouped by state
    and by cluster (or township when a cell has no cluster). */
@@ -2331,7 +2334,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-flow-state + .org-flow-state { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
 .org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
 .org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
-.org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+.org-flow-clusters { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: var(--sticky-top); }
 /* Home Cell chooser inside a cluster: buttons on wide screens, a dropdown on
    phones, so only the chosen cell's structure is open at a time. */
 .hc-cells { display: grid; gap: 10px; padding-top: 14px; position: relative; }
@@ -2507,9 +2510,21 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .org-flow-cluster-meta { flex: 1 1 100%; justify-content: space-between; }
 }
 .org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
-/* An open cluster takes the whole row, so its supervisor and Home Cells read as
-   one structure instead of a narrow column with empty space beside it. */
-.org-flow-cluster[open] { grid-column: 1 / -1; }
+/* Clusters are a single-column accordion: every card has the full width, so
+   opening one never leaves a half-empty grid row beside it. */
+.org-flow-cluster[open] > summary {
+  position: sticky; top: var(--sticky-top); z-index: 4;
+  margin: -6px -6px 0; padding: 6px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.org-flow-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 4px 0 2px; padding: 2px 0;
+  color: var(--muted); font-size: 12.5px; font-weight: 600; text-decoration: none;
+}
+.org-flow-back:hover { color: var(--link); text-decoration: underline; }
 /* The card holding the chosen Home Cell keeps a brand edge, so it is obvious
    which cluster the open structure belongs to. */
 .org-flow-cluster.is-active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--chip-brand-bg); }
@@ -2530,7 +2545,6 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-flow-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
 .org-flow-team .org-node-lead { width: 190px; }
 @media (max-width: 760px) {
-  .org-flow-clusters { grid-template-columns: 1fr; }
   .org-flow-team .org-node { width: 190px; }
   .org-flow-team .org-node-lead { width: 205px; }
 }

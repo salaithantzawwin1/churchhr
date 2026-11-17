@@ -148,7 +148,16 @@ function supervisionGroups(cells: OrgCell[], clusters: SupervisionClusterRow[], 
     }
     group.cells.push(cell);
   }
-  return [...groups.values()];
+  // Cluster order comes from the cluster records, not from the order cells
+  // happen to arrive in: a cell query sorted by Home Cell name used to make
+  // the cards read 1, 3, 2. Townships without a cluster stay last by name.
+  return [...groups.values()].sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "cluster" ? -1 : 1;
+    if (a.cluster && b.cluster && a.cluster.sortOrder !== b.cluster.sortOrder) {
+      return a.cluster.sortOrder - b.cluster.sortOrder;
+    }
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
+  });
 }
 
 function initialOf(name: string | null | undefined): string {
@@ -636,7 +645,7 @@ export function OrganizationPage(props: Common & {
 
   // defaultOpen: the first cluster is drawn open, so the page shows the
   // structure it is about instead of a row of collapsed cards.
-  const renderSupervisionGroup = (group: SupervisionGroup, defaultOpen = false) => {
+  const renderSupervisionGroup = (group: SupervisionGroup, defaultOpen = false, listId?: string) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
       ? clusterRole(group.id, position)
@@ -679,6 +688,11 @@ export function OrganizationPage(props: Common & {
           </span>
         </summary>
         <div class="org-flow-cluster-body">
+          {listId && (
+            <a class="org-flow-back" href={`#${listId}`}>
+              <span aria-hidden="true">↑</span> {t("org.backToClusters")}
+            </a>
+          )}
           {/* Pastor above the team, the team on its own bus. Drawn as branches
               so every role hangs off a visible connector instead of floating
               beside the others with no line between them. */}
@@ -875,18 +889,22 @@ export function OrganizationPage(props: Common & {
             {countLabel(t, "org.cells", state.cells.length)} · {countLabel(t, "org.membersShort", stateMembers)}
           </span>
         </div>
-        {[...churchGroups.values()].map((churchGroup, churchIndex) => (
-          <div class="org-church-block">
-            <div class="org-church-block-head">
-              <h3>{churchGroup.name}</h3>
-              <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
+        {[...churchGroups.values()].map((churchGroup, churchIndex) => {
+          const listId = `org-clusters-${state.id}-${churchGroup.key}`;
+          return (
+            <div class="org-church-block">
+              <div class="org-church-block-head">
+                <h3>{churchGroup.name}</h3>
+                <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
+              </div>
+              <div class="org-flow-clusters" id={listId}>
+                {supervisionGroups(churchGroup.cells, clusters, L)
+                  .map((group, groupIndex) =>
+                    renderSupervisionGroup(group, churchIndex === 0 && groupIndex === 0, listId))}
+              </div>
             </div>
-            <div class="org-flow-clusters">
-              {supervisionGroups(churchGroup.cells, clusters, L)
-                .map((group, groupIndex) => renderSupervisionGroup(group, churchIndex === 0 && groupIndex === 0))}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
     );
   };
