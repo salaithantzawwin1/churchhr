@@ -513,7 +513,7 @@ export function RegionalChurchModal(props: {
       {cellError && <div class="modal-error" role="alert">{cellError}</div>}
       {/* One form and one Save, matching the cluster editor: details and Home
           Cell attachment are written together instead of two separate saves. */}
-      <form method="post" class="cluster-main-form"
+      <form method="post" class="cluster-main-form church-form"
         action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
         {church ? (
           <>
@@ -686,6 +686,7 @@ export function RegionalChurchesPage(props: Common & {
               class="btn sm secondary js-edit-modal"
               href={`/organization/regional-churches/${church.id}/edit`}
               data-modal-title={t("org.editRegional")}
+              data-modal-size="md"
             >{t("members.edit")}</a>
           </div>
         )}
@@ -707,6 +708,7 @@ export function RegionalChurchesPage(props: Common & {
               class="btn js-add-modal"
               href="/organization/regional-churches/new"
               data-modal-title={t("org.addRegional")}
+              data-modal-size="md"
             >+ {t("org.addRegional")}</a>
           )}
           <a class="btn secondary" href="/organization?tab=regional">{t("dept.back")}</a>
