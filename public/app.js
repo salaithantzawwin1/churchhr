@@ -2025,14 +2025,30 @@
   })();
 
   // Home Cell structure reads one cluster at a time: opening a card collapses the
-  // others, so two half-filled structures are never side by side. Capture phase,
-  // because `toggle` does not bubble and cards are replaced after a save.
+  // others, so two half-filled structures are never side by side. The cluster
+  // holding the chosen Home Cell is pinned open so the selection never loses its
+  // structure. Capture phase, because `toggle` does not bubble and cards are
+  // replaced after a save.
+  document.addEventListener("click", function (e) {
+    var summary = e.target && e.target.closest ? e.target.closest("summary") : null;
+    if (!summary) return;
+    var card = summary.parentElement;
+    if (card && card.classList.contains("org-flow-cluster") && card.classList.contains("is-active")) {
+      e.preventDefault();
+    }
+  }, true);
   document.addEventListener("toggle", function (e) {
     var el = e.target;
-    if (!el || el.tagName !== "DETAILS" || !el.open) return;
+    if (!el || el.tagName !== "DETAILS") return;
     if (!el.classList || !el.classList.contains("org-flow-cluster")) return;
+    var pinned = el.classList.contains("is-active");
+    if (!el.open) {
+      // Clicking the chosen cluster's header must not hide its structure.
+      if (pinned) el.open = true;
+      return;
+    }
     Array.prototype.forEach.call(document.querySelectorAll("details.org-flow-cluster[open]"), function (other) {
-      if (other !== el) other.open = false;
+      if (other !== el && !other.classList.contains("is-active")) other.open = false;
     });
   }, true);
 
