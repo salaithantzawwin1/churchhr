@@ -75,12 +75,13 @@ organizationRoutes.get("/", requirePermission("members.view"), async (c) => {
   const scope = scopeOf(c);
   const tabParam = c.req.query("tab");
   // Main Church leads the page; the other tabs are explicit links.
-  const tab: "church" | "main" | "regional" | "home-cells" | "family-groups" =
-    tabParam === "home-cells" ? "home-cells"
-      : tabParam === "family-groups" ? "family-groups"
-        : tabParam === "regional" ? "regional"
-          : tabParam === "church" ? "church"
-            : "main";
+  const tab: "all" | "church" | "main" | "regional" | "home-cells" | "family-groups" =
+    tabParam === "all" ? "all"
+      : tabParam === "home-cells" ? "home-cells"
+        : tabParam === "family-groups" ? "family-groups"
+          : tabParam === "regional" ? "regional"
+            : tabParam === "church" ? "church"
+              : "main";
 
   const cellsP = db.all<OrgCell>(sql`
     SELECT hc.id, hc.label, hc.code, hc.region_id,

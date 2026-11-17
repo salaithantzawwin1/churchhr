@@ -1741,6 +1741,58 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-collapse-body { padding: 12px 2px 0; }
 .org-collapse-hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
 .org-main-church .org-collapse { margin-top: 16px; }
+/* All overview: summary cards stay compact and every number links to the detail
+   tab that owns it. */
+.org-all { display: grid; gap: 16px; }
+.org-all-main { padding: 20px; }
+.org-all-main-facts { display: flex; flex-wrap: wrap; gap: 7px 18px; align-items: baseline; font-size: 13px; }
+.org-all-main-facts b { color: var(--ink); font-size: 15px; }
+.org-all-main-lead { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; margin-top: 12px; }
+.org-all-main-person { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.org-all-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.org-all-panel { padding: 18px 20px; }
+.org-all-panel > .org-section-head { margin-bottom: 12px; }
+.org-all-panel > .btn { margin-top: 12px; }
+.org-all-list { display: grid; gap: 8px; }
+.org-all-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 8px 16px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--card);
+}
+.org-all-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.org-all-row-title { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-all-row-title:hover { text-decoration: underline; }
+.org-all-row-team { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; }
+.org-all-row-team > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.org-all-coverage-total { color: var(--ink); font-size: 22px; font-weight: 700; }
+.org-all-coverage-list { gap: 7px; }
+.org-all-coverage-row {
+  display: grid; grid-template-columns: minmax(90px, 1fr) minmax(70px, 1.4fr) auto;
+  align-items: center; gap: 8px;
+}
+.org-all-coverage-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.org-all-progress {
+  width: 100%; height: 7px; appearance: none; border: 0; border-radius: 999px;
+  overflow: hidden; background: var(--line); color: var(--brand);
+}
+.org-all-progress::-webkit-progress-bar { background: var(--line); border-radius: 999px; }
+.org-all-progress::-webkit-progress-value { background: var(--brand); border-radius: 999px; }
+.org-all-progress::-moz-progress-bar { background: var(--brand); border-radius: 999px; }
+.org-all-vacancy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.org-all-vacancy {
+  display: flex; flex-direction: column; gap: 3px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--ink); text-decoration: none;
+}
+.org-all-vacancy:hover { border-color: var(--brand); }
+.org-all-vacancy-n { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.org-all-links { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) {
+  .org-all-grid { grid-template-columns: 1fr; }
+  .org-all-vacancy-grid { grid-template-columns: 1fr; }
+  .org-all-row { grid-template-columns: 1fr; }
+  .org-all-row-team { justify-content: flex-start; }
+}
 /* Main Church sits under its region: keep the regional team visible above the
    church chart instead of making the reader jump to Regions & Churches. */
 .org-main-region {

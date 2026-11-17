@@ -260,7 +260,7 @@ function nestRoles(rows: PositionDefRow[], lead: PositionDefRow | null) {
 }
 
 export function OrganizationPage(props: Common & {
-  tab: "church" | "main" | "home-cells" | "regional" | "family-groups";
+  tab: "all" | "church" | "main" | "home-cells" | "regional" | "family-groups";
   cells: OrgCell[];
   familyGroups: OrgFamilyGroup[];
   /** Home Cell whose structure panel is open below the chart (query ?cell=). */
@@ -388,6 +388,7 @@ export function OrganizationPage(props: Common & {
   const withLeader = leadCode
     ? statsCells.filter((c) => leaderFor(leaders, "home_cell", leadCode, { scopeId: c.id })).length
     : 0;
+
   const canEdit = perms.has("members.update");
   const canManageOptions = perms.has("options.manage");
   // Home Cell / Family Group management is reachable with the structure grant
@@ -538,6 +539,31 @@ export function OrganizationPage(props: Common & {
     );
   };
   const regionalRows = positionRows(positionDefs, "region", L);
+
+  // All-tab totals. Vacancies are calculated from the same position catalog the
+  // detail tabs use, so an overview can never disagree with the page it links to.
+  const allVacantChurchRoles = regionalChurches.reduce((sum, church) => {
+    const rows = positionRows(defsForChurch(positionDefs, church.id), "church", L);
+    return sum + rows.all.filter((def) =>
+      !leaderFor(leaders, "church", def.code, { regionalChurchId: church.id })).length;
+  }, 0);
+  const allVacantRegionRoles = regionGroups.reduce((sum, r) => sum
+    + regionalRows.all.filter((def) => !leaderFor(leaders, "region", def.code, { regionId: r.id })).length, 0);
+  const allVacantCellLeaders = cells.length - withLeader;
+  const allVacancyTotal = allVacantChurchRoles + allVacantRegionRoles + allVacantCellLeaders;
+  const allCoverage = cells.length ? Math.round((withLeader / cells.length) * 100) : 0;
+  const mainChurch = mainChurches[0] ?? null;
+  const mainChurchDefs = mainChurch ? defsForChurch(positionDefs, mainChurch.id) : positionDefs;
+  const mainChurchRows = positionRows(mainChurchDefs, "church", L);
+  const mainChurchLead = mainChurch && mainChurchRows.lead
+    ? leaderFor(leaders, "church", mainChurchRows.lead.code, { regionalChurchId: mainChurch.id })
+    : null;
+  const mainChurchCells = mainChurch
+    ? cells.filter((c) => c.regional_church_id === mainChurch.id)
+    : [];
+  const mainChurchMembers = mainChurchCells.reduce((sum, c) => sum + c.member_count, 0);
+  const mainRegion = mainChurch ? regions.find((r) => r.id === mainChurch.regionId) ?? null : null;
+
   const deptRows = positionRows(positionDefs, "department", L);
 
   const departmentRole = (departmentId: number, position: string) =>
@@ -1021,7 +1047,7 @@ export function OrganizationPage(props: Common & {
       <div class="page-head org-page-head">
         <div>
           <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span></h1>
-          <p class="page-sub">{tab === "main" ? t("org.mainIntro") : t("org.intro")}</p>
+          <p class="page-sub">{tab === "main" ? t("org.mainIntro") : tab === "all" ? t("org.allIntro") : t("org.intro")}</p>
         </div>
       </div>
 
@@ -1029,6 +1055,8 @@ export function OrganizationPage(props: Common & {
         <nav class="tabs tabs-wrap" aria-label={t("nav.organization")}>
           <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
+          <a class={`btn sm ${tab === "all" ? "" : "secondary"}`} href="/organization?tab=all"
+            aria-current={tab === "all" ? "page" : undefined}>{t("org.allTab")}</a>
           <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization?tab=church"
             aria-current={tab === "church" ? "page" : undefined}>{t("org.churchTab")}</a>
           <a class={`btn sm ${tab === "regional" ? "" : "secondary"}`} href="/organization?tab=regional"
@@ -1040,14 +1068,176 @@ export function OrganizationPage(props: Common & {
         </nav>
       </div>
 
-      <div class="stat-grid org-stats">
-        <div class="stat"><div class="n">{statsCells.length}</div><div class="t">{t("org.cells")}</div></div>
-        <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
-        <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
-        <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
-      </div>
+      {tab === "all" ? (
+        <div class="stat-grid org-stats">
+          <div class="stat"><div class="n">{regions.length}</div><div class="t">{t("org.allRegions")}</div></div>
+          <div class="stat"><div class="n">{regionalChurches.length}</div><div class="t">{t("org.churchesTitle")}</div></div>
+          <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
+          <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
+          <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
+          <div class="stat"><div class="n">{allVacancyTotal}</div><div class="t">{t("org.allVacantRoles")}</div></div>
+        </div>
+      ) : (
+        <div class="stat-grid org-stats">
+          <div class="stat"><div class="n">{statsCells.length}</div><div class="t">{t("org.cells")}</div></div>
+          <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
+          <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
+          <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
+        </div>
+      )}
 
-      {tab === "church" ? (
+      {tab === "all" ? (
+        <div class="org-all">
+          <section class="card org-all-main">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.mainChurch")}</h2>
+                <p class="muted small">{mainChurch ? t("org.allMainHint") : t("org.allNoMainChurch")}</p>
+              </div>
+              {mainChurch && (
+                <a class="btn secondary sm" href="/organization?tab=main">{t("org.allOpenMain")}</a>
+              )}
+            </div>
+            {mainChurch && (
+              <div class="org-all-main-body">
+                <div class="org-all-main-facts">
+                  <span>
+                    <b>{regionalChurchName(mainChurch, L)}</b>
+                    {mainRegion && (
+                      <span class="muted">
+                        {" · "}{L !== "mm" && mainRegion.nameEn ? mainRegion.nameEn : mainRegion.name}
+                      </span>
+                    )}
+                  </span>
+                  <span><b>{mainChurchCells.length}</b> {pluralLabel(t, "org.cells", mainChurchCells.length)}</span>
+                  <span><b>{mainChurchMembers}</b> {pluralLabel(t, "org.membersShort", mainChurchMembers)}</span>
+                  <span><b>{departmentsForChurch(mainChurch.id).length}</b> {pluralLabel(t, "org.departmentsShort", departmentsForChurch(mainChurch.id).length)}</span>
+                </div>
+                {mainChurchRows.lead && (
+                  <div class="org-all-main-lead">
+                    <span class="org-mini-role">{positionDefLabel(mainChurchRows.lead, L)}</span>
+                    <span class="org-all-main-person">
+                      <LeaderAvatar leader={mainChurchLead} size="sm" />
+                      <LeaderLink leader={mainChurchLead} empty={t("org.vacant")} />
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <div class="org-all-grid">
+            <section class="card org-all-panel">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.allRegionalOversight")}</h2>
+                  <p class="muted small">{t("org.allRegionalOversightHint")}</p>
+                </div>
+                <a class="btn secondary sm" href="/organization?tab=regional">{t("org.regionalTab")}</a>
+              </div>
+              <div class="org-all-list">
+                {regionGroups.map((r) => {
+                  const rowCells = cells.filter((c) => c.region_id === r.id);
+                  const rowMembers = rowCells.reduce((sum, c) => sum + c.member_count, 0);
+                  const lead = regionalRows.lead ? regionalTeam(r.id, regionalRows.lead.code)[0] ?? null : null;
+                  return (
+                    <div class="org-all-row">
+                      <div class="org-all-row-main">
+                        <a class="org-all-row-title" href={`/organization?tab=regional&region=${r.id}`}>{r.name}</a>
+                        <span class="muted small">
+                          {countLabel(t, "org.churchesShort", r.churches.length)} · {countLabel(t, "org.cells", rowCells.length)} · {countLabel(t, "org.membersShort", rowMembers)}
+                        </span>
+                      </div>
+                      <div class="org-all-row-team">
+                        {lead && regionalRows.lead ? (
+                          <>
+                            <LeaderAvatar leader={lead} size="sm" />
+                            <span>
+                              <span class="org-mini-role">{positionDefLabel(regionalRows.lead, L)}</span>
+                              <LeaderLink leader={lead} empty={t("org.allNoRegionalLead")} />
+                            </span>
+                          </>
+                        ) : (
+                          <span class="muted small">{t("org.allNoRegionalLead")}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section class="card org-all-panel">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.allCoverage")}</h2>
+                  <p class="muted small">{t("org.allCoverageHint")}</p>
+                </div>
+                <span class="org-all-coverage-total">{allCoverage}%</span>
+              </div>
+              <progress class="org-all-progress" value={allCoverage} max={100} aria-label={t("org.allCoverage")} />
+              <div class="org-all-list org-all-coverage-list">
+                {regionalChurches.slice(0, 8).map((church) => {
+                  const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+                  const churchLeaders = leadCode
+                    ? churchCells.filter((c) => homeRole(c.id, leadCode)).length
+                    : 0;
+                  const pct = churchCells.length ? Math.round((churchLeaders / churchCells.length) * 100) : 0;
+                  return (
+                    <div class="org-all-coverage-row">
+                      <span class="org-all-coverage-name">{regionalChurchName(church, L)}</span>
+                      <progress class="org-all-progress" value={pct} max={100} aria-label={`${regionalChurchName(church, L)}: ${pct}%`} />
+                      <span class="muted small">{churchLeaders}/{churchCells.length}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.allViewHomeCells")}</a>
+            </section>
+          </div>
+
+          <section class="card org-all-panel">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.allVacancySummary")}</h2>
+                <p class="muted small">{t("org.allVacancySummaryHint")}</p>
+              </div>
+            </div>
+            <div class="org-all-vacancy-grid">
+              <a class="org-all-vacancy" href="/organization?tab=church">
+                <span class="org-all-vacancy-n">{allVacantChurchRoles}</span>
+                <span>{t("org.allVacantChurchRoles")}</span>
+              </a>
+              <a class="org-all-vacancy" href="/organization?tab=regional">
+                <span class="org-all-vacancy-n">{allVacantRegionRoles}</span>
+                <span>{t("org.allVacantRegionRoles")}</span>
+              </a>
+              <a class="org-all-vacancy" href="/organization?tab=home-cells&gap=leader">
+                <span class="org-all-vacancy-n">{allVacantCellLeaders}</span>
+                <span>{t("org.allVacantCellLeaders")}</span>
+              </a>
+            </div>
+          </section>
+
+          <section class="card org-all-panel">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.allQuickLinks")}</h2>
+                <p class="muted small">{t("org.allQuickLinksHint")}</p>
+              </div>
+            </div>
+            <div class="org-all-links">
+              <a class="btn secondary sm" href="/organization?tab=main">{t("org.mainChurch")}</a>
+              <a class="btn secondary sm" href="/organization?tab=church">{t("org.churchTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=regional">{t("org.regionalTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.cellsTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=family-groups">{t("org.fgTab")}</a>
+              <a class="btn secondary sm" href="/organization/departments">{t("org.departments")}</a>
+            </div>
+          </section>
+        </div>
+      ) : tab === "church" ? (
+
         <>
           <section class="card org-chart">
             <div class="org-section-head">
