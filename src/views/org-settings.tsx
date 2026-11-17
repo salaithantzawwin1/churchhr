@@ -513,7 +513,7 @@ export function RegionalChurchModal(props: {
       {cellError && <div class="modal-error" role="alert">{cellError}</div>}
       {/* One form and one Save, matching the cluster editor: details and Home
           Cell attachment are written together instead of two separate saves. */}
-      <form method="post" class="cluster-main-form church-form"
+      <form method="post" class="cluster-main-form compact-form"
         action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
         {church ? (
           <>

@@ -164,7 +164,7 @@ export function SupervisionClusterModal(props: {
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
       {cellError && <div class="modal-error" role="alert">{cellError}</div>}
-      <form method="post" class="cluster-main-form"
+      <form method="post" class="cluster-main-form compact-form"
         action={cluster ? `/organization/clusters/${cluster.id}` : "/organization/clusters"} data-modal-ajax>
         {cluster ? (
           <>
@@ -301,7 +301,7 @@ export function SupervisionClustersPage(props: Common & {
           <CardViewToggle lang={lang} viewKey="clusters" />
           {canCreate && (
             <a class="btn js-add-modal" href="/organization/clusters/new"
-              data-modal-title={t("org.addCluster")}>
+              data-modal-title={t("org.addCluster")} data-modal-size="md">
               + {t("org.addCluster")}
             </a>
           )}
@@ -391,7 +391,7 @@ export function SupervisionClustersPage(props: Common & {
                 {canUpdate && (
                   <div class="hh-card-actions">
                     <a class="btn sm secondary js-edit-modal" href={`/organization/clusters/${cluster.id}/edit`}
-                      data-modal-title={t("org.editCluster")}>
+                      data-modal-title={t("org.editCluster")} data-modal-size="md">
                       {t("members.edit")}
                     </a>
                   </div>

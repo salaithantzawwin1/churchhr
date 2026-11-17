@@ -2274,15 +2274,19 @@ table.list-tbl.ph-tbl { min-width: 0; }
 }
 .modal-body .cluster-main-form { flex: 0 0 auto; gap: 14px; margin-bottom: 0; }
 .modal-body .cluster-main-form .form-grid { gap: 12px 16px; }
-/* Church editor: four short fields, so the sheet is one step narrower than the
-   default dialog and the spacing is trimmed to keep the whole form on screen.
-   The Save/Add button keeps the field height and gets a steady width instead of
-   hugging its short label. */
-.modal-body .church-form { gap: 12px; }
-.modal-body .church-form .form-grid { gap: 10px 14px; }
-.modal-body .church-form .field .lbl { margin-bottom: 3px; }
-.modal-body .church-form > .actions:last-child { padding-top: 10px; }
-.modal-body .church-form > .actions:last-child .btn { min-width: 92px; }
+/* Compact editors: New church, New department, New cluster and Add pastor are a
+   handful of short fields, so their dialogs open one step narrower than the
+   default sheet (data-modal-size="md") and the spacing is trimmed to keep the
+   whole form on screen. The primary button keeps the field height and gets a
+   steady width instead of hugging a three-letter label. */
+.modal-body .compact-form { gap: 12px; }
+.modal-body .compact-form .form-grid { gap: 10px 14px; }
+.modal-body .compact-form .field .lbl { margin-bottom: 3px; }
+.modal-body .compact-form > .actions:last-child { padding-top: 10px; }
+.modal-body .compact-form > .actions:last-child .btn:not(.secondary):not(.outline-danger) { min-width: 92px; }
+/* The form already closes its footer with one dashed divider, so the delete row
+   underneath must not draw a second one. */
+.modal-body .cluster-main-form + .cluster-modal-foot { border-top: 0; }
 .cluster-main-form .dept-toggle { width: fit-content; min-width: 190px; }
 .cluster-main-form .modal-form-panes { padding-top: 2px; }
 .cluster-main-form .cluster-cell-groups { box-shadow: inset 0 1px 2px rgba(2, 8, 23, .04); }

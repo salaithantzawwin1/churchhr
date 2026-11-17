@@ -117,7 +117,7 @@ export function DepartmentModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" class="dept-form"
+      <form method="post" class="dept-form compact-form"
         action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
         data-modal-ajax>
         <div class="form-grid dept-fields">
@@ -371,7 +371,7 @@ export function DepartmentsPage(props: Common & {
           <CardViewToggle lang={lang} viewKey="departments" />
           {canManage && (
             <a class="btn js-add-modal" href="/organization/departments/new"
-              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+              data-modal-title={t("dept.addTitle")} data-modal-size="md">+ {t("dept.add")}</a>
           )}
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
         </div>
@@ -383,7 +383,7 @@ export function DepartmentsPage(props: Common & {
           <p class="muted">{t("dept.emptyBody")}</p>
           {canManage && (
             <a class="btn js-add-modal" href="/organization/departments/new"
-              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+              data-modal-title={t("dept.addTitle")} data-modal-size="md">+ {t("dept.add")}</a>
           )}
         </div>
       ) : (
@@ -436,7 +436,7 @@ export function DepartmentsPage(props: Common & {
                 <a class="btn sm secondary" href={`/organization/departments/${d.id}`}>{t("org.viewDepartment")}</a>
                 {canManage && (
                   <a class="btn sm secondary js-edit-modal" href={`/organization/departments/${d.id}/edit`}
-                    data-modal-title={t("dept.editTitle")}>{t("members.edit")}</a>
+                    data-modal-title={t("dept.editTitle")} data-modal-size="md">{t("members.edit")}</a>
                 )}
               </div>
             </article>

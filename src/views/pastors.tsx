@@ -292,7 +292,7 @@ export function PastorModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" class="pastor-form"
+      <form method="post" class="pastor-form compact-form"
         action={pastor ? `/organization/pastors/${pastor.id}` : "/organization/pastors"}
         data-modal-ajax>
         <PastorFields
@@ -360,7 +360,7 @@ export function PastorsPage(props: Common & {
           <CardViewToggle lang={lang} viewKey="pastors" />
           {canUpdate && (
             <a class="btn js-add-modal" href="/organization/pastors/new"
-              data-modal-title={t("org.addPastor")}>
+              data-modal-title={t("org.addPastor")} data-modal-size="md">
               + {t("org.addPastor")}
             </a>
           )}
@@ -458,7 +458,7 @@ export function PastorsPage(props: Common & {
                   <a class="btn sm secondary" href={`/organization/pastors/${pastor.id}`}>{t("org.viewPastor")}</a>
                   {canUpdate && (
                     <a class="btn sm secondary js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-                      data-modal-title={t("org.editPastor")}>
+                      data-modal-title={t("org.editPastor")} data-modal-size="md">
                       {t("members.edit")}
                     </a>
                   )}
@@ -547,7 +547,7 @@ export function PastorDetailPage(props: Common & {
         <div class="page-head-actions pastor-actions">
           {canUpdate && (
             <a class="btn js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-              data-modal-title={t("org.editPastor")}>
+              data-modal-title={t("org.editPastor")} data-modal-size="md">
               {t("members.edit")}
             </a>
           )}
