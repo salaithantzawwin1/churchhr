@@ -313,10 +313,11 @@ export function OrganizationPage(props: Common & {
   const scopedCells = churchScoped
     ? cells.filter((c) => c.regional_church_id === selectedChurch.id)
     : cells;
-  const scopedDepartments = churchScoped
-    ? departments.filter((d) => d.regional_church_id != null
-      ? d.regional_church_id === selectedChurch.id
-      : (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
+  const departmentsForChurch = (churchId: number) => departments.filter((d) => d.regional_church_id != null
+    ? d.regional_church_id === churchId
+    : (d.church_ids ?? "").split(",").includes(String(churchId)));
+  const scopedDepartments = churchScoped && selectedChurch
+    ? departmentsForChurch(selectedChurch.id)
     : departments;
   const states = groupCells(scopedCells, clusters, L);
   // The Family Groups tab doubles as the reporting view, so it can be searched by
@@ -541,6 +542,102 @@ export function OrganizationPage(props: Common & {
 
   const departmentRole = (departmentId: number, position: string) =>
     leaderFor(leaders, "department", position, { departmentId });
+
+  const renderDepartments = (depts: OrgDepartment[], churchScope: boolean, open = false) => (
+          <section class="org-departments">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.departments")}</h2>
+                <p class="muted small">{t("org.departmentsHint")}</p>
+              </div>
+              {canManageDepartments && (
+                <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
+              )}
+            </div>
+
+            {depts.length === 0 ? (
+              <div class="card org-empty org-empty-small">
+                <p class="muted">
+                  {churchScope ? t("org.noChurchDepartments") : t("org.noDepartments")}
+                </p>
+                {canManageDepartments && (
+                  <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
+                )}
+              </div>
+            ) : (
+              <details class="org-collapse" open={open}>
+                <summary class="org-collapse-summary">
+                  <span>{countLabel(t, "org.departmentsShort", depts.length)} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
+                  <span class="chev" aria-hidden="true">▾</span>
+                </summary>
+                <div class="org-collapse-body">
+              <div class="org-grid org-dept-grid">
+                {depts.map((d) => {
+                  const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
+                  // Department roles nest exactly like church roles.
+                  const deptForest = nestRoles(deptRows.all, deptRows.lead);
+                  const deptLeaves = [
+                    ...deptForest.roots.filter((r) => r.code !== deptRows.lead?.code),
+                    ...(deptForest.kids.get(deptRows.lead?.code ?? "") ?? []),
+                  ];
+                  const deptRoleBranch = (def: PositionDefRow) => {
+                    const leader = departmentRole(d.id, def.code);
+                    const children = deptForest.kids.get(def.code) ?? [];
+                    return (
+                      <div class="org-role-branch">
+                        <div class={`org-mini${leader ? "" : " org-vacant"}`}>
+                          <LeaderAvatar leader={leader} size="sm" />
+                          <div>
+                            <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                            <LeaderLink leader={leader} empty={t("org.vacant")} />
+                          </div>
+                        </div>
+                        {children.length > 0 && (
+                          <div class="org-role-kids">
+                            {children.map((child) => deptRoleBranch(child))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <article class="card org-dept-card">
+                      <div class="org-dept-head">
+                        <LeaderAvatar leader={head} size="md" />
+                        <div class="org-dept-title">
+                          <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
+                          <span class="muted small">
+                            {countLabel(t, "org.membersShort", d.member_count)}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="org-dept-lead">
+                        <span class="org-node-role">
+                          {deptRows.lead ? positionDefLabel(deptRows.lead, L) : t("org.departmentHead")}
+                        </span>
+                        <LeaderLink leader={head} empty={t("org.vacant")} />
+                      </div>
+                      <div class="org-mini-list">
+                        {deptLeaves.map((def) => deptRoleBranch(def))}
+                      </div>
+                      <div class="org-card-actions">
+                        <a class="org-card-link" href={`/organization/departments/${d.id}`}>
+                          {t("org.viewDepartment")} <span aria-hidden="true">→</span>
+                        </a>
+                        {canManageDepartments && (
+                          <a class="org-card-link" href="/organization/departments">{t("org.editStructure")}</a>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+                </div>
+              </details>
+            )}
+          </section>
+  );
+
   const homeRole = (cellId: number, position: string) =>
     leaderFor(leaders, "home_cell", position, { scopeId: cellId });
   const townshipRole = (townshipId: number | null, position: string) =>
@@ -1001,98 +1098,8 @@ export function OrganizationPage(props: Common & {
             ) : renderChurchChart(selectedChurch, "church")}
           </section>
 
-          <section class="org-departments">
-            <div class="org-section-head">
-              <div>
-                <h2>{t("org.departments")}</h2>
-                <p class="muted small">{t("org.departmentsHint")}</p>
-              </div>
-              {canManageDepartments && (
-                <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
-              )}
-            </div>
+          {renderDepartments(scopedDepartments, churchScoped)}
 
-            {scopedDepartments.length === 0 ? (
-              <div class="card org-empty org-empty-small">
-                <p class="muted">
-                  {churchScoped ? t("org.noChurchDepartments") : t("org.noDepartments")}
-                </p>
-                {canManageDepartments && (
-                  <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
-                )}
-              </div>
-            ) : (
-              <details class="org-collapse">
-                <summary class="org-collapse-summary">
-                  <span>{countLabel(t, "org.departmentsShort", scopedDepartments.length)} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
-                  <span class="chev" aria-hidden="true">▾</span>
-                </summary>
-                <div class="org-collapse-body">
-              <div class="org-grid org-dept-grid">
-                {scopedDepartments.map((d) => {
-                  const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
-                  // Department roles nest exactly like church roles.
-                  const deptForest = nestRoles(deptRows.all, deptRows.lead);
-                  const deptLeaves = [
-                    ...deptForest.roots.filter((r) => r.code !== deptRows.lead?.code),
-                    ...(deptForest.kids.get(deptRows.lead?.code ?? "") ?? []),
-                  ];
-                  const deptRoleBranch = (def: PositionDefRow) => {
-                    const leader = departmentRole(d.id, def.code);
-                    const children = deptForest.kids.get(def.code) ?? [];
-                    return (
-                      <div class="org-role-branch">
-                        <div class={`org-mini${leader ? "" : " org-vacant"}`}>
-                          <LeaderAvatar leader={leader} size="sm" />
-                          <div>
-                            <span class="org-mini-role">{positionDefLabel(def, L)}</span>
-                            <LeaderLink leader={leader} empty={t("org.vacant")} />
-                          </div>
-                        </div>
-                        {children.length > 0 && (
-                          <div class="org-role-kids">
-                            {children.map((child) => deptRoleBranch(child))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  };
-                  return (
-                    <article class="card org-dept-card">
-                      <div class="org-dept-head">
-                        <LeaderAvatar leader={head} size="md" />
-                        <div class="org-dept-title">
-                          <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
-                          <span class="muted small">
-                            {countLabel(t, "org.membersShort", d.member_count)}
-                          </span>
-                        </div>
-                      </div>
-                      <div class="org-dept-lead">
-                        <span class="org-node-role">
-                          {deptRows.lead ? positionDefLabel(deptRows.lead, L) : t("org.departmentHead")}
-                        </span>
-                        <LeaderLink leader={head} empty={t("org.vacant")} />
-                      </div>
-                      <div class="org-mini-list">
-                        {deptLeaves.map((def) => deptRoleBranch(def))}
-                      </div>
-                      <div class="org-card-actions">
-                        <a class="org-card-link" href={`/organization/departments/${d.id}`}>
-                          {t("org.viewDepartment")} <span aria-hidden="true">→</span>
-                        </a>
-                        {canManageDepartments && (
-                          <a class="org-card-link" href="/organization/departments">{t("org.editStructure")}</a>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-                </div>
-              </details>
-            )}
-          </section>
 
           {scopedCells.length === 0 ? (
             <div class="card org-empty">
@@ -1242,6 +1249,7 @@ export function OrganizationPage(props: Common & {
                 </div>
               )}
               {renderChurchChart(church, "main")}
+              {renderDepartments(departmentsForChurch(church.id), true, true)}
               {churchCells.length > 0 && (
                 <details class="org-collapse org-main-cells">
                   <summary class="org-collapse-summary">
