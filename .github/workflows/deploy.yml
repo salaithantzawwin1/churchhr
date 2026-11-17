@@ -1,11 +1,12 @@
 name: Deploy to Cloudflare Workers
 
 # Every push to main typechecks, runs the Worker test suite (real workerd +
-# local D1 with the production migrations) and only then applies pending D1
-# migrations before deploying the Worker, so neither failing code nor code ahead
-# of the schema can ship. Cloudflare Workers Builds is also connected to main:
-# keep its build command applying migrations too, or disconnect it, so
-# production has a single migration-first deploy path.
+# local D1 with the production migrations), refuses moderate-or-worse dependency
+# advisories and only then applies pending D1 migrations before deploying the
+# Worker, so neither failing code nor code ahead of the schema can ship.
+# Cloudflare Workers Builds is also connected to main: keep its build command
+# applying migrations too, or disconnect it, so production has a single
+# migration-first deploy path.
 on:
   push:
     branches: [main]
@@ -37,6 +38,9 @@ jobs:
       - name: Test (workerd + local D1)
         run: npm test
 
+      - name: Audit dependencies (moderate or worse fails the build)
+        run: npm audit --audit-level=moderate
+
       - name: Apply D1 migrations (remote)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -54,19 +58,50 @@ jobs:
       - name: Verify production health
         run: |
           set -euo pipefail
+          base=https://www.mmgoodnewshr.online
           expected_version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/version.ts)
           expected_migration=$(basename "$(ls migrations/*.sql | sort | tail -n 1)")
           echo "Expecting version $expected_version and migration $expected_migration"
+          healthy=0
           for attempt in $(seq 1 12); do
-            body=$(curl -fsS --max-time 10 https://www.mmgoodnewshr.online/healthz || true)
+            body=$(curl -fsS --max-time 10 "$base/healthz" || true)
             echo "$body"
             if printf '%s' "$body" | grep -q "\"version\":\"$expected_version\"" \
               && printf '%s' "$body" | grep -q "\"migration\":\"$expected_migration\"" \
               && printf '%s' "$body" | grep -q '"db":"ok"'; then
               echo "Production health probe passed"
-              exit 0
+              healthy=1
+              break
             fi
             sleep 5
           done
-          echo "Production health probe failed: expected $expected_version / $expected_migration with db ok" >&2
-          exit 1
+          if [ "$healthy" != 1 ]; then
+            echo "Production health probe failed: expected $expected_version / $expected_migration with db ok" >&2
+            exit 1
+          fi
+
+          # The sign-in page must render in every shipped language and keep the
+          # form the POST handler reads, or nobody can get in after a release.
+          for pair in mm:my en:en kr:ko; do
+            lang=${pair%%:*}
+            html_lang=${pair##*:}
+            page=$(curl -fsS --max-time 10 "$base/login?lang=$lang")
+            printf '%s' "$page" | grep -q "<html lang=\"$html_lang\"" || {
+              echo "/login?lang=$lang did not render lang=$html_lang" >&2; exit 1; }
+            printf '%s' "$page" | grep -q 'name="password"' || {
+              echo "/login?lang=$lang lost its password field" >&2; exit 1; }
+            echo "/login?lang=$lang ok"
+          done
+
+          # A signed-out visitor must be sent to the sign-in page rather than an
+          # error page, which proves auth still runs ahead of every page handler.
+          for path in / /organization /members /reports; do
+            result=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' "$base$path")
+            code=${result%% *}
+            location=${result#* }
+            if [ "$code" != 302 ] || [ "$location" != "$base/login" ]; then
+              echo "$path expected 302 to $base/login, got $code $location" >&2
+              exit 1
+            fi
+            echo "$path redirects to /login"
+          done
