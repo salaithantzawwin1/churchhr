@@ -372,10 +372,20 @@ export function OrganizationPage(props: Common & {
       hasTeam: leaders.some((l) => l.scope_type === "region" && l.region_id === r.id),
     }))
     .filter((r) => r.churches.length > 0 || r.hasTeam);
-  const members = cells.reduce((sum, c) => sum + c.member_count, 0);
+  // The four summary tiles describe the tab in front of the user, not the whole
+  // registry: Main Church counts only that church, Church Structure counts the
+  // selected church, and a filtered Regions view counts that region.
+  const statsCells = tab === "main"
+    ? cells.filter((c) => mainChurches.some((church) => church.id === c.regional_church_id))
+    : tab === "church"
+      ? scopedCells
+      : tab === "regional" && region != null
+        ? cells.filter((c) => c.region_id === region)
+        : cells;
+  const members = statsCells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
-    ? cells.filter((c) => leaderFor(leaders, "home_cell", leadCode, { scopeId: c.id })).length
+    ? statsCells.filter((c) => leaderFor(leaders, "home_cell", leadCode, { scopeId: c.id })).length
     : 0;
   const canEdit = perms.has("members.update");
   const canManageOptions = perms.has("options.manage");
@@ -934,7 +944,7 @@ export function OrganizationPage(props: Common & {
       </div>
 
       <div class="stat-grid org-stats">
-        <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
+        <div class="stat"><div class="n">{statsCells.length}</div><div class="t">{t("org.cells")}</div></div>
         <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
         <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
         <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
@@ -1168,8 +1178,10 @@ export function OrganizationPage(props: Common & {
           <div class="card org-empty">
             <h2>{t("org.mainChurch")}</h2>
             <p class="muted">{t("org.mainChurchEmpty")}</p>
-            {canManageStructure && (
-              <a class="btn secondary" href="/organization/regional-churches">{t("org.addRegional")}</a>
+            {canManageStructure ? (
+              <a class="btn secondary" href="/organization/regional-churches">{t("org.manageRegional")}</a>
+            ) : (
+              <a class="btn secondary" href="/organization?tab=regional">{t("org.regionalTab")}</a>
             )}
           </div>
         ) : mainChurches.map((church) => {
