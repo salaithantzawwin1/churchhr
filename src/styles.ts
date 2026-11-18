@@ -639,7 +639,7 @@ th.bar-col { width: 42%; }
 .modal-body form > .actions { margin-top: 0; }
 .modal-body form > .actions:last-child {
   position: sticky; bottom: -18px; z-index: 1; margin-top: auto;
-  margin-left: -20px; margin-right: -20px; margin-bottom: -18px; padding: 12px 20px;
+  margin-left: -20px; margin-right: -20px; margin-bottom: -18px; padding: 12px 20px 16px;
   background: var(--card); border-top: 1px solid var(--line);
   justify-content: flex-end;
 }
@@ -2294,7 +2294,9 @@ details.regional-attached { display: block; }
    grid of township columns, so a state with many cells scrolls inside its own
    panel instead of stretching the dialog. */
 .modal-body .cluster-main-form > .actions:last-child {
-  position: static; margin: 0; padding: 12px 0 0; border: 0;
+  /* A little air under the primary button: flush with the sheet's bottom edge
+     the Add button read as if it had been clipped by the dialog. */
+  position: static; margin: 0; padding: 12px 0 6px; border: 0;
   border-top: 1px dashed var(--line); background: none; justify-content: flex-end;
 }
 .modal-body .cluster-main-form { flex: 0 0 auto; gap: 14px; margin-bottom: 0; }
@@ -3240,6 +3242,10 @@ th { font-size: 13px; }
     margin-left: -24px; margin-right: -24px; margin-bottom: 0;
     padding: 10px 24px; bottom: 0;
   }
+  /* The compact editors (New church, New department, Add pastor) close with a
+     plain row rather than the sticky bar, so the padding-bottom removed above
+     would leave their Add button against the card's bottom edge. */
+  .modal-body .cluster-main-form > .actions:last-child { padding-bottom: 18px; }
 }
 .flash { border-radius: var(--radius); }
 .footer { padding: 30px 16px 38px; font-size: 12.5px; }
