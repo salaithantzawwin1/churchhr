@@ -119,7 +119,9 @@ function userForm(v: {
   // swaps it live; the server renders the matching one). A password set on an
   // existing account always forces the change, so its hint keeps the sentence.
   const pwBase = v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit");
-  const pwForced = `${pwBase} ${t("adm.passwordMustChangeNote")}`;
+  // The edit hint already ends with the forced-change rule, so only the new
+  // account's text needs that sentence appended.
+  const pwForced = v.id === undefined ? `${pwBase} ${t("adm.passwordMustChangeNote")}` : pwBase;
   const pwHint = v.id === undefined && v.mustChange !== 1 ? pwBase : pwForced;
   return (
     <form method="post" action={action} class="user-form compact-form" data-user-form
@@ -141,9 +143,9 @@ function userForm(v: {
         <legend>{t("adm.accountSection")}</legend>
         <div class="form-grid">
           <label class="field">
-            <span class="lbl">Username {v.id === undefined && "*"}</span>
+            <span class="lbl">{t("profile.username")} {v.id === undefined && "*"}</span>
             <input type="text" name="username" value={v.username} required={v.id === undefined}
-              pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
+              pattern="[A-Za-z0-9_.\-]{3,32}" title={t("adm.usernameRule")} />
           </label>
           <label class="field">
             <span class="lbl">{t("profile.displayName")}</span>
@@ -540,7 +542,7 @@ export function RoleFormFragment(props: {
         <label class="field">
           <span class="lbl">{t("adm.roleName")} {isNew && "*"}</span>
           <input type="text" name="name" value={isNew ? v.name ?? "" : role?.name ?? ""}
-            required={isNew} maxLength={60} readOnly={!isNew && role?.is_system === 1}
+            required={isNew} maxLength={60} readOnly={!isNew && role?.is_system === 1 ? true : undefined}
             title={!isNew && role?.is_system === 1 ? t("adm.roleSystemLocked") : undefined} />
           <span class="field-hint">{isNew ? t("adm.roleNameHint") : role?.is_system === 1 ? t("adm.roleSystemLocked") : t("adm.roleNameHint")}</span>
         </label>
@@ -637,7 +639,7 @@ export function AdminRolesPage(props: RolesProps) {
                 <td class="muted" data-label="ID">{r.id}</td>
                 <td data-label={t("adm.roleName")}>
                   {roleName(r, t)}
-                  {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
+                  {r.is_system === 1 && <span class="badge" style="margin-left:6px">{t("adm.systemBadge")}</span>}
                   {(r.user_count ?? 0) > 0 && (
                     <span class="hint" style="display:block;font-size:12px">
                       {countLabel(t, "adm.roleUsers", r.user_count ?? 0)}
@@ -661,7 +663,7 @@ export function AdminRolesPage(props: RolesProps) {
                 </td>
                 <td data-label={t("members.status")}>
                   {r.is_system === 1
-                    ? <span class="badge active">system</span>
+                    ? <span class="badge active">{t("adm.systemBadge")}</span>
                     : <span class="badge inactive">—</span>}
                 </td>
                 <td class="row-actions-cell" data-label="">

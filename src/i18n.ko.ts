@@ -558,6 +558,8 @@ export const KO: Record<string, string> = {
   "adm.passwordSection": "비밀번호",
   "adm.passwordHintNew": "새 계정의 첫 비밀번호입니다. Generate로 강력한 비밀번호를 만들 수 있습니다.",
   "adm.passwordMustChangeNote": "다음 로그인 시 변경해야 합니다.",
+  "adm.usernameRule": "영문/숫자 3-32자, 마침표·밑줄·하이픈 포함 가능",
+  "adm.systemBadge": "시스템",
   "adm.passwordHintEdit": "비워 두면 현재 비밀번호가 유지됩니다. 여기서 설정하거나 Reset password로 발급한 새 비밀번호는 다음 로그인 시 변경해야 합니다.",
   "adm.generatePassword": "Generate",
   "adm.errDisplayName": "성명은 80자 이하여야 합니다.",
