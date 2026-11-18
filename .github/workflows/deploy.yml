@@ -46,6 +46,30 @@ jobs:
       - name: Audit production dependencies (moderate or worse fails the build)
         run: npm audit --omit=dev --audit-level=moderate
 
+      # Dev-only advisories still need to be seen, so every dependency is audited
+      # too. This step never fails the job: it reports the findings to the run
+      # summary (and the log) without holding up the deploy.
+      - name: Report dependency advisories, dev included (non-blocking)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          report=$(npm audit --audit-level=low 2>&1 || true)
+          printf '%s\n' "$report"
+          if printf '%s' "$report" | grep -q 'found 0 vulnerabilities'; then
+            echo "No advisories across production and dev dependencies." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Dependency advisories (non-blocking)"
+            echo ""
+            echo "Reported for visibility only. Dev-only packages never reach the Worker"
+            echo "bundle, so these advisories do not fail this deploy."
+            echo ""
+            echo '```'
+            printf '%s\n' "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Apply D1 migrations (remote)
         uses: cloudflare/wrangler-action@v3
         with:
