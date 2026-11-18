@@ -1,9 +1,11 @@
 name: Deploy to Cloudflare Workers
 
 # Every push to main typechecks, runs the Worker test suite (real workerd +
-# local D1 with the production migrations), refuses moderate-or-worse dependency
-# advisories and only then applies pending D1 migrations before deploying the
-# Worker, so neither failing code nor code ahead of the schema can ship.
+# local D1 with the production migrations), refuses moderate-or-worse advisories
+# in the production dependencies and only then applies pending D1 migrations
+# before deploying the Worker, so neither failing code nor code ahead of the
+# schema can ship. Dev-only tooling advisories (vitest/vite transitive packages)
+# do not affect what the Worker ships, so they are not audited here.
 # Cloudflare Workers Builds is also connected to main: keep its build command
 # applying migrations too, or disconnect it, so production has a single
 # migration-first deploy path.
@@ -38,8 +40,11 @@ jobs:
       - name: Test (workerd + local D1)
         run: npm test
 
-      - name: Audit dependencies (moderate or worse fails the build)
-        run: npm audit --audit-level=moderate
+      # Only production dependencies are audited: the Worker bundle ships those.
+      # Dev tooling advisories would otherwise block deploys for packages that
+      # never reach production.
+      - name: Audit production dependencies (moderate or worse fails the build)
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Apply D1 migrations (remote)
         uses: cloudflare/wrangler-action@v3
