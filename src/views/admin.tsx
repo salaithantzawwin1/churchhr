@@ -2,7 +2,7 @@ import { CapsHint, PwToggle } from "./auth";
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { canManageStructure, PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
+import { canManageStructure, PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, STRUCTURE_PERMISSIONS, type Permission } from "../rbac";
 import { countLabel, getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
@@ -97,6 +97,17 @@ function userForm(v: {
       grantedBy.set(p, names);
     }
   }
+  // options.manage implies every structures.* permission (canManageStructure),
+  // so a role holding only options.manage must not read as denied here: the pane
+  // names that role and says the grant comes through options.manage.
+  const optionsRoles = grantedBy.get("options.manage") ?? [];
+  const impliedBy = new Map<string, string[]>();
+  if (optionsRoles.length > 0) {
+    for (const p of STRUCTURE_PERMISSIONS) {
+      if (!grantedBy.has(p)) impliedBy.set(p, optionsRoles);
+    }
+  }
+  const grantedCount = new Set([...grantedBy.keys(), ...impliedBy.keys()]).size;
   const roleNames = props.roles.filter((r) => v.selectedRoles.includes(r.id)).map((r) => r.name).join(", ");
   const stateNames = props.regions.filter((r) => v.selectedStates.includes(r.id)).map((r) => r.name);
   const scopeText = v.allStates ? t("adm.allStates") : stateNames.join(", ") || "—";
@@ -113,7 +124,7 @@ function userForm(v: {
           aria-selected="false">{t("adm.accessTab")}</button>
         <button type="button" role="tab" class="position-tab" data-tab-target="perms"
           aria-selected="false">{t("adm.permsTab")}<span class="tab-count" data-perm-count
-          >{grantedBy.size}/{PERMISSIONS.length}</span></button>
+          >{grantedCount}/{PERMISSIONS.length}</span></button>
       </div>
       <div class="modal-form-panes" data-tabs-body>
         <section class="modal-form-pane" data-tab-pane="account" role="tabpanel">
@@ -223,19 +234,24 @@ function userForm(v: {
         <span class="perm-summary-item"><span class="perm-summary-key">{t("adm.homeCellScope")}</span>
           <strong>{cellText}</strong></span>
       </p>
-      <div class="perm-groups perm-groups-compact" data-perm-preview>
+      <div class="perm-groups perm-groups-compact" data-perm-preview data-perm-via={t("adm.permViaOptions")}>
         {permissionGroups().map((g) => (
           <div class="perm-group">
             <p class="perm-group-label">{t(g.labelKey)}</p>
             <div class="perm-list perm-list-rows">
               {g.permissions.map((p) => {
-                const by = grantedBy.get(p) ?? [];
+                const direct = grantedBy.get(p) ?? [];
+                const implied = direct.length > 0 ? [] : impliedBy.get(p) ?? [];
+                const on = direct.length > 0 || implied.length > 0;
+                const by = direct.length > 0
+                  ? direct.join(", ")
+                  : implied.length > 0 ? `${implied.join(", ")} · ${t("adm.permViaOptions")}` : "";
                 return (
-                  <div class={`perm-row ${by.length ? "is-on" : "is-off"}`} data-perm-row={p}>
-                    <span class="perm-mark" aria-hidden="true">{by.length ? "✓" : "–"}</span>
+                  <div class={`perm-row ${on ? "is-on" : "is-off"}`} data-perm-row={p}>
+                    <span class="perm-mark" aria-hidden="true">{on ? "✓" : "–"}</span>
                     <span class="perm-name">{PL[p]}</span>
                     <span class="perm-code">{p}</span>
-                    <span class="perm-by" data-perm-by>{by.join(", ")}</span>
+                    <span class="perm-by" data-perm-by>{by}</span>
                   </div>
                 );
               })}

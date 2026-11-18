@@ -534,19 +534,36 @@
         if (roleName && byPerm[p].indexOf(roleName) === -1) byPerm[p].push(roleName);
       });
     });
+    // options.manage implies every structures.* permission (canManageStructure),
+    // so those must read as granted, naming the role that carries options.manage.
+    var viaLabel = preview.getAttribute("data-perm-via") || "";
+    var implied = {};
+    var optionsRoles = byPerm["options.manage"] || [];
+    if (optionsRoles.length) {
+      Array.prototype.forEach.call(preview.querySelectorAll("[data-perm-row]"), function (row) {
+        var p = row.getAttribute("data-perm-row");
+        if (p.indexOf("structures.") === 0 && !byPerm[p]) implied[p] = optionsRoles;
+      });
+    }
     Array.prototype.forEach.call(preview.querySelectorAll("[data-perm-row]"), function (row) {
-      var names = byPerm[row.getAttribute("data-perm-row")] || [];
-      var on = names.length > 0;
+      var p = row.getAttribute("data-perm-row");
+      var names = byPerm[p] || [];
+      var through = implied[p] || [];
+      var on = names.length > 0 || through.length > 0;
       row.classList.toggle("is-on", on);
       row.classList.toggle("is-off", !on);
       var mark = row.querySelector(".perm-mark");
       if (mark) mark.textContent = on ? "✓" : "–";
       var label = row.querySelector("[data-perm-by]");
-      if (label) label.textContent = names.join(", ");
+      if (label) {
+        label.textContent = names.length > 0 ? names.join(", ")
+          : through.length > 0 ? through.join(", ") + " · " + viaLabel : "";
+      }
     });
     var count = form.querySelector("[data-perm-count]");
     if (count) {
-      count.textContent = granted + "/" + preview.querySelectorAll("[data-perm-row]").length;
+      count.textContent = (granted + Object.keys(implied).length)
+        + "/" + preview.querySelectorAll("[data-perm-row]").length;
     }
   }
 

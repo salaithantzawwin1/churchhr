@@ -162,6 +162,14 @@ beforeAll(async () => {
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('In-Scope Cluster', 1)"),
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Out-of-Scope Cluster', 2)"),
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Delete Me Cluster', 1)"),
+    // A role that never received the granular structures.* rows: options.manage
+    // alone still lets it manage structure (canManageStructure), so the account
+    // dialog has to show those permissions as granted, not denied.
+    db.prepare("INSERT INTO roles (id, name, description, is_system) VALUES (10, 'Legacy Options Manager', 'test', 0)"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (10, 'options.manage')"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (9, 'optionsmgr', 'x', 1, 0)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (9, 10)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (9, 1)"),
   ]);
   for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID, STRUCT_ID]) {
     sessions.set(id, await createSession(id));
@@ -250,6 +258,18 @@ describe("app-wide account and role settings", () => {
     // The pane names the role that grants the permission, so a tick is traceable.
     expect(html).toContain('data-perm-row="members.view"');
     expect(html).toContain("Viewer");
+  });
+
+  it("reads options.manage as granting every structure permission", async () => {
+    const res = await getAs("/admin/users/9/edit?modal=1", ADMIN_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    // The role holds options.manage only; canManageStructure still lets it edit
+    // structures, so the pane must not report those as denied.
+    expect(html).toContain('class="perm-row is-on" data-perm-row="options.manage"');
+    expect(html).toContain('class="perm-row is-on" data-perm-row="structures.create"');
+    expect(html).toContain('class="perm-row is-on" data-perm-row="structures.delete"');
+    expect(html).toContain("via options.manage");
   });
 });
 
