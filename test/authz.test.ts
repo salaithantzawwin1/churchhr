@@ -272,6 +272,16 @@ describe("app-wide account and role settings", () => {
     expect(html).toContain("via options.manage");
   });
 
+  it("keeps the password rule in a tooltip with the meter beside Generate", async () => {
+    const html = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    // The rule is available on the info dot instead of a permanent hint line.
+    expect(html).toContain('class="field-tip"');
+    expect(html).toContain("Leave blank to keep the current password");
+    expect(html).not.toContain('<span class="hint">Leave blank');
+    // app.js renders the strength meter into this slot, next to Generate.
+    expect(html).toContain("data-strength-slot");
+  });
+
   it("shows options.manage's structure rights on the roles list and editor", async () => {
     const list = await (await getAs("/admin/roles", ADMIN_ID)).text();
     // The list names the permissions the role can use through options.manage.

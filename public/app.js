@@ -35,7 +35,10 @@
     try { labels = JSON.parse(raw); } catch (e) { labels = raw ? raw.split(",") : []; }
     meter.innerHTML = '<div class="pw-bars"><span></span><span></span><span></span><span></span></div>' +
       '<span class="pw-label"></span>';
-    wrap.appendChild(meter);
+    // A field may reserve a spot for the meter (the account form puts it beside
+    // Generate); otherwise it goes under the input as before.
+    var slot = wrap.querySelector("[data-strength-slot]");
+    (slot || wrap).appendChild(meter);
     var labelsEl = meter.querySelector(".pw-label");
     function update() {
       var r = scorePassword(input.value);

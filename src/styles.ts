@@ -1971,11 +1971,38 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .modal-body .user-form.compact-form .check-grid { gap: 6px; }
 .modal-body .user-form.compact-form .check-chip { padding: 5px 8px; gap: 6px; font-size: 12.5px; }
 /* The password field shares the Account grid row with Language. At half width an
-   input and the Generate button cannot sit on one line, so the button drops
-   under the input (the shape the .pw-row already takes on a phone). */
+   input and the Generate button cannot share a line, so the input takes the row
+   and the strength meter sits beside Generate underneath it. */
 .modal-body .user-form .pw-field .pw-wrap { flex: 1 1 100%; }
 .modal-body .user-form .pw-field .pw-row { flex-wrap: wrap; }
-.modal-body .user-form .pw-field .pw-row .btn { width: auto; }
+.modal-body .user-form .pw-field .pw-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
+.modal-body .user-form .pw-field .pw-actions .btn { width: auto; }
+.modal-body .user-form .pw-field .pw-strength-slot { flex: 1 1 auto; min-width: 0; }
+.modal-body .user-form .pw-field .pw-strength { margin-top: 0; }
+.modal-body .user-form .pw-field .pw-strength .pw-bars span { width: 16px; }
+/* A rule that belongs to a field label: an info dot whose text appears on hover
+   and on keyboard focus, so the rule stays reachable without a permanent line
+   of hint text pushing the sheet taller. */
+.lbl-row { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; min-width: 0; }
+.lbl-row .lbl { margin-bottom: 0; }
+.field-tip { position: relative; display: inline-flex; flex: none; }
+.field-tip-btn {
+  width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line-strong); background: var(--field-bg);
+  color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; cursor: help;
+}
+.field-tip-btn:hover, .field-tip-btn:focus-visible { color: var(--ink); border-color: var(--link); }
+.field-tip::after {
+  /* Anchored to the icon's right edge so a bubble in the right-hand column grows
+     leftwards: centred, it would overflow the sheet and add a scrollbar. */
+  content: attr(data-tip); position: absolute; right: 0; left: auto; bottom: calc(100% + 6px);
+  z-index: 6; width: max-content; max-width: min(240px, 62vw); padding: 7px 9px;
+  border-radius: var(--radius-sm); background: var(--ink); color: var(--card);
+  font-size: 11.5px; font-weight: 500; line-height: 1.45; text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
+}
+.field-tip:hover::after, .field-tip:focus-within::after { opacity: 1; visibility: visible; }
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }
 

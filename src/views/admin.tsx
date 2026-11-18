@@ -112,6 +112,9 @@ function userForm(v: {
   const stateNames = props.regions.filter((r) => v.selectedStates.includes(r.id)).map((r) => r.name);
   const scopeText = v.allStates ? t("adm.allStates") : stateNames.join(", ") || "—";
   const cellText = v.homeCellIds.length ? `${v.homeCellIds.length} / ${props.homeCells.length}` : "—";
+  // Shown on the info dot beside the password label instead of a permanent line
+  // under the field: it is a rule, not something to read while typing.
+  const pwHint = v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit");
   return (
     <form method="post" action={action} class="user-form compact-form" data-user-form
       data-flash-ok={v.id ? "user-updated" : "user-created"}>
@@ -155,7 +158,12 @@ function userForm(v: {
               Generate button drops under the input (see .pw-field), which keeps
               the sheet one section shorter than a full password block. */}
           <div class="field pw-field">
-            <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
+            <span class="lbl-row">
+              <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
+              <span class="field-tip" data-tip={pwHint}>
+                <button type="button" class="field-tip-btn" aria-label={pwHint} title={pwHint}>i</button>
+              </span>
+            </span>
             <div class="pw-row">
               <span class="pw-wrap">
                 <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
@@ -164,10 +172,14 @@ function userForm(v: {
                   data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
                 <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
               </span>
-              <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+              <span class="pw-actions">
+                <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+                {/* app.js fills this with the strength meter, so the bars sit
+                    beside Generate instead of under the input. */}
+                <span class="pw-strength-slot" data-strength-slot></span>
+              </span>
             </div>
             <CapsHint label={t("pw.capsLock")} />
-            <span class="hint">{v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit")}</span>
           </div>
         </div>
       </fieldset>
