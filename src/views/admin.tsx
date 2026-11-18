@@ -193,7 +193,6 @@ function userForm(v: {
             <input type="checkbox" name="must_change" value="1" checked={v.mustChange === 1} /> <span>{t("adm.mustChange")}</span>
           </label>
         </div>
-        <p class="hint">{t("adm.mustChangeHint")}</p>
       </fieldset>
         </section>
         <section class="modal-form-pane" data-tab-pane="access" role="tabpanel">

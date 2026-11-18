@@ -277,6 +277,10 @@ describe("app-wide account and role settings", () => {
     // The rule is available on the info dot instead of a permanent hint line.
     expect(html).toContain('class="field-tip"');
     expect(html).toContain("Leave blank to keep the current password");
+    // The Reset-password clause lives in the tooltip rather than repeating under
+    // Status, so the sheet explains it once.
+    expect(html).toContain("issued by Reset password");
+    expect(html).not.toContain("A new password set here");
     expect(html).not.toContain('<span class="hint">Leave blank');
     // app.js renders the strength meter into this slot, next to Generate.
     expect(html).toContain("data-strength-slot");
