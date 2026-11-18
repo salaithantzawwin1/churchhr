@@ -1325,6 +1325,7 @@ export const KO: Record<string, string> = {
   "org.allRegionalOversight": "지역 리더십",
   "org.allRegionalOversightHint": "각 지역의 리더 팀과 담당 교회입니다.",
   "org.allCoverage": "홈셀 리더 현황",
+  "org.allCoverageNoCells": "아직 홈셀이 없는 교회 {n}곳",
   "org.allCoverageHint": "홈셀에 리더가 있는지 보여줍니다.",
   "org.allVacancySummary": "리더 공석",
   "org.allVacancySummaryHint": "아직 리더가 없는 직책입니다.",

@@ -69,6 +69,19 @@ export type OrgLeader = {
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
+/** Coverage rows for the All tab: churches that have Home Cells come first,
+ * weakest coverage at the top so gaps appear before the healthy churches.
+ * Churches without a single Home Cell have no percentage to compare, so they are
+ * counted instead of listed as a column of 0/0 bars. */
+export function splitCoverageRows<T extends { pct: number; total: number; name: string }>(
+  rows: T[],
+): { ranked: T[]; withoutCells: number } {
+  const ranked = rows
+    .filter((row) => row.total > 0)
+    .sort((a, b) => a.pct - b.pct || b.total - a.total || a.name.localeCompare(b.name));
+  return { ranked, withoutCells: rows.filter((row) => row.total === 0).length };
+}
+
 type TownshipGroup = { id: number | null; name: string; cells: OrgCell[] };
 type SupervisionGroup = {
   kind: "cluster" | "township"; id: number | null; name: string; cells: OrgCell[];
@@ -673,6 +686,19 @@ export function OrganizationPage(props: Common & {
   const regionalTeam = (regionId: number, position: string) =>
     leadersFor(leaders, "region", position, { regionId });
 
+  const coverageRows = regionalChurches.map((church) => {
+    const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+    const filled = leadCode ? churchCells.filter((c) => homeRole(c.id, leadCode)).length : 0;
+    return {
+      church,
+      name: regionalChurchName(church, L),
+      filled,
+      total: churchCells.length,
+      pct: churchCells.length ? Math.round((filled / churchCells.length) * 100) : 0,
+    };
+  });
+  const { ranked: coveredChurches, withoutCells: churchesWithoutCells } = splitCoverageRows(coverageRows);
+
   // Home Cell tab: ?gap= narrows the chart to the cells that need attention.
   // The cell whose structure is open is always kept, so saving the last vacancy
   // of a filtered cell never yanks its card away mid-edit.
@@ -1173,25 +1199,26 @@ export function OrganizationPage(props: Common & {
                   <h2>{t("org.allCoverage")}</h2>
                   <p class="muted small">{t("org.allCoverageHint")}</p>
                 </div>
-                <span class="org-all-coverage-total">{allCoverage}%</span>
+                <span class="org-all-coverage-total">
+                  {withLeader} / {cells.length} {pluralLabel(t, "org.cells", cells.length)}
+                </span>
               </div>
-              <progress class="org-all-progress" value={allCoverage} max={100} aria-label={t("org.allCoverage")} />
+              <progress class="org-all-progress" value={allCoverage} max={100}
+                aria-label={`${t("org.allCoverage")}: ${withLeader} / ${cells.length}`} />
               <div class="org-all-list org-all-coverage-list">
-                {regionalChurches.slice(0, 8).map((church) => {
-                  const churchCells = cells.filter((c) => c.regional_church_id === church.id);
-                  const churchLeaders = leadCode
-                    ? churchCells.filter((c) => homeRole(c.id, leadCode)).length
-                    : 0;
-                  const pct = churchCells.length ? Math.round((churchLeaders / churchCells.length) * 100) : 0;
-                  return (
-                    <div class="org-all-coverage-row">
-                      <span class="org-all-coverage-name">{regionalChurchName(church, L)}</span>
-                      <progress class="org-all-progress" value={pct} max={100} aria-label={`${regionalChurchName(church, L)}: ${pct}%`} />
-                      <span class="muted small">{churchLeaders}/{churchCells.length}</span>
-                    </div>
-                  );
-                })}
+                {coveredChurches.map((row) => (
+                  <div class="org-all-coverage-row">
+                    <span class="org-all-coverage-name">{row.name}</span>
+                    <progress class="org-all-progress" value={row.pct} max={100} aria-label={`${row.name}: ${row.pct}%`} />
+                    <span class="muted small">{row.filled}/{row.total}</span>
+                  </div>
+                ))}
               </div>
+              {churchesWithoutCells > 0 && (
+                <p class="muted small org-all-coverage-none">
+                  {t("org.allCoverageNoCells").replace("{n}", String(churchesWithoutCells))}
+                </p>
+              )}
               <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.allViewHomeCells")}</a>
             </section>
           </div>
