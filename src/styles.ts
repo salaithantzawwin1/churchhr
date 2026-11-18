@@ -1835,10 +1835,19 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .org-region-role.org-vacant { background: var(--chip-muted-bg, transparent); }
 .org-region-holders { display: grid; gap: 6px; }
-.org-region-holder { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
+.org-region-holder { display: flex; align-items: flex-start; gap: 7px; min-width: 0; }
+/* A name and its priority stack instead of sharing one narrow line: Burmese
+   glyphs are tall, and squeezing the two inline pushed the wrapped name down
+   onto the "Add leader" button under the card. */
+.org-person { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.5; }
+.org-person > a, .org-person > span { overflow-wrap: anywhere; }
+.org-person-meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.org-region-role > .btn { margin-top: 2px; }
+.org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.org-mini-person a { overflow-wrap: anywhere; }
 .org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
-.org-node-extra-person { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.org-node-extra-person { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; line-height: 1.5; }
+.org-node-extra-person a { overflow-wrap: anywhere; }
 .region-holder-list { display: grid; gap: 7px; margin: 12px 0; }
 .region-holder-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
@@ -2793,13 +2802,14 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-dept-title h3 { margin: 0 0 2px; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
 .org-dept-title h3 a { color: var(--ink); text-decoration: none; }
 .org-dept-title h3 a:hover { color: var(--link); text-decoration: underline; }
-.org-dept-lead { display: flex; flex-direction: column; gap: 2px; padding: 9px 0 0; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+.org-dept-lead { display: flex; flex-direction: column; gap: 3px; padding: 9px 0 0; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; line-height: 1.6; }
+.org-dept-lead .org-node-role { line-height: 1.4; }
 .org-dept-lead a { color: var(--ink); text-decoration: none; }
 .org-dept-lead a:hover { color: var(--link); text-decoration: underline; }
 .org-mini-list { display: grid; gap: 7px; }
 .org-mini { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 12.5px; }
 .org-mini > div { display: flex; flex-direction: column; min-width: 0; }
-.org-mini-role { color: var(--muted); font-size: 10.5px; line-height: 1.3; }
+.org-mini-role { color: var(--muted); font-size: 10.5px; line-height: 1.4; }
 .org-mini a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
 .org-mini a:hover { color: var(--link); text-decoration: underline; }
 .org-mini.org-vacant { opacity: .72; }

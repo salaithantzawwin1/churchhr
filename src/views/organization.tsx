@@ -1548,10 +1548,10 @@ export function OrganizationPage(props: Common & {
                                     {team.map((person) => (
                                       <div class="org-region-holder">
                                         <LeaderAvatar leader={person} size="sm" />
-                                        <div>
+                                        <div class="org-person">
                                           <LeaderLink leader={person} empty={t("org.vacant")} />
                                           {def.allowMultiple === 1 && (
-                                            <span class="muted small"> · {t("org.priority")} {person.priority}</span>
+                                            <span class="org-person-meta">{t("org.priority")} {person.priority}</span>
                                           )}
                                         </div>
                                       </div>
