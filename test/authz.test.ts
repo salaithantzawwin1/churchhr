@@ -286,6 +286,19 @@ describe("app-wide account and role settings", () => {
     expect(html).toContain("data-strength-slot");
   });
 
+  it("only promises a forced password change while the new account requires it", async () => {
+    const create = await (await getAs("/admin/users/new", ADMIN_ID)).text();
+    // Two variants travel with the tooltip: app.js shows the forced-change one
+    // only while "Require password change on login" is ticked, the other when it
+    // is not, so an unticked box never claims a change will be forced.
+    expect(create).toContain("data-tip-on=");
+    expect(create).toContain("data-tip-off=");
+    expect(create).toMatch(/data-tip="[^"]*must be changed at the next sign-in/);
+    const edit = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    // A password set on an existing account always forces the change.
+    expect(edit).not.toContain("data-tip-on=");
+  });
+
   it("shows options.manage's structure rights on the roles list and editor", async () => {
     const list = await (await getAs("/admin/roles", ADMIN_ID)).text();
     // The list names the permissions the role can use through options.manage.

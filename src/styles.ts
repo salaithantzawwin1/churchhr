@@ -2003,6 +2003,14 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
 }
 .field-tip:hover::after, .field-tip:focus-within::after { opacity: 1; visibility: visible; }
+/* A dot in a field's label anchors its bubble to the field instead of to the
+   16px dot: a bubble sized against the dot runs off the sheet's left edge on a
+   phone, while a field-width panel fits the narrowest layout there is. */
+.pw-field { position: relative; }
+.pw-field .field-tip { position: static; }
+.pw-field .field-tip::after {
+  left: 0; right: 0; width: auto; max-width: none; bottom: calc(100% + 4px);
+}
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }
 

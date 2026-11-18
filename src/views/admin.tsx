@@ -113,8 +113,14 @@ function userForm(v: {
   const scopeText = v.allStates ? t("adm.allStates") : stateNames.join(", ") || "—";
   const cellText = v.homeCellIds.length ? `${v.homeCellIds.length} / ${props.homeCells.length}` : "—";
   // Shown on the info dot beside the password label instead of a permanent line
-  // under the field: it is a rule, not something to read while typing.
-  const pwHint = v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit");
+  // under the field: it is a rule, not something to read while typing. A new
+  // account only has to change its first password when "Require password change
+  // on login" is ticked, so the forced-change sentence follows that box (app.js
+  // swaps it live; the server renders the matching one). A password set on an
+  // existing account always forces the change, so its hint keeps the sentence.
+  const pwBase = v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit");
+  const pwForced = `${pwBase} ${t("adm.passwordMustChangeNote")}`;
+  const pwHint = v.id === undefined && v.mustChange !== 1 ? pwBase : pwForced;
   return (
     <form method="post" action={action} class="user-form compact-form" data-user-form
       data-flash-ok={v.id ? "user-updated" : "user-created"}>
@@ -160,7 +166,9 @@ function userForm(v: {
           <div class="field pw-field">
             <span class="lbl-row">
               <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
-              <span class="field-tip" data-tip={pwHint}>
+              <span class="field-tip" data-tip={pwHint}
+                data-tip-on={v.id === undefined ? pwForced : undefined}
+                data-tip-off={v.id === undefined ? pwBase : undefined}>
                 <button type="button" class="field-tip-btn" aria-label={pwHint} title={pwHint}>i</button>
               </span>
             </span>

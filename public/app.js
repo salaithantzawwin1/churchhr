@@ -570,6 +570,30 @@
     }
   }
 
+  // New account: the password tooltip only promises a forced change while
+  // "Require password change on login" is ticked, so it follows that box.
+  function initMustChangeTip(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("form[data-user-form]"), function (form) {
+      var box = form.querySelector('input[name="must_change"]');
+      var tip = form.querySelector(".field-tip[data-tip-on]");
+      if (!box || !tip || tip.getAttribute("data-tip-bound")) return;
+      tip.setAttribute("data-tip-bound", "1");
+      function apply() {
+        var text = box.checked ? tip.getAttribute("data-tip-on") : tip.getAttribute("data-tip-off");
+        if (!text) return;
+        tip.setAttribute("data-tip", text);
+        var btn = tip.querySelector(".field-tip-btn");
+        if (btn) {
+          btn.setAttribute("aria-label", text);
+          btn.setAttribute("title", text);
+        }
+      }
+      box.addEventListener("change", apply);
+      apply();
+    });
+  }
+  initMustChangeTip(document);
+
   function initUserPermPreview(root) {
     Array.prototype.forEach.call(root.querySelectorAll("form[data-user-form]"), function (form) {
       if (form.getAttribute("data-perm-init")) return;
@@ -1773,6 +1797,7 @@
     });
     initRegionCascade(bodyEl);
     initCellStateScope(bodyEl);
+    initMustChangeTip(bodyEl);
     initUserPermPreview(bodyEl);
     initDatePickers(bodyEl);
     initHeadPicker(bodyEl);
