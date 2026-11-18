@@ -299,6 +299,40 @@ describe("app-wide account and role settings", () => {
     expect(edit).not.toContain("data-tip-on=");
   });
 
+  it("states the forced password change once in the edit tooltip", async () => {
+    const html = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    const tip = html.match(/data-tip="([^"]*)"/)?.[1] ?? "";
+    const sentence = "must be changed at the next sign-in";
+    // The edit hint already ends with the rule; appending the new-account note
+    // too made the tooltip say it twice.
+    expect(tip).toContain(sentence);
+    expect(tip.split(sentence).length - 1).toBe(1);
+  });
+
+  it("keeps the forced-change promise out of the unticked new-account tooltip", async () => {
+    const html = await (await getAs("/admin/users/new", ADMIN_ID)).text();
+    const on = html.match(/data-tip-on="([^"]*)"/)?.[1] ?? "";
+    const off = html.match(/data-tip-off="([^"]*)"/)?.[1] ?? "";
+    const sentence = "must be changed at the next sign-in";
+    // app.js picks between the two wordings, so the unticked wording must not
+    // carry the promise at all.
+    expect(on).toContain(sentence);
+    expect(on.split(sentence).length - 1).toBe(1);
+    expect(off.length).toBeGreaterThan(0);
+    expect(off).not.toContain(sentence);
+  });
+
+  it("keeps custom role names editable and system role names locked", async () => {
+    const nameInput = (html: string) => html.match(/<input[^>]*name="name"[^>]*>/)?.[0] ?? "";
+    const custom = nameInput(await (await getAs("/admin/roles/10/edit?modal=1", ADMIN_ID)).text());
+    // readOnly={false} rendered as readOnly="false", which browsers still treat
+    // as a present, locking attribute, so no readonly attribute may appear here.
+    expect(custom).toContain('value="Legacy Options Manager"');
+    expect(custom).not.toMatch(/readonly/i);
+    const system = nameInput(await (await getAs("/admin/roles/1/edit?modal=1", ADMIN_ID)).text());
+    expect(system).toMatch(/readonly/i);
+  });
+
   it("shows options.manage's structure rights on the roles list and editor", async () => {
     const list = await (await getAs("/admin/roles", ADMIN_ID)).text();
     // The list names the permissions the role can use through options.manage.
