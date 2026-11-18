@@ -238,6 +238,19 @@ describe("app-wide account and role settings", () => {
   it("still serves ordinary pages to the scoped manager", async () => {
     expect((await getAs("/members", SCOPED_ADMIN_ID)).status).toBe(200);
   });
+
+  it("shows one account's allowed and missing permissions in its edit modal", async () => {
+    const res = await getAs("/admin/users/3/edit?modal=1", ADMIN_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    // The Viewer holds dashboard.view and members.view, nothing that writes.
+    expect(html).toContain('class="perm-row is-on" data-perm-row="members.view"');
+    expect(html).toContain('class="perm-row is-off" data-perm-row="members.create"');
+    expect(html).toContain('class="perm-row is-off" data-perm-row="users.manage"');
+    // The pane names the role that grants the permission, so a tick is traceable.
+    expect(html).toContain('data-perm-row="members.view"');
+    expect(html).toContain("Viewer");
+  });
 });
 
 describe("role and account safety", () => {

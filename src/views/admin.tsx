@@ -49,7 +49,7 @@ export type AdminUserRow = {
 
 type UsersProps = Common & {
   users: (AdminUserRow & { state_names?: string })[];
-  roles: { id: number; name: string; description: string | null }[];
+  roles: { id: number; name: string; description: string | null; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] }) | null;
   homeCells?: { id: number; name: string; regionId?: number }[];
@@ -77,13 +77,33 @@ function userForm(v: {
   active: number;
   mustChange: number;
 }, props: {
-  roles: { id: number; name: string }[];
+  /** Role permissions travel with each role, so the Permissions pane can show
+   *  what the ticked roles grant without a second lookup. */
+  roles: { id: number; name: string; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   homeCells: { id: number; name: string; regionId?: number }[];
-}, t: (k: string) => string) {
+}, t: (k: string) => string, PL: Record<string, string>) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
+  // Every permission the ticked roles grant, with the role names that grant it:
+  // the Permissions pane answers "what may this account do, project-wide?"
+  // including what it may not. app.js keeps this in step while roles are ticked.
+  const grantedBy = new Map<string, string[]>();
+  for (const id of v.selectedRoles) {
+    const role = props.roles.find((r) => r.id === id);
+    if (!role) continue;
+    for (const p of role.permissions ?? []) {
+      const names = grantedBy.get(p) ?? [];
+      if (!names.includes(role.name)) names.push(role.name);
+      grantedBy.set(p, names);
+    }
+  }
+  const roleNames = props.roles.filter((r) => v.selectedRoles.includes(r.id)).map((r) => r.name).join(", ");
+  const stateNames = props.regions.filter((r) => v.selectedStates.includes(r.id)).map((r) => r.name);
+  const scopeText = v.allStates ? t("adm.allStates") : stateNames.join(", ") || "—";
+  const cellText = v.homeCellIds.length ? `${v.homeCellIds.length} / ${props.homeCells.length}` : "—";
   return (
-    <form method="post" action={action} class="user-form" data-flash-ok={v.id ? "user-updated" : "user-created"}>
+    <form method="post" action={action} class="user-form compact-form" data-user-form
+      data-flash-ok={v.id ? "user-updated" : "user-created"}>
       {/* Two short panes instead of one long sheet: identity and password on
           Account, everything about what the account may see on Access. */}
       <div class="position-tabs modal-form-tabs" data-tabs role="tablist" aria-label={t("adm.accountSection")}>
@@ -91,6 +111,9 @@ function userForm(v: {
           aria-selected="true">{t("adm.accountSection")}</button>
         <button type="button" role="tab" class="position-tab" data-tab-target="access"
           aria-selected="false">{t("adm.accessTab")}</button>
+        <button type="button" role="tab" class="position-tab" data-tab-target="perms"
+          aria-selected="false">{t("adm.permsTab")}<span class="tab-count" data-perm-count
+          >{grantedBy.size}/{PERMISSIONS.length}</span></button>
       </div>
       <div class="modal-form-panes" data-tabs-body>
         <section class="modal-form-pane" data-tab-pane="account" role="tabpanel">
@@ -157,6 +180,7 @@ function userForm(v: {
           {props.roles.map((r) => (
             <label class="check-chip">
               <input type="checkbox" name="roles" value={String(r.id)}
+                data-role-name={r.name} data-role-perms={(r.permissions ?? []).join(" ")}
                 checked={v.selectedRoles.includes(r.id)} /> <span>{r.name}</span>
             </label>
           ))}
@@ -190,6 +214,37 @@ function userForm(v: {
         <p class="hint" data-cell-scope-empty hidden>{t("adm.noCellForState")}</p>
       </fieldset>
         </section>
+        <section class="modal-form-pane" data-tab-pane="perms" role="tabpanel">
+      <p class="perm-summary">
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("nav.roles")}</span>
+          <strong>{roleNames || "—"}</strong></span>
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("adm.stateScope")}</span>
+          <strong>{scopeText}</strong></span>
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("adm.homeCellScope")}</span>
+          <strong>{cellText}</strong></span>
+      </p>
+      <div class="perm-groups perm-groups-compact" data-perm-preview>
+        {permissionGroups().map((g) => (
+          <div class="perm-group">
+            <p class="perm-group-label">{t(g.labelKey)}</p>
+            <div class="perm-list perm-list-rows">
+              {g.permissions.map((p) => {
+                const by = grantedBy.get(p) ?? [];
+                return (
+                  <div class={`perm-row ${by.length ? "is-on" : "is-off"}`} data-perm-row={p}>
+                    <span class="perm-mark" aria-hidden="true">{by.length ? "✓" : "–"}</span>
+                    <span class="perm-name">{PL[p]}</span>
+                    <span class="perm-code">{p}</span>
+                    <span class="perm-by" data-perm-by>{by.join(", ")}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="hint">{t("adm.permsHint")}</p>
+        </section>
       </div>
       <div class="actions">
         <button class="btn" type="submit">{v.id ? t("form.save") : t("adm.create")}</button>
@@ -198,12 +253,19 @@ function userForm(v: {
   );
 }
 
+/** Permission labels in the active UI language. The role editor and the user
+ *  form's Permissions pane read the same three tables. */
+function permLabels(lang?: Lang): Record<string, string> {
+  return (lang ?? "en") === "mm" ? PERMISSION_LABELS
+    : (lang ?? "en") === "kr" ? PERMISSION_LABELS_KR : PERMISSION_LABELS_EN;
+}
+
 /** Bare user form (no Layout) — served for the add/edit modal?modal=1 fetch and
  * reused by error responses inside the same modal. */
 export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
   values: { id?: number; username: string; displayName: string; language: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
-  roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
+  roles: { id: number; name: string; permissions?: string[] }[]; regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string; regionId?: number }[];
 }) {
   const t = getDict(props.lang ?? "en");
@@ -216,7 +278,7 @@ export function UserFormFragment(props: {
         </div>
       )}
       {userForm({ ...props.values, homeCellIds: props.values.homeCellIds ?? [] },
-        { roles: props.roles, regions: props.regions, homeCells: props.homeCells ?? [] }, t)}
+        { roles: props.roles, regions: props.regions, homeCells: props.homeCells ?? [] }, t, permLabels(props.lang))}
     </>
   );
 }
@@ -293,7 +355,7 @@ export function AdminUsersPage(props: UsersProps) {
           {editErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", language: editUser.language ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", language: editUser.language ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t, permLabels(lang))}
         </div>
       )}
 
@@ -332,7 +394,7 @@ export function TempPasswordPage(props: Common & { username: string; tempPasswor
 
 export function AdminUserEditPage(props: Common & {
   editUser: AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] };
-  roles: { id: number; name: string; description: string | null }[];
+  roles: { id: number; name: string; description: string | null; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string }[];
   editErrors: string[];

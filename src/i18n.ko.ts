@@ -551,6 +551,8 @@ export const KO: Record<string, string> = {
   "adm.displayNameHint": "보고서에 사용자 이름 대신 표시됩니다.",
   "adm.accountSection": "계정 정보",
   "adm.accessTab": "접근 권한",
+  "adm.permsTab": "권한",
+  "adm.permsHint": "✓ = 이 계정에 허용됨, – = 허용되지 않음. 접근 권한 탭에서 선택한 역할에 따라 목록이 바뀝니다. 홈셀이 — 이면 홈셀 제한이 없습니다.",
   "adm.languageAuto": "자동 (브라우저)",
   "adm.languageHint": "이 계정이 로그인 후 보게 될 언어입니다.",
   "adm.passwordSection": "비밀번호",

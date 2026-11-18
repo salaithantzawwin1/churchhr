@@ -1939,6 +1939,37 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
    sliver: let it and the panes keep their natural height and scroll the sheet. */
 .user-form > .position-tabs, .user-form > .modal-form-panes { flex: none; }
 .modal-form-pane .cluster-cell-groups { margin-top: 0; }
+/* Permissions pane: a read-only answer to "what may this account do,
+   project-wide?", so every permission is one dense row and the roles that
+   grant it are named behind it. A blank row reads as plainly as a granted one. */
+.perm-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; font-size: 12.5px; }
+.perm-summary-item { display: inline-flex; gap: 5px; min-width: 0; }
+.perm-summary-key { color: var(--muted); }
+.perm-summary-item strong { font-weight: 700; overflow-wrap: anywhere; }
+.perm-groups-compact { display: grid; gap: 10px; }
+.perm-list-rows { display: grid; gap: 2px; }
+.perm-row {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: baseline;
+  gap: 2px 8px; padding: 3px 7px; border-radius: var(--radius-sm);
+  font-size: 12.5px; line-height: 1.45;
+}
+.perm-row.is-on { background: var(--chip-brand-bg); }
+.perm-row.is-off { color: var(--muted); }
+.perm-mark { font-weight: 700; }
+.perm-row.is-on .perm-mark { color: var(--link); }
+.perm-name { overflow-wrap: anywhere; }
+.perm-code { font-size: 11px; color: var(--muted); }
+.perm-by { grid-column: 2 / -1; font-size: 11px; color: var(--muted); }
+.perm-row.is-off .perm-by { display: none; }
+@media (max-width: 640px) { .perm-code { display: none; } }
+/* The account sheet has short fields but four sections; inside the modal it
+   tightens its gaps, chips and hints so the Save bar stays in view on a laptop. */
+.modal-body .user-form.compact-form .modal-form-tabs { margin-bottom: 12px; }
+.modal-body .user-form.compact-form .form-section + .form-section { margin-top: 10px; }
+.modal-body .user-form.compact-form .form-section legend { margin-bottom: 6px; font-size: 12.5px; }
+.modal-body .user-form.compact-form .hint { margin: 3px 0 0; font-size: 11.5px; }
+.modal-body .user-form.compact-form .check-grid { gap: 6px; }
+.modal-body .user-form.compact-form .check-chip { padding: 5px 8px; gap: 6px; font-size: 12.5px; }
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }
 

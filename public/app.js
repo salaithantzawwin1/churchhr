@@ -516,6 +516,53 @@
   }
   initCellStateScope(document);
 
+  // User modal: the Permissions pane is a preview of the ticked roles, so it
+  // follows the role chips instead of waiting for a save. Each chip carries the
+  // permissions of its role (data-role-perms); the pane lists every permission
+  // and marks the ones the union grants, naming the roles that grant them.
+  function applyUserPermPreview(form) {
+    var preview = form.querySelector("[data-perm-preview]");
+    if (!preview) return;
+    var byPerm = {};
+    var granted = 0;
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="roles"]'), function (b) {
+      if (!b.checked) return;
+      var roleName = b.getAttribute("data-role-name") || "";
+      (b.getAttribute("data-role-perms") || "").split(/\s+/).forEach(function (p) {
+        if (!p) return;
+        if (!byPerm[p]) { byPerm[p] = []; granted++; }
+        if (roleName && byPerm[p].indexOf(roleName) === -1) byPerm[p].push(roleName);
+      });
+    });
+    Array.prototype.forEach.call(preview.querySelectorAll("[data-perm-row]"), function (row) {
+      var names = byPerm[row.getAttribute("data-perm-row")] || [];
+      var on = names.length > 0;
+      row.classList.toggle("is-on", on);
+      row.classList.toggle("is-off", !on);
+      var mark = row.querySelector(".perm-mark");
+      if (mark) mark.textContent = on ? "✓" : "–";
+      var label = row.querySelector("[data-perm-by]");
+      if (label) label.textContent = names.join(", ");
+    });
+    var count = form.querySelector("[data-perm-count]");
+    if (count) {
+      count.textContent = granted + "/" + preview.querySelectorAll("[data-perm-row]").length;
+    }
+  }
+
+  function initUserPermPreview(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("form[data-user-form]"), function (form) {
+      if (form.getAttribute("data-perm-init")) return;
+      form.setAttribute("data-perm-init", "1");
+      applyUserPermPreview(form);
+      form.addEventListener("change", function (e) {
+        var el = e.target;
+        if (el && el.name === "roles") applyUserPermPreview(form);
+      });
+    });
+  }
+  initUserPermPreview(document);
+
   // Household head picker: the native select stays as the no-JS fallback, but
   // when JS runs it becomes a type-to-search combobox. Picking a head copies
   // that member's placement (state, township, home cell, group, family group)
@@ -1706,6 +1753,7 @@
     });
     initRegionCascade(bodyEl);
     initCellStateScope(bodyEl);
+    initUserPermPreview(bodyEl);
     initDatePickers(bodyEl);
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
