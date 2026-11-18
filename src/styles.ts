@@ -2611,9 +2611,13 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 /* On a phone the meta row (bar, counts, chevron) used to squeeze the cluster
    name into a 56px column: give the name its own line and the meta the next. */
 @media (max-width: 420px) {
-  .org-flow-cluster-head { flex-wrap: wrap; }
+  .org-flow-cluster-head { flex-wrap: wrap; position: relative; padding-right: 18px; }
   .org-flow-cluster-title { flex: 1 1 100%; }
-  .org-flow-cluster-meta { flex: 1 1 100%; justify-content: space-between; }
+  .org-flow-cluster-meta { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; }
+  .org-flow-cluster-meta .muted { white-space: nowrap; }
+  /* Keep the chevron in the card corner instead of letting it wrap alone
+     below the role/cell counts on a narrow phone. */
+  .org-flow-chev { position: absolute; top: 8px; right: 2px; }
 }
 .org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
 /* Clusters are a single-column accordion: every card has the full width, so
@@ -2656,14 +2660,21 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 }
 @media (max-width: 520px) {
   .org-flow-team { flex-wrap: wrap; justify-content: center; }
+  .org-flow-team > .org-branch { width: 100%; }
   .org-flow-team .org-node,
-  .org-flow-team .org-node-lead { width: 100%; max-width: 260px; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
+  .org-flow-team .org-node-lead { width: 100%; max-width: none; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
   .org-flow-team .org-node .org-node-role { order: 1; }
   .org-flow-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  .org-flow-team .org-node-name .muted { white-space: nowrap; }
   /* A wrapped row cannot draw one straight bus, so the stems go with it. */
   .org-flow-team::before, .org-flow-team > .org-branch::before, .org-flow-team > .org-branch::after {
     display: none;
   }
+}
+@media (max-width: 360px) {
+  /* The vacant avatar takes the width the role name needs on a small phone. */
+  .org-flow-team .org-node .org-avatar { display: none; }
+  .org-flow-team .org-node { padding: 8px 10px; }
 }
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }
