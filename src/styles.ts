@@ -1772,6 +1772,12 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .org-all-coverage-name { min-width: 0; font-size: 12.5px; line-height: 1.3; overflow-wrap: anywhere; }
 .org-all-coverage-none { margin: 8px 0 0; }
+/* Cells outside every church sit apart from the ranked churches, above the
+   note, with a dashed rule so the reader never reads it as another church. */
+.org-all-coverage-unassigned {
+  margin-top: 3px; padding-top: 9px; border-top: 1px dashed var(--line);
+}
+.org-all-coverage-unassigned .org-all-coverage-name { color: var(--muted); font-style: italic; }
 @media (min-width: 641px) and (max-width: 1100px) {
   .org-all-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

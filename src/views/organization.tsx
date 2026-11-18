@@ -698,6 +698,13 @@ export function OrganizationPage(props: Common & {
     };
   });
   const { ranked: coveredChurches, withoutCells: churchesWithoutCells } = splitCoverageRows(coverageRows);
+  // Cells with no Regional Church are in the headline total but belong to no
+  // church row, so they get their own line to keep the column sum honest.
+  const unassignedCells = cells.filter((c) => c.regional_church_id == null);
+  const unassignedFilled = leadCode ? unassignedCells.filter((c) => homeRole(c.id, leadCode)).length : 0;
+  const unassignedPct = unassignedCells.length
+    ? Math.round((unassignedFilled / unassignedCells.length) * 100)
+    : 0;
 
   // Home Cell tab: ?gap= narrows the chart to the cells that need attention.
   // The cell whose structure is open is always kept, so saving the last vacancy
@@ -1213,6 +1220,14 @@ export function OrganizationPage(props: Common & {
                     <span class="muted small">{row.filled}/{row.total}</span>
                   </div>
                 ))}
+                {unassignedCells.length > 0 && (
+                  <div class="org-all-coverage-row org-all-coverage-unassigned">
+                    <span class="org-all-coverage-name">{t("org.allCoverageUnassigned")}</span>
+                    <progress class="org-all-progress" value={unassignedPct} max={100}
+                      aria-label={`${t("org.allCoverageUnassigned")}: ${unassignedPct}%`} />
+                    <span class="muted small">{unassignedFilled}/{unassignedCells.length}</span>
+                  </div>
+                )}
               </div>
               {churchesWithoutCells > 0 && (
                 <p class="muted small org-all-coverage-none">
