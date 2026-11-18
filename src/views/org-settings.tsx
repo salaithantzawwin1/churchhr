@@ -591,7 +591,16 @@ export function RegionalChurchModal(props: {
               </div>
             </form>
           ) : (
-            <p class="muted small modal-note">{t("org.deleteRegionalHint")}</p>
+            /* The delete action is blocked by the church's Home Cells or
+               positions: show the button greyed out with the reason beside it
+               instead of a lone sentence with no action to explain. */
+            <div class="actions modal-delete-blocked">
+              <button class="btn sm outline-danger" type="button" disabled
+                title={t("org.deleteRegionalHint")} aria-describedby="regional-delete-hint">
+                {t("members.delete")}
+              </button>
+              <p class="muted small modal-note" id="regional-delete-hint">{t("org.deleteRegionalHint")}</p>
+            </div>
           )}
         </div>
       )}

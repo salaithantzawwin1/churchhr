@@ -2071,6 +2071,11 @@ table.list-tbl.ph-tbl { min-width: 0; }
 /* Modal sheets for the settings screens: body copy between forms, a quiet
    danger section that is not a sticky action bar, and inline error text. */
 .modal-note { margin: 2px 0 0; }
+/* A blocked delete keeps the greyed button and its reason on one row: the
+   explanation stays visible without adding a second band to the dialog. */
+.cluster-modal-foot .modal-delete-blocked { margin: 0; gap: 8px 12px; justify-content: flex-start; }
+.cluster-modal-foot .modal-delete-blocked .btn { flex: 0 0 auto; }
+.cluster-modal-foot .modal-delete-blocked .modal-note { margin: 0; flex: 1 1 200px; min-width: 0; }
 .modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
 /* Confirm buttons line up with the form footers: Cancel left, action right. */
 .modal-confirm .actions, .modal-body > .actions { justify-content: flex-end; }
