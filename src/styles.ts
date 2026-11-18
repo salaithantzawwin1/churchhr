@@ -1970,6 +1970,12 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .modal-body .user-form.compact-form .hint { margin: 3px 0 0; font-size: 11.5px; }
 .modal-body .user-form.compact-form .check-grid { gap: 6px; }
 .modal-body .user-form.compact-form .check-chip { padding: 5px 8px; gap: 6px; font-size: 12.5px; }
+/* The password field shares the Account grid row with Language. At half width an
+   input and the Generate button cannot sit on one line, so the button drops
+   under the input (the shape the .pw-row already takes on a phone). */
+.modal-body .user-form .pw-field .pw-wrap { flex: 1 1 100%; }
+.modal-body .user-form .pw-field .pw-row { flex-wrap: wrap; }
+.modal-body .user-form .pw-field .pw-row .btn { width: auto; }
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }
 

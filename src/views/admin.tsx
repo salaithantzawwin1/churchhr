@@ -151,24 +151,24 @@ function userForm(v: {
             </select>
             <span class="hint">{t("adm.languageHint")}</span>
           </label>
-        </div>
-      </fieldset>
-      <fieldset class="form-section">
-        <legend>{t("adm.passwordSection")}</legend>
-        <p class="hint">{v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit")}</p>
-        <div class="field">
-          <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
-          <div class="pw-row">
-            <span class="pw-wrap">
-              <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
-                autocomplete="new-password"
-                data-strength="1"
-                data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
-              <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
-            </span>
-            <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+          {/* Password shares the row with Language: at a half-width cell the
+              Generate button drops under the input (see .pw-field), which keeps
+              the sheet one section shorter than a full password block. */}
+          <div class="field pw-field">
+            <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
+            <div class="pw-row">
+              <span class="pw-wrap">
+                <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
+                  autocomplete="new-password"
+                  data-strength="1"
+                  data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
+                <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+              </span>
+              <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+            </div>
+            <CapsHint label={t("pw.capsLock")} />
+            <span class="hint">{v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit")}</span>
           </div>
-          <CapsHint label={t("pw.capsLock")} />
         </div>
       </fieldset>
       <fieldset class="form-section">
@@ -472,6 +472,14 @@ function permissionGroups(): { labelKey: string; permissions: Permission[] }[] {
   return groups;
 }
 
+/** Structure permissions a role may use only because it holds options.manage.
+ *  The list and the editor show them so neither reads as missing what the app
+ *  actually grants (canManageStructure). */
+function impliedStructurePerms(r: { permissions: string[] }): Permission[] {
+  if (!r.permissions.includes("options.manage")) return [];
+  return STRUCTURE_PERMISSIONS.filter((p) => !r.permissions.includes(p));
+}
+
 function permCheckboxes(role: { id: number; permissions: string[] } | null, labels: Record<string, string>) {
   return (
     <div class="form-grid" style="margin-top:8px">
@@ -529,13 +537,19 @@ export function RoleFormFragment(props: {
             <div class="perm-group">
               <p class="perm-group-label">{t(g.labelKey)}</p>
               <div class="perm-list">
-                {g.permissions.map((p) => (
-                  <label class="field" style="font-size:14px">
-                    <input type="checkbox" name="permissions" value={p}
-                      checked={perms.includes(p)} /> {PL[p]}
-                    <span class="hint"> ({p})</span>
-                  </label>
-                ))}
+                {g.permissions.map((p) => {
+                  // options.manage already grants it; a checked disabled box shows
+                  // that without persisting a redundant explicit row on save.
+                  const implied = role !== null && !perms.includes(p)
+                    && p.startsWith("structures.") && perms.includes("options.manage");
+                  return (
+                    <label class="field" style="font-size:14px">
+                      <input type="checkbox" name="permissions" value={p}
+                        checked={perms.includes(p) || implied} disabled={implied ? true : undefined} /> {PL[p]}
+                      <span class="hint"> ({p}{implied ? ` · ${t("adm.permViaOptions")}` : ""})</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -613,9 +627,18 @@ export function AdminRolesPage(props: RolesProps) {
                 </td>
                 <td class="small muted" data-label={t("adm.desc")}>{roleDescription(r, t)}</td>
                 <td class="small" data-label={t("adm.permissions")}>
-                  {r.permissions.length === 0
+                  {r.permissions.length === 0 && impliedStructurePerms(r).length === 0
                     ? <span class="muted">—</span>
-                    : r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
+                    : (
+                      <>
+                        {r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
+                        {impliedStructurePerms(r).map((p) => (
+                          <span class="badge" style="margin-right:4px" title={t("adm.permViaOptions")}>
+                            {PL[p]} <span class="muted">· {t("adm.permViaOptions")}</span>
+                          </span>
+                        ))}
+                      </>
+                    )}
                 </td>
                 <td data-label={t("members.status")}>
                   {r.is_system === 1

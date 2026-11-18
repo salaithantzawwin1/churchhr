@@ -271,6 +271,17 @@ describe("app-wide account and role settings", () => {
     expect(html).toContain('class="perm-row is-on" data-perm-row="structures.delete"');
     expect(html).toContain("via options.manage");
   });
+
+  it("shows options.manage's structure rights on the roles list and editor", async () => {
+    const list = await (await getAs("/admin/roles", ADMIN_ID)).text();
+    // The list names the permissions the role can use through options.manage.
+    expect(list).toContain("via options.manage");
+    const modal = await (await getAs("/admin/roles/10/edit?modal=1", ADMIN_ID)).text();
+    // The editor ticks them but keeps them read-only, so saving does not write
+    // redundant explicit grants the role never had.
+    expect(modal).toMatch(/value="structures.create"[^>]*checked[^>]*disabled/);
+    expect(modal).toContain("via options.manage");
+  });
 });
 
 describe("role and account safety", () => {
