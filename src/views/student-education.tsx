@@ -1,5 +1,5 @@
 import { getDict, type Lang } from "../i18n";
-import { HOPE_SCHOOL } from "../pastor-children";
+import { GRADES, HOPE_SCHOOL } from "../pastor-children";
 import {
   ENROLMENT_STATUSES,
   SCHOOL_KINDS,
@@ -129,7 +129,15 @@ export function EnrolmentModal(props: {
           </label>
           <label class="field">
             <span class="lbl">{t("org.childGrade")}</span>
-            <input type="text" name="grade" value={v.grade} maxlength={40} placeholder="KG / G5 / Year 1" />
+            <select name="grade">
+              <option value="" selected={v.grade === ""}>{t("form.choose")}</option>
+              {GRADES.map((grade) => (
+                <option value={grade} selected={v.grade === grade}>{grade}</option>
+              ))}
+              {v.grade && !(GRADES as readonly string[]).includes(v.grade) && (
+                <option value={v.grade} selected>{v.grade}</option>
+              )}
+            </select>
           </label>
           <label class="field">
             <span class="lbl">{t("edu.schoolKind")} <span class="req">*</span></span>

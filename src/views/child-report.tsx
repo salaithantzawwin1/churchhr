@@ -199,6 +199,7 @@ export function ChildReportPage(props: Common & {
                       <tr>
                         <th class="num">{t("org.childReportNo")}</th>
                         <th>{t("org.childName")}</th>
+                        <th>{t("org.childGrade")}</th>
                         <th>{t("org.childGender")} · {t("org.childAge")}</th>
                         <th>{t("org.childDob")}</th>
                         <th>{t("org.childAcademicYear")}</th>
@@ -227,6 +228,7 @@ export function ChildReportPage(props: Common & {
                               )}
                             </td>
                             <td>{[gender, age == null ? "" : String(age)].filter(Boolean).join(" · ") || "—"}</td>
+                            <td class="nowrap">{row.grade || "—"}</td>
                             <td class="nowrap">{row.dateOfBirth || "—"}</td>
                             <td class="nowrap">{row.academicYear || "—"}</td>
                             <td class="report-parents">

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { DB } from "./db/client";
-import { HOPE_SCHOOL, currentAcademicYear, loadChildReport } from "./pastor-children";
+import { HOPE_SCHOOL, currentAcademicYear, loadChildReport, normalizeGrade } from "./pastor-children";
 
 /** One school year of a member's education. The child's identity lives on the
  *  member row (relationship = son/daughter); this table only records where they
@@ -118,7 +118,7 @@ export function readEnrolmentForm(
   const pick = (key: string) => String(body[key] ?? "").trim();
   const values: EnrolmentValues = {
     academicYear: pick("academic_year").slice(0, 20),
-    grade: pick("grade").slice(0, 40),
+    grade: normalizeGrade(pick("grade")),
     schoolKind: pick("school_kind"),
     schoolName: pick("school_name").slice(0, 120),
     status: pick("status") || "active",
@@ -234,7 +234,7 @@ export async function loadStudentReport(
     nameEn: row.nameEn,
     gender: row.gender,
     dateOfBirth: row.dateOfBirth,
-    grade: row.grade,
+    grade: normalizeGrade(row.grade) || null,
     academicYear: row.academicYear,
     schoolKind: row.schoolKind === "other" ? "other" : "hope",
     schoolName: row.schoolName,
@@ -269,7 +269,7 @@ export async function loadStudentReport(
       nameEn: row.nameEn,
       gender: row.gender,
       dateOfBirth: row.dateOfBirth,
-      grade: row.grade,
+      grade: normalizeGrade(row.grade) || null,
       academicYear: row.academicYear,
       schoolKind: row.atHopeSchool === 1 ? "hope" : "other",
       schoolName: row.school,

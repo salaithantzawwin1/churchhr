@@ -77,6 +77,8 @@ const reportId = (title: string) => idOf("SELECT id FROM activity_reports WHERE 
 const familyId = (name: string) => idOf("SELECT id FROM families WHERE name = ?", name);
 const memberId = (name: string) => idOf("SELECT id FROM members WHERE name_english = ?", name);
 const churchId = (name: string) => idOf("SELECT id FROM regional_churches WHERE name = ?", name);
+const homeCellId = (label: string) =>
+  idOf("SELECT id FROM lookup_options WHERE type = 'home_cell' AND label = ?", label);
 const clusterId = (name: string) => idOf("SELECT id FROM supervision_clusters WHERE name = ?", name);
 
 beforeAll(async () => {
@@ -558,8 +560,10 @@ describe("member scope", () => {
 
   it("edits an in-scope member", async () => {
     const id = await memberId("In Member");
+    // Home Cell is required on the member form, so the edit carries one.
     const res = await postAs(`/members/${id}`, RECORDS_ID, {
       name_english: "In Member Renamed", region_id: "1", status: "active",
+      home_cell_id: String(await homeCellId("Scoped Cell A")),
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toContain("ok=member-updated");

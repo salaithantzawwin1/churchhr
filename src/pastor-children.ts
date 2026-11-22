@@ -159,6 +159,29 @@ export function reportYears(rows: YearRow[]): string[] {
     .sort((a, b) => b.localeCompare(a));
 }
 
+/** Canonical grade labels, in school order: KG, then G1 … G12. The form offers
+ *  exactly these, and the report and its filter compare against them. */
+export const GRADES = [
+  "KG", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12",
+] as const;
+
+/** One spelling of a grade, so "kg", "K.G.", "Grade 5" and "g5" do not become
+ *  three separate groups in the report. Unknown labels ("Year 13") are kept as
+ *  typed rather than thrown away. */
+export function normalizeGrade(value: string | null | undefined): string {
+  const text = (value ?? "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  const upper = text.toUpperCase();
+  const compact = upper.replace(/[\s.\-_/]/g, "");
+  if (/^(KG|KINDERGARTEN|PREKG|PRE|KG1|KG2)$/.test(compact)) return "KG";
+  const digits = compact.replace(/^(GRADE|CLASS|STANDARD|STD|YEAR|G)/, "");
+  if (/^\d{1,2}$/.test(digits)) {
+    const n = Number(digits);
+    if (n >= 1 && n <= 12) return `G${n}`;
+  }
+  return text.slice(0, 40);
+}
+
 /** School order of a grade label: KG first, then 1, 2, …, then anything else
  *  (e.g. "Year 11") by its number, so a grade list reads like a school. */
 function gradeOrder(label: string): number {
@@ -194,7 +217,7 @@ export type ChildLinkSuggestion = {
 
 /** Names are compared without spaces, dots or separators, and across the
  *  Myanmar and English spellings, so "မာရီ ဂရေ့စ်" meets "Grace". */
-function nameKey(value: string | null | undefined): string {
+export function nameKey(value: string | null | undefined): string {
   return (value ?? "").toLowerCase().replace(/[\s.,\-·'’]/g, "");
 }
 
@@ -293,7 +316,7 @@ export function readChildForm(
     nameEn: pick("name_en").slice(0, 100),
     gender: pick("gender"),
     dateOfBirth: pick("date_of_birth"),
-    grade: pick("grade").slice(0, 40),
+    grade: normalizeGrade(pick("grade")),
     academicYear: pick("academic_year").slice(0, 20),
     atHopeSchool: pick("at_hope_school") === "1",
     school: pick("school").slice(0, 120),

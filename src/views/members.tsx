@@ -497,10 +497,27 @@ export function MembersListPage(props: ListProps) {
 }
 
 export type FormValues = Record<string, string>;
+
+/** A member that may be the same person as the one being saved. Soft warning
+ *  only: the form still saves once the clerk confirms. */
+export type DuplicateCandidate = {
+  id: number;
+  name: string;
+  nameEn: string | null;
+  dateOfBirth: string | null;
+  phone: string | null;
+  nrcNumber: string | null;
+  homeCell: string | null;
+  /** i18n keys of the details that matched (name, phone, NRC, birth date). */
+  reasons: string[];
+};
+
 type FormProps = Common & {
   values: FormValues;
   errors: string[];
   member: { id: number; photoUrl?: string } | null;
+  /** Possible duplicates found on the last save attempt. */
+  duplicates?: DuplicateCandidate[];
   regions: { id: number; name: string }[];
   options: Record<string, OptionRow[]>;
   departments: DepartmentRow[];
@@ -579,7 +596,7 @@ export function MemberFormPage(props: FormProps) {
 
 /** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
-  const { values: v, errors, member, regions, options, departments, lang, modal } = props;
+  const { values: v, errors, member, regions, options, departments, lang, modal, duplicates = [] } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -612,6 +629,31 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
       )}
       <form method="post" action={action} data-flash-ok="member-updated">
         {modal && <input type="hidden" name="from_modal" value="1" />}
+        {duplicates.length > 0 && (
+          <div class="flash warn dup-warning" role="status">
+            <strong>{t("dup.warning")}</strong>
+            <ul class="err-list small">
+              {duplicates.map((d) => (
+                <li>
+                  <a href={`/members/${d.id}`} target="_blank" rel="noopener">
+                    {d.name || d.nameEn || `#${d.id}`}
+                  </a>
+                  {[d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ")}
+                  {d.reasons.length > 0 && (
+                    <span class="muted"> · {d.reasons.map((r) => t(r)).join(", ")}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p>{t("dup.note")}</p>
+            <button class="btn sm secondary" type="submit" name="confirm_duplicate" value="1">
+              {t("dup.saveAnyway")}
+            </button>
+            <a class="btn sm secondary" href={duplicates[0] ? `/members/${duplicates[0].id}` : "/members"}>
+              {t("dup.open")}
+            </a>
+          </div>
+        )}
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="photo-field" data-photo-field data-initial={initial}
@@ -732,8 +774,8 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               </select>
             </label>
             <label class="field">
-              <span class="lbl">{t("form.homeCell")}</span>
-              <select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById, false, clusterLabelById)}</select>
+              <span class="lbl">{t("form.homeCell")} <span class="req">*</span></span>
+              <select name="home_cell_id" required data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById, false, clusterLabelById)}</select>
               {/* Read-only: the cluster follows from the cell, it is not a choice. */}
               <span class="hint cluster-hint" data-cluster-hint="1" data-label={t("form.cluster")} hidden={!cellCluster}>
                 {cellCluster ? `${t("form.cluster")}: ${cellCluster}` : ""}
@@ -1377,6 +1419,10 @@ export type ImportReport = {
   errorCount: number;
   errors: { line: number; msg: string }[];
   newOptions: string[];
+  /** Valid rows that arrive without a Home Cell (import keeps them). */
+  noHomeCell: number;
+  /** False when the uploaded file has no Home Cell column at all. */
+  homeCellColumn: boolean;
   csvB64?: string;
 };
 
@@ -1439,6 +1485,17 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
             <p class="small muted" style="margin-top:10px">
               {t("import.newOptions")}{report.newOptions.join(", ")}
             </p>
+          )}
+          {(!report.homeCellColumn || report.noHomeCell > 0) && (
+            <div class="flash warn" style="margin-top:12px">
+              <strong>
+                {report.homeCellColumn
+                  ? `${t("import.noHomeCell")} ${report.noHomeCell}`
+                  : t("import.homeCellNoColumn")}
+              </strong>
+              <p class="small">{t("import.homeCellNote")}</p>
+              <a class="btn sm secondary" href="/members?missing=home_cell">{t("import.homeCellFix")}</a>
+            </div>
           )}
 
           {!report.done && report.valid > 0 && report.csvB64 && (
