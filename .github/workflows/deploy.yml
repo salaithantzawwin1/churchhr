@@ -20,6 +20,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  # Read check runs so the last step can tell whether Workers Builds also handled
+  # this commit.
+  checks: read
+
 concurrency:
   group: cloudflare-deploy
   cancel-in-progress: false
@@ -140,3 +146,62 @@ jobs:
             fi
             echo "$path redirects to /login"
           done
+
+      # Best effort only. Cloudflare Workers Builds once deployed main alongside
+      # this workflow with none of the gates above, which left its ungated deploy
+      # live. If it is ever reconnected, say so loudly instead of running a
+      # second deploy path quietly. This step never fails the job, and the check
+      # run can appear after this job has finished, so a quiet result is not
+      # proof the connection is gone.
+      - name: Warn if Cloudflare Workers Builds also handled this commit (non-blocking)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A failed lookup (rate limit, missing permission) must not turn this
+          # informational step red, so the response is captured and the parser
+          # reports what it got instead.
+          body=$(curl -fsS --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" || true)
+          printf '%s' "$body" | python3 -c '
+          import json, os, sys
+
+          try:
+              runs = json.load(sys.stdin).get("check_runs", [])
+          except (ValueError, AttributeError):
+              print("Could not read check runs for this commit; skipping the Workers Builds check.")
+              sys.exit(0)
+
+          sha = os.environ.get("GITHUB_SHA", "")
+          found = [
+              "%s [%s/%s]" % (r.get("name"), r.get("status"), r.get("conclusion") or "-")
+              for r in runs
+              if (r.get("app") or {}).get("slug") == "cloudflare-workers-and-pages"
+          ]
+          if not found:
+              print("No Cloudflare Workers Builds check run for %s at this point." % sha)
+              sys.exit(0)
+
+          print("::warning::Cloudflare Workers Builds is also handling this commit, so production has a second, ungated deploy path.")
+          report = "\n".join([
+              "### :warning: Cloudflare Workers Builds is deploying this commit too",
+              "",
+              "Check runs reported for `%s`:" % sha,
+              "",
+              "```",
+          ] + found + [
+              "```",
+              "",
+              "That path runs no typecheck, tests, audit or migrations, so disconnect it:",
+              "Workers & Pages -> church-member-registry -> Settings -> Builds -> Disconnect.",
+              "",
+          ])
+          print(report)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(report + "\n")
+          '
