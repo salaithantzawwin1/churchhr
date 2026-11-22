@@ -1,14 +1,20 @@
 name: Deploy to Cloudflare Workers
 
-# Every push to main typechecks, runs the Worker test suite (real workerd +
-# local D1 with the production migrations), refuses moderate-or-worse advisories
-# in the production dependencies and only then applies pending D1 migrations
-# before deploying the Worker, so neither failing code nor code ahead of the
-# schema can ship. Dev-only tooling advisories (vitest/vite transitive packages)
-# do not affect what the Worker ships, so they are not audited here.
-# Cloudflare Workers Builds is also connected to main: keep its build command
-# applying migrations too, or disconnect it, so production has a single
-# migration-first deploy path.
+# GitHub Actions is the only production deploy path for this Worker. Every push
+# to main typechecks, runs the Worker test suite (real workerd + local D1 with
+# the production migrations), refuses moderate-or-worse advisories in the
+# production dependencies and only then applies pending D1 migrations before
+# deploying the Worker, so neither failing code nor code ahead of the schema can
+# ship. Dev-only tooling advisories (vitest/vite transitive packages) do not
+# affect what the Worker ships, so they are not audited here.
+#
+# Cloudflare Workers Builds used to be connected to main as well and deployed the
+# same commit a second time with none of the gates above: on f5712de its
+# "Workers Builds: church-member-registry" check run finished after this job and
+# was the deployment left live. Keep that connection disconnected (Workers &
+# Pages -> church-member-registry -> Settings -> Builds -> Disconnect) so a push
+# cannot ship ungated code. If it is ever reconnected, move these gates and the
+# migrations into its build command instead of running two deploy paths.
 on:
   push:
     branches: [main]
