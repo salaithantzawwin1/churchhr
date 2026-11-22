@@ -3081,18 +3081,11 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 /* The chip under the name repeats the Position column, so it follows the column
    chooser: with Position switched off, the chip goes away too. */
 .members-tbl[data-inline-role="off"] .member-role-inline { display: none; }
-/* Short screens: the sticky Save bar floats over whatever sits beneath it, so a
-   sheet that scrolls keeps the bar's height of clear space at its end. Every
-   field can then be scrolled fully above the bar, even on a 500px-high screen.
-   The identity strip, tab bar and section lose a little air at the same time so
-   the first pane fits without hiding a control behind the bar. */
-@media (max-height: 640px) {
-  .modal-body .position-form { padding-bottom: 62px; }
-  .modal-body .position-form .position-hero { padding: 9px 11px; margin-bottom: 8px; }
-  .modal-body .position-form .position-intro { margin-bottom: 8px; }
-  .modal-body .position-form .position-tabs { margin-bottom: 9px; padding: 3px; }
-  .modal-body .position-form .position-section { padding: 10px 11px; margin-bottom: 8px; }
-}
+/* One layout at every height: the sheet body scrolls as a whole and the Save
+   bar stays pinned to the bottom. The form reserves the bar's height at its
+   end, so the last field can always be scrolled clear of the bar instead of
+   sitting under it when the dialog opens. */
+.modal-body .position-form { padding-bottom: 62px; }
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }
 /* Laptop widths squeeze this column, and a badge that broke its own name
