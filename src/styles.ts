@@ -1943,11 +1943,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--field-bg);
 }
 .position-section-head { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px; }
-.position-step {
-  width: 22px; height: 22px; flex: none; display: grid; place-items: center;
-  border-radius: 50%; background: var(--chip-brand-bg); color: var(--link);
-  font-size: 11.5px; font-weight: 700; line-height: 1;
-}
 .position-section h3 { margin: 1px 0 0; font-size: 14px; }
 .position-section-head .hint { margin: 2px 0 0; }
 .position-section .field { margin-bottom: 0; }
@@ -3082,6 +3077,21 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .list-tbl :is(th, td)[data-col="role"] { display: none; }
   .member-role-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .member-role-inline .position-edit { margin-left: 0; }
+}
+/* The chip under the name repeats the Position column, so it follows the column
+   chooser: with Position switched off, the chip goes away too. */
+.members-tbl[data-inline-role="off"] .member-role-inline { display: none; }
+/* Short screens: the sticky Save bar floats over whatever sits beneath it, so a
+   sheet that scrolls keeps the bar's height of clear space at its end. Every
+   field can then be scrolled fully above the bar, even on a 500px-high screen.
+   The identity strip, tab bar and section lose a little air at the same time so
+   the first pane fits without hiding a control behind the bar. */
+@media (max-height: 640px) {
+  .modal-body .position-form { padding-bottom: 62px; }
+  .modal-body .position-form .position-hero { padding: 9px 11px; margin-bottom: 8px; }
+  .modal-body .position-form .position-intro { margin-bottom: 8px; }
+  .modal-body .position-form .position-tabs { margin-bottom: 9px; padding: 3px; }
+  .modal-body .position-form .position-section { padding: 10px 11px; margin-bottom: 8px; }
 }
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }

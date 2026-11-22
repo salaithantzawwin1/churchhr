@@ -939,7 +939,6 @@ export const KO: Record<string, string> = {
   "org.noLeader": "리더 없음",
   "org.position": "직책",
   "org.assign": "지정",
-  "org.change": "변경",
   "org.assignTitle": "성도 직책",
   "org.assignPosition": "직책 지정",
   "org.changePosition": "직책 변경",

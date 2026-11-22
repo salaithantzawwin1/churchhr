@@ -1244,6 +1244,10 @@
       Array.prototype.forEach.call(table.querySelectorAll("[data-col]"), function (cell) {
         cell.style.display = off[cell.getAttribute("data-col")] ? "none" : "";
       });
+      // On narrow screens the role is repeated as a chip under the member's
+      // name; it belongs to the same column, so switching Position off in the
+      // chooser must remove that chip as well.
+      table.setAttribute("data-inline-role", off.role ? "off" : "on");
       var st = {};
       Array.prototype.forEach.call(boxes, function (b) {
         st[b.getAttribute("data-col")] = b.checked;
