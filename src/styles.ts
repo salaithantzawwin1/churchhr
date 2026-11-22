@@ -3082,10 +3082,10 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
    chooser: with Position switched off, the chip goes away too. */
 .members-tbl[data-inline-role="off"] .member-role-inline { display: none; }
 /* One layout at every height: the sheet body scrolls as a whole and the Save
-   bar stays pinned to the bottom. The form reserves the bar's height at its
-   end, so the last field can always be scrolled clear of the bar instead of
-   sitting under it when the dialog opens. */
-.modal-body .position-form { padding-bottom: 62px; }
+   bar stays pinned over its bottom edge. The body keeps the bar's height clear
+   at the end of the scroll area, so the last field can be scrolled above the
+   bar instead of ending up under it. */
+.modal-body:has(.position-form) { padding-bottom: 63px; }
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }
 /* Laptop widths squeeze this column, and a badge that broke its own name
