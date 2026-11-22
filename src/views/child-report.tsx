@@ -33,22 +33,25 @@ function parentText(row: StudentReportRow, L: Lang): string {
   return L !== "mm" && row.parentNameEn ? row.parentNameEn : row.parentName;
 }
 
-/** Group rows by grade, keeping the grades in school order (KG, 1, 2, …). */
-function groupByGrade(rows: StudentReportRow[]): { grade: string; rows: StudentReportRow[] }[] {
-  const groups = new Map<string, StudentReportRow[]>();
-  for (const row of rows) {
-    const key = row.grade ?? "";
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(row);
-    else groups.set(key, [row]);
-  }
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : compareGrades(a, b)))
-    .map(([grade, list]) => ({ grade, rows: list }));
+/** One table in school order: KG, G1 … G12, then rows without a grade. Inside
+ *  a grade the name orders the list, so the same class stays together. */
+function sortReportRows(rows: StudentReportRow[]): StudentReportRow[] {
+  return [...rows].sort((a, b) => {
+    const ga = a.grade ?? "";
+    const gb = b.grade ?? "";
+    if (!ga && gb) return 1;
+    if (ga && !gb) return -1;
+    if (ga && gb) {
+      const diff = compareGrades(ga, gb);
+      if (diff !== 0) return diff;
+    }
+    return (a.name || a.nameEn || "").localeCompare(b.name || b.nameEn || "");
+  });
 }
 
-/** Hope School report across pastors' and members' children: grouped by grade
- *  for the chosen school year, with the Hope / outside split the school needs. */
+/** Hope School report across pastors' and members' children: one table in
+ *  grade order (KG → G12) for the chosen school year, with the Hope / outside
+ *  split the school needs. */
 export function ChildReportPage(props: Common & {
   rows: StudentReportRow[];
   years: string[];
@@ -63,7 +66,7 @@ export function ChildReportPage(props: Common & {
   const outside = rows.length - hope;
   const pastorRows = rows.filter((r) => r.personType === "pastor");
   const memberRows = rows.filter((r) => r.personType === "member");
-  const groups = groupByGrade(rows);
+  const ordered = sortReportRows(rows);
   const yearText = filters.year || t("org.childReportAllYears");
   const gradeText = filters.grade || t("org.childReportAllGrades");
   const schoolTextLabel = filters.school === "hope" ? t("org.childReportHopeOnly")
@@ -175,90 +178,70 @@ export function ChildReportPage(props: Common & {
           <p class="muted">{t("org.childReportEmpty")}</p>
         </div>
       ) : (
-        <div class="report-groups">
-          {groups.map((group) => {
-            const groupHope = group.rows.filter((r) => r.schoolKind === "hope").length;
-            return (
-              <section class="card report-group">
-                <div class="report-group-head">
-                  <h2>{group.grade || "—"}</h2>
-                  <div class="report-group-tags">
-                    <span class="pastor-tag">
-                      {t("org.childReportPeople")}: <strong>{group.rows.length}</strong>
-                    </span>
-                    {groupHope > 0 && (
-                      <span class="pastor-tag is-accent">
-                        {t("org.hopeShort")}: <strong>{groupHope}</strong>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div class="tbl-wrap">
-                  <table class="report-table">
-                    <thead>
-                      <tr>
-                        <th class="num">{t("org.childReportNo")}</th>
-                        <th>{t("org.childName")}</th>
-                        <th>{t("org.childGrade")}</th>
-                        <th>{t("org.childGender")} · {t("org.childAge")}</th>
-                        <th>{t("org.childDob")}</th>
-                        <th>{t("org.childAcademicYear")}</th>
-                        <th>{t("org.childReportParents")}</th>
-                        <th>{t("org.childSchool")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.rows.map((row, index) => {
-                        const age = ageFromDate(row.dateOfBirth);
-                        const gender = row.gender === "male" ? t("org.male")
-                          : row.gender === "female" ? t("org.female") : "";
-                        const parents = parentText(row, L);
-                        return (
-                          <tr>
-                            <td class="num">{index + 1}</td>
-                            <td>
-                              <strong>{row.name || "—"}</strong>
-                              {row.nameEn && row.nameEn !== row.name ? (
-                                <span class="muted small"> {row.nameEn}</span>
-                              ) : null}
-                              {row.status !== "active" && (
-                                <div class="muted small">
-                                  {row.status === "graduated" ? t("edu.statusGraduated") : t("edu.statusLeft")}
-                                </div>
-                              )}
-                            </td>
-                            <td>{[gender, age == null ? "" : String(age)].filter(Boolean).join(" · ") || "—"}</td>
-                            <td class="nowrap">{row.grade || "—"}</td>
-                            <td class="nowrap">{row.dateOfBirth || "—"}</td>
-                            <td class="nowrap">{row.academicYear || "—"}</td>
-                            <td class="report-parents">
-                              {row.parentId != null ? (
-                                <a href={row.personType === "pastor"
-                                  ? `/organization/pastors/${row.parentId}`
-                                  : `/members/${row.parentId}`}>{parents || "—"}</a>
-                              ) : (
-                                <span>{parents || "—"}</span>
-                              )}
-                              <span class="muted small">
-                                {row.personType === "pastor" ? t("org.childReportPastors") : t("org.childReportMembers")}
-                                {row.stateName ? ` · ${L !== "mm" && row.stateNameEn ? row.stateNameEn : row.stateName}` : ""}
-                              </span>
-                            </td>
-                            <td>
-                              {row.schoolKind === "hope" ? (
-                                <span class="badge active">{HOPE_SCHOOL}</span>
-                              ) : (schoolText(row) || "—")}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        <section class="card report-group">
+          <div class="tbl-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th class="num">{t("org.childReportNo")}</th>
+                  <th>{t("org.childName")}</th>
+                  <th>{t("org.childGrade")}</th>
+                  <th>{t("org.childGender")} · {t("org.childAge")}</th>
+                  <th>{t("org.childDob")}</th>
+                  <th>{t("org.childAcademicYear")}</th>
+                  <th>{t("org.childReportParents")}</th>
+                  <th>{t("org.childSchool")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordered.map((row, index) => {
+                  const age = ageFromDate(row.dateOfBirth);
+                  const gender = row.gender === "male" ? t("org.male")
+                    : row.gender === "female" ? t("org.female") : "";
+                  const parents = parentText(row, L);
+                  return (
+                    <tr>
+                      <td class="num">{index + 1}</td>
+                      <td>
+                        <strong>{row.name || "—"}</strong>
+                        {row.nameEn && row.nameEn !== row.name ? (
+                          <span class="muted small"> {row.nameEn}</span>
+                        ) : null}
+                        {row.status !== "active" && (
+                          <div class="muted small">
+                            {row.status === "graduated" ? t("edu.statusGraduated") : t("edu.statusLeft")}
+                          </div>
+                        )}
+                      </td>
+                      <td class="nowrap">{row.grade || "—"}</td>
+                      <td>{[gender, age == null ? "" : String(age)].filter(Boolean).join(" · ") || "—"}</td>
+                      <td class="nowrap">{row.dateOfBirth || "—"}</td>
+                      <td class="nowrap">{row.academicYear || "—"}</td>
+                      <td class="report-parents">
+                        {row.parentId != null ? (
+                          <a href={row.personType === "pastor"
+                            ? `/organization/pastors/${row.parentId}`
+                            : `/members/${row.parentId}`}>{parents || "—"}</a>
+                        ) : (
+                          <span>{parents || "—"}</span>
+                        )}
+                        <span class="muted small">
+                          {row.personType === "pastor" ? t("org.childReportPastors") : t("org.childReportMembers")}
+                          {row.stateName ? ` · ${L !== "mm" && row.stateNameEn ? row.stateNameEn : row.stateName}` : ""}
+                        </span>
+                      </td>
+                      <td>
+                        {row.schoolKind === "hope" ? (
+                          <span class="badge active">{HOPE_SCHOOL}</span>
+                        ) : (schoolText(row) || "—")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
       <p class="scroll-hint print-hide" aria-hidden="true"><span>↔</span> {t("members.scrollHint")}</p>
     </Layout>
