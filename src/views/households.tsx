@@ -8,7 +8,7 @@ import { regionCascadeSelects } from "./hh-cascade";
 import { formatPhone, optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { EditIcon, RemoveUserIcon, TrashIcon } from "./action-icons";
-import type { DuplicateCandidate } from "./members";
+import { DuplicateWarning, type DuplicateCandidate } from "./duplicate-warning";
 import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
 
 /** Household relationships: stored key -> label per UI language. */
@@ -660,34 +660,7 @@ export function HouseholdAddMemberPage(props: Common & {
           <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul></div>
       )}
       <form method="post" action={`/admin/households/${family.id}/add-member`}>
-        {duplicates.length > 0 && (
-          <div class="flash warn dup-warning" role="status">
-            <strong>{t("dup.warning")}</strong>
-            <ul class="err-list small">
-              {duplicates.map((d) => {
-                const meta = [d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ");
-                return (
-                  <li>
-                    <a href={`/members/${d.id}`} target="_blank" rel="noopener">
-                      {d.name || `#${d.id}`}
-                    </a>
-                    {meta && <span class="muted small"> · {meta}</span>}
-                    {d.reasons.length > 0 && (
-                      <span class="muted"> · {d.reasons.map((r) => t(r)).join(", ")}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <p>{t("dup.note")}</p>
-            <button class="btn sm secondary" type="submit" name="confirm_duplicate" value="1">
-              {t("dup.saveAnyway")}
-            </button>
-            <a class="btn sm secondary" href={duplicates[0] ? `/members/${duplicates[0].id}` : "/members"}>
-              {t("dup.open")}
-            </a>
-          </div>
-        )}
+        <DuplicateWarning duplicates={duplicates} lang={lang} />
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="form-grid">

@@ -14,6 +14,10 @@ import { clusterName, regionalChurchName, type RegionalChurchRow, type Supervisi
 import { departmentName, type DepartmentRow } from "../departments";
 import { EditIcon, TrashIcon } from "./action-icons";
 import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
+import { DuplicateWarning, type DuplicateCandidate } from "./duplicate-warning";
+
+/** Re-exported so route modules keep importing it from the members view. */
+export type { DuplicateCandidate };
 
 export type MemberListItem = {
   id: number;
@@ -498,18 +502,6 @@ export function MembersListPage(props: ListProps) {
 
 export type FormValues = Record<string, string>;
 
-/** A member that may be the same person as the one being saved. Soft warning
- *  only: the form still saves once the clerk confirms. */
-export type DuplicateCandidate = {
-  id: number;
-  name: string;
-  dateOfBirth: string | null;
-  phone: string | null;
-  homeCell: string | null;
-  /** i18n keys of the details that matched (name, phone, NRC, birth date). */
-  reasons: string[];
-};
-
 type FormProps = Common & {
   values: FormValues;
   errors: string[];
@@ -630,34 +622,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
       )}
       <form method="post" action={action} data-flash-ok="member-updated">
         {modal && <input type="hidden" name="from_modal" value="1" />}
-        {duplicates.length > 0 && (
-          <div class="flash warn dup-warning" role="status">
-            <strong>{t("dup.warning")}</strong>
-            <ul class="err-list small">
-              {duplicates.map((d) => {
-                const meta = [d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ");
-                return (
-                  <li>
-                    <a href={`/members/${d.id}`} target="_blank" rel="noopener">
-                      {d.name || `#${d.id}`}
-                    </a>
-                    {meta && <span class="muted small"> · {meta}</span>}
-                    {d.reasons.length > 0 && (
-                      <span class="muted"> · {d.reasons.map((r) => t(r)).join(", ")}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <p>{t("dup.note")}</p>
-            <button class="btn sm secondary" type="submit" name="confirm_duplicate" value="1">
-              {t("dup.saveAnyway")}
-            </button>
-            <a class="btn sm secondary" href={duplicates[0] ? `/members/${duplicates[0].id}` : "/members"}>
-              {t("dup.open")}
-            </a>
-          </div>
-        )}
+        <DuplicateWarning duplicates={duplicates} lang={lang} />
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="photo-field" data-photo-field data-initial={initial}
