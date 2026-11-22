@@ -3072,9 +3072,13 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .dept-active { align-self: start; }
 }
 .member-role-inline { display: none; }
-@media (max-width: 760px) {
-  /* The member table scrolls sideways on phones; surface the role under the
-     name so assigning it never needs a horizontal swipe. */
+/* The member list needs about 1180px for every column. Below that the role was
+   pushed behind a horizontal swipe (and below 900px it was hidden outright),
+   which left tablet/laptop widths with no visible position at all. Until the
+   full table fits, the position chip moves under the member's name, so it is
+   always on screen and clickable. */
+@media (max-width: 1180px) {
+  .list-tbl :is(th, td)[data-col="role"] { display: none; }
   .member-role-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .member-role-inline .position-edit { margin-left: 0; }
 }
@@ -3087,6 +3091,11 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .position-member { margin: 0 0 10px; font-size: 15px; }
 .position-form .actions { margin-top: 14px; }
 .badge.position { background: var(--chip-brand-bg); color: var(--link); }
+/* The role chip opens the position dialog itself, so it carries the link and
+   needs its own affordance instead of the removed Change text beside it. */
+.position-edit-badge { text-decoration: none; cursor: pointer; }
+.position-edit-badge:hover { box-shadow: inset 0 0 0 1px var(--link); }
+.position-edit-badge:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 @media (max-width: 760px) {
   .org-grid { grid-template-columns: 1fr; }
   .org-cell-row { grid-template-columns: 1fr auto; }
@@ -3899,7 +3908,9 @@ a.audit-entity.is-link:hover { background: var(--chip-brand-bg); text-decoration
     height: 24px; padding: 0; z-index: 1;
   }
   .members-tbl tbody td:first-child::before { display: none; }
-  .members-tbl tbody td[data-col="role"] { grid-column: 1 / -1; }
+  /* The card has room for the role again, so it gets its own row instead of
+     the compact chip beside the name. */
+  .members-tbl tbody td[data-col="role"] { display: block; grid-column: 1 / -1; }
   /* The cards stack, so phone and township fit again; on a phone those are the
      two fields people look a member up by. */
   .members-tbl tbody :is(td)[data-col="phone"],

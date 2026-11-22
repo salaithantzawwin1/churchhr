@@ -8,7 +8,7 @@ import { getDict, pluralLabel, type Lang } from "../i18n";
 import { HOPE_SCHOOL } from "../pastor-children";
 import type { EnrolmentRow } from "../student-enrolments";
 import { MemberEducationCard } from "./student-education";
-import { positionLabels } from "../positions";
+import { positionLabel, positionLabels, positionScope } from "../positions";
 import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
@@ -162,11 +162,37 @@ export function MembersListPage(props: ListProps) {
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
   const colLabel = (key: string) => cols.find((c) => c.key === key)?.label ?? "";
-  const roleLabels = (csv: string | null | undefined) =>
-    positionDefs ? positionLabelsForCsv(positionDefs, csv, L) : positionLabels(csv, L);
-  const roleBadges = (csv: string | null | undefined) => roleLabels(csv).map((label) => (
-    <span class="badge position">{label}</span>
-  ));
+  const roleEntries = (csv: string | null | undefined) =>
+    (csv ?? "").split(",").map((v) => v.trim()).filter(Boolean).map((code) => ({
+      code,
+      label: positionDefs ? positionLabelForCode(positionDefs, code, L) : positionLabel(code, L),
+    }));
+  /** Member-form tab that holds a position, so its chip opens the right pane. */
+  const POSITION_TAB: Record<string, string> = {
+    home_cell: "home", township: "supervision", cluster: "supervision",
+    region: "regional", department: "department", church: "church",
+  };
+  const positionHref = (memberId: number, code: string) => {
+    const def = positionDefs?.find((d) => d.code === code);
+    const scope = def?.scopeType ?? positionScope(code);
+    const tab = scope ? POSITION_TAB[scope] : null;
+    return `/members/${memberId}/position${tab ? `?tab=${tab}` : ""}`;
+  };
+  // The chip itself is the way in: clicking a member's position opens the same
+  // dialog on the tab that holds it, so no separate Change link is needed.
+  const roleBadges = (csv: string | null | undefined, edit?: { memberId: number }) =>
+    roleEntries(csv).map(({ code, label }) => edit ? (
+      <a
+        class="badge position position-edit-badge js-edit-modal"
+        href={positionHref(edit.memberId, code)}
+        data-modal-title={t("org.assignTitle")}
+        data-modal-size="md"
+        title={`${t("org.changePosition")}: ${label}`}
+        aria-label={`${t("org.changePosition")}: ${label}`}
+      >{label}</a>
+    ) : (
+      <span class="badge position">{label}</span>
+    ));
   const filtered = hasFilters(f);
   /** Current list query, used to build "remove this filter" links. */
   const activeParams = {
@@ -428,11 +454,11 @@ export function MembersListPage(props: ListProps) {
                   {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
                   {(m.positions || canUpdate) && (
                     <span class="member-role-inline">
-                      {roleBadges(m.positions)}
-                      {canUpdate && (
+                      {roleBadges(m.positions, canUpdate ? { memberId: m.id } : undefined)}
+                      {canUpdate && !m.positions && (
                         <a class="position-edit js-edit-modal" href={`/members/${m.id}/position`}
                           data-modal-title={t("org.assignTitle")} data-modal-size="md">
-                          {m.positions ? t("org.change") : t("org.assign")}
+                          {t("org.assign")}
                         </a>
                       )}
                     </span>
@@ -462,14 +488,16 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="marital" data-label={colLabel("marital")}>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell" data-label={colLabel("homeCell")}>{m.home_cell ?? ""}</td>
                 <td data-col="role" class="position-cell" data-label={colLabel("role")}>
-                  {m.positions ? roleBadges(m.positions) : <span class="muted small">—</span>}
-                  {canUpdate && (
+                  {m.positions
+                    ? roleBadges(m.positions, canUpdate ? { memberId: m.id } : undefined)
+                    : <span class="muted small">—</span>}
+                  {canUpdate && !m.positions && (
                     <a
                       class="position-edit js-edit-modal"
                       href={`/members/${m.id}/position`}
                       data-modal-title={t("org.assignTitle")}
-                      data-modal-size="sm"
-                    >{m.positions ? t("org.change") : t("org.assign")}</a>
+                      data-modal-size="md"
+                    >{t("org.assign")}</a>
                   )}
                 </td>
                 <td data-col="group" data-label={colLabel("group")}>{m.group_label ?? ""}</td>
@@ -836,11 +864,13 @@ type PositionFormProps = {
   canManagePositions: boolean;
   canManageRegional: boolean;
   error?: string | null;
+  /** Tab to open first; a position chip opens the tab that holds it. */
+  initialTab?: string | null;
   lang?: Lang;
 };
 
 export function MemberPositionPage(props: Common & PositionFormProps) {
-  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional } = props;
+  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, initialTab } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -853,7 +883,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
           member={member} assignments={assignments} departments={departments}
           positionDefs={positionDefs} regionalChurches={regionalChurches} clusters={clusters}
           canManageDepartments={canManageDepartments} canManagePositions={canManagePositions}
-          canManageRegional={canManageRegional} lang={lang}
+          canManageRegional={canManageRegional} initialTab={initialTab} lang={lang}
         />
       </div>
     </Layout>
@@ -861,7 +891,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
 }
 
 export function MemberPositionForm(props: PositionFormProps) {
-  const { member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, error, lang } = props;
+  const { member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, error, initialTab, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
@@ -899,7 +929,7 @@ export function MemberPositionForm(props: PositionFormProps) {
     { key: "department", label: t("org.tabDepartment"), available: departmentDefs.length > 0 || departments.length > 0 },
     { key: "church", label: t("org.tabChurch"), available: churchDefs.length > 0 },
   ].filter((x) => x.available);
-  const firstTab = tabs[0]?.key ?? "home";
+  const firstTab = tabs.find((x) => x.key === initialTab)?.key ?? tabs[0]?.key ?? "home";
 
   const managePositions = (scope: string) => canManagePositions && (
     <p class="hint">
@@ -939,6 +969,9 @@ export function MemberPositionForm(props: PositionFormProps) {
       <p class="hint position-intro">{t("org.positionIntro")}</p>
       {error && <div class="flash err">{error}</div>}
       <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
+        {/* Keeps the pane the dialog was opened on when the save comes back with
+            a validation error. */}
+        <input type="hidden" name="tab" value={firstTab} />
         <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
           {tabs.map((tab) => (
             <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
@@ -951,10 +984,8 @@ export function MemberPositionForm(props: PositionFormProps) {
         <div class="position-panes" data-tabs-body>
           <section class="position-section" data-tab-pane="home" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">1</span>
               <div>
                 <h3>{t("org.homeCellSection")}</h3>
-                {member.homeCellId && <p class="hint">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>}
               </div>
             </div>
             {!member.homeCellId ? (
@@ -976,7 +1007,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="supervision" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">2</span>
               <div>
                 <h3>{t("org.supervisionSection")}</h3>
                 <p class="hint">{t("org.supervisionSectionHint")}</p>
@@ -1031,7 +1061,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="regional" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">3</span>
               <div><h3>{t("org.regionalSection")}</h3></div>
             </div>
             {regionalDefs.length === 0 ? (
@@ -1057,7 +1086,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="department" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">4</span>
               <div><h3>{t("org.departmentSection")}</h3></div>
             </div>
             {departments.length === 0 ? (
@@ -1105,7 +1133,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="church" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">5</span>
               <div><h3>{t("org.churchSection")}</h3></div>
             </div>
             {churchDefs.length === 0 ? managePositions("church") : (

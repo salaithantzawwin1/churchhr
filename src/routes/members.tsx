@@ -1279,7 +1279,8 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
     positionDefs: state.defs, regionalChurches: state.regionalChurches, clusters: state.clusters,
     canManageDepartments: c.get("perms").has("options.manage") && scope.scopeAll,
     canManagePositions: c.get("perms").has("options.manage") && scope.scopeAll,
-    canManageRegional: c.get("perms").has("options.manage"), lang: c.get("lang"),
+    canManageRegional: c.get("perms").has("options.manage"),
+    initialTab: c.req.query("tab") ?? null, lang: c.get("lang"),
   };
   if (c.req.query("modal") !== "1") {
     return c.html(
@@ -1353,7 +1354,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageRegional={c.get("perms").has("options.manage")}
-      error={message} lang={c.get("lang")}
+      error={message} initialTab={s(body.tab) || null} lang={c.get("lang")}
     />,
     400,
   );
