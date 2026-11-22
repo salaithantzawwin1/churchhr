@@ -5,7 +5,8 @@ name: Deploy to Cloudflare Workers
 # the production migrations), refuses moderate-or-worse advisories in the
 # production dependencies and only then applies pending D1 migrations before
 # deploying the Worker, so neither failing code nor code ahead of the schema can
-# ship. Dev-only tooling advisories (vitest/vite transitive packages) do not
+# ship. Because a migration cannot be rolled back, the live database is exported
+# and kept as a run artifact before the schema changes. Dev-only tooling advisories (vitest/vite transitive packages) do not
 # affect what the Worker ships, so they are not audited here.
 #
 # Cloudflare Workers Builds used to be connected to main as well and deployed the
@@ -81,6 +82,29 @@ jobs:
             printf '%s\n' "$report"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Migrations are irreversible. Export the live database first and keep the
+      # dump with the run, so a bad migration can at least be recovered by hand.
+      # A failed export stops the deploy instead of shipping unprotected.
+      - name: Prepare D1 backup directory
+        run: mkdir -p d1-backup
+
+      - name: Back up D1 before migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 export church-members-db --remote --output=d1-backup/pre-migration-${{ github.sha }}.sql
+
+      # The dump holds member records, so it stays in the private run artifact
+      # for a short window rather than in the repository.
+      - name: Keep the pre-migration backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-${{ github.sha }}
+          path: d1-backup/*.sql
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Apply D1 migrations (remote)
         uses: cloudflare/wrangler-action@v3

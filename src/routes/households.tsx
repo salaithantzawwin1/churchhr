@@ -8,7 +8,8 @@ import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { loadEnrolmentSummaries, type EnrolmentSummary } from "../student-enrolments";
 import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
-import { asInt, intParam, isFutureDate, normKey, parseDateFlexible, s } from "../util";
+import { asInt, intParam, normKey, s } from "../util";
+import { MEMBER_FORM_KEYS, readMemberForm } from "../member-form";
 import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
@@ -659,6 +660,44 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   );
 });
 
+/** The new-member form. It was only reachable as the POST error page before,
+ *  so the quick-add form itself had no URL in the app; this is that URL. */
+householdsRoutes.get("/:id/add-member/new", requirePermission("members.create"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
+  if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
+    return c.redirect("/admin/households?err=err-notfound", 302);
+  }
+  const lang = c.get("lang");
+  const [allOptions, allRegions, placement] = await Promise.all([
+    loadAllOptions(db), loadRegions(db), householdPlacement(db, family),
+  ]);
+  // Pre-fill what the household already decides so the required Home Cell is
+  // usually not a fresh choice for the clerk.
+  const cell = family.home_cell_id ?? placement.homeCellId;
+  const group = family.group_id ?? placement.groupId;
+  const values: Record<string, string> = {
+    region_id: String(family.region_id),
+    township: family.township ?? "",
+    address: family.address ?? "",
+    home_cell_id: cell ? String(cell) : "",
+    group_id: group ? String(group) : "",
+  };
+  return c.html(
+    <HouseholdAddMemberPage
+      user={c.get("user")} perms={c.get("perms")} family={family}
+      values={values} errors={[]}
+      relationship={family.head_member_id ? "spouse" : "head"}
+      options={hhFormOptions(allOptions)}
+      regions={scopedRegions(allRegions, scope, lang)}
+      lang={lang}
+    />,
+  );
+});
+
 /** Option lists shared by household forms (region cascade fields). */
 function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
   return {
@@ -670,13 +709,6 @@ function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
   };
 }
 
-const MEMBER_FORM_KEYS = [
-  "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
-  "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
-  "ethnicity_id", "education_id", "family_group_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id",
-  "salvation_date", "status", "notes", "relationship",
-] as const;
 
 householdsRoutes.post("/:id/add-member", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
@@ -696,48 +728,30 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const body = await c.req.parseBody();
   const relationship = s(body.relationship);
   const rel = (RELATIONSHIPS as readonly string[]).includes(relationship) ? relationship : "other";
-  const values: Record<string, string> = {};
-  for (const k of MEMBER_FORM_KEYS) values[k] = s(body[k]);
-  values.address = values.address || family.address || "";
-  values.township = values.township || family.township || "";
-  values.region_id = values.region_id || String(family.region_id);
-  const errors: string[] = [];
-  const td = getDict(lang);
-  if (!values.name_myanmar && !values.name_english) errors.push(td("val.name"));
-  const regionId = asInt(values.region_id);
-  if (regionId === null || (!scope.scopeAll && !scope.stateIds.includes(regionId))) {
-    errors.push(td("val.state"));
-  }
-  // Same date rules as the full member form: normalise the input and refuse
-  // impossible or future dates instead of storing them verbatim.
-  let dateOfBirth: string | null = null;
-  if (values.date_of_birth) {
-    dateOfBirth = parseDateFlexible(values.date_of_birth);
-    if (!dateOfBirth) errors.push(td("val.dob"));
-    else if (isFutureDate(dateOfBirth)) errors.push(td("val.dobFuture"));
-  }
-  let salvationDate: string | null = null;
-  if (values.salvation_date) {
-    salvationDate = parseDateFlexible(values.salvation_date);
-    if (!salvationDate) errors.push(td("val.salvation"));
-    else if (isFutureDate(salvationDate)) errors.push(td("val.salvationFuture"));
-  }
 
-  // The household's Home Cell and Family Group win; a new head may seed them
-  // when the household was created before those columns existed. Home Cell is
-  // required here too, so this path cannot create a member without one.
+  // The household's state, address, Home Cell and Group fill the form where the
+  // clerk left them blank; after that the shared member validator applies the
+  // same rules as the member form (Home Cell required, state scope, enums and
+  // option ownership), so the two screens cannot drift apart.
+  const input: Record<string, unknown> = {};
+  for (const k of MEMBER_FORM_KEYS) input[k] = body[k];
+  input.address = input.address || family.address || "";
+  input.township = input.township || family.township || "";
+  input.region_id = input.region_id || String(family.region_id);
   const allOptions = await loadAllOptions(db);
+  const allRegions = await loadRegions(db);
   const placement = await householdPlacement(db, family);
-  const postedHome = asInt(values.home_cell_id);
-  const postedGroup = asInt(values.group_id);
+  const postedHome = asInt(s(body.home_cell_id));
+  const postedGroup = asInt(s(body.group_id));
   const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
   const groupId = family.group_id ?? placement.groupId ?? postedGroup;
-  if (!homeCellId) errors.push(td("val.homeCell"));
-  // The required select echoes the cell the household already supplies.
-  if (!values.home_cell_id && homeCellId) values.home_cell_id = String(homeCellId);
+  if (!input.home_cell_id && homeCellId) input.home_cell_id = String(homeCellId);
+  if (!input.group_id && groupId) input.group_id = String(groupId);
 
-  if (errors.length > 0) {
-    const allRegions = await loadRegions(db);
+  const { values, errors, data } = readMemberForm(input, {
+    scope, options: allOptions, regions: allRegions, t: getDict(lang),
+  });
+  if (!data) {
     return c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
         values={values} errors={errors} relationship={rel}
@@ -756,7 +770,7 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
       db, id, family.region_id, homeCellId, null, groupId, allOptions,
     );
   } else if (!familyGroupId && isHead) {
-    familyGroupId = asInt(values.family_group_id);
+    familyGroupId = data.family_group_id as number | null;
   }
   if (isHead && !family.home_cell_id && postedHome) {
     await db.update(families).set({ homeCellId: postedHome, groupId: postedGroup })
@@ -766,31 +780,33 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const inserted = await db
     .insert(members)
     .values({
-      nameMyanmar: values.name_myanmar || null,
-      nameEnglish: values.name_english || null,
-      gender: values.gender ?? "",
-      maritalStatus: values.marital_status ?? "",
-      dateOfBirth,
-      bloodType: values.blood_type ?? "",
-      phone: values.phone || null,
-      nrcNumber: values.nrc_number || null,
-      languages: values.languages || null,
-      address: values.address || null,
-      township: values.township || null,
-      fatherName: values.father_name || null,
-      motherName: values.mother_name || null,
-      ethnicityId: asInt(values.ethnicity_id),
-      educationId: asInt(values.education_id),
-      job: values.job || null,
-      workSkills: values.work_skills || null,
-      income: values.income ? Number(values.income.replace(/[,\s]/g, "")) || null : null,
-      salvationDate,
-      notes: values.notes || null,
-      status: values.status === "inactive" ? "inactive" : "active",
-      regionId: regionId!,
+      nameMyanmar: data.name_myanmar,
+      nameEnglish: data.name_english,
+      gender: data.gender,
+      maritalStatus: data.marital_status,
+      dateOfBirth: data.date_of_birth,
+      bloodType: data.blood_type,
+      phone: data.phone,
+      nrcNumber: data.nrc_number,
+      languages: data.languages,
+      address: data.address,
+      township: data.township,
+      fatherName: data.father_name,
+      motherName: data.mother_name,
+      ethnicityId: data.ethnicity_id,
+      educationId: data.education_id,
+      job: data.job,
+      workSkills: data.work_skills,
+      income: data.income,
+      salvationDate: data.salvation_date,
+      notes: data.notes,
+      status: data.status,
+      regionId: data.region_id as number,
       householdId: id,
       relationship: rel,
-      familyGroupId, groupId, homeCellId,
+      familyGroupId,
+      groupId: (data.group_id as number | null) ?? groupId,
+      homeCellId: (data.home_cell_id as number | null) ?? homeCellId,
       createdBy: c.get("user").id,
       updatedBy: c.get("user").id,
     } as any)

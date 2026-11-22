@@ -21,6 +21,13 @@ async function createSession(userId: number): Promise<string> {
   return raw;
 }
 
+function getAs(path: string): Promise<Response> {
+  return SELF.fetch(`${HOST}${path}`, {
+    headers: { Cookie: `session=${token}` },
+    redirect: "manual",
+  });
+}
+
 function postAs(path: string, form: Record<string, string>): Promise<Response> {
   return SELF.fetch(`${HOST}${path}`, {
     method: "POST",
@@ -69,6 +76,9 @@ beforeAll(async () => {
   await db.prepare("UPDATE users SET must_change_password = 0 WHERE id = 1").run();
   await db.prepare(
     "INSERT INTO lookup_options (type, label, active, sort_order, region_id) VALUES ('home_cell', 'Guard Cell', 1, 1, 1)",
+  ).run();
+  await db.prepare(
+    "INSERT INTO lookup_options (type, label, active, sort_order, region_id) VALUES ('home_cell', 'Other State Cell', 1, 2, 2)",
   ).run();
   const cell = await db.prepare(
     "SELECT id FROM lookup_options WHERE type = 'home_cell' AND label = 'Guard Cell'",
@@ -171,6 +181,48 @@ describe("household quick-add Home Cell guard", () => {
       "SELECT home_cell_id FROM members WHERE name_english = 'Placed Member'",
     ).first<{ home_cell_id: number | null }>();
     expect(row?.home_cell_id).toBe(homeCellId);
+  });
+
+  it("serves the new-member form on its own page", async () => {
+    const id = await familyId("No Cell Household");
+    const res = await getAs(`/admin/households/${id}/add-member/new`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain(`action="/admin/households/${id}/add-member"`);
+    expect(html).toContain('name="name_english"');
+    expect(html).toContain('name="home_cell_id"');
+  });
+
+  it("applies the member form's option ownership rule", async () => {
+    const id = await familyId("No Cell Household");
+    const other = await env.DB.prepare(
+      "SELECT id FROM lookup_options WHERE label = 'Other State Cell'",
+    ).first<{ id: number }>();
+    const res = await postAs(`/admin/households/${id}/add-member`, {
+      name_english: "Cross State Member",
+      region_id: "1",
+      home_cell_id: String(other!.id),
+      relationship: "other",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Invalid dropdown value");
+    const row = await env.DB.prepare(
+      "SELECT id FROM members WHERE name_english = 'Cross State Member'",
+    ).first();
+    expect(row).toBeNull();
+  });
+
+  it("applies the member form's enum checks", async () => {
+    const id = await familyId("No Cell Household");
+    const res = await postAs(`/admin/households/${id}/add-member`, {
+      name_english: "Bad Gender Member",
+      region_id: "1",
+      home_cell_id: String(homeCellId),
+      gender: "robot",
+      relationship: "other",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Invalid gender");
   });
 
   it("uses the household's own cell when the form leaves it blank", async () => {

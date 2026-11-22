@@ -541,6 +541,13 @@ export function HouseholdSearchMemberPage(props: Common & {
           <a class="back-link" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
           <h1>{t("hh.addExisting")}<span class="muted small"> · {family.name}</span></h1>
         </div>
+        {perms.has("members.create") && (
+          <div class="page-actions">
+            <a class="btn secondary" href={`/admin/households/${family.id}/add-member/new`}>
+              {t("members.addNew")}
+            </a>
+          </div>
+        )}
       </div>
 
       <div class="card">

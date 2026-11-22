@@ -6,7 +6,7 @@ import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { ALL_STATES, abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
+import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 import {
   getMemberPositions, isPositionForScope, positionLabel, positionTaken, setHomeCellPosition, setMemberPositions,
@@ -42,6 +42,7 @@ import {
   type DuplicateCandidate, type Filters, type FormValues, type ImportReport, type MemberDetail,
 } from "../views/members";
 import { nameKey } from "../pastor-children";
+import { readMemberForm } from "../member-form";
 
 export const membersRoutes = new Hono<AppEnv>();
 
@@ -329,133 +330,6 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
 });
 
 // ---------- shared form read/validate ----------
-
-const OPTION_FIELD: Record<string, string> = {
-  ethnicity_id: "ethnicity",
-  education_id: "education",
-  family_group_id: "family_group",
-  fellowship_category_id: "fellowship_category",
-  sector_id: "sector",
-  group_id: "group",
-  home_cell_id: "home_cell",
-};
-
-const FORM_KEYS = [
-  "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
-  "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
-  "family_group_id", "ethnicity_id", "education_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "department_id", "group_id", "fellowship_category_id", "sector_id",
-  "salvation_date", "status", "notes",
-] as const;
-
-type Validated = { values: FormValues; errors: string[]; data: Record<string, string | number | null> | null };
-
-function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[], departments: { id: number }[] = [], regions: { id: number }[] = []): Validated {
-  const v: FormValues = {};
-  for (const k of FORM_KEYS) v[k] = s(body[k]);
-  const errors: string[] = [];
-
-  if (!v.name_myanmar && !v.name_english) errors.push(msg("val.name"));
-
-  const regionId = asInt(v.region_id);
-  let regionOk = false;
-  if (regionId === null) errors.push(msg("val.state"));
-  // Scope-all may pick any state, but only one that still exists: an id from a
-  // hand-edited form reached the insert and failed its foreign key (HTTP 500).
-  else if (scope.scopeAll) regionOk = regions.length === 0 || regions.some((r) => r.id === regionId);
-  else regionOk = scope.stateIds.includes(regionId);
-  if (regionId !== null && !regionOk) errors.push(msg("val.scope"));
-
-  if (v.gender && !(v.gender in GENDERS)) errors.push(msg("val.gender"));
-  if (v.marital_status && !(v.marital_status in MARITAL_STATUSES)) errors.push(msg("val.marital"));
-  if (v.blood_type && !BLOOD_TYPES.includes(v.blood_type) &&
-      !findOption(options, "blood_type", v.blood_type, 0)) {
-    errors.push(msg("val.blood"));
-  }
-
-  let dob: string | null = "";
-  if (v.date_of_birth) {
-    dob = parseDateFlexible(v.date_of_birth);
-    if (dob === null) errors.push(msg("val.dob"));
-    else if (isFutureDate(dob)) errors.push(msg("val.dobFuture"));
-  }
-  let salvation: string | null = "";
-  if (v.salvation_date) {
-    salvation = parseDateFlexible(v.salvation_date);
-    if (salvation === null) errors.push(msg("val.salvation"));
-    else if (isFutureDate(salvation)) errors.push(msg("val.salvationFuture"));
-  }
-
-  let income: number | null = null;
-  if (v.income) {
-    const digits = v.income.replace(/[,\s]/g, "");
-    if (/^\d+$/.test(digits)) income = Number(digits);
-    else errors.push(msg("val.income"));
-  }
-
-  const status = v.status && v.status in STATUSES ? v.status : "active";
-
-  let departmentId: number | null = null;
-  if (v.department_id) {
-    departmentId = asInt(v.department_id);
-    if (departmentId === null || !departments.some((d) => d.id === departmentId)) {
-      errors.push(msg("val.department"));
-      departmentId = null;
-    }
-  }
-
-  // Home Cell is the member's place in the reporting structure, so the form
-  // and the server both refuse to save without one. Legacy rows that predate
-  // this rule stay readable and are fixed the next time they are edited.
-  if (!v.home_cell_id) errors.push(msg("val.homeCell"));
-
-  const optionIds: Record<string, number | null> = {};
-  for (const [field, type] of Object.entries(OPTION_FIELD)) {
-    const raw = v[field];
-    if (!raw) { optionIds[field] = null; continue; }
-    const found = options.find((o) => o.type === type && o.id === asInt(raw));
-    // A state-scoped option from another state would silently attach the member
-    // to a structure the editor cannot see, so only accept the member's own
-    // state plus all-states (region 0) options.
-    if (found && found.regionId !== ALL_STATES && found.regionId !== regionId) {
-      errors.push(msg("val.option"));
-      optionIds[field] = null;
-      continue;
-    }
-    if (!found) errors.push(msg("val.option"));
-    optionIds[field] = found ? found.id : null;
-  }
-
-  if (errors.length > 0) return { values: v, errors, data: null };
-  return {
-    values: v,
-    errors,
-    data: {
-      name_myanmar: v.name_myanmar || null,
-      name_english: v.name_english || null,
-      gender: v.gender,
-      marital_status: v.marital_status,
-      date_of_birth: dob === "" ? null : dob,
-      blood_type: v.blood_type,
-      phone: v.phone || null,
-      nrc_number: v.nrc_number || null,
-      languages: v.languages || null,
-      address: v.address || null,
-      township: v.township || null,
-      father_name: v.father_name || null,
-      mother_name: v.mother_name || null,
-      job: v.job || null,
-      work_skills: v.work_skills || null,
-      income,
-      salvation_date: salvation === "" ? null : salvation,
-      status,
-      notes: v.notes || null,
-      region_id: regionId,
-      department_id: departmentId,
-      ...optionIds,
-    },
-  };
-}
 
 /** Members that look like the same person as `data`, for the soft warning
  *  shown before a save. A name match uses the same key as the pastor-child
@@ -1225,7 +1099,9 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
+  const { values, errors, data } = readMemberForm(body, {
+    scope, options, departments, regions: allRegions, t: getDict(c.get("lang")),
+  });
   const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
   // Echo the resized upload back into the form so a re-render (validation or
@@ -1763,7 +1639,9 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
+  const { values, errors, data } = readMemberForm(body, {
+    scope, options, departments, regions: allRegions, t: getDict(c.get("lang")),
+  });
   const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
   const photoData = photo.error ? "" : s(body.photo_data);

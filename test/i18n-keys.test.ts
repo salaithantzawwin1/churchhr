@@ -40,11 +40,12 @@ function adminKeysInSource(): string[] {
   return [...new Set([...matches].map((m) => m[0].slice(1, -1)))].sort();
 }
 
-/** Validator and import messages, e.g. msg("val.name") / td("hh.val.phone");
- *  a message outside the dictionaries is rendered verbatim. */
+/** Validator and import messages, e.g. msg("val.name") / td("hh.val.phone") /
+ *  t("val.homeCell") from the shared member validator; a message outside the
+ *  dictionaries is rendered verbatim. */
 function messageKeysInSource(): string[] {
   const keys = new Set<string>();
-  const call = /\b(?:msg|td|translate)\(\s*"([A-Za-z][A-Za-z0-9_.]*)"/g;
+  const call = /\b(?:msg|td|translate|t)\(\s*"([A-Za-z][A-Za-z0-9_.]*)"/g;
   for (const m of CODE_TEXT.matchAll(call)) {
     const key = m[1]!;
     if (/^(val|imp|photo|hh\.val|flash|adm)\./.test(key)) keys.add(key);
