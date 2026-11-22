@@ -1445,6 +1445,26 @@
   }
   initTabs(document);
 
+  // The position dialog's identity strip keeps its role chips on one line and
+  // scrolls them sideways when the sheet is narrow. A fade on the right edge
+  // says there is more to see, and it goes away once the last chip is in view.
+  function initRoleChips(root) {
+    Array.prototype.forEach.call(root.querySelectorAll(".position-role-chips"), function (row) {
+      if (row.getAttribute("data-chips-bound")) return;
+      row.setAttribute("data-chips-bound", "1");
+      function update() {
+        var hidden = row.scrollWidth - row.clientWidth > 2;
+        var left = row.scrollWidth - row.clientWidth - Math.ceil(row.scrollLeft);
+        row.classList.toggle("is-scrollable", hidden);
+        row.classList.toggle("at-end", hidden && left <= 2);
+      }
+      row.addEventListener("scroll", update, { passive: true });
+      window.addEventListener("resize", update);
+      update();
+    });
+  }
+  initRoleChips(document);
+
   // A one-time password page is the response to a POST. Aim its history entry
   // at the list, so refreshing reloads the list (a GET) instead of resubmitting
   // the form and issuing a second password.
@@ -1858,6 +1878,7 @@
     initDepartmentPosition(bodyEl);
     initChurchPosition(bodyEl);
     initTabs(bodyEl);
+    initRoleChips(bodyEl);
     initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);
   }

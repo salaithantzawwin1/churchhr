@@ -3097,8 +3097,18 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .position-form .position-hero { padding: 7px 12px; margin-bottom: 6px; gap: 8px; }
 .position-form .position-role-chips {
   flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; gap: 4px;
+  padding-right: 22px;
 }
 .position-form .position-role-chips .badge { white-space: nowrap; }
+/* A wide sheet has the height to spare, so there the chips wrap and every role
+   stays on screen; the sideways row is only for narrow sheets. */
+@media (min-width: 1200px) { .position-form .position-role-chips { flex-wrap: wrap; overflow-x: visible; padding-right: 0; } }
+/* A chip cut off at the right edge reads as a bug, so the row fades out where
+   more chips wait; app.js drops the fade once the row is scrolled to its end. */
+.position-form .position-role-chips.is-scrollable:not(.at-end) {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent);
+}
 .position-form .position-role-chips::-webkit-scrollbar { display: none; }
 .position-form .position-intro { margin-bottom: 5px; font-size: 11.5px; }
 .position-form .position-tabs { margin-bottom: 5px; padding: 2px; }
