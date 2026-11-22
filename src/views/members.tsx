@@ -1014,8 +1014,15 @@ export function MemberPositionForm(props: PositionFormProps) {
             </div>
             {clusters.length > 0 && clusterDefs.length > 0 && (
               <div class="position-subsection">
-                <h4>{t("org.clusterSection")}</h4>
-                <p class="hint">{t("org.clusterHint")}</p>
+                {/* One sentence of guidance behind an info dot, so the two
+                    selects start right under the heading. */}
+                <h4 class="position-subsection-title">
+                  {t("org.clusterSection")}
+                  <span class="field-tip" data-tip={t("org.clusterHint")}>
+                    <button type="button" class="field-tip-btn" aria-label={t("org.clusterHint")}
+                      title={t("org.clusterHint")}>i</button>
+                  </span>
+                </h4>
                 <div class="form-grid">
                   <label class="field">
                     <span class="lbl">{t("org.clusterLabel")}</span>

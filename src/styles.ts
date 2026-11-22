@@ -2823,6 +2823,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 }
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }
+.position-subsection-title { display: flex; align-items: center; gap: 6px; }
 .position-subsection .form-grid { margin-top: 8px; }
 .page-head-actions { align-items: stretch; }
 .page-head-actions .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
