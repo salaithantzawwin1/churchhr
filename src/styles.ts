@@ -1860,10 +1860,28 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-person-meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
 /* A dashed outline reads as "this slot is empty, add someone" instead of a
    solid button that stretched the full card width and looked like a field. */
-.org-region-role > .btn {
-  align-self: flex-start; margin-top: 2px; border-style: dashed; color: var(--muted);
+/* A vacant slot that can take a leader is one dashed card you click: the empty
+   state is the action, so the card no longer holds a second dashed button.
+   A filled card gets a quiet text link at its foot instead. */
+.org-region-role-add {
+  justify-content: space-between; gap: 8px;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted); text-decoration: none;
+  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
 }
-.org-region-role > .btn:hover { color: var(--link); border-color: var(--link); }
+.org-region-role-add:hover, .org-region-role-add:focus-visible {
+  border-color: var(--link); background: var(--chip-brand-bg); color: var(--link);
+}
+/* A tinted pill so an empty slot reads as something to press, not as a card
+   that failed to load its leader. */
+.org-region-add-label {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
+  align-self: flex-start; padding: 4px 10px; border-radius: 999px;
+  background: var(--chip-brand-bg); color: var(--link);
+  font-size: 12.5px; font-weight: 600; line-height: 1.4;
+}
+.org-region-role-add:hover .org-region-add-label { text-decoration: underline; }
+.org-region-add { margin-top: auto; padding-top: 6px; }
 .org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
 .org-mini-person a { overflow-wrap: anywhere; }
 .org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
@@ -3425,14 +3443,22 @@ th { font-size: 13px; }
    region names can still be shaped legibly at. */
 .assign-hero .position-hero-home { font-size: 13px; line-height: 1.6; }
 .assign-search { margin-bottom: 0; }
-label.field.assign-priority {
-  /* min-content on the label track: a max-content track lets the full-width
-     hint below it stretch the whole grid past the dialog on a phone. */
-  display: grid; grid-template-columns: min-content 96px; align-items: center;
-  gap: 2px 10px;
+/* The priority of the person being added sits in the footer beside Save. The
+   current-team rows above already show each holder's own priority, so a second
+   full-width Priority field in the body read as the same control twice; the
+   rule that used to sit under it is now an info dot on the label. */
+.modal-body form > .actions.assign-actions { justify-content: space-between; }
+.assign-priority-inline { display: inline-flex; align-items: center; gap: 8px; }
+.assign-priority-inline .lbl-row { margin-bottom: 0; }
+.assign-priority-inline .lbl { margin: 0; }
+.assign-priority-inline input[type="number"] {
+  width: 68px; height: 34px; padding: 0 6px; text-align: center;
 }
-.assign-priority .lbl { margin: 0; }
-.assign-priority .hint { grid-column: 1 / -1; margin: 0; font-size: 11.5px; }
+/* The dot sits at the sheet's left edge in this footer, so its bubble grows
+   rightwards; the default right-anchored bubble ran off the sheet and was
+   clipped by the scrolling body. */
+.assign-priority-inline .field-tip::after { left: 0; right: auto; }
+.assign-actions-buttons { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 /* flex-shrink alone collapsed this to a 17px strip in the taller region
    dialog, leaving the candidates invisible; the list keeps a usable height and
    only then scrolls, with rows pinned to the top. */

@@ -1580,6 +1580,23 @@ export function OrganizationPage(props: Common & {
                         <div class="org-region-team-grid">
                           {regionalRows.all.map((def) => {
                             const team = regionalTeam(group.id, def.code);
+                            const canAdd = canEdit && def.allowMultiple === 1;
+                            const addHref = `/organization/region-assign?region=${group.id}&position=${def.code}`;
+                            const addTitle = `${t("org.addHolder")} · ${positionDefLabel(def, L)}`;
+                            // A vacant slot that can take a leader is the action itself: the
+                            // whole card is the link, so nobody has to find a button inside
+                            // a mostly empty box.
+                            if (canAdd && team.length === 0) {
+                              return (
+                                <a class="org-region-role org-region-role-add js-add-modal" href={addHref}
+                                  data-modal-title={addTitle} data-modal-size="md">
+                                  <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                                  <span class="org-region-add-label">
+                                    <span aria-hidden="true">+</span>{t("org.addHolder")}
+                                  </span>
+                                </a>
+                              );
+                            }
                             return (
                               <div class={`org-region-role${team.length ? "" : " org-vacant"}`}>
                                 <span class="org-mini-role">{positionDefLabel(def, L)}</span>
@@ -1600,10 +1617,10 @@ export function OrganizationPage(props: Common & {
                                     ))}
                                   </div>
                                 )}
-                                {canEdit && def.allowMultiple === 1 && (
-                                  <a class="btn sm secondary js-add-modal" href={`/organization/region-assign?region=${group.id}&position=${def.code}`}
-                                    data-modal-title={`${t("org.addHolder")} · ${positionDefLabel(def, L)}`} data-modal-size="md">
-                                    + {t("org.addHolder")}
+                                {canAdd && team.length > 0 && (
+                                  <a class="org-card-link org-region-add js-add-modal" href={addHref}
+                                    data-modal-title={addTitle} data-modal-size="md">
+                                    <span aria-hidden="true">+</span> {t("org.addHolder")}
                                   </a>
                                 )}
                               </div>

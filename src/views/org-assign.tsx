@@ -180,19 +180,26 @@ export function AssignLeaderModal(props: {
           </div>
         )}
 
-        {allowMultiple && (
-          <label class="field assign-priority">
-            <span class="lbl">{t("org.priority")}</span>
-            <input type="number" name="priority" min="1" max="99" value="1" />
-            <span class="hint">{t("org.priorityHint")}</span>
-          </label>
-        )}
-
         <p class="assign-warn" data-assign-warn hidden></p>
 
-        <div class="actions">
-          <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
-          <button class="btn" type="submit">{t("form.save")}</button>
+        <div class="actions assign-actions">
+          {allowMultiple && (
+            <span class="assign-priority-inline">
+              <span class="lbl-row">
+                <span class="lbl">{t("org.priority")}</span>
+                <span class="field-tip" data-tip={t("org.priorityHint")}>
+                  <button type="button" class="field-tip-btn" aria-label={t("org.priorityHint")}
+                    title={t("org.priorityHint")}>i</button>
+                </span>
+              </span>
+              <input type="number" name="priority" min="1" max="99" value="1"
+                aria-label={t("org.priority")} />
+            </span>
+          )}
+          <span class="assign-actions-buttons">
+            <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
+            <button class="btn" type="submit">{t("form.save")}</button>
+          </span>
         </div>
       </form>
     </>
