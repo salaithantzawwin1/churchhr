@@ -3455,7 +3455,9 @@ label.field.assign-priority {
 .assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
 .assign-hint { margin: 0; color: var(--muted); font-size: 11.5px; }
-.assign-list-clear { margin-top: var(--space-2); }
+/* One "clear the post" row, so it must not inherit the candidate list's floor:
+   a 120px box holding a single option read as an empty panel. */
+.assign-list-clear { margin-top: var(--space-2); min-height: 0; }
 
 /* Nested roles in the Home Cell and Department charts: children hang off their
    parent on a connector rail, the same reading as the church tree — each child
