@@ -1448,20 +1448,30 @@
   // The position dialog's identity strip keeps its role chips on one line and
   // scrolls them sideways when the sheet is narrow. A fade on the right edge
   // says there is more to see, and it goes away once the last chip is in view.
+  // A row belongs to one dialog opening, so the resize listener is shared by
+  // all of them and rows whose dialog is gone are dropped: one listener per
+  // row would pile up on the window every time the dialog opens.
+  var chipRows = [];
+  function updateChipRow(row) {
+    var hidden = row.scrollWidth - row.clientWidth > 2;
+    var left = row.scrollWidth - row.clientWidth - Math.ceil(row.scrollLeft);
+    row.classList.toggle("is-scrollable", hidden);
+    row.classList.toggle("at-end", hidden && left <= 2);
+  }
+  function refreshChipRows() {
+    chipRows = chipRows.filter(function (row) { return row.isConnected; });
+    chipRows.forEach(updateChipRow);
+  }
+  window.addEventListener("resize", refreshChipRows);
   function initRoleChips(root) {
     Array.prototype.forEach.call(root.querySelectorAll(".position-role-chips"), function (row) {
       if (row.getAttribute("data-chips-bound")) return;
       row.setAttribute("data-chips-bound", "1");
-      function update() {
-        var hidden = row.scrollWidth - row.clientWidth > 2;
-        var left = row.scrollWidth - row.clientWidth - Math.ceil(row.scrollLeft);
-        row.classList.toggle("is-scrollable", hidden);
-        row.classList.toggle("at-end", hidden && left <= 2);
-      }
-      row.addEventListener("scroll", update, { passive: true });
-      window.addEventListener("resize", update);
-      update();
+      chipRows.push(row);
+      row.addEventListener("scroll", function () { updateChipRow(row); }, { passive: true });
+      updateChipRow(row);
     });
+    refreshChipRows();
   }
   initRoleChips(document);
 
