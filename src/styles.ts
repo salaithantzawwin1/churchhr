@@ -3081,11 +3081,11 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 /* The chip under the name repeats the Position column, so it follows the column
    chooser: with Position switched off, the chip goes away too. */
 .members-tbl[data-inline-role="off"] .member-role-inline { display: none; }
-/* One layout at every height: the sheet body scrolls as a whole and the Save
-   bar stays pinned over its bottom edge. The body keeps the bar's height clear
-   at the end of the scroll area, so the last field can be scrolled above the
-   bar instead of ending up under it. */
-.modal-body:has(.position-form) { padding-bottom: 63px; }
+/* The position sheet has one layout at every height: the body scrolls as a
+   whole and the Save bar is pinned to its bottom edge. No extra padding is
+   reserved below the bar: the bar is the last item in the form's flow, so at
+   the end of the scroll the last field already sits above it, and easing the
+   field higher is what left an empty band under the bar. */
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }
 /* Laptop widths squeeze this column, and a badge that broke its own name
