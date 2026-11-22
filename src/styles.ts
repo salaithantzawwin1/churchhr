@@ -1925,7 +1925,7 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .position-hero-main { flex: 1; min-width: 0; }
 .position-hero-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.position-hero-title h4 { margin: 0; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.position-hero-title h4 { margin: 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .position-hero-home { color: var(--muted); font-size: 12px; }
 .position-hero-home strong { color: var(--ink); font-weight: 600; }
 .position-hero-profile { color: var(--link); font-size: 12px; font-weight: 600; text-decoration: none; }
@@ -1937,14 +1937,14 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .position-hero-link:hover { text-decoration: underline; }
 .position-role-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .position-role-chips .badge { font-size: 11.5px; }
-.position-intro { margin: 0 0 12px; }
+.position-intro { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; }
 .position-section {
   margin: 0 0 11px; padding: 12px 13px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--field-bg);
 }
 .position-section-head { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px; }
-.position-section h3 { margin: 1px 0 0; font-size: 14px; }
-.position-section-head .hint { margin: 2px 0 0; }
+.position-section h3 { margin: 1px 0 0; font-size: 13px; }
+.position-section-head .hint { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; }
 .position-section .field { margin-bottom: 0; }
 .position-section .form-grid { margin-top: 0; }
 .position-section select:disabled { opacity: .55; cursor: not-allowed; }

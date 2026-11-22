@@ -1386,6 +1386,28 @@
   }
   initDepartmentPosition(document);
 
+  // A church-wide role belongs to one Regional Church, so its position select
+  // waits for a church: the server rejects a role that has no church to sit in.
+  function initChurchPosition(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-church-position]"), function (scope) {
+      if (scope.getAttribute("data-church-bound")) return;
+      scope.setAttribute("data-church-bound", "1");
+      var church = scope.querySelector('select[name="church_id"]');
+      var pos = scope.querySelector('select[name="church_position"]');
+      if (!church || !pos) return;
+      function sync(clear) {
+        var hasChurch = Boolean(church.value);
+        pos.disabled = !hasChurch;
+        if (!hasChurch && clear) pos.value = "";
+      }
+      church.addEventListener("change", function () { sync(true); });
+      // Not cleared on load: an existing role keeps its value until the user
+      // changes the church themselves.
+      sync(false);
+    });
+  }
+  initChurchPosition(document);
+
   // Tabbed forms (e.g. Assign position). Without JS every pane stays visible
   // and usable; this only hides the panes that are not selected.
   function initTabs(root) {
@@ -1834,6 +1856,7 @@
     initListFilter(bodyEl);
     initAssignWarn(bodyEl);
     initDepartmentPosition(bodyEl);
+    initChurchPosition(bodyEl);
     initTabs(bodyEl);
     initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);

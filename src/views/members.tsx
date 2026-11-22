@@ -1143,7 +1143,7 @@ export function MemberPositionForm(props: PositionFormProps) {
               <div><h3>{t("org.churchSection")}</h3></div>
             </div>
             {churchDefs.length === 0 ? managePositions("church") : (
-              <div class="form-grid">
+              <div class="form-grid" data-church-position>
                 <label class="field">
                   <span class="lbl">{t("org.church")}</span>
                   <select name="church_id">
