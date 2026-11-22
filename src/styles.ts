@@ -3086,6 +3086,27 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
    reserved below the bar: the bar is the last item in the form's flow, so at
    the end of the scroll the last field already sits above it, and easing the
    field higher is what left an empty band under the bar. */
+/* The stack above the fields stays compact so that, even in a 500px-high
+   window, every tab shows its first field without scrolling: the sheet takes
+   almost the full height, the title bar loses its air, and the identity strip,
+   the hint and the tab bar tighten up. The role chips run on one line and
+   scroll sideways instead of wrapping to three, which was the tallest part. */
+.modal-card:has(.position-form) { max-height: calc(100dvh - 8px); }
+.modal-card:has(.position-form) .modal-head { padding: 5px 20px; }
+.modal-card:has(.position-form) .modal-head h3 { font-size: 16px; }
+.position-form .position-hero { padding: 7px 12px; margin-bottom: 6px; gap: 8px; }
+.position-form .position-role-chips {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; gap: 4px;
+}
+.position-form .position-role-chips .badge { white-space: nowrap; }
+.position-form .position-role-chips::-webkit-scrollbar { display: none; }
+.position-form .position-intro { margin-bottom: 5px; font-size: 11.5px; }
+.position-form .position-tabs { margin-bottom: 5px; padding: 2px; }
+.position-form .position-tab { padding: 6px 10px; }
+.position-form .position-section { padding: 9px 11px; }
+.position-form .position-section-head { margin-bottom: 5px; }
+.position-form .position-notice { padding: 5px 8px; font-size: 11.5px; }
+.position-form .position-notice p { margin: 0 0 5px; }
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }
 /* Laptop widths squeeze this column, and a badge that broke its own name
