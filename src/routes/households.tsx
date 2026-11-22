@@ -722,8 +722,21 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
     if (!salvationDate) errors.push(td("val.salvation"));
     else if (isFutureDate(salvationDate)) errors.push(td("val.salvationFuture"));
   }
+
+  // The household's Home Cell and Family Group win; a new head may seed them
+  // when the household was created before those columns existed. Home Cell is
+  // required here too, so this path cannot create a member without one.
+  const allOptions = await loadAllOptions(db);
+  const placement = await householdPlacement(db, family);
+  const postedHome = asInt(values.home_cell_id);
+  const postedGroup = asInt(values.group_id);
+  const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
+  const groupId = family.group_id ?? placement.groupId ?? postedGroup;
+  if (!homeCellId) errors.push(td("val.homeCell"));
+  // The required select echoes the cell the household already supplies.
+  if (!values.home_cell_id && homeCellId) values.home_cell_id = String(homeCellId);
+
   if (errors.length > 0) {
-    const allOptions = await loadAllOptions(db);
     const allRegions = await loadRegions(db);
     return c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
@@ -737,14 +750,6 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const now = Math.floor(Date.now() / 1000);
   const isHead = rel === "head";
 
-  // The household's Home Cell and Family Group win; a new head may seed them
-  // when the household was created before those columns existed.
-  const allOptions = await loadAllOptions(db);
-  const placement = await householdPlacement(db, family);
-  const postedHome = asInt(values.home_cell_id);
-  const postedGroup = asInt(values.group_id);
-  const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
-  const groupId = family.group_id ?? placement.groupId ?? postedGroup;
   let familyGroupId = family.family_group_id ?? placement.familyGroupId;
   if (!familyGroupId && homeCellId) {
     familyGroupId = await ensureHouseholdFamilyGroup(

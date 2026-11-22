@@ -700,6 +700,9 @@ export function HouseholdAddMemberPage(props: Common & {
               townshipOpts: props.options?.township ?? [],
               homeCellId: v.home_cell_id ?? "",
               homeCellOpts: props.options?.home_cell ?? [],
+              // This form creates a member, so it needs a Home Cell like the
+              // member form does; the household's own cell is not required.
+              homeCellRequired: true,
               groupId: v.group_id ?? "",
               groupOpts: props.options?.group ?? [],
               familyGroupId: v.family_group_id ?? "",

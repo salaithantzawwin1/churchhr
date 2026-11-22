@@ -14,6 +14,8 @@ export function regionCascadeSelects(opts: {
   townshipOpts: OptionRow[];
   homeCellId: string;
   homeCellOpts: OptionRow[];
+  /** Forms that create a member require a Home Cell (see members.tsx). */
+  homeCellRequired?: boolean;
   groupId: string;
   groupOpts: OptionRow[];
   familyGroupId: string;
@@ -89,8 +91,11 @@ export function regionCascadeSelects(opts: {
         </select>
       </label>
       <label class="field">
-        <span class="lbl">{t("Home Cell", "Home Cell", "홈셀")}</span>
-        <select name="home_cell_id" data-region-filter="1" data-parent-filter="township">
+        <span class="lbl">
+          {t("Home Cell", "Home Cell", "홈셀")}{opts.homeCellRequired ? <span class="req"> *</span> : null}
+        </span>
+        <select name="home_cell_id" required={opts.homeCellRequired}
+          data-region-filter="1" data-parent-filter="township">
           {filteredOpts(opts.homeCellOpts, opts.homeCellId, true)}
         </select>
       </label>

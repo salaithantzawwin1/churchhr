@@ -185,11 +185,10 @@ export function normalizeGrade(value: string | null | undefined): string {
 /** School order of a grade label: KG first, then 1, 2, …, then anything else
  *  (e.g. "Year 11") by its number, so a grade list reads like a school. */
 function gradeOrder(label: string): number {
-  const text = label.trim().toUpperCase();
-  if (/^(KG|K\.?G\.?|KINDERGARTEN|PRE)/.test(text)) return 0;
-  const digits = /(\d{1,2})\s*$/.exec(text);
-  if (digits) return Number(digits[1]);
-  return 100;
+  const index = (GRADES as readonly string[]).indexOf(normalizeGrade(label));
+  if (index >= 0) return index;
+  const digits = /(\d{1,2})\s*$/.exec(label.trim());
+  return digits ? Number(digits[1]) : 100;
 }
 
 export function compareGrades(a: string, b: string): number {

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { families, memberHistory } from "../db/schema";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
@@ -473,7 +473,8 @@ async function findPossibleDuplicates(
   const nrc = String(data.nrc_number ?? "").toUpperCase().replace(/\s+/g, "");
   const dob = String(data.date_of_birth ?? "");
 
-  const conditions = [];
+  const conditions: SQL[] = [];
+  // Mirrors nameKey() in SQL: keep the two in sync.
   const nameExpr = (col: string) => sql.raw(`LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${col},''),' ',''),'.',''),'-',''),'·',''),'''',''),'’',''))`);
   if (keyMm) conditions.push(sql`${nameExpr("m.name_myanmar")} = ${keyMm}`);
   if (keyEn) conditions.push(sql`${nameExpr("m.name_english")} = ${keyEn}`);
@@ -511,10 +512,8 @@ async function findPossibleDuplicates(
     return {
       id: row.id,
       name: row.name ?? row.nameEn ?? "",
-      nameEn: row.nameEn,
       dateOfBirth: row.dateOfBirth,
       phone: row.phone,
-      nrcNumber: row.nrcNumber,
       homeCell: row.homeCell,
       reasons,
     };
@@ -691,9 +690,6 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
   if (!idx.has("name_myanmar") && !idx.has("name_english")) {
     throw new Error(msg("imp.noNameColumn"));
   }
-  // Home Cell is required on the member form, but an older CSV has no such
-  // column: those rows still import and are flagged for a later assignment.
-  const homeCellColumn = idx.has("home_cell");
 
   const allRegions = await loadRegions(db);
   const allOptions = await loadAllOptions(db);
@@ -890,7 +886,6 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       errors,
       newOptions: [...pending.values()].map((p) => `${p.type}: ${p.label}`),
       noHomeCell,
-      homeCellColumn,
     },
     validRows,
     pending,
@@ -1233,6 +1228,9 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
   const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
+  // Echo the resized upload back into the form so a re-render (validation or
+  // duplicate warning) does not drop the photo the clerk just chose.
+  const photoData = photo.error ? "" : s(body.photo_data);
   const render = (status: 400 | 200, duplicates: DuplicateCandidate[] = []) =>
     c.html(
       fromModal
@@ -1241,6 +1239,7 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
             options={formOptions(options)} departments={departments}
+            photoData={photoData}
             duplicates={duplicates}
             lang={c.get("lang")} modal
           />
@@ -1249,6 +1248,7 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
             options={formOptions(options)} departments={departments}
+            photoData={photoData}
             duplicates={duplicates}
             lang={c.get("lang")}
           />,
@@ -1766,6 +1766,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
   const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
+  const photoData = photo.error ? "" : s(body.photo_data);
   const formProps = (duplicates: DuplicateCandidate[] = []) => ({
     user: c.get("user"), perms: c.get("perms"), values,
     errors: errors.map((e) => renderMsg(e, c.get("lang"))),
@@ -1776,6 +1777,7 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
     regions: scopedRegions(allRegions, scope, c.get("lang")),
     options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
     departments,
+    photoData,
     duplicates,
     lang: c.get("lang"),
   });

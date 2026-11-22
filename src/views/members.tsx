@@ -503,10 +503,8 @@ export type FormValues = Record<string, string>;
 export type DuplicateCandidate = {
   id: number;
   name: string;
-  nameEn: string | null;
   dateOfBirth: string | null;
   phone: string | null;
-  nrcNumber: string | null;
   homeCell: string | null;
   /** i18n keys of the details that matched (name, phone, NRC, birth date). */
   reasons: string[];
@@ -516,6 +514,9 @@ type FormProps = Common & {
   values: FormValues;
   errors: string[];
   member: { id: number; photoUrl?: string } | null;
+  /** Photo already uploaded in this save attempt; kept when the form is
+   *  re-rendered, so a duplicate warning does not throw the image away. */
+  photoData?: string;
   /** Possible duplicates found on the last save attempt. */
   duplicates?: DuplicateCandidate[];
   regions: { id: number; name: string }[];
@@ -596,7 +597,7 @@ export function MemberFormPage(props: FormProps) {
 
 /** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
-  const { values: v, errors, member, regions, options, departments, lang, modal, duplicates = [] } = props;
+  const { values: v, errors, member, regions, options, departments, lang, modal, photoData, duplicates = [] } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -605,7 +606,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   const action = member ? `/members/${member.id}` : "/members";
   const edit = member !== null;
-  const photoUrl = member?.photoUrl;
+  const photoUrl = photoData || member?.photoUrl;
   const initial = Array.from((v.name_myanmar || v.name_english || "?").trim())[0] ?? "?";
   const dob = v.date_of_birth || "";
   const townshipLabelById = new Map(
@@ -636,7 +637,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               {duplicates.map((d) => (
                 <li>
                   <a href={`/members/${d.id}`} target="_blank" rel="noopener">
-                    {d.name || d.nameEn || `#${d.id}`}
+                    {d.name || `#${d.id}`}
                   </a>
                   {[d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ")}
                   {d.reasons.length > 0 && (
@@ -679,7 +680,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               </div>
               <p class="hint">{t("form.photoHint")}</p>
               <p class="photo-status" data-photo-status role="status"></p>
-              <input type="hidden" name="photo_data" data-photo-data />
+              <input type="hidden" name="photo_data" data-photo-data value={photoData ?? ""} />
             </div>
           </div>
           <div class="form-grid">
@@ -1421,8 +1422,6 @@ export type ImportReport = {
   newOptions: string[];
   /** Valid rows that arrive without a Home Cell (import keeps them). */
   noHomeCell: number;
-  /** False when the uploaded file has no Home Cell column at all. */
-  homeCellColumn: boolean;
   csvB64?: string;
 };
 
@@ -1486,13 +1485,9 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
               {t("import.newOptions")}{report.newOptions.join(", ")}
             </p>
           )}
-          {(!report.homeCellColumn || report.noHomeCell > 0) && (
+          {report.noHomeCell > 0 && (
             <div class="flash warn" style="margin-top:12px">
-              <strong>
-                {report.homeCellColumn
-                  ? `${t("import.noHomeCell")} ${report.noHomeCell}`
-                  : t("import.homeCellNoColumn")}
-              </strong>
+              <strong>{t("import.noHomeCell")} {report.noHomeCell}</strong>
               <p class="small">{t("import.homeCellNote")}</p>
               <a class="btn sm secondary" href="/members?missing=home_cell">{t("import.homeCellFix")}</a>
             </div>
