@@ -1793,7 +1793,13 @@
       f.setAttribute("data-confirm-was-hidden", f.hidden ? "1" : "0");
       f.hidden = true;
       var box = confirmBox(text, yesLabel, "data-confirm-no", modal.getAttribute("data-cancel"));
-      bodyEl.appendChild(box);
+      // A row's own delete form sits in a list of holders: put the question
+      // straight under that row. Appending it to the end of the dialog left the
+      // question below the form footer, under buttons that do not answer it.
+      var row = f.closest(".region-holder-row");
+      if (row && row.parentNode && bodyEl.contains(row)) row.parentNode.insertBefore(box, row.nextSibling);
+      else bodyEl.appendChild(box);
+      if (box.scrollIntoView) box.scrollIntoView({ block: "nearest" });
       // Focus the safe choice, not the destructive one.
       var inlineNo = box.querySelector("[data-confirm-no]");
       if (inlineNo) inlineNo.focus();

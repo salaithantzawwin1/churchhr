@@ -2203,6 +2203,9 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .cluster-modal-foot .modal-delete-blocked .btn { flex: 0 0 auto; }
 .cluster-modal-foot .modal-delete-blocked .modal-note { margin: 0; flex: 1 1 200px; min-width: 0; }
 .modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* A remove prompt inserted under the holder row it belongs to: it spans the
+   list row instead of splitting the holder grid into an extra column. */
+.region-holder-list .modal-confirm { grid-column: 1 / -1; margin-top: 0; padding-top: 10px; }
 /* Confirm buttons line up with the form footers: Cancel left, action right. */
 .modal-confirm .actions, .modal-body > .actions { justify-content: flex-end; }
 /* Role editor: permissions grouped by area, two balanced columns from 700px so
@@ -3457,7 +3460,17 @@ th { font-size: 13px; }
 /* The dot sits at the sheet's left edge in this footer, so its bubble grows
    rightwards; the default right-anchored bubble ran off the sheet and was
    clipped by the scrolling body. */
+.assign-priority-inline { position: relative; }
 .assign-priority-inline .field-tip::after { left: 0; right: auto; }
+/* On a phone the dot is far enough right that even a rightward bubble reaches
+   past the sheet and adds a horizontal scrollbar to the body. There the bubble
+   takes the width of the priority control instead of a fixed 240px. */
+@media (max-width: 640px) {
+  .assign-priority-inline .field-tip { position: static; }
+  .assign-priority-inline .field-tip::after {
+    left: 0; right: 0; width: auto; max-width: none; bottom: calc(100% + 6px);
+  }
+}
 .assign-actions-buttons { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 /* flex-shrink alone collapsed this to a 17px strip in the taller region
    dialog, leaving the candidates invisible; the list keeps a usable height and
