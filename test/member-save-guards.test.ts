@@ -225,6 +225,37 @@ describe("household quick-add Home Cell guard", () => {
     expect(await res.text()).toContain("Invalid gender");
   });
 
+  it("warns about a likely duplicate and saves only on Save anyway", async () => {
+    await env.DB.prepare(
+      "INSERT INTO families (name, region_id, home_cell_id, created_by) VALUES ('Dup Household', 1, ?, 1)",
+    ).bind(homeCellId).run();
+    const id = await familyId("Dup Household");
+    const existing = await memberId("Dup Target");
+    const before = await memberCount();
+    const form = {
+      name_english: "dup  target",
+      region_id: "1",
+      home_cell_id: String(homeCellId),
+      relationship: "other",
+    };
+
+    const warned = await postAs(`/admin/households/${id}/add-member`, form);
+    expect(warned.status).toBe(200);
+    const html = await warned.text();
+    expect(html).toContain("A member with the same details may already exist");
+    expect(html).toContain("Save anyway");
+    expect(html).toContain(`/members/${existing}`);
+    // The warning re-renders the form with what was typed and saves nothing.
+    expect(html).toContain('value="dup  target"');
+    expect(await memberCount()).toBe(before);
+
+    const saved = await postAs(`/admin/households/${id}/add-member`, {
+      ...form, confirm_duplicate: "1",
+    });
+    expect(saved.status).toBe(302);
+    expect(await memberCount()).toBe(before + 1);
+  });
+
   it("uses the household's own cell when the form leaves it blank", async () => {
     await env.DB.prepare(
       "INSERT INTO families (name, region_id, home_cell_id, created_by) VALUES ('Cell Household', 1, ?, 1)",

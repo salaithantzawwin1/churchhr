@@ -80,6 +80,21 @@ export function ChildReportPage(props: Common & {
     hope: group.rows.filter((r) => r.schoolKind === "hope").length,
     outside: group.rows.filter((r) => r.schoolKind !== "hope").length,
   }));
+  // Totals per grade in the same KG → G12 order as the table, ungraded last,
+  // so the summary reads like the report above it.
+  const gradeTotals = new Map<string, { hope: number; outside: number }>();
+  for (const row of ordered) {
+    const grade = row.grade ?? "";
+    const bucket = gradeTotals.get(grade) ?? { hope: 0, outside: 0 };
+    if (row.schoolKind === "hope") bucket.hope += 1;
+    else bucket.outside += 1;
+    gradeTotals.set(grade, bucket);
+  }
+  const gradeRows = [...gradeTotals.entries()].sort(([a], [b]) => {
+    if (!a && b) return 1;
+    if (a && !b) return -1;
+    return a && b ? compareGrades(a, b) : 0;
+  });
 
   return (
     <Layout title={t("org.childReport")} lang={lang} user={user} perms={perms}
@@ -138,6 +153,40 @@ export function ChildReportPage(props: Common & {
           </table>
         </div>
       </section>
+
+      {rows.length > 0 && (
+        <section class="card report-matrix-card">
+          <h2>{t("org.childReportGradeTotals")}</h2>
+          <div class="tbl-wrap">
+            <table class="report-table report-matrix">
+              <thead>
+                <tr>
+                  <th>{t("org.childGrade")}</th>
+                  <th class="num">{HOPE_SCHOOL}</th>
+                  <th class="num">{t("org.childReportOutside")}</th>
+                  <th class="num">{t("org.childReportTotal")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gradeRows.map(([grade, counts]) => (
+                  <tr>
+                    <td>{grade || "—"}</td>
+                    <td class="num">{counts.hope}</td>
+                    <td class="num">{counts.outside}</td>
+                    <td class="num"><strong>{counts.hope + counts.outside}</strong></td>
+                  </tr>
+                ))}
+                <tr class="report-total-row">
+                  <td>{t("org.childReportTotal")}</td>
+                  <td class="num"><strong>{hope}</strong></td>
+                  <td class="num"><strong>{outside}</strong></td>
+                  <td class="num"><strong>{rows.length}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <form class="filters settings-filters print-hide" method="get" action="/organization/hope-school"
         data-auto-submit="1">

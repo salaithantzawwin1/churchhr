@@ -10,6 +10,8 @@ import { loadEnrolmentSummaries, type EnrolmentSummary } from "../student-enrolm
 import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
 import { asInt, intParam, normKey, s } from "../util";
 import { MEMBER_FORM_KEYS, readMemberForm } from "../member-form";
+import type { DuplicateCandidate } from "../views/members";
+import { findPossibleDuplicates } from "./members";
 import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
@@ -19,10 +21,16 @@ import {
 
 export const householdsRoutes = new Hono<AppEnv>();
 
-type Scope = { scopeAll: boolean; stateIds: number[] };
+type Scope = { scopeAll: boolean; stateIds: number[]; homeCellIds: number[] };
 
-function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
-  return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
+function scopeOf(c: { get: (k: "scopeAll" | "stateIds" | "homeCellIds") => any }): Scope {
+  return {
+    scopeAll: c.get("scopeAll"),
+    stateIds: c.get("stateIds"),
+    // Carried for the shared member duplicate lookup, which honours the
+    // account's Home Cell limit like the member list does.
+    homeCellIds: (c.get("homeCellIds") ?? []) as number[],
+  };
 }
 
 function scopeCondF(scope: Scope) {
@@ -751,14 +759,22 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const { values, errors, data } = readMemberForm(input, {
     scope, options: allOptions, regions: allRegions, t: getDict(lang),
   });
-  if (!data) {
-    return c.html(
+  const render = (status: 400 | 200, duplicates: DuplicateCandidate[] = []) =>
+    c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
         values={values} errors={errors} relationship={rel}
+        duplicates={duplicates}
         options={hhFormOptions(allOptions)}
         regions={scopedRegions(allRegions, scope, lang)}
-        lang={lang} />, 400,
+        lang={lang} />, status,
     );
+  if (!data) return render(400);
+  // Same soft duplicate warning as the member form: the likely duplicate is
+  // shown, and the clerk decides whether to save anyway. Adding a household
+  // member is a member save, so it must not skip the check.
+  if (s(body.confirm_duplicate) !== "1") {
+    const duplicates = await findPossibleDuplicates(db, data, scope, null);
+    if (duplicates.length > 0) return render(200, duplicates);
   }
 
   const now = Math.floor(Date.now() / 1000);

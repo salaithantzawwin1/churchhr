@@ -634,17 +634,20 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           <div class="flash warn dup-warning" role="status">
             <strong>{t("dup.warning")}</strong>
             <ul class="err-list small">
-              {duplicates.map((d) => (
-                <li>
-                  <a href={`/members/${d.id}`} target="_blank" rel="noopener">
-                    {d.name || `#${d.id}`}
-                  </a>
-                  {[d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ")}
-                  {d.reasons.length > 0 && (
-                    <span class="muted"> · {d.reasons.map((r) => t(r)).join(", ")}</span>
-                  )}
-                </li>
-              ))}
+              {duplicates.map((d) => {
+                const meta = [d.homeCell, d.dateOfBirth, d.phone].filter(Boolean).join(" · ");
+                return (
+                  <li>
+                    <a href={`/members/${d.id}`} target="_blank" rel="noopener">
+                      {d.name || `#${d.id}`}
+                    </a>
+                    {meta && <span class="muted small"> · {meta}</span>}
+                    {d.reasons.length > 0 && (
+                      <span class="muted"> · {d.reasons.map((r) => t(r)).join(", ")}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             <p>{t("dup.note")}</p>
             <button class="btn sm secondary" type="submit" name="confirm_duplicate" value="1">

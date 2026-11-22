@@ -335,7 +335,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
  *  shown before a save. A name match uses the same key as the pastor-child
  *  linker (spaces, dots and separators ignored), and phone / NRC / birth date
  *  each count on their own so a clerk can see the existing record. */
-async function findPossibleDuplicates(
+export async function findPossibleDuplicates(
   db: DB,
   data: Record<string, string | number | null>,
   scope: Scope,

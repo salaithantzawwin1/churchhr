@@ -4022,16 +4022,8 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 @keyframes nav-progress-slide { 0% { transform: translateX(-45%); } 100% { transform: translateX(285%); } }
 @media (prefers-reduced-motion: reduce) { .nav-progress.is-on::before { animation: none; width: 100%; } }
 
-/* Hope School children report: one card per grade, the year totals above it. */
-.report-groups { display: grid; gap: var(--space-3); }
+/* Hope School children report: one table card, the totals above it. */
 .report-group { padding: 0; overflow: hidden; }
-.report-group-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px 12px; flex-wrap: wrap;
-  padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);
-}
-.report-group-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
-.report-group-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .report-table th {
   padding: 8px 12px; border-bottom: 1px solid var(--line);
@@ -4067,7 +4059,6 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   .badge, .badge.active, .badge.inactive { background: none !important; border: 1px solid #999; color: #111 !important; }
   .pastor-tag { border: 1px solid #999; color: #111; background: none; }
   .report-group { border: 1px solid #ccc; }
-  .report-group-head { background: none; }
   a { color: #111; text-decoration: none; }
   .print-meta { margin: 0 0 10px; color: #333; font-size: 12px; }
 }

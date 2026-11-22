@@ -1233,6 +1233,7 @@ export const KO: Record<string, string> = {
   "org.childReportMembers": "성도 자녀",
   "org.childReportOutside": "외부 학교",
   "org.childReportMatrix": "부모 유형별",
+  "org.childReportGradeTotals": "학년별 합계",
   "org.childReportNoEnrolment": "교육 기록 없음",
   "edu.title": "교육",
   "edu.intro": "이 성도 가정 자녀의 학교 이력입니다. 학년도마다 한 줄씩 저장해 학년과 학교를 매년 확인할 수 있습니다.",
