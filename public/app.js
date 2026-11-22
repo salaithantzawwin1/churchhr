@@ -1270,16 +1270,35 @@
 
   // Collapsible filter panels: open on desktop, collapsed on phones — unless a
   // filter is already narrowing the list, in which case the panel stays open so
-  // the chosen values remain visible. Once the user toggles one, resize only
-  // forces it open for wide viewports.
+  // the chosen values remain visible. A panel marked data-remember keeps the
+  // fold the user chose at every width, so a laptop can put the grid away too.
   (function initFilterBoxes() {
     var boxes = document.querySelectorAll("details.filter-box");
     if (!boxes.length) return;
     var mq = window.matchMedia("(max-width: 640px)");
+    var KEY = "filterPanelCollapsed";
     Array.prototype.forEach.call(boxes, function (d) {
-      if (mq.matches && !d.querySelector(".filter-count")) d.open = false;
+      var remember = d.hasAttribute("data-remember");
+      var saved = null;
+      if (remember) {
+        try { saved = window.localStorage.getItem(KEY); } catch (e) { /* private mode */ }
+      }
+      if (saved === "1") d.open = false;
+      else if (saved === "0") d.open = true;
+      else if (mq.matches && !d.querySelector(".filter-count")) d.open = false;
+      if (remember) {
+        // Setting open above fires toggle too, so the page's own default must
+        // not be stored as if the user had chosen it.
+        var quiet = true;
+        window.setTimeout(function () { quiet = false; }, 0);
+        d.addEventListener("toggle", function () {
+          if (quiet) return;
+          saved = d.open ? "0" : "1";
+          try { window.localStorage.setItem(KEY, saved); } catch (e) { /* ignore */ }
+        });
+      }
       mq.addEventListener("change", function () {
-        if (!mq.matches) d.open = true;
+        if (!mq.matches && saved !== "1") d.open = true;
       });
     });
   })();

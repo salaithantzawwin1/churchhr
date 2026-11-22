@@ -890,8 +890,33 @@ th.bar-col { width: 42%; }
 
 /* ---------- collapsible filter panel (mobile) ---------- */
 .filter-box { margin-bottom: 14px; }
-.filter-box > summary { display: none; }
+/* Filter panel toggle. Phones fold every panel; the members list folds at every
+   width too (see .members-filter-box), so the same row opens and closes the grid
+   on a laptop. Panels that hide it here stay permanently open on wide screens. */
+.filter-box > summary {
+  display: none; align-items: center; justify-content: space-between; gap: 10px;
+  list-style: none; cursor: pointer; padding: 11px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  font-weight: 600; font-size: 14px; color: var(--ink);
+}
+.filter-box > summary::-webkit-details-marker { display: none; }
+.filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
+/* A closed panel that still narrows the list shows what is applied, so the
+   badge alone is not the only clue. */
+.filter-box.has-filters > summary { border-color: var(--brand); }
+.filter-peek {
+  display: none; margin-left: auto; min-width: 0; max-width: 58%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font-size: 12.5px; font-weight: 500;
+}
+.filter-box:not([open]) > summary .filter-peek { display: block; }
+.filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
+.filter-box[open] > summary .chev { transform: rotate(180deg); }
 .filter-box > form.filters { margin-bottom: 0; }
+.members-filter-box > summary { display: flex; }
+.members-filter-box[open] > form.members-filter {
+  border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
+}
 
 /* ---------- table: scroll affordance + sticky identity ---------- */
 .scroll-hint { display: none; }
@@ -927,25 +952,9 @@ th.bar-col { width: 42%; }
   #bulk-bar { bottom: 10px; width: calc(100% - 16px); padding: 10px 12px; gap: 8px; }
   #bulk-bar select { flex: 1 1 100%; }
   #bulk-bar .btn { flex: 1 1 100%; }
-  .filter-box > summary {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    list-style: none; cursor: pointer; padding: 11px 14px;
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    font-weight: 600; font-size: 14px; color: var(--ink);
-  }
-  .filter-box > summary::-webkit-details-marker { display: none; }
-  .filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
-  /* A closed panel that still narrows the list shows what is applied, so the
-     badge alone is not the only clue. */
-  .filter-box.has-filters > summary { border-color: var(--brand); }
-  .filter-peek {
-    display: none; margin-left: auto; min-width: 0; max-width: 58%;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: var(--muted); font-size: 12.5px; font-weight: 500;
-  }
-  .filter-box:not([open]) > summary .filter-peek { display: block; }
-  .filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
-  .filter-box[open] > summary .chev { transform: rotate(180deg); }
+  /* Every panel gets the toggle on a phone (the other rules live at the base,
+     hidden on wide screens). */
+  .filter-box > summary { display: flex; }
   .filter-box > form.filters { border-top-left-radius: 0; border-top-right-radius: 0; }
   .filter-box > form.filters .actions { margin-top: 4px; }
   .who-link { max-width: 70px; }
@@ -1849,20 +1858,40 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-person { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.5; }
 .org-person > a, .org-person > span { overflow-wrap: anywhere; }
 .org-person-meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
-.org-region-role > .btn { margin-top: 2px; }
+/* A dashed outline reads as "this slot is empty, add someone" instead of a
+   solid button that stretched the full card width and looked like a field. */
+.org-region-role > .btn {
+  align-self: flex-start; margin-top: 2px; border-style: dashed; color: var(--muted);
+}
+.org-region-role > .btn:hover { color: var(--link); border-color: var(--link); }
 .org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
 .org-mini-person a { overflow-wrap: anywhere; }
 .org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
 .org-node-extra-person { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; line-height: 1.5; }
 .org-node-extra-person a { overflow-wrap: anywhere; }
-.region-holder-list { display: grid; gap: 7px; margin: 12px 0; }
+.region-holder-list { display: grid; gap: 7px; margin: 10px 0; }
+.region-holder-list h4 { margin: 0; font-size: 13.5px; }
+.region-holder-empty { margin: 0; }
 .region-holder-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
   padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--field-bg);
 }
-.region-holder-row form { margin: 0 0 0 auto; }
-.region-holder-priority { display: flex; align-items: center; gap: 6px; }
-.region-holder-priority-field { display: flex; align-items: center; gap: 4px; }
+.region-holder-name { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
+.region-holder-row form { margin: 0; flex: 0 0 auto; }
+/* The controls keep their own width so they stay on one line; the name is what
+   shrinks (and the row wraps them below it only on a narrow dialog). */
+.region-holder-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+/* Beats .modal-body form, which stacks a form's children in a column: here the
+   priority label, its number and Save belong on one row. */
+.region-holder-row form.region-holder-priority {
+  display: flex; flex-direction: row; align-items: center; gap: 6px;
+  flex-wrap: nowrap; min-height: 0;
+}
+/* A bare number, not a full-width field: the value is one or two digits and the
+   Save beside it has to read as "update this priority". */
+.region-holder-priority input { width: 64px; min-width: 0; height: 34px; padding: 0 6px; text-align: center; }
+.region-holder-priority-field { white-space: nowrap; }
 .org-dept-card { gap: 10px; }
 /* Position assignment modal: a compact identity summary followed by three
    clearly numbered role areas. */
@@ -3392,16 +3421,24 @@ th { font-size: 13px; }
 .assign-hero .position-avatar { width: 30px; height: 30px; font-size: 14px; }
 .assign-hero-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1px 8px; min-width: 0; }
 .assign-hero-role { font-size: 13.5px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
-.assign-hero .position-hero-home { font-size: 11.5px; }
+/* The scope line sits beside the role, so it stays a size that the Myanmar
+   region names can still be shaped legibly at. */
+.assign-hero .position-hero-home { font-size: 13px; line-height: 1.6; }
 .assign-search { margin-bottom: 0; }
 label.field.assign-priority {
-  display: grid; grid-template-columns: max-content 96px; align-items: center;
+  /* min-content on the label track: a max-content track lets the full-width
+     hint below it stretch the whole grid past the dialog on a phone. */
+  display: grid; grid-template-columns: min-content 96px; align-items: center;
   gap: 2px 10px;
 }
 .assign-priority .lbl { margin: 0; }
 .assign-priority .hint { grid-column: 1 / -1; margin: 0; font-size: 11.5px; }
+/* flex-shrink alone collapsed this to a 17px strip in the taller region
+   dialog, leaving the candidates invisible; the list keeps a usable height and
+   only then scrolls, with rows pinned to the top. */
 .assign-list {
-  display: grid; gap: 4px; max-height: 300px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 4px; flex: 1 1 auto; min-height: 120px; max-height: 300px;
+  align-content: start; overflow-y: auto; overscroll-behavior: contain;
   padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface-3);
 }

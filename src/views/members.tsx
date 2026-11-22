@@ -251,11 +251,22 @@ export function MembersListPage(props: ListProps) {
         </div>
       </div>
 
-      <details class={chips.length > 0 ? "filter-box filter-toolbar-box has-filters" : "filter-box filter-toolbar-box"} open>
-      <summary>
-        <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
-              {chips.length > 0 && (                <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>                  {chips.map((c) => c.label).join(" · ")}                </span>              )}        <span class="chev" aria-hidden="true">▾</span>
-      </summary>
+      {/* data-remember: app.js keeps the fold the clerk chose at any width, so a
+          laptop can put the filter grid away and keep it away while paging. */}
+      <details
+        class={`filter-box filter-toolbar-box members-filter-box${chips.length > 0 ? " has-filters" : ""}`}
+        data-remember
+        open
+      >
+        <summary>
+          <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+          {chips.length > 0 && (
+            <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>
+              {chips.map((c) => c.label).join(" · ")}
+            </span>
+          )}
+          <span class="chev" aria-hidden="true">▾</span>
+        </summary>
       <form class="filter-toolbar members-filter" method="get" action="/members" data-auto-submit="1">
         <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")}
           aria-label={t("members.search")} enterkeyhint="search" />

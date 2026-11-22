@@ -34,11 +34,16 @@ export function RegionPastorModal(props: {
 
   return (
     <>
-      <div class="position-hero">
+      {/* Same compact summary as the church dialog: the post and its region on
+          one line, so the dialog title is not repeated as a stacked heading and
+          a long Myanmar region name cannot collide with the line above it. */}
+      <div class="position-hero assign-hero">
         <span class="position-avatar" aria-hidden="true">{regionName.trim().charAt(0) || "?"}</span>
         <div class="position-hero-main">
-          <div class="position-hero-title"><h4>{label}</h4></div>
-          <div class="position-hero-home">{t("org.assignFor")} <strong>{regionName}</strong></div>
+          <div class="assign-hero-line">
+            <strong class="assign-hero-role">{label}</strong>
+            <span class="position-hero-home">{t("org.assignFor")} <strong>{regionName}</strong></span>
+          </div>
           <p class="hint">{t("org.regionTeamHint")}</p>
         </div>
       </div>
@@ -48,27 +53,31 @@ export function RegionPastorModal(props: {
       <div class="region-holder-list">
         <h4>{t("org.regionCurrentTeam")}</h4>
         {holders.length === 0 ? (
-          <p class="muted small">{t("org.vacant")}</p>
+          <p class="muted small region-holder-empty">{t("org.vacant")}</p>
         ) : (
           holders.map((holder) => (
             <div class="region-holder-row">
-              <strong>{holder.name}</strong>
-              {/* Saving a holder again updates their priority in place. */}
-              <form method="post" action="/organization/region-assign" data-modal-ajax class="region-holder-priority">
-                <input type="hidden" name="region" value={String(regionId)} />
-                <input type="hidden" name="position" value={def.code} />
-                <input type="hidden" name="pastor_id" value={String(holder.pastorId)} />
-                <label class="region-holder-priority-field">
-                  <span class="muted small">{t("org.priority")}</span>
-                  <input type="number" name="priority" min="1" max="99" value={String(holder.priority)} />
-                </label>
-                <button class="btn sm secondary" type="submit">{t("form.save")}</button>
-              </form>
-              <form method="post" action="/organization/region-assign/remove" data-confirm={t("org.removeHolderConfirm")}>
-                <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
-                <input type="hidden" name="region" value={String(regionId)} />
-                <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
-              </form>
+              <strong class="region-holder-name">{holder.name}</strong>
+              {/* Priority and removal sit together on the right, so the row reads
+                  "who · their rank · remove" instead of scattering four controls. */}
+              <div class="region-holder-actions">
+                {/* Saving a holder again updates their priority in place. */}
+                <form method="post" action="/organization/region-assign" data-modal-ajax class="region-holder-priority">
+                  <input type="hidden" name="region" value={String(regionId)} />
+                  <input type="hidden" name="position" value={def.code} />
+                  <input type="hidden" name="pastor_id" value={String(holder.pastorId)} />
+                  <label class="region-holder-priority-field">
+                    <span class="muted small">{t("org.priority")}</span>
+                    <input type="number" name="priority" min="1" max="99" value={String(holder.priority)} />
+                  </label>
+                  <button class="btn sm secondary" type="submit">{t("form.save")}</button>
+                </form>
+                <form method="post" action="/organization/region-assign/remove" data-confirm={t("org.removeHolderConfirm")}>
+                  <input type="hidden" name="assignment_id" value={String(holder.assignmentId)} />
+                  <input type="hidden" name="region" value={String(regionId)} />
+                  <button class="btn sm outline-danger" type="submit">{t("members.delete")}</button>
+                </form>
+              </div>
             </div>
           ))
         )}
@@ -78,10 +87,13 @@ export function RegionPastorModal(props: {
         <input type="hidden" name="region" value={String(regionId)} />
         <input type="hidden" name="position" value={def.code} />
 
+        {/* The placeholder carries the label, matching the church dialog, so the
+            filter does not cost a heading row in an already tall form. */}
         <label class="field assign-search">
-          <span class="lbl">{t("org.assignSearchPastors")}</span>
+          <span class="lbl sr-only">{t("org.assignSearchPastors")}</span>
           <input type="search" data-filter-list=".assign-list"
-            placeholder={t("org.assignSearchPastors")} autocomplete="off" />
+            placeholder={t("org.assignSearchPastors")} aria-label={t("org.assignSearchPastors")}
+            autocomplete="off" />
         </label>
         <p class="assign-hint">{t("org.assignPastorHint")}</p>
 
@@ -107,7 +119,7 @@ export function RegionPastorModal(props: {
           </div>
         )}
 
-        <label class="field">
+        <label class="field assign-priority">
           <span class="lbl">{t("org.priority")}</span>
           <input type="number" name="priority" min="1" max="99" value="1" />
           <span class="hint">{t("org.priorityHint")}</span>
