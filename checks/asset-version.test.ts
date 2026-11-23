@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ASSET_V } from "../src/assets";
 import { assetDigest } from "../scripts/asset-digest.mjs";
@@ -10,10 +13,8 @@ import { assetDigest } from "../scripts/asset-digest.mjs";
  * their digest, recomputed here through the same call `npm run assets:version`
  * uses, so forgetting the bump fails `npm test` and therefore CI.
  *
- * The asset list comes from src/views/layout.tsx, so adding a link needs no
- * change here; a link without a source file throws from the digest. This runs in
- * the node project because reading files needs node; the Worker tests run in
- * workerd.
+ * The list comes from src/versioned-assets.json, which the layout renders from;
+ * this runs in the node project because reading files needs node.
  */
 
 describe("static asset version", () => {
@@ -28,5 +29,19 @@ describe("static asset version", () => {
 
   it("keeps the date-hash shape the layout links use", () => {
     expect(ASSET_V).toMatch(/^\d{8}-[0-9a-f]{8}$/);
+  });
+
+  it("refuses a listed asset that has no file", () => {
+    const root = mkdtempSync(join(tmpdir(), "asset-digest-"));
+    try {
+      mkdirSync(join(root, "src"));
+      writeFileSync(
+        join(root, "src", "versioned-assets.json"),
+        JSON.stringify({ stylesheets: [{ url: "/styles.css", file: "src/styles.ts" }], scripts: [] }),
+      );
+      expect(() => assetDigest(root)).toThrow(/versions src\/styles\.ts, which does not exist/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

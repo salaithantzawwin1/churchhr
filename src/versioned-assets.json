@@ -1,0 +1,16 @@
+{
+  "stylesheets": [
+    {
+      "url": "/vendor/flowbite-datepicker/datepicker.css",
+      "file": "public/vendor/flowbite-datepicker/datepicker.css"
+    },
+    { "url": "/styles.css", "file": "src/styles.ts" }
+  ],
+  "scripts": [
+    {
+      "url": "/vendor/flowbite-datepicker/Datepicker.umd.js",
+      "file": "public/vendor/flowbite-datepicker/Datepicker.umd.js"
+    },
+    { "url": "/app.js", "file": "public/app.js" }
+  ]
+}
