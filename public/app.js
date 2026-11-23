@@ -1414,7 +1414,11 @@
     Array.prototype.forEach.call(root.querySelectorAll("[data-tabs]"), function (bar) {
       if (bar.getAttribute("data-tabs-bound")) return;
       bar.setAttribute("data-tabs-bound", "1");
-      var wrap = bar.parentNode;
+      // The bar can sit in a row of its own (the position sheet keeps an info
+      // dot beside it), so panes are looked up from the form the bar belongs to
+      // rather than its immediate parent; without a form the parent still wraps
+      // both the bar and its panes.
+      var wrap = bar.closest("form") || bar.parentNode;
       var buttons = bar.querySelectorAll("[data-tab-target]");
       var panes = wrap.querySelectorAll("[data-tab-pane]");
       if (!buttons.length) return;
