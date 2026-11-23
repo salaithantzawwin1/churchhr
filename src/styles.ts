@@ -3143,6 +3143,11 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
    width: the old phone overhang only lined the bar up while the body scrolled,
    and a sheet too short to scroll showed a strip of card colour beneath it. */
 .modal-body:has(> .position-form form > .actions:last-child) { padding-bottom: 0; }
+/* The sheet's form is nested, so the rule that clears the form's own bottom
+   margin under a sticky bar (it only matches a form that is a direct child of
+   the body) missed it: the margin pushed the wrapper past the bar and left a
+   strip of card colour under it once the body's padding was gone. */
+.modal-body .position-form > form { margin-bottom: 0; }
 /* The sheet tightens everything above the fields, so its Save bar is trimmed to
    match: the Save button keeps its field height, the band around it loses the
    extra air. */
