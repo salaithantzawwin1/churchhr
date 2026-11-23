@@ -9,6 +9,7 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "assets:version": "node scripts/asset-version.mjs",
     "db:local": "wrangler d1 migrations apply church-members-db --local",
     "db:remote": "wrangler d1 migrations apply church-members-db --remote"
   },
