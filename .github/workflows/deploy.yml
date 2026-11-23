@@ -129,34 +129,15 @@ jobs:
           base=https://www.mmgoodnewshr.online
           expected_version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/version.ts)
           expected_migration=$(basename "$(ls migrations/*.sql | sort | tail -n 1)")
-          export EXPECTED_VERSION="$expected_version" EXPECTED_MIGRATION="$expected_migration"
           echo "Expecting version $expected_version and migration $expected_migration"
           healthy=0
           for attempt in $(seq 1 12); do
             body=$(curl -fsS --max-time 10 "$base/healthz" || true)
             echo "$body"
-            if printf '%s' "$body" | python3 -c '
-          import json, os, sys
-
-          try:
-              doc = json.loads(sys.stdin.read())
-          except ValueError:
-              print("healthz is not JSON yet")
-              sys.exit(1)
-
-          want = {
-              "version": os.environ["EXPECTED_VERSION"],
-              "migration": os.environ["EXPECTED_MIGRATION"],
-              "db": "ok",
-          }
-          wrong = {key: doc.get(key) for key, value in want.items() if doc.get(key) != value}
-          if wrong:
-              print("healthz mismatch: " + ", ".join(
-                  "%s=%r (want %r)" % (key, got, want[key]) for key, got in wrong.items()))
-              sys.exit(1)
-
-          print("healthz matches this build")
-          '; then
+            # jq -e exits non-zero on a malformed payload or a field mismatch,
+            # so a half-read or stale /healthz just retries.
+            if printf '%s' "$body" | jq -e --arg version "$expected_version" --arg migration "$expected_migration" '.version == $version and .migration == $migration and .db == "ok"' >/dev/null; then
+              echo "healthz matches this build (attempt $attempt)"
               healthy=1
               break
             fi
