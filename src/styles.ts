@@ -3433,29 +3433,27 @@ th { font-size: 13px; }
 .modal-head h3 { font-size: 19px; font-weight: 700; }
 .modal-body { padding: 22px 24px; }
 .modal-body form > .actions:last-child {
-  margin-left: -24px; margin-right: -24px; margin-bottom: -22px; padding: 14px 24px;
+  margin-left: -24px; margin-right: -24px; margin-bottom: 0; bottom: 0; padding: 14px 24px;
 }
+/* The bar sits on the card's bottom edge at every width. The -22px margins it
+   used on phones only lined up while the body scrolled, so a sheet shorter than
+   the viewport kept a strip of card colour under the bar; the body now reserves
+   no space under it and the bar's own bottom padding is the air the button
+   needs. Matched on any form that ends in the bar, not only one that is a
+   direct child: the position sheet wraps its form in .position-form. */
+.modal-body:has(form > .actions:last-child) { padding-bottom: 0; }
+.modal-body:has(form > .actions:last-child) form:has(> .actions:last-child) { margin-bottom: 0; }
+/* The compact editors (New church, New cluster) close with a plain row rather
+   than the sticky bar, so the padding-bottom removed above would leave their Add
+   button against the card's bottom edge at every width. */
+.modal-body .cluster-main-form > .actions:last-child { padding-bottom: 18px; }
 /* Desktop: a three-field form should not be mostly chrome. The header and the
-   sticky bar are trimmed, and the bar sits flush with the card's bottom edge
-   instead of leaving a strip of body padding under it. Phones keep the roomier
-   values above so the touch targets stay large. */
+   sticky bar are trimmed. Phones keep the roomier values above so the touch
+   targets stay large. */
 @media (min-width: 761px) {
   .modal-head { padding: 13px 24px; }
   .modal-head h3 { font-size: 17px; line-height: 1.3; }
-  /* Matched on any form that ends in the sticky bar, not only one that is a
-     direct child of the body: a modal may wrap its form (the position sheet's
-     .position-form), and the direct-child selectors used here silently missed
-     it, leaving body padding and the form's own margin under the bar. */
-  .modal-body:has(form > .actions:last-child) { padding-bottom: 0; }
-  .modal-body:has(form > .actions:last-child) form:has(> .actions:last-child) { margin-bottom: 0; }
-  .modal-body form > .actions:last-child {
-    margin-left: -24px; margin-right: -24px; margin-bottom: 0;
-    padding: 10px 24px; bottom: 0;
-  }
-  /* The compact editors (New church, New department, Add pastor) close with a
-     plain row rather than the sticky bar, so the padding-bottom removed above
-     would leave their Add button against the card's bottom edge. */
-  .modal-body .cluster-main-form > .actions:last-child { padding-bottom: 18px; }
+  .modal-body form > .actions:last-child { padding: 10px 24px; }
 }
 .flash { border-radius: var(--radius); }
 .footer { padding: 30px 16px 38px; font-size: 12.5px; }
@@ -3479,11 +3477,9 @@ th { font-size: 13px; }
   .stat { padding: 18px 20px; min-height: 108px; }
   .stat .n { font-size: 31px; }
   /* Match the body's real 22px/24px padding: the fixed 18px insets left a
-     strip of card colour down both sides of the phone save bar. */
-  .modal-body form > .actions:last-child {
-    margin-left: -24px; margin-right: -24px; margin-bottom: -22px; bottom: -22px;
-    padding: 13px 24px;
-  }
+     strip of card colour down both sides of the phone save bar. The bar is
+     already flush at every width, so only the touch-sized padding changes. */
+  .modal-body form > .actions:last-child { padding: 13px 24px; }
 }
 /* ---------- label typography per language ----------
    Uppercase and letter-spacing are Latin-only devices: they destroy Myanmar
