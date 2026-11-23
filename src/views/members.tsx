@@ -1083,7 +1083,11 @@ export function MemberPositionForm(props: PositionFormProps) {
                 {canManageRegional && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
               </>
             ) : (
-              <div class="form-grid">
+              <>
+                {/* The region names the whole section, so it reads as one line
+                    above the field the way the township does on the supervision
+                    tab; sharing the grid row left it floating in a half-width
+                    column with an empty space underneath. */}
                 <p class="position-scope">
                   {t("org.tabRegional")}: <strong>{member.regionName ?? `#${assignments.regionId}`}</strong>
                 </p>
@@ -1093,7 +1097,7 @@ export function MemberPositionForm(props: PositionFormProps) {
                     {positionOptions(regionalDefs, assignments.region)}
                   </select>
                 </label>
-              </div>
+              </>
             )}
           </section>
 
