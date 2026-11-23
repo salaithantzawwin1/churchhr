@@ -3138,16 +3138,16 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 /* The position sheet's form sits inside .position-form, so the rule that drops
    the body's bottom padding under a sticky bar (it only matches a form that is
    a direct child of the body) never applied here: 22px of card colour stayed
-   below the Save bar and made the footer look twice its height. */
-@media (min-width: 761px) {
-  .modal-body:has(> .position-form form > .actions:last-child) { padding-bottom: 0; }
-}
+   below the Save bar and made the footer look twice its height. The bar is the
+   last item in the form's flow, so the body reserves no space under it at any
+   width: the old phone overhang only lined the bar up while the body scrolled,
+   and a sheet too short to scroll showed a strip of card colour beneath it. */
+.modal-body:has(> .position-form form > .actions:last-child) { padding-bottom: 0; }
 /* The sheet tightens everything above the fields, so its Save bar is trimmed to
    match: the Save button keeps its field height, the band around it loses the
-   extra air. Phones stay a little roomier for the thumb. */
-.modal-body .position-form form > .actions:last-child { padding-top: 8px; padding-bottom: 8px; }
-@media (max-width: 760px) {
-  .modal-body .position-form form > .actions:last-child { padding-top: 10px; padding-bottom: 10px; }
+   extra air. */
+.modal-body .position-form form > .actions:last-child {
+  padding-top: 8px; padding-bottom: 8px; margin-bottom: 0; bottom: 0;
 }
 .badge.position { background: var(--chip-brand-bg); color: var(--link); }
 /* The role chip opens the position dialog itself, so it carries the link and
