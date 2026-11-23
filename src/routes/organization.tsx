@@ -1175,6 +1175,7 @@ organizationRoutes.get("/departments", requirePermission("options.manage"), asyn
       lang={c.get("lang")} departments={await loadAdminDepartments(db, scope)}
       positionDefs={await loadPositionDefs(db)} leaders={await loadDepartmentLeaders(db, scope)}
       canManage={scope.scopeAll}
+      page={intParam(c.req.query("page"))}
     />,
   );
 });

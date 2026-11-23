@@ -9,6 +9,7 @@ import { PastorChildrenCard } from "./pastor-children";
 import { formatPhone, qs, todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
+import { Pager } from "./pager";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 type ChurchOption = { id: number; name: string; regionId: number };
@@ -364,8 +365,9 @@ export function PastorsPage(props: Common & {
       <div class="page-head">
         <div>
           <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span><span
-            class="field-tip" data-tip={t("org.pastorsIntro")}>
+            class="page-tip">
             <button type="button" class="field-tip-btn" aria-label={t("org.pastorsIntro")}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{t("org.pastorsIntro")}</span>
           </span></h1>
         </div>
         <div class="page-head-actions">
@@ -481,13 +483,7 @@ export function PastorsPage(props: Common & {
         </div>
       )}
 
-      {pages > 1 && (
-        <div class="actions" style="justify-content:center">
-          {currentPage > 1 && <a class="btn secondary" href={pageHref(currentPage - 1)}>{t("members.prev")}</a>}
-          <span class="muted">{t("members.page")} {currentPage} / {pages}</span>
-          {currentPage < pages && <a class="btn secondary" href={pageHref(currentPage + 1)}>{t("members.next")}</a>}
-        </div>
-      )}
+      <Pager page={currentPage} pages={pages} lang={lang} href={pageHref} />
     </Layout>
   );
 }

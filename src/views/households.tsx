@@ -4,6 +4,7 @@ import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 import type { EnrolmentSummary } from "../student-enrolments";
 import { CardViewToggle } from "./view-toggle";
+import { Pager } from "./pager";
 import { regionCascadeSelects } from "./hh-cascade";
 import { formatPhone, optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
@@ -202,6 +203,8 @@ export function HouseholdsListPage(props: Common & {
   rows: any[]; q: string; township?: string;
   townshipOptions?: { id: number; label: string }[];
   region?: number | null; regions?: { id: number; name: string }[];
+  /** Total households matching the filters, across every page. */
+  total?: number; page?: number | null; pages?: number;
 }) {
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "en");
@@ -222,9 +225,10 @@ export function HouseholdsListPage(props: Common & {
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span><span
-            class="field-tip" data-tip={t("hh.listSub")}>
+          <h1>{t("hh.pageHeading")}<span class="count-pill">{props.total ?? rows.length}</span><span
+            class="page-tip">
             <button type="button" class="field-tip-btn" aria-label={t("hh.listSub")}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{t("hh.listSub")}</span>
           </span></h1>
         </div>
         <div class="actions hh-list-actions">
@@ -333,6 +337,9 @@ export function HouseholdsListPage(props: Common & {
           })}
         </div>
       )}
+
+      <Pager page={props.page ?? 1} pages={props.pages ?? 1} lang={lang}
+        href={(n) => `/admin/households${qs({ q: q.trim() || null, township: props.township ?? null, region, page: n })}`} />
     </Layout>
   );
 }

@@ -2051,18 +2051,31 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
 }
 .field-tip:hover::after, .field-tip:focus-within::after { opacity: 1; visibility: visible; }
-/* Collection-page intros ride in the same hover/focus dot beside the heading
-   instead of a permanent subtitle line, so the page keeps that vertical space
-   while the explanation stays one focus stop away. The heading, not the 16px
-   dot, anchors the bubble: anchored to a dot that sits far along a title, a
-   340px sentence ran past the right edge on a phone, and even its hidden box
-   widened the page. Opening from the heading's left edge below it keeps the
-   bubble inside the page at every width. */
+/* Collection-page intros ride in a hover/focus dot beside the heading instead of
+   a permanent subtitle line. From 1100px up the bubble opens to the right of
+   the dot into the empty header band, clear of the tab/action row underneath;
+   the heading anchors it so its hidden box can never widen the page. Narrower
+   layouts have no such band (the dot sits ~20px above the tab row), so there the
+   text becomes a header-width panel in the flow: it pushes the next row down
+   instead of covering it, and still cannot overflow sideways. */
 .page-head h1 { position: relative; }
-.page-head h1 .field-tip { margin-left: 8px; vertical-align: 2px; position: static; }
-.page-head .field-tip::after {
-  left: 0; right: auto; top: calc(100% + 6px); bottom: auto;
-  max-width: min(340px, calc(100vw - 40px)); font-size: 12px;
+.page-tip { position: static; display: inline-flex; margin-left: 8px; vertical-align: 2px; }
+.page-tip-text {
+  position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  z-index: 6; width: max-content; max-width: 340px; padding: 7px 9px;
+  border-radius: var(--radius-sm); background: var(--ink); color: var(--card);
+  font-size: 12px; font-weight: 500; line-height: 1.45; text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
+}
+.page-tip:hover .page-tip-text, .page-tip:focus-within .page-tip-text { opacity: 1; visibility: visible; }
+@media (max-width: 1099px) {
+  .page-tip { display: inline; }
+  .page-tip-text {
+    position: static; transform: none; display: none;
+    width: auto; max-width: none; margin: 8px 0 0; padding: 8px 10px;
+    opacity: 1; visibility: visible; pointer-events: auto; transition: none;
+  }
+  .page-tip:focus-within .page-tip-text { display: block; }
 }
 /* A dot in a field's label anchors its bubble to the field instead of to the
    16px dot: a bubble sized against the dot runs off the sheet's left edge on a

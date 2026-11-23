@@ -15,6 +15,7 @@ import { departmentName, type DepartmentRow } from "../departments";
 import { EditIcon, TrashIcon } from "./action-icons";
 import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
 import { DuplicateWarning, type DuplicateCandidate } from "./duplicate-warning";
+import { Pager } from "./pager";
 
 /** Re-exported so route modules keep importing it from the members view. */
 export type { DuplicateCandidate };
@@ -528,13 +529,8 @@ export function MembersListPage(props: ListProps) {
         </table>
       </div>
 
-      {pages > 1 && (
-        <div class="actions" style="justify-content:center">
-          {page > 1 && <a class="btn secondary" href={`/members${filterQs(f, page - 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.prev")}</a>}
-          <span class="muted">{t("members.page")} {page} / {pages}</span>
-          {page < pages && <a class="btn secondary" href={`/members${filterQs(f, page + 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.next")}</a>}
-        </div>
-      )}
+      <Pager page={page} pages={pages} lang={lang}
+        href={(n) => `/members${filterQs(f, n)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`} />
     </Layout>
   );
 }

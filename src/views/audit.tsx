@@ -1,6 +1,7 @@
 import { Layout, type Flash } from "./layout";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
+import { Pager } from "./pager";
 
 export type AuditRow = {
   id: number;
@@ -330,13 +331,8 @@ export function AuditLogPage(props: Common & {
         </div>
       )}
 
-      {pages > 1 && (
-        <div class="actions" style="justify-content:center">
-          {page > 1 && <a class="btn secondary" href={link(page - 1)}>{t("audit.prev")}</a>}
-          <span class="muted">{t("audit.page")} {page} / {pages}</span>
-          {page < pages && <a class="btn secondary" href={link(page + 1)}>{t("audit.next")}</a>}
-        </div>
-      )}
+      <Pager page={page} pages={pages} lang={lang} href={link}
+        labels={{ prev: t("audit.prev"), next: t("audit.next"), page: t("audit.page") }} />
     </Layout>
   );
 }

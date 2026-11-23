@@ -1084,8 +1084,9 @@ export function OrganizationPage(props: Common & {
       <div class="page-head org-page-head">
         <div>
           <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span><span
-            class="field-tip" data-tip={pageIntro}>
+            class="page-tip">
             <button type="button" class="field-tip-btn" aria-label={pageIntro}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{pageIntro}</span>
           </span></h1>
         </div>
       </div>

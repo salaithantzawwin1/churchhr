@@ -33,6 +33,9 @@ function scopeOf(c: { get: (k: "scopeAll" | "stateIds" | "homeCellIds") => any }
   };
 }
 
+/** Household cards per page; the other collection lists page at the same size. */
+const PER_PAGE = 24;
+
 function scopeCondF(scope: Scope) {
   if (scope.scopeAll) return sql`1=1`;
   if (scope.stateIds.length === 0) return sql`1=0`;
@@ -257,6 +260,11 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   const townshipCond = township ? sql`AND f.township = ${township}` : sql``;
   const region = intParam(c.req.query("region"));
   const regionCond = region ? sql`AND f.region_id = ${region}` : sql``;
+  const where = sql`${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}`;
+  const countRows = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM families f WHERE ${where}`);
+  const total = countRows[0]?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(Math.max(1, intParam(c.req.query("page")) ?? 1), pages);
   const rowsP = db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
            (f.photo IS NOT NULL) AS has_photo,
@@ -273,9 +281,9 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = COALESCE(f.family_group_id, head.family_group_id)
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
-    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}
+    WHERE ${where}
     ORDER BY f.id DESC
-    LIMIT 200`);
+    LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`);
   const lang = c.get("lang");
   // The list, the township filter options and the state filter options are
   // independent reads: one query window instead of three.
@@ -298,6 +306,7 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       rows={rows} q={q} township={township} townshipOptions={townshipsInScope} lang={lang}
       region={region} regions={regionOptions}
+      total={total} page={page} pages={pages}
     />,
   );
 });
