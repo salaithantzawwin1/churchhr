@@ -242,7 +242,7 @@ tbody tr:hover { background: var(--row-hover); }
 .small { font-size: 13px; }
 .btn {
   display: inline-block; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
-  background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14.5px;
+  background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14px;
   font-family: inherit; text-decoration: none;
   line-height: 1.35; min-height: 40px;
 }

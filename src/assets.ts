@@ -4,4 +4,4 @@
  * version never reaches a returning browser. Run `npm run assets:version` after
  * changing any of them; test/asset-version.test.ts fails in CI when the value
  * and the files disagree. */
-export const ASSET_V = "20261123-c9be8aed";
+export const ASSET_V = "20261123-18bc5c3a";
