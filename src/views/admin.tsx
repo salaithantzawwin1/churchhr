@@ -171,7 +171,7 @@ function userForm(v: {
               <span class="field-tip" data-tip={pwHint}
                 data-tip-on={v.id === undefined ? pwForced : undefined}
                 data-tip-off={v.id === undefined ? pwBase : undefined}>
-                <button type="button" class="field-tip-btn" aria-label={pwHint} title={pwHint}>i</button>
+                <button type="button" class="field-tip-btn" aria-label={pwHint}>i</button>
               </span>
             </span>
             <div class="pw-row">

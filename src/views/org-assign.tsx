@@ -188,8 +188,7 @@ export function AssignLeaderModal(props: {
               <span class="lbl-row">
                 <span class="lbl">{t("org.priority")}</span>
                 <span class="field-tip" data-tip={t("org.priorityHint")}>
-                  <button type="button" class="field-tip-btn" aria-label={t("org.priorityHint")}
-                    title={t("org.priorityHint")}>i</button>
+                  <button type="button" class="field-tip-btn" aria-label={t("org.priorityHint")}>i</button>
                 </span>
               </span>
               <input type="number" name="priority" min="1" max="99" value="1"

@@ -966,19 +966,26 @@ export function MemberPositionForm(props: PositionFormProps) {
           </div>
         </div>
       </div>
-      <p class="hint position-intro">{t("org.positionIntro")}</p>
       {error && <div class="flash err">{error}</div>}
       <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
         {/* Keeps the pane the dialog was opened on when the save comes back with
             a validation error. */}
         <input type="hidden" name="tab" value={firstTab} />
-        <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
-          {tabs.map((tab) => (
-            <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
-              data-tab-target={tab.key} aria-selected={tab.key === firstTab ? "true" : "false"}>
-              {tab.label}
-            </button>
-          ))}
+        <div class="position-tabs-row">
+          <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
+            {tabs.map((tab) => (
+              <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
+                data-tab-target={tab.key} aria-selected={tab.key === firstTab ? "true" : "false"}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* The rule for the whole sheet sits behind an info dot beside the
+              area tabs: it applies to every area, so it needs no line of its
+              own above them. */}
+          <span class="field-tip" data-tip={t("org.positionIntro")}>
+            <button type="button" class="field-tip-btn" aria-label={t("org.positionIntro")}>i</button>
+          </span>
         </div>
 
         <div class="position-panes" data-tabs-body>
@@ -1019,8 +1026,7 @@ export function MemberPositionForm(props: PositionFormProps) {
                 <h4 class="position-subsection-title">
                   {t("org.clusterSection")}
                   <span class="field-tip" data-tip={t("org.clusterHint")}>
-                    <button type="button" class="field-tip-btn" aria-label={t("org.clusterHint")}
-                      title={t("org.clusterHint")}>i</button>
+                    <button type="button" class="field-tip-btn" aria-label={t("org.clusterHint")}>i</button>
                   </span>
                 </h4>
                 <div class="form-grid">

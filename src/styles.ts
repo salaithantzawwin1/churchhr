@@ -1937,7 +1937,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .position-hero-link:hover { text-decoration: underline; }
 .position-role-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .position-role-chips .badge { font-size: 11.5px; }
-.position-intro { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; }
 .position-section {
   margin: 0 0 11px; padding: 12px 13px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--field-bg);
@@ -3110,7 +3109,18 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent);
 }
 .position-form .position-role-chips::-webkit-scrollbar { display: none; }
-.position-form .position-intro { margin-bottom: 5px; font-size: 11.5px; }
+/* The sheet's one-line rule lives behind an info dot beside the area tabs, so
+   it costs no line of its own above them. */
+.position-form .position-tabs-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.position-form .position-tabs-row .position-tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
+/* A dot in a heading opens one panel above the block it belongs to. Anchored to
+   the 16px dot the bubble grew sideways across the words it explains, and on a
+   phone it ran past the sheet's edge. */
+.position-form .field-tip { position: static; }
+.position-form .position-tabs-row,
+.position-form .position-subsection-title,
+.position-form .position-section-head { position: relative; }
+.position-form .field-tip::after { left: 0; right: 0; width: auto; max-width: none; }
 .position-form .position-tabs { margin-bottom: 5px; padding: 2px; }
 .position-form .position-tab { padding: 6px 10px; }
 .position-form .position-section { padding: 9px 11px; }
@@ -3125,6 +3135,20 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .position-cell .badge { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .position-member { margin: 0 0 10px; font-size: 15px; }
 .position-form .actions { margin-top: 14px; }
+/* The position sheet's form sits inside .position-form, so the rule that drops
+   the body's bottom padding under a sticky bar (it only matches a form that is
+   a direct child of the body) never applied here: 22px of card colour stayed
+   below the Save bar and made the footer look twice its height. */
+@media (min-width: 761px) {
+  .modal-body:has(> .position-form form > .actions:last-child) { padding-bottom: 0; }
+}
+/* The sheet tightens everything above the fields, so its Save bar is trimmed to
+   match: the Save button keeps its field height, the band around it loses the
+   extra air. Phones stay a little roomier for the thumb. */
+.modal-body .position-form form > .actions:last-child { padding-top: 8px; padding-bottom: 8px; }
+@media (max-width: 760px) {
+  .modal-body .position-form form > .actions:last-child { padding-top: 10px; padding-bottom: 10px; }
+}
 .badge.position { background: var(--chip-brand-bg); color: var(--link); }
 /* The role chip opens the position dialog itself, so it carries the link and
    needs its own affordance instead of the removed Change text beside it. */
