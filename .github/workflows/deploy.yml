@@ -120,28 +120,50 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
 
-      - name: Verify production health
+      # Post-deploy version check. The fields are compared as parsed JSON, not as
+      # substrings, so a stale deploy cannot pass because some number happens to
+      # contain the expected one ("1.28.13" inside "1.28.139").
+      - name: Post-deploy smoke check (live version, migration, db and sign-in match this build)
         run: |
           set -euo pipefail
           base=https://www.mmgoodnewshr.online
           expected_version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/version.ts)
           expected_migration=$(basename "$(ls migrations/*.sql | sort | tail -n 1)")
+          export EXPECTED_VERSION="$expected_version" EXPECTED_MIGRATION="$expected_migration"
           echo "Expecting version $expected_version and migration $expected_migration"
           healthy=0
           for attempt in $(seq 1 12); do
             body=$(curl -fsS --max-time 10 "$base/healthz" || true)
             echo "$body"
-            if printf '%s' "$body" | grep -q "\"version\":\"$expected_version\"" \
-              && printf '%s' "$body" | grep -q "\"migration\":\"$expected_migration\"" \
-              && printf '%s' "$body" | grep -q '"db":"ok"'; then
-              echo "Production health probe passed"
+            if printf '%s' "$body" | python3 -c '
+          import json, os, sys
+
+          try:
+              doc = json.loads(sys.stdin.read())
+          except ValueError:
+              print("healthz is not JSON yet")
+              sys.exit(1)
+
+          want = {
+              "version": os.environ["EXPECTED_VERSION"],
+              "migration": os.environ["EXPECTED_MIGRATION"],
+              "db": "ok",
+          }
+          wrong = {key: doc.get(key) for key, value in want.items() if doc.get(key) != value}
+          if wrong:
+              print("healthz mismatch: " + ", ".join(
+                  "%s=%r (want %r)" % (key, got, want[key]) for key, got in wrong.items()))
+              sys.exit(1)
+
+          print("healthz matches this build")
+          '; then
               healthy=1
               break
             fi
             sleep 5
           done
-          if [ "$healthy" != 1 ]; then
-            echo "Production health probe failed: expected $expected_version / $expected_migration with db ok" >&2
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::/healthz never reported version $expected_version, migration $expected_migration, db ok" >&2
             exit 1
           fi
 
