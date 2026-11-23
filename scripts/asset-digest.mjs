@@ -22,19 +22,32 @@ function sourceFile(url) {
 
 /**
  * Every asset the layout links as `/path?v=${ASSET_V}`, as { url, file }.
- * Throws when a link cannot be read, so a cache-busted asset cannot be missed.
+ *
+ * It reads the href/src attributes that mention ASSET_V rather than grepping
+ * for the canonical spelling, so a link written another way (`"/app.js?v=" +
+ * ASSET_V`, spaces inside the braces) is reported instead of silently left out
+ * of the digest.
  */
 function versionedAssets(root = process.cwd()) {
   const layout = readFileSync(join(root, LAYOUT), "utf8");
-  const urls = [...layout.matchAll(/`(\/[^`?]*)\?v=\$\{ASSET_V\}`/g)].map((match) => match[1]);
-  const uses = layout.match(/\$\{ASSET_V\}/g)?.length ?? 0;
-  if (urls.length === 0 || urls.length !== uses) {
-    throw new Error(
-      `${LAYOUT} interpolates ASSET_V ${uses} time(s) but ${urls.length} link(s) could be read. ` +
-      "Write each versioned asset as `/path?v=${ASSET_V}` so it is included.",
-    );
+  const assets = [];
+  // A JSX value runs to the end of the tag, so `${ASSET_V}` is not taken as its
+  // closing brace the way a plain `\{[^}]*\}` would.
+  for (const [, attribute] of layout.matchAll(/(?:href|src)=(\{[^>]*\}|"[^"]*")/g)) {
+    if (!attribute.includes("ASSET_V")) continue;
+    const linked = /^\{`(\/[^`?]+)\?v=\$\{ASSET_V\}`\}$/.exec(attribute);
+    if (!linked) {
+      throw new Error(
+        `${LAYOUT} links ${attribute} with ASSET_V; write it as \`/path?v=\${ASSET_V}\` so the digest can read it.`,
+      );
+    }
+    assets.push({ url: linked[1], file: sourceFile(linked[1]) });
   }
-  return urls.map((url) => ({ url, file: sourceFile(url) }));
+  if (assets.length === 0) throw new Error(`${LAYOUT} links no asset with ?v=\${ASSET_V}.`);
+  // Sorted by file, not by where the link happens to sit: reordering the tags
+  // changes nothing a browser can see, so it must not move ASSET_V and bust
+  // every visitor's cache. Plain comparisons keep the order locale-free.
+  return assets.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }
 
 /**
