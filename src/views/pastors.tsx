@@ -6,7 +6,7 @@ import {
   ministryTenure, type ChildLinkSuggestion, type PastorChildCount, type PastorChildRow,
 } from "../pastor-children";
 import { PastorChildrenCard } from "./pastor-children";
-import { formatPhone, todayInYangon } from "../util";
+import { formatPhone, qs, todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
 
@@ -329,6 +329,8 @@ export function PastorsPage(props: Common & {
   q?: string;
   status?: "all" | "active" | "inactive";
   region?: number | null;
+  /** 1-based page of the filtered list; filters apply across every page. */
+  page?: number | null;
 }) {
   const { user, perms, flash, lang, pastors, regions } = props;
   const L = lang ?? "en";
@@ -348,13 +350,23 @@ export function PastorsPage(props: Common & {
   const counts = new Map((props.childCounts ?? []).map((c) => [c.pastorId, c] as const));
   const totalChildren = (props.childCounts ?? []).reduce((n, c) => n + Number(c.children), 0);
   const totalHope = (props.childCounts ?? []).reduce((n, c) => n + Number(c.hopeSchool), 0);
+  /** Two dozen cards keeps desktop rows full at three or four columns; the
+   *  filters still run over the whole scoped list, so page links carry them. */
+  const perPage = 24;
+  const pages = Math.max(1, Math.ceil(visible.length / perPage));
+  const currentPage = Math.min(Math.max(1, props.page ?? 1), pages);
+  const shown = visible.slice((currentPage - 1) * perPage, currentPage * perPage);
+  const pageHref = (n: number) =>
+    `/organization/pastors${qs({ q: q.trim() || null, status: status !== "all" ? status : null, region, page: n })}`;
 
   return (
     <Layout title={t("org.pastorsTitle")} lang={lang} user={user} perms={perms} active="/organization/pastors" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span></h1>
-          <p class="page-sub">{t("org.pastorsIntro")}</p>
+          <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span><span
+            class="field-tip" data-tip={t("org.pastorsIntro")}>
+            <button type="button" class="field-tip-btn" aria-label={t("org.pastorsIntro")}>i</button>
+          </span></h1>
         </div>
         <div class="page-head-actions">
           <CardViewToggle lang={lang} viewKey="pastors" />
@@ -400,7 +412,7 @@ export function PastorsPage(props: Common & {
         </div>
       ) : (
         <div class="hh-grid" data-view-grid>
-          {visible.map((pastor) => {
+          {shown.map((pastor) => {
             const photo = pastorPhotoUrl(pastor);
             const initial = Array.from((pastor.name || pastor.nameEn || "?").trim())[0] ?? "?";
             const state = L !== "mm" && pastor.stateNameEn ? pastor.stateNameEn : pastor.stateName;
@@ -466,6 +478,14 @@ export function PastorsPage(props: Common & {
               </article>
             );
           })}
+        </div>
+      )}
+
+      {pages > 1 && (
+        <div class="actions" style="justify-content:center">
+          {currentPage > 1 && <a class="btn secondary" href={pageHref(currentPage - 1)}>{t("members.prev")}</a>}
+          <span class="muted">{t("members.page")} {currentPage} / {pages}</span>
+          {currentPage < pages && <a class="btn secondary" href={pageHref(currentPage + 1)}>{t("members.next")}</a>}
         </div>
       )}
     </Layout>

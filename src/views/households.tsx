@@ -222,8 +222,10 @@ export function HouseholdsListPage(props: Common & {
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
-          <p class="page-sub">{t("hh.listSub")}</p>
+          <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span><span
+            class="field-tip" data-tip={t("hh.listSub")}>
+            <button type="button" class="field-tip-btn" aria-label={t("hh.listSub")}>i</button>
+          </span></h1>
         </div>
         <div class="actions hh-list-actions">
           <CardViewToggle lang={lang} viewKey="households" />

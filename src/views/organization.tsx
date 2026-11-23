@@ -1075,12 +1075,18 @@ export function OrganizationPage(props: Common & {
     );
   };
 
+  /** The sentence each tab used to print as a subtitle now travels in the
+   *  heading's info dot, so the tabs start higher on the page. */
+  const pageIntro = tab === "main" ? t("org.mainIntro") : tab === "all" ? t("org.allIntro") : t("org.intro");
+
   return (
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head org-page-head">
         <div>
-          <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span></h1>
-          <p class="page-sub">{tab === "main" ? t("org.mainIntro") : tab === "all" ? t("org.allIntro") : t("org.intro")}</p>
+          <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span><span
+            class="field-tip" data-tip={pageIntro}>
+            <button type="button" class="field-tip-btn" aria-label={pageIntro}>i</button>
+          </span></h1>
         </div>
       </div>
 

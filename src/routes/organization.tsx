@@ -2275,6 +2275,7 @@ organizationRoutes.get("/pastors", requireAnyPermission("pastors.view", "pastors
       regions={await orgRegions(db, scope, c.get("lang"))}
       q={listQuery(c.req.query("q"))} status={listStatus(c.req.query("status"))}
       region={intParam(c.req.query("region"))}
+      page={intParam(c.req.query("page"))}
     />,
   );
 });

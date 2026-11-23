@@ -2051,6 +2051,19 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
 }
 .field-tip:hover::after, .field-tip:focus-within::after { opacity: 1; visibility: visible; }
+/* Collection-page intros ride in the same hover/focus dot beside the heading
+   instead of a permanent subtitle line, so the page keeps that vertical space
+   while the explanation stays one focus stop away. The heading, not the 16px
+   dot, anchors the bubble: anchored to a dot that sits far along a title, a
+   340px sentence ran past the right edge on a phone, and even its hidden box
+   widened the page. Opening from the heading's left edge below it keeps the
+   bubble inside the page at every width. */
+.page-head h1 { position: relative; }
+.page-head h1 .field-tip { margin-left: 8px; vertical-align: 2px; position: static; }
+.page-head .field-tip::after {
+  left: 0; right: auto; top: calc(100% + 6px); bottom: auto;
+  max-width: min(340px, calc(100vw - 40px)); font-size: 12px;
+}
 /* A dot in a field's label anchors its bubble to the field instead of to the
    16px dot: a bubble sized against the dot runs off the sheet's left edge on a
    phone, while a field-width panel fits the narrowest layout there is. */
