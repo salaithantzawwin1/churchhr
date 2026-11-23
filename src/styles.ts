@@ -3442,9 +3442,12 @@ th { font-size: 13px; }
 @media (min-width: 761px) {
   .modal-head { padding: 13px 24px; }
   .modal-head h3 { font-size: 17px; line-height: 1.3; }
-  .modal-body:has(> form > .actions:last-child) { padding-bottom: 0; }
-  /* The global form margin would otherwise leave a strip of card under the bar. */
-  .modal-body:has(> form > .actions:last-child) > form { margin-bottom: 0; }
+  /* Matched on any form that ends in the sticky bar, not only one that is a
+     direct child of the body: a modal may wrap its form (the position sheet's
+     .position-form), and the direct-child selectors used here silently missed
+     it, leaving body padding and the form's own margin under the bar. */
+  .modal-body:has(form > .actions:last-child) { padding-bottom: 0; }
+  .modal-body:has(form > .actions:last-child) form:has(> .actions:last-child) { margin-bottom: 0; }
   .modal-body form > .actions:last-child {
     margin-left: -24px; margin-right: -24px; margin-bottom: 0;
     padding: 10px 24px; bottom: 0;
