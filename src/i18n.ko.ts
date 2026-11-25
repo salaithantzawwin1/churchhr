@@ -958,6 +958,8 @@ export const KO: Record<string, string> = {
   "org.regionCurrentTeam": "현재 팀",
   "org.priority": "우선순위",
   "org.priorityHint": "1이 가장 높습니다. 같은 우선순위는 한 단계로 표시되며 자동으로 한 명을 고르지 않습니다.",
+  "org.priorityLower": "우선순위 낮추기",
+  "org.priorityRaise": "우선순위 높이기",
   "org.addHolder": "리더 추가",
   "org.removeHolderConfirm": "이 담당을 제거할까요?",
   "org.churchLeadershipHint": "성도 목록에서 지정하는 교회 전체 직책입니다.",

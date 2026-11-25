@@ -1503,6 +1503,9 @@
     titleEl.textContent = title || "";
     card.classList.toggle("sm", size === "sm");
     card.classList.toggle("md", size === "md");
+    // A sheet keeps its 520px column on desktop and sits on the bottom edge on
+    // a phone; the other sizes stay centred everywhere.
+    card.classList.toggle("sheet", size === "sheet");
     modal.hidden = false;
     document.body.style.overflow = "hidden";
   }
@@ -1547,6 +1550,19 @@
   modal.addEventListener("click", function (e) {
     var el = e.target;
     if (el && el.closest && el.closest("[data-close]")) closeModal();
+  });
+  // Priority steppers are rendered inside the modal body, so one delegated
+  // listener covers every sheet. The buttons step the native number input, so
+  // typing, arrow keys and form submission keep working unchanged.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest(".stepper-btn[data-step]") : null;
+    if (!btn) return;
+    var stepper = btn.closest(".priority-stepper");
+    var input = stepper ? stepper.querySelector('input[type="number"]') : null;
+    if (!input) return;
+    e.preventDefault();
+    if (Number(btn.getAttribute("data-step")) > 0) input.stepUp(); else input.stepDown();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   document.addEventListener("keydown", function (e) {
     if (modal.hidden) return;

@@ -1596,7 +1596,7 @@ export function OrganizationPage(props: Common & {
                             if (canAdd && team.length === 0) {
                               return (
                                 <a class="org-region-role org-region-role-add js-add-modal" href={addHref}
-                                  data-modal-title={addTitle} data-modal-size="md">
+                                  data-modal-title={addTitle} data-modal-size="sheet">
                                   <span class="org-mini-role">{positionDefLabel(def, L)}</span>
                                   <span class="org-region-add-label">
                                     <span aria-hidden="true">+</span>{t("org.addHolder")}
@@ -1626,7 +1626,7 @@ export function OrganizationPage(props: Common & {
                                 )}
                                 {canAdd && team.length > 0 && (
                                   <a class="org-card-link org-region-add js-add-modal" href={addHref}
-                                    data-modal-title={addTitle} data-modal-size="md">
+                                    data-modal-title={addTitle} data-modal-size="sheet">
                                     <span aria-hidden="true">+</span> {t("org.addHolder")}
                                   </a>
                                 )}

@@ -1887,58 +1887,27 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
 .org-node-extra-person { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; line-height: 1.5; }
 .org-node-extra-person a { overflow-wrap: anywhere; }
-.region-holder-list { display: grid; gap: 7px; margin: 10px 0; }
-.region-holder-list h4 { margin: 0; font-size: 13.5px; }
-.region-team-head { display: flex; align-items: center; gap: 7px; }
-.region-team-count {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
-  background: var(--chip-bg); color: var(--muted);
-  font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
-}
+.region-holder-list { display: grid; gap: 8px; margin: 0; }
 .region-holder-empty { margin: 0; }
 .region-holder-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
-  padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--field-bg);
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-2);
   transition: border-color .15s ease;
 }
 .region-holder-row:hover { border-color: var(--line-strong); }
-.region-holder-name { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
-.region-holder-row form { margin: 0; flex: 0 0 auto; }
+.region-holder-name { flex: 1 1 110px; min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; }
 /* The controls keep their own width so they stay on one line; the name is what
    shrinks (and the row wraps them below it only on a narrow dialog). */
 .region-holder-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin-left: auto; flex: 0 0 auto; }
-/* Beats .modal-body form, which stacks a form's children in a column: here the
-   priority label, its number and Save belong on one row. The rim makes them
-   read as one "rank → save" control, so Delete stays a separate action. */
+.region-holder-row form { margin: 0; flex: 0 0 auto; }
+/* .modal-body form stacks children in a column; here the stepper and its Save
+   are one control row that submits together. */
 .region-holder-row form.region-holder-priority {
-  display: flex; flex-direction: row; align-items: center; gap: 3px;
-  flex-wrap: nowrap; min-height: 0; padding: 2px 2px 2px 10px;
-  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
-  transition: border-color .15s ease;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  flex-wrap: nowrap; min-height: 0;
 }
-.region-holder-row form.region-holder-priority:focus-within { border-color: var(--link); }
-/* A bare number, not a full-width field: the value is one or two digits and the
-   Save beside it has to read as "update this priority". The selector is deep
-   enough to beat the later, global input[type=number] height rule. */
-.region-holder-row .region-holder-priority input[type="number"] {
-  width: 34px; min-width: 0; height: 28px; padding: 0 2px; text-align: center;
-  border: 0; border-radius: 0; background: transparent; box-shadow: none;
-  font-variant-numeric: tabular-nums;
-  appearance: textfield; -moz-appearance: textfield;
-}
-.region-holder-row .region-holder-priority input[type="number"]::-webkit-outer-spin-button,
-.region-holder-row .region-holder-priority input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none; margin: 0;
-}
-/* The pill border already marks focus, so the global blue input ring would
-   draw a second box inside it. */
-.region-holder-row .region-holder-priority input:focus {
-  outline: none; border: 0; box-shadow: none;
-}
-.region-holder-priority .btn.sm { min-height: 28px; padding: 0 10px; border-radius: 999px; }
-.region-holder-priority-field { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.region-holder-row .btn.sm { height: 32px; min-height: 32px; padding: 0 12px; }
 .region-holder-priority-field .muted { font-size: 11.5px; }
 .org-dept-card { gap: 10px; }
 /* Position assignment modal: a compact identity summary followed by three
@@ -3574,6 +3543,134 @@ th { font-size: 13px; }
    region names can still be shaped legibly at. */
 .assign-hero .position-hero-home { font-size: 13px; line-height: 1.6; }
 .assign-search { margin-bottom: 0; }
+
+/* The region sheet keeps a 520px column on desktop (the church dialog's 620px
+   is wider than these short, one-line controls need). Its body takes the height
+   left by the header, so the sticky action bar sits below the candidate list
+   instead of covering it while the dialog is still short. */
+.modal-card.sheet { width: min(520px, 100%); height: min(640px, calc(100dvh - 40px)); }
+.modal-card.sheet .modal-body { flex: 1 1 auto; min-height: 0; }
+
+/* ---------- region add-leader sheet ----------
+   The post's scope and the priority rule sit in one tinted band instead of the
+   larger profile hero the church dialog carries; this dialog is about a team,
+   not one person. */
+.assign-info {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: linear-gradient(145deg, var(--chip-brand-bg), var(--surface));
+}
+.assign-info-icon {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 50%; background: var(--chip-brand-bg); color: var(--link);
+}
+.assign-info-icon svg { width: 16px; height: 16px; }
+.assign-info-body { min-width: 0; }
+.assign-info-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.assign-info-line strong { font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+.assign-info-line > span { color: var(--muted); font-size: 13px; }
+.assign-info-line > span strong { font-size: 13px; color: var(--ink); }
+.assign-info p { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+/* Latin-only micro-label: the per-language rule below drops the tracking for
+   Myanmar and Korean, where uppercase cannot help. */
+.assign-section-title {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 2px;
+  color: var(--muted); font-size: 11px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.assign-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--muted);
+  font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  letter-spacing: 0; text-transform: none;
+}
+.assign-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.assign-dot.is-holder { background: var(--link); }
+
+/* Priority stepper: a label box, a bare number and two buttons in one 32px
+   control. The buttons drive the native input's stepUp()/stepDown(), so the
+   value still works with a keyboard, a spinner-free phone keypad and the form.
+   .priority-value is deliberately deep enough to beat the global input height. */
+.priority-stepper {
+  display: flex; align-items: stretch; height: 32px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.priority-stepper:focus-within {
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--chip-brand-bg);
+}
+.priority-stepper-label {
+  display: flex; align-items: center; padding: 0 10px;
+  border-right: 1px solid var(--line); background: var(--surface-3);
+  color: var(--muted); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+}
+.priority-stepper-controls { display: flex; align-items: center; }
+.stepper-btn {
+  display: grid; place-items: center; width: 22px; height: 100%;
+  padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.stepper-btn:hover { background: var(--surface-2); color: var(--ink); }
+.stepper-btn:active { background: var(--line); }
+.stepper-btn svg { width: 11px; height: 11px; }
+.priority-stepper input.priority-value {
+  width: 30px; height: 100%; padding: 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none;
+  color: var(--ink); font-size: 13px; font-weight: 600; text-align: center;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield; -moz-appearance: textfield;
+}
+.priority-stepper input.priority-value::-webkit-outer-spin-button,
+.priority-stepper input.priority-value::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.priority-stepper input.priority-value:focus { outline: none; border: 0; box-shadow: none; }
+
+/* Candidate rows: a status dot and the church badge carry the same reading as
+   the current-team row. The radio stays in the DOM for selection and the
+   keyboard; only its chrome is hidden. */
+.assign-row:has(.assign-dot) input[type="radio"] {
+  position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+.assign-badge {
+  margin-left: auto; max-width: 45%; padding: 2px 7px; border-radius: 4px;
+  background: var(--chip-bg); color: var(--muted); font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.assign-row:has(input:checked) .assign-dot { background: var(--link); }
+
+.assign-footer-priority { display: inline-flex; align-items: center; gap: 6px; }
+.assign-footer-priority .field-tip::after { left: 0; right: auto; }
+@media (max-width: 640px) {
+  .assign-footer-priority .field-tip::after {
+    left: auto; right: 0; bottom: calc(100% + 6px); width: max-content; max-width: 240px;
+  }
+}
+/* Phones: the team card stacks so the priority, Save and Delete share one full
+   row, and the dialog becomes a bottom sheet. */
+@media (max-width: 480px) {
+  .modal:has(.modal-card.sheet) { align-items: flex-end; padding: 0; }
+  .modal-card.sheet {
+    width: 100%; max-width: 100%; height: auto;
+    max-height: calc(100dvh - 10px); border-radius: 14px 14px 0 0;
+  }
+  .region-holder-row { flex-direction: column; align-items: stretch; }
+  .region-holder-actions { width: 100%; margin-left: 0; }
+  .region-holder-actions form.region-holder-priority { flex: 1 1 auto; }
+  .region-holder-actions .priority-stepper { flex: 1 1 auto; }
+  .region-holder-actions .priority-stepper-controls { flex: 1; }
+  .region-holder-actions .priority-stepper input.priority-value { flex: 1; width: auto; }
+  .assign-actions.assign-actions { flex-direction: column; align-items: stretch; }
+  .assign-footer-priority, .assign-footer-priority .priority-stepper { width: 100%; }
+  .assign-footer-priority .priority-stepper-controls { flex: 1; }
+  .assign-footer-priority .priority-stepper input.priority-value { flex: 1; width: auto; }
+  .assign-actions-buttons { width: 100%; }
+  .assign-actions-buttons .btn { flex: 1; }
+  .region-holder-row .btn.sm { flex: 0 0 auto; }
+}
 /* The priority of the person being added sits in the footer beside Save. The
    current-team rows above already show each holder's own priority, so a second
    full-width Priority field in the body read as the same control twice; the
@@ -3677,7 +3774,8 @@ th { font-size: 13px; }
 :not(:lang(en)) :is(
   .org-node-role, .org-church-kicker, .org-supervision-title, .nav-menu-label,
   .pastor-section legend, .detail-item .k, .edit-change .k, .edit-pair .k,
-  .regional-candidate-group h4, .cluster-kicker, .cluster-cell-group h4
+  .regional-candidate-group h4, .cluster-kicker, .cluster-cell-group h4,
+  .assign-section-title, .priority-stepper-label
 ) { text-transform: none; letter-spacing: 0; }
 
 /* ---------- members list on a phone ----------
