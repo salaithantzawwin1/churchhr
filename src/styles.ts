@@ -1889,27 +1889,57 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-node-extra-person a { overflow-wrap: anywhere; }
 .region-holder-list { display: grid; gap: 7px; margin: 10px 0; }
 .region-holder-list h4 { margin: 0; font-size: 13.5px; }
+.region-team-head { display: flex; align-items: center; gap: 7px; }
+.region-team-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--muted);
+  font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
 .region-holder-empty { margin: 0; }
 .region-holder-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
-  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--field-bg);
+  transition: border-color .15s ease;
 }
-.region-holder-name { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
+.region-holder-row:hover { border-color: var(--line-strong); }
+.region-holder-name { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
 .region-holder-row form { margin: 0; flex: 0 0 auto; }
 /* The controls keep their own width so they stay on one line; the name is what
    shrinks (and the row wraps them below it only on a narrow dialog). */
 .region-holder-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin-left: auto; flex: 0 0 auto; }
 /* Beats .modal-body form, which stacks a form's children in a column: here the
-   priority label, its number and Save belong on one row. */
+   priority label, its number and Save belong on one row. The rim makes them
+   read as one "rank → save" control, so Delete stays a separate action. */
 .region-holder-row form.region-holder-priority {
-  display: flex; flex-direction: row; align-items: center; gap: 6px;
-  flex-wrap: nowrap; min-height: 0;
+  display: flex; flex-direction: row; align-items: center; gap: 3px;
+  flex-wrap: nowrap; min-height: 0; padding: 2px 2px 2px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card);
+  transition: border-color .15s ease;
 }
+.region-holder-row form.region-holder-priority:focus-within { border-color: var(--link); }
 /* A bare number, not a full-width field: the value is one or two digits and the
-   Save beside it has to read as "update this priority". */
-.region-holder-priority input { width: 64px; min-width: 0; height: 34px; padding: 0 6px; text-align: center; }
-.region-holder-priority-field { white-space: nowrap; }
+   Save beside it has to read as "update this priority". The selector is deep
+   enough to beat the later, global input[type=number] height rule. */
+.region-holder-row .region-holder-priority input[type="number"] {
+  width: 34px; min-width: 0; height: 28px; padding: 0 2px; text-align: center;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield; -moz-appearance: textfield;
+}
+.region-holder-row .region-holder-priority input[type="number"]::-webkit-outer-spin-button,
+.region-holder-row .region-holder-priority input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+/* The pill border already marks focus, so the global blue input ring would
+   draw a second box inside it. */
+.region-holder-row .region-holder-priority input:focus {
+  outline: none; border: 0; box-shadow: none;
+}
+.region-holder-priority .btn.sm { min-height: 28px; padding: 0 10px; border-radius: 999px; }
+.region-holder-priority-field { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.region-holder-priority-field .muted { font-size: 11.5px; }
 .org-dept-card { gap: 10px; }
 /* Position assignment modal: a compact identity summary followed by three
    clearly numbered role areas. */
@@ -3551,9 +3581,12 @@ th { font-size: 13px; }
 .modal-body form > .actions.assign-actions { justify-content: space-between; }
 .assign-priority-inline { display: inline-flex; align-items: center; gap: 8px; }
 .assign-priority-inline .lbl-row { margin-bottom: 0; }
-.assign-priority-inline .lbl { margin: 0; }
+/* Matches the compact Priority label inside each current-team row, so the two
+   priority controls no longer read as different sizes. */
+.assign-priority-inline .lbl { margin: 0; font-size: 12.5px; }
 .assign-priority-inline input[type="number"] {
-  width: 68px; height: 34px; padding: 0 6px; text-align: center;
+  width: 58px; height: 32px; padding: 0 4px; text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 /* The dot sits at the sheet's left edge in this footer, so its bubble grows
    rightwards; the default right-anchored bubble ran off the sheet and was
@@ -3576,6 +3609,9 @@ th { font-size: 13px; }
 .assign-list {
   display: grid; gap: 4px; flex: 1 1 auto; min-height: 120px; max-height: 300px;
   align-content: start; overflow-y: auto; overscroll-behavior: contain;
+  /* Keep the scrollbar in its own gutter so it never covers a row's church
+     name, and only appears once the list actually scrolls. */
+  scrollbar-gutter: stable; scrollbar-width: thin;
   padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface-3);
 }
@@ -3583,13 +3619,23 @@ th { font-size: 13px; }
   display: flex; align-items: center; gap: var(--space-3);
   padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-sm);
   background: var(--card); cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
 }
-.assign-row:hover { border-color: var(--line-strong); }
+.assign-row:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .assign-row input { margin: 0; }
+/* The chosen candidate keeps the same highlight as the current holder, so the
+   list answers "who am I about to add?" before Save is pressed. */
+.assign-row:has(input:checked) { border-color: var(--link); background: var(--surface-2); }
+.assign-row:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: -2px; }
 .assign-row.is-current { border-color: var(--link); }
 .assign-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .assign-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.assign-meta {
+  margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap;
+  /* A long Myanmar church name gives way to the person's name instead of
+     widening the row. */
+  max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+}
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
 .assign-hint { margin: 0; color: var(--muted); font-size: 11.5px; }
 /* One "clear the post" row, so it must not inherit the candidate list's floor:

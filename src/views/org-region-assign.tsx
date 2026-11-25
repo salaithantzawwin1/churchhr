@@ -51,7 +51,10 @@ export function RegionPastorModal(props: {
       {error && <p class="flash err modal-error">{error}</p>}
 
       <div class="region-holder-list">
-        <h4>{t("org.regionCurrentTeam")}</h4>
+        <h4 class="region-team-head">
+          {t("org.regionCurrentTeam")}
+          <span class="region-team-count" aria-hidden="true">{holders.length}</span>
+        </h4>
         {holders.length === 0 ? (
           <p class="muted small region-holder-empty">{t("org.vacant")}</p>
         ) : (
@@ -62,13 +65,15 @@ export function RegionPastorModal(props: {
                   "who · their rank · remove" instead of scattering four controls. */}
               <div class="region-holder-actions">
                 {/* Saving a holder again updates their priority in place. */}
-                <form method="post" action="/organization/region-assign" data-modal-ajax class="region-holder-priority">
+                <form method="post" action="/organization/region-assign" data-modal-ajax class="region-holder-priority"
+                  title={t("org.priorityHint")}>
                   <input type="hidden" name="region" value={String(regionId)} />
                   <input type="hidden" name="position" value={def.code} />
                   <input type="hidden" name="pastor_id" value={String(holder.pastorId)} />
                   <label class="region-holder-priority-field">
                     <span class="muted small">{t("org.priority")}</span>
-                    <input type="number" name="priority" min="1" max="99" value={String(holder.priority)} />
+                    <input type="number" name="priority" min="1" max="99" value={String(holder.priority)}
+                      aria-label={`${t("org.priority")} — ${holder.name}`} />
                   </label>
                   <button class="btn sm secondary" type="submit">{t("form.save")}</button>
                 </form>
@@ -106,7 +111,8 @@ export function RegionPastorModal(props: {
                 ? `${t("org.assignCurrentAt")} ${candidate.regionPosition}${candidate.regionName ? ` · ${candidate.regionName}` : ""}`
                 : "";
               return (
-                <label class="assign-row" data-name={`${candidate.name} ${candidate.churchName ?? ""}`}>
+                <label class="assign-row" data-name={`${candidate.name} ${candidate.churchName ?? ""}`}
+                  title={candidate.churchName ?? undefined}>
                   <input type="radio" name="pastor_id" value={String(candidate.id)} />
                   <span class="assign-text">
                     <span class="assign-name">{candidate.name}</span>
