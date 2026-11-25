@@ -3679,6 +3679,49 @@ th { font-size: 13px; }
   .assign-actions-buttons .btn { flex: 1; }
   .region-holder-row .btn.sm { flex: 0 0 auto; }
 }
+/* Short windows: at 530px tall the sheet is 466px, the band and the spacing
+   push the candidate list under the sticky footer, and nothing of the list is
+   reachable without scrolling. The band drops its explanatory line, the row
+   padding and gaps tighten, and the sheet takes the window height so two to
+   three candidates stay above the footer. */
+@media (max-height: 640px) {
+  .modal-card.sheet .modal-head { padding: 8px 18px; }
+  .modal-card.sheet .modal-head h3 { font-size: 16px; }
+  .modal-card.sheet .modal-body { padding: 8px 14px 0; }
+  .modal-card.sheet .assign-info { padding: 6px 9px; margin-bottom: 6px; gap: 8px; }
+  .modal-card.sheet .assign-info p { display: none; }
+  .modal-card.sheet .assign-info-icon { width: 22px; height: 22px; }
+  .modal-card.sheet .assign-info-icon svg { width: 13px; height: 13px; }
+  .modal-card.sheet .assign-info-line strong { font-size: 12.5px; }
+  .modal-card.sheet .assign-section-title { margin: 0; font-size: 10.5px; }
+  .modal-card.sheet .region-holder-list { gap: 4px; margin-bottom: 6px; }
+  .modal-card.sheet .region-holder-row { padding: 5px 9px; }
+  .modal-card.sheet form.assign-form { gap: 6px; }
+  .modal-card.sheet .assign-search input { height: 32px; }
+  .modal-card.sheet .assign-hint { display: none; }
+  .modal-card.sheet .assign-list { min-height: 146px; padding: 6px; }
+  /* The sticky bar's negative margins are cut for the 20px body padding; the
+     compact padding here would leave a 6px overhang and a sideways scrollbar. */
+  .modal-card.sheet .modal-body form > .actions:last-child {
+    margin-left: -14px; margin-right: -14px; margin-bottom: 0; bottom: 0;
+    padding: 7px 14px;
+  }
+}
+/* The global 88dvh cap costs a short desktop window ~60px it needs for the
+   list; on a phone the sheet is bottom-anchored and sizes to its content. */
+@media (max-height: 640px) and (min-width: 481px) {
+  .modal:has(.modal-card.sheet) { padding: 8px; }
+  .modal-card.sheet { height: calc(100dvh - 16px); max-height: none; }
+}
+
+/* Light theme: --muted is tuned for the white page and falls to 4.1-4.4:1 on
+   the tinted band, the inset stepper label and the chips, which is under AA for
+   this small text; those labels take a darker slate instead. */
+:root[data-theme="light"] :is(
+  .assign-info p, .assign-info-line > span, .assign-section-title,
+  .assign-count, .priority-stepper-label, .assign-badge, .assign-hint
+) { color: #475569; }
+
 /* The priority of the person being added sits in the footer beside Save. The
    current-team rows above already show each holder's own priority, so a second
    full-width Priority field in the body read as the same control twice; the
