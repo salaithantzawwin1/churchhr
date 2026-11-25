@@ -10,22 +10,33 @@ import { defineConfig } from "vitest/config";
  *  A second project runs plain node tests. They are the ones that can read the
  *  repository (checks/), which workerd cannot: the asset-version test hashes
  *  public/app.js and the stylesheet to prove ASSET_V was bumped with them. */
+const workerPlugins = () =>
+  cloudflareTest(async () => ({
+    wrangler: { configPath: "./wrangler.jsonc" },
+    miniflare: {
+      bindings: { TEST_MIGRATIONS: await readD1Migrations(path.resolve("migrations")) },
+    },
+  }));
+
 export default defineConfig({
   test: {
     projects: [
       {
-        plugins: [
-          cloudflareTest(async () => ({
-            wrangler: { configPath: "./wrangler.jsonc" },
-            miniflare: {
-              bindings: { TEST_MIGRATIONS: await readD1Migrations(path.resolve("migrations")) },
-            },
-          })),
-        ],
+        plugins: [workerPlugins()],
         test: {
           name: "worker",
           include: ["test/**/*.test.ts"],
+          // This file applies the migrations itself, from a pre-0040 schema, so
+          // the shared all-migrations setup must not run first.
+          exclude: ["test/migration-data.test.ts"],
           setupFiles: ["./test/apply-migrations.ts"],
+        },
+      },
+      {
+        plugins: [workerPlugins()],
+        test: {
+          name: "migration",
+          include: ["test/migration-data.test.ts"],
         },
       },
       {

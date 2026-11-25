@@ -1,0 +1,48 @@
+name: Uptime probe
+
+# deploy.yml checks /healthz once, right after a release. Nothing watches the
+# Worker between releases, so a D1 problem or a broken route on an unchanged
+# deployment would stay invisible until the next push or a user report. This
+# scheduled probe fails the run when the live service is unhealthy; GitHub then
+# notifies the repository's watchers (Settings → Notifications). Pair it with a
+# Cloudflare alert if you need an on-call page rather than an email.
+#
+# Scheduled workflows are disabled after 60 days without repository activity, so
+# re-enable this one if the project ever goes quiet.
+
+on:
+  schedule:
+    # Every 30 minutes.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Live service is healthy and can still sign users in
+        run: |
+          set -euo pipefail
+          base=https://www.mmgoodnewshr.online
+
+          body=$(curl -fsS --max-time 10 "$base/healthz")
+          echo "$body"
+          # Parsed JSON, not substring matches: a half-read payload or a stale
+          # cached response must not pass.
+          printf '%s' "$body" | jq -e \
+            '.ok == true and .db == "ok" and (.migration | type == "string" and length > 0)' \
+            >/dev/null
+
+          code=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$base/login")
+          if [ "$code" != "200" ]; then
+            echo "::error::/login answered $code, expected 200" >&2
+            exit 1
+          fi
+          echo "healthz ok, /login 200"

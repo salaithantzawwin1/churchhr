@@ -16,7 +16,8 @@ export type HealthResult = {
  * 0015 members.photo, 0016 activity_reports, 0017 report_edits, 0018 families
  * placement, 0019 member_positions, 0021 church_departments, 0022 member
  * departments, 0023 position catalogue and regional churches, 0024 position
- * change history, 0048 families.photo). */
+ * change history, 0043 pastor children, 0044 student enrolments, 0045 pastor
+ * child → member link, 0047 users.display_name, 0048 families.photo). */
 export async function checkHealth(env: Bindings): Promise<HealthResult> {
   const started = Date.now();
   let db: "ok" | "error" = "ok";
@@ -46,6 +47,10 @@ export async function checkHealth(env: Bindings): Promise<HealthResult> {
       "SELECT spouse_pastor_id FROM pastors LIMIT 1",
       "SELECT action, device FROM audit_log LIMIT 1",
       "SELECT start_year, end_year FROM pastor_history LIMIT 1",
+      "SELECT grade, academic_year FROM pastor_children LIMIT 1",
+      "SELECT member_id FROM pastor_children LIMIT 1",
+      "SELECT academic_year, school_kind FROM student_enrolments LIMIT 1",
+      "SELECT display_name FROM users LIMIT 1",
     ];
     const [migrationResult] = await env.DB.batch<{ name: string }>(
       statements.map((sqlText) => env.DB.prepare(sqlText)),

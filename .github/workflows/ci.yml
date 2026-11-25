@@ -1,0 +1,46 @@
+name: CI
+
+# deploy.yml gates a release only after it lands on main. This workflow runs the
+# same gates on a pull request, so a regression is caught before merge instead of
+# shipping and then needing a second commit to undo. It never deploys.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Runs in real workerd with a local D1, including the migration data tests
+      # that replay 0040 and 0049 against legacy rows.
+      - name: Test (workerd + local D1)
+        run: npm test
+
+      # Only the packages that ship in the Worker bundle are audited, matching
+      # the deploy gate. Dev-only advisories are reported weekly by audit.yml.
+      - name: Audit production dependencies (moderate or worse fails the build)
+        run: npm audit --omit=dev --audit-level=moderate
