@@ -3548,7 +3548,12 @@ th { font-size: 13px; }
    is wider than these short, one-line controls need). Its body takes the height
    left by the header, so the sticky action bar sits below the candidate list
    instead of covering it while the dialog is still short. */
-.modal-card.sheet { width: min(520px, 100%); height: min(640px, calc(100dvh - 40px)); }
+.modal-card.sheet {
+  width: min(520px, 100%); height: min(640px, calc(100dvh - 40px));
+  /* The sticky footer paints to the card's edges, so without this the bottom
+     corners come out square over the sheet's radius. */
+  overflow: hidden;
+}
 .modal-card.sheet .modal-body { flex: 1 1 auto; min-height: 0; }
 
 /* ---------- region add-leader sheet ----------
@@ -3556,7 +3561,7 @@ th { font-size: 13px; }
    larger profile hero the church dialog carries; this dialog is about a team,
    not one person. */
 .assign-info {
-  display: flex; align-items: flex-start; gap: 10px; padding: 12px;
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px; margin-bottom: 14px;
   border: 1px solid var(--line); border-radius: 10px;
   background: linear-gradient(145deg, var(--chip-brand-bg), var(--surface));
 }
@@ -3574,17 +3579,20 @@ th { font-size: 13px; }
 /* Latin-only micro-label: the per-language rule below drops the tracking for
    Myanmar and Korean, where uppercase cannot help. */
 .assign-section-title {
-  display: flex; align-items: center; gap: 7px; margin: 0 0 2px;
+  display: flex; align-items: center; gap: 6px; margin: 0 0 2px;
   color: var(--muted); font-size: 11px; font-weight: 700;
   letter-spacing: .07em; text-transform: uppercase;
 }
 .assign-count {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px;
+  min-width: 16px; height: 16px; padding: 0 5px; border-radius: 999px;
   background: var(--chip-bg); color: var(--muted);
-  font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
   letter-spacing: 0; text-transform: none;
 }
+/* The team card sits between the info band and the form, which have no gap of
+   their own, so it carries the spacing on both sides. */
+.modal-body > .region-holder-list { margin-bottom: 14px; }
 .assign-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
 .assign-dot.is-holder { background: var(--link); }
 
