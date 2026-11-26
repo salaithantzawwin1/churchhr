@@ -1,9 +1,8 @@
 import { CapsHint, PwToggle } from "./auth";
-import { KeyIcon } from "./action-icons";
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
-import { canManageStructure, PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, type Permission } from "../rbac";
+import { canManageStructure, PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PERMISSION_LABELS_EN, PERMISSION_LABELS_KR, STRUCTURE_PERMISSIONS, type Permission } from "../rbac";
 import { countLabel, getDict, type Lang } from "../i18n";
 import { OPTION_TYPE_LABELS, OPTION_TYPE_LABELS_EN, OPTION_TYPE_LABELS_KR, isRegionScopedType, type OptionType } from "../db/schema";
 import { PARENT_TYPE } from "../lookup";
@@ -50,7 +49,7 @@ export type AdminUserRow = {
 
 type UsersProps = Common & {
   users: (AdminUserRow & { state_names?: string })[];
-  roles: { id: number; name: string; description: string | null }[];
+  roles: { id: number; name: string; description: string | null; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   editUser: (AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] }) | null;
   homeCells?: { id: number; name: string; regionId?: number }[];
@@ -78,13 +77,55 @@ function userForm(v: {
   active: number;
   mustChange: number;
 }, props: {
-  roles: { id: number; name: string }[];
+  /** Role permissions travel with each role, so the Permissions pane can show
+   *  what the ticked roles grant without a second lookup. */
+  roles: { id: number; name: string; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   homeCells: { id: number; name: string; regionId?: number }[];
-}, t: (k: string) => string) {
+}, t: (k: string) => string, PL: Record<string, string>) {
   const action = v.id ? `/admin/users/${v.id}` : "/admin/users";
+  // Every permission the ticked roles grant, with the role names that grant it:
+  // the Permissions pane answers "what may this account do, project-wide?"
+  // including what it may not. app.js keeps this in step while roles are ticked.
+  const grantedBy = new Map<string, string[]>();
+  for (const id of v.selectedRoles) {
+    const role = props.roles.find((r) => r.id === id);
+    if (!role) continue;
+    for (const p of role.permissions ?? []) {
+      const names = grantedBy.get(p) ?? [];
+      if (!names.includes(role.name)) names.push(role.name);
+      grantedBy.set(p, names);
+    }
+  }
+  // options.manage implies every structures.* permission (canManageStructure),
+  // so a role holding only options.manage must not read as denied here: the pane
+  // names that role and says the grant comes through options.manage.
+  const optionsRoles = grantedBy.get("options.manage") ?? [];
+  const impliedBy = new Map<string, string[]>();
+  if (optionsRoles.length > 0) {
+    for (const p of STRUCTURE_PERMISSIONS) {
+      if (!grantedBy.has(p)) impliedBy.set(p, optionsRoles);
+    }
+  }
+  const grantedCount = new Set([...grantedBy.keys(), ...impliedBy.keys()]).size;
+  const roleNames = props.roles.filter((r) => v.selectedRoles.includes(r.id)).map((r) => r.name).join(", ");
+  const stateNames = props.regions.filter((r) => v.selectedStates.includes(r.id)).map((r) => r.name);
+  const scopeText = v.allStates ? t("adm.allStates") : stateNames.join(", ") || "—";
+  const cellText = v.homeCellIds.length ? `${v.homeCellIds.length} / ${props.homeCells.length}` : "—";
+  // Shown on the info dot beside the password label instead of a permanent line
+  // under the field: it is a rule, not something to read while typing. A new
+  // account only has to change its first password when "Require password change
+  // on login" is ticked, so the forced-change sentence follows that box (app.js
+  // swaps it live; the server renders the matching one). A password set on an
+  // existing account always forces the change, so its hint keeps the sentence.
+  const pwBase = v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit");
+  // The edit hint already ends with the forced-change rule, so only the new
+  // account's text needs that sentence appended.
+  const pwForced = v.id === undefined ? `${pwBase} ${t("adm.passwordMustChangeNote")}` : pwBase;
+  const pwHint = v.id === undefined && v.mustChange !== 1 ? pwBase : pwForced;
   return (
-    <form method="post" action={action} class="user-form" data-flash-ok={v.id ? "user-updated" : "user-created"}>
+    <form method="post" action={action} class="user-form compact-form" data-user-form
+      data-flash-ok={v.id ? "user-updated" : "user-created"}>
       {/* Two short panes instead of one long sheet: identity and password on
           Account, everything about what the account may see on Access. */}
       <div class="position-tabs modal-form-tabs" data-tabs role="tablist" aria-label={t("adm.accountSection")}>
@@ -92,6 +133,9 @@ function userForm(v: {
           aria-selected="true">{t("adm.accountSection")}</button>
         <button type="button" role="tab" class="position-tab" data-tab-target="access"
           aria-selected="false">{t("adm.accessTab")}</button>
+        <button type="button" role="tab" class="position-tab" data-tab-target="perms"
+          aria-selected="false">{t("adm.permsTab")}<span class="tab-count" data-perm-count
+          >{grantedCount}/{PERMISSIONS.length}</span></button>
       </div>
       <div class="modal-form-panes" data-tabs-body>
         <section class="modal-form-pane" data-tab-pane="account" role="tabpanel">
@@ -99,9 +143,9 @@ function userForm(v: {
         <legend>{t("adm.accountSection")}</legend>
         <div class="form-grid">
           <label class="field">
-            <span class="lbl">Username {v.id === undefined && "*"}</span>
+            <span class="lbl">{t("profile.username")} {v.id === undefined && "*"}</span>
             <input type="text" name="username" value={v.username} required={v.id === undefined}
-              pattern="[A-Za-z0-9_.\-]{3,32}" title="အက္ခရာ/ဂဏန်း 3-32" />
+              pattern="[A-Za-z0-9_.\-]{3,32}" title={t("adm.usernameRule")} />
           </label>
           <label class="field">
             <span class="lbl">{t("profile.displayName")}</span>
@@ -118,24 +162,35 @@ function userForm(v: {
             </select>
             <span class="hint">{t("adm.languageHint")}</span>
           </label>
-        </div>
-      </fieldset>
-      <fieldset class="form-section">
-        <legend>{t("adm.passwordSection")}</legend>
-        <p class="hint">{v.id === undefined ? t("adm.passwordHintNew") : t("adm.passwordHintEdit")}</p>
-        <div class="field">
-          <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
-          <div class="pw-row">
-            <span class="pw-wrap">
-              <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
-                autocomplete="new-password"
-                data-strength="1"
-                data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
-              <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+          {/* Password shares the row with Language: at a half-width cell the
+              Generate button drops under the input (see .pw-field), which keeps
+              the sheet one section shorter than a full password block. */}
+          <div class="field pw-field">
+            <span class="lbl-row">
+              <label class="lbl" for="user-password">{v.id === undefined ? t("adm.initialPw") : t("adm.newPw")}</label>
+              <span class="field-tip" data-tip={pwHint}
+                data-tip-on={v.id === undefined ? pwForced : undefined}
+                data-tip-off={v.id === undefined ? pwBase : undefined}>
+                <button type="button" class="field-tip-btn" aria-label={pwHint}>i</button>
+              </span>
             </span>
-            <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+            <div class="pw-row">
+              <span class="pw-wrap">
+                <input type="password" id="user-password" name={v.id === undefined ? "password" : "new_password"}
+                  autocomplete="new-password"
+                  data-strength="1"
+                  data-labels={[t("pw.0"), t("pw.1"), t("pw.2"), t("pw.3"), t("pw.4")]} />
+                <PwToggle id="user-password" showLabel={t("login.showPassword")} hideLabel={t("login.hidePassword")} />
+              </span>
+              <span class="pw-actions">
+                <button class="btn secondary" type="button" data-gen-password="user-password">{t("adm.generatePassword")}</button>
+                {/* app.js fills this with the strength meter, so the bars sit
+                    beside Generate instead of under the input. */}
+                <span class="pw-strength-slot" data-strength-slot></span>
+              </span>
+            </div>
+            <CapsHint label={t("pw.capsLock")} />
           </div>
-          <CapsHint label={t("pw.capsLock")} />
         </div>
       </fieldset>
       <fieldset class="form-section">
@@ -157,6 +212,7 @@ function userForm(v: {
           {props.roles.map((r) => (
             <label class="check-chip">
               <input type="checkbox" name="roles" value={String(r.id)}
+                data-role-name={r.name} data-role-perms={(r.permissions ?? []).join(" ")}
                 checked={v.selectedRoles.includes(r.id)} /> <span>{r.name}</span>
             </label>
           ))}
@@ -194,6 +250,42 @@ function userForm(v: {
         <p class="hint" data-cell-scope-empty hidden>{t("adm.noCellForState")}</p>
       </fieldset>
         </section>
+        <section class="modal-form-pane" data-tab-pane="perms" role="tabpanel">
+      <p class="perm-summary">
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("nav.roles")}</span>
+          <strong>{roleNames || "—"}</strong></span>
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("adm.stateScope")}</span>
+          <strong>{scopeText}</strong></span>
+        <span class="perm-summary-item"><span class="perm-summary-key">{t("adm.homeCellScope")}</span>
+          <strong>{cellText}</strong></span>
+      </p>
+      <div class="perm-groups perm-groups-compact" data-perm-preview data-perm-via={t("adm.permViaOptions")}>
+        {permissionGroups().map((g) => (
+          <div class="perm-group">
+            <p class="perm-group-label">{t(g.labelKey)}</p>
+            <div class="perm-list perm-list-rows">
+              {g.permissions.map((p) => {
+                const direct = grantedBy.get(p) ?? [];
+                const implied = direct.length > 0 ? [] : impliedBy.get(p) ?? [];
+                const on = direct.length > 0 || implied.length > 0;
+                const by = direct.length > 0
+                  ? direct.join(", ")
+                  : implied.length > 0 ? `${implied.join(", ")} · ${t("adm.permViaOptions")}` : "";
+                return (
+                  <div class={`perm-row ${on ? "is-on" : "is-off"}`} data-perm-row={p}>
+                    <span class="perm-mark" aria-hidden="true">{on ? "✓" : "–"}</span>
+                    <span class="perm-name">{PL[p]}</span>
+                    <span class="perm-code">{p}</span>
+                    <span class="perm-by" data-perm-by>{by}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="hint">{t("adm.permsHint")}</p>
+        </section>
       </div>
       <div class="actions">
         <button class="btn" type="submit">{v.id ? t("form.save") : t("adm.create")}</button>
@@ -202,12 +294,19 @@ function userForm(v: {
   );
 }
 
+/** Permission labels in the active UI language. The role editor and the user
+ *  form's Permissions pane read the same three tables. */
+function permLabels(lang?: Lang): Record<string, string> {
+  return (lang ?? "en") === "mm" ? PERMISSION_LABELS
+    : (lang ?? "en") === "kr" ? PERMISSION_LABELS_KR : PERMISSION_LABELS_EN;
+}
+
 /** Bare user form (no Layout) — served for the add/edit modal?modal=1 fetch and
  * reused by error responses inside the same modal. */
 export function UserFormFragment(props: {
   lang?: Lang; errors: string[]; modal?: boolean;
   values: { id?: number; username: string; displayName: string; language: string; allStates: boolean; selectedRoles: number[]; selectedStates: number[]; homeCellIds?: number[]; active: number; mustChange: number };
-  roles: { id: number; name: string }[]; regions: { id: number; name: string }[];
+  roles: { id: number; name: string; permissions?: string[] }[]; regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string; regionId?: number }[];
 }) {
   const t = getDict(props.lang ?? "en");
@@ -220,7 +319,7 @@ export function UserFormFragment(props: {
         </div>
       )}
       {userForm({ ...props.values, homeCellIds: props.values.homeCellIds ?? [] },
-        { roles: props.roles, regions: props.regions, homeCells: props.homeCells ?? [] }, t)}
+        { roles: props.roles, regions: props.regions, homeCells: props.homeCells ?? [] }, t, permLabels(props.lang))}
     </>
   );
 }
@@ -274,20 +373,15 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="row-actions-cell" data-label="">
                   <div class="row-icon-actions">
                     {u.id !== user.id
-                      ? <>
-                          <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
-                            data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
-                            title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
-                          {/* One click issues a random password and shows it once. */}
-                          <form method="post" action={`/admin/users/${u.id}/reset-password`} data-reset-password
-                            data-modal-title={t("adm.resetPasswordTitle")}
-                            data-intro={t("adm.resetPasswordIntro")}
-                            data-copy-label={t("adm.resetPasswordCopy")}>
-                            <button class="btn sm secondary icon-btn" type="submit"
-                              title={t("adm.resetPassword")} aria-label={t("adm.resetPassword")}><KeyIcon /></button>
-                          </form>
-                        </>
+                      ? <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
+                           data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
+                           title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
                       : <span class="muted" title={t("adm.selfEdit")}>—</span>}
+                    {u.id !== user.id && (
+                      <form method="post" action={`/admin/users/${u.id}/reset-password`} class="row-reset-form">
+                        <button class="btn sm secondary" type="submit">{t("adm.resetPassword")}</button>
+                      </form>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -302,7 +396,7 @@ export function AdminUsersPage(props: UsersProps) {
           {editErrors.length > 0 && (
             <div class="flash err"><ul class="err-list">{editErrors.map((e) => <li>{e}</li>)}</ul></div>
           )}
-          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", language: editUser.language ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t)}
+          {userForm({ id: editUser.id, username: editUser.username, displayName: editUser.display_name ?? "", language: editUser.language ?? "", allStates: editUser.allStates, selectedRoles: editUser.selectedRoles, selectedStates: editUser.selectedStates, homeCellIds: editUser.selectedHomeCells ?? [], active: editUser.active, mustChange: editUser.must_change_password }, { roles, regions, homeCells: props.homeCells ?? [] }, t, permLabels(lang))}
         </div>
       )}
 
@@ -310,9 +404,38 @@ export function AdminUsersPage(props: UsersProps) {
   );
 }
 
+/** The temporary password is rendered exactly once, straight from the reset
+ *  request's response: it is never stored, put in a URL, or listed again. */
+export function TempPasswordPage(props: Common & { username: string; tempPassword: string }) {
+  const t = getDict(props.lang ?? "en");
+  return (
+    <Layout title={t("adm.resetTitle")} lang={props.lang} user={props.user} perms={props.perms}
+      active="/admin/users" flash={props.flash ?? null}>
+      <div class="page-head">
+        <h1>{t("adm.resetTitle")}</h1>
+        <a class="btn secondary" href="/admin/users">{t("members.toList")}</a>
+      </div>
+      {/* The page is the answer to a POST: the script points this history entry
+          at the list, so a refresh shows the list instead of re-issuing a
+          password. */}
+      <div class="card" data-reset-result="/admin/users">
+        <p>{t("adm.resetFor")} <strong>{props.username}</strong></p>
+        <div class="temp-pw-row">
+          <p class="temp-pw">{props.tempPassword}</p>
+          <button type="button" class="btn secondary"
+            data-copy-text={props.tempPassword} data-copy-done={t("adm.copied")}>{t("adm.copy")}</button>
+        </div>
+        {/* The button itself flips to "Copied"; this line only announces it. */}
+        <p class="sr-only" aria-live="polite" data-copy-status></p>
+        <p class="hint">{t("adm.resetOnce")}</p>
+      </div>
+    </Layout>
+  );
+}
+
 export function AdminUserEditPage(props: Common & {
   editUser: AdminUserRow & { allStates: boolean; selectedRoles: number[]; selectedStates: number[]; selectedHomeCells: number[] };
-  roles: { id: number; name: string; description: string | null }[];
+  roles: { id: number; name: string; description: string | null; permissions?: string[] }[];
   regions: { id: number; name: string }[];
   homeCells?: { id: number; name: string }[];
   editErrors: string[];
@@ -374,6 +497,14 @@ function permissionGroups(): { labelKey: string; permissions: Permission[] }[] {
   return groups;
 }
 
+/** Structure permissions a role may use only because it holds options.manage.
+ *  The list and the editor show them so neither reads as missing what the app
+ *  actually grants (canManageStructure). */
+function impliedStructurePerms(r: { permissions: string[] }): Permission[] {
+  if (!r.permissions.includes("options.manage")) return [];
+  return STRUCTURE_PERMISSIONS.filter((p) => !r.permissions.includes(p));
+}
+
 function permCheckboxes(role: { id: number; permissions: string[] } | null, labels: Record<string, string>) {
   return (
     <div class="form-grid" style="margin-top:8px">
@@ -415,7 +546,7 @@ export function RoleFormFragment(props: {
         <label class="field">
           <span class="lbl">{t("adm.roleName")} {isNew && "*"}</span>
           <input type="text" name="name" value={isNew ? v.name ?? "" : role?.name ?? ""}
-            required={isNew} maxLength={60} readOnly={!isNew && role?.is_system === 1}
+            required={isNew} maxLength={60} readOnly={!isNew && role?.is_system === 1 ? true : undefined}
             title={!isNew && role?.is_system === 1 ? t("adm.roleSystemLocked") : undefined} />
           <span class="field-hint">{isNew ? t("adm.roleNameHint") : role?.is_system === 1 ? t("adm.roleSystemLocked") : t("adm.roleNameHint")}</span>
         </label>
@@ -431,13 +562,19 @@ export function RoleFormFragment(props: {
             <div class="perm-group">
               <p class="perm-group-label">{t(g.labelKey)}</p>
               <div class="perm-list">
-                {g.permissions.map((p) => (
-                  <label class="field" style="font-size:14px">
-                    <input type="checkbox" name="permissions" value={p}
-                      checked={perms.includes(p)} /> {PL[p]}
-                    <span class="hint"> ({p})</span>
-                  </label>
-                ))}
+                {g.permissions.map((p) => {
+                  // options.manage already grants it; a checked disabled box shows
+                  // that without persisting a redundant explicit row on save.
+                  const implied = role !== null && !perms.includes(p)
+                    && p.startsWith("structures.") && perms.includes("options.manage");
+                  return (
+                    <label class="field" style="font-size:14px">
+                      <input type="checkbox" name="permissions" value={p}
+                        checked={perms.includes(p) || implied} disabled={implied ? true : undefined} /> {PL[p]}
+                      <span class="hint"> ({p}{implied ? ` · ${t("adm.permViaOptions")}` : ""})</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -506,7 +643,7 @@ export function AdminRolesPage(props: RolesProps) {
                 <td class="muted" data-label="ID">{r.id}</td>
                 <td data-label={t("adm.roleName")}>
                   {roleName(r, t)}
-                  {r.is_system === 1 && <span class="badge" style="margin-left:6px">system</span>}
+                  {r.is_system === 1 && <span class="badge" style="margin-left:6px">{t("adm.systemBadge")}</span>}
                   {(r.user_count ?? 0) > 0 && (
                     <span class="hint" style="display:block;font-size:12px">
                       {countLabel(t, "adm.roleUsers", r.user_count ?? 0)}
@@ -515,13 +652,22 @@ export function AdminRolesPage(props: RolesProps) {
                 </td>
                 <td class="small muted" data-label={t("adm.desc")}>{roleDescription(r, t)}</td>
                 <td class="small" data-label={t("adm.permissions")}>
-                  {r.permissions.length === 0
+                  {r.permissions.length === 0 && impliedStructurePerms(r).length === 0
                     ? <span class="muted">—</span>
-                    : r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
+                    : (
+                      <>
+                        {r.permissions.map((p) => <span class="badge" style="margin-right:4px">{PL[p as keyof typeof PL] ?? p}</span>)}
+                        {impliedStructurePerms(r).map((p) => (
+                          <span class="badge" style="margin-right:4px" title={t("adm.permViaOptions")}>
+                            {PL[p]} <span class="muted">· {t("adm.permViaOptions")}</span>
+                          </span>
+                        ))}
+                      </>
+                    )}
                 </td>
                 <td data-label={t("members.status")}>
                   {r.is_system === 1
-                    ? <span class="badge active">system</span>
+                    ? <span class="badge active">{t("adm.systemBadge")}</span>
                     : <span class="badge inactive">—</span>}
                 </td>
                 <td class="row-actions-cell" data-label="">

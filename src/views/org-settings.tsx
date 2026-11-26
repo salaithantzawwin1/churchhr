@@ -513,7 +513,7 @@ export function RegionalChurchModal(props: {
       {cellError && <div class="modal-error" role="alert">{cellError}</div>}
       {/* One form and one Save, matching the cluster editor: details and Home
           Cell attachment are written together instead of two separate saves. */}
-      <form method="post" class="cluster-main-form"
+      <form method="post" class="cluster-main-form compact-form"
         action={church ? `/organization/regional-churches/${church.id}` : "/organization/regional-churches"} data-modal-ajax>
         {church ? (
           <>
@@ -591,7 +591,16 @@ export function RegionalChurchModal(props: {
               </div>
             </form>
           ) : (
-            <p class="muted small modal-note">{t("org.deleteRegionalHint")}</p>
+            /* The delete action is blocked by the church's Home Cells or
+               positions: show the button greyed out with the reason beside it
+               instead of a lone sentence with no action to explain. */
+            <div class="actions modal-delete-blocked">
+              <button class="btn sm outline-danger" type="button" disabled
+                title={t("org.deleteRegionalHint")} aria-describedby="regional-delete-hint">
+                {t("members.delete")}
+              </button>
+              <p class="muted small modal-note" id="regional-delete-hint">{t("org.deleteRegionalHint")}</p>
+            </div>
           )}
         </div>
       )}
@@ -668,16 +677,25 @@ export function RegionalChurchesPage(props: Common & {
         {cells.length === 0 ? (
           <p class="muted small regional-attached-empty">{t("org.regionalNoCells")}</p>
         ) : (
-          <div class="regional-attached">
-            {attachedGroups.map((group) => (
-              <div class="regional-township-line">
-                <span class="town">{group.name}</span>
-                {group.cells.map((cell) => (
-                  <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
-                ))}
-              </div>
-            ))}
-          </div>
+          /* Closed by default so a church stays one readable row until its
+             cells are actually asked for. */
+          <details class="regional-attached">
+            <summary>
+              <span class="chev" aria-hidden="true">▾</span>
+              <span>{t("org.cells")}</span>
+              <span class="regional-attached-count">{cells.length}</span>
+            </summary>
+            <div class="regional-attached-body">
+              {attachedGroups.map((group) => (
+                <div class="regional-township-line">
+                  <span class="town">{group.name}</span>
+                  {group.cells.map((cell) => (
+                    <a class="regional-cell-chip" href={`/members?home_cell=${cell.id}`}>{cell.label}</a>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </details>
         )}
 
         {canUpdate && (
@@ -686,6 +704,7 @@ export function RegionalChurchesPage(props: Common & {
               class="btn sm secondary js-edit-modal"
               href={`/organization/regional-churches/${church.id}/edit`}
               data-modal-title={t("org.editRegional")}
+              data-modal-size="md"
             >{t("members.edit")}</a>
           </div>
         )}
@@ -707,6 +726,7 @@ export function RegionalChurchesPage(props: Common & {
               class="btn js-add-modal"
               href="/organization/regional-churches/new"
               data-modal-title={t("org.addRegional")}
+              data-modal-size="md"
             >+ {t("org.addRegional")}</a>
           )}
           <a class="btn secondary" href="/organization?tab=regional">{t("dept.back")}</a>

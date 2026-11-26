@@ -136,6 +136,11 @@ export const PERMISSION_LABELS_EN: Record<Permission, string> = {
   "audit.view": "View audit log",
 };
 
+/** The permissions options.manage implies. canManageStructure reads the same
+ * rule, so anywhere the UI describes an account's rights it has to expand it —
+ * otherwise a legacy or custom role holding only options.manage looks denied. */
+export const STRUCTURE_PERMISSIONS = PERMISSIONS.filter((p) => p.startsWith("structures."));
+
 /** May this permission set perform a structure action (Home Cell, Family Group,
  * Township, Cluster, Regional Church)? options.manage still implies all of them,
  * which is what the seeded system roles carry. */

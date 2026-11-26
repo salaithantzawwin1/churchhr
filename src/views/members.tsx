@@ -2,17 +2,23 @@ import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
 import type { OptionRow } from "../lookup";
-import { ageFromDate, optionLabel, optionText, qs, todayInYangon } from "../util";
+import { ageFromDate, formatPhone, optionLabel, optionText, qs, todayInYangon } from "../util";
 import { BLOOD_TYPES, GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { getDict, pluralLabel, type Lang } from "../i18n";
 import { HOPE_SCHOOL } from "../pastor-children";
 import type { EnrolmentRow } from "../student-enrolments";
 import { MemberEducationCard } from "./student-education";
-import { positionLabels } from "../positions";
+import { positionLabel, positionLabels, positionScope } from "../positions";
 import { defsForScope, isPastorPositionCode, positionDefLabel, positionLabelForCode, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { clusterName, regionalChurchName, type RegionalChurchRow, type SupervisionClusterRow } from "../org-units";
 import { departmentName, type DepartmentRow } from "../departments";
 import { EditIcon, TrashIcon } from "./action-icons";
+import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
+import { DuplicateWarning, type DuplicateCandidate } from "./duplicate-warning";
+import { Pager } from "./pager";
+
+/** Re-exported so route modules keep importing it from the members view. */
+export type { DuplicateCandidate };
 
 export type MemberListItem = {
   id: number;
@@ -55,6 +61,8 @@ export type Filters = {
   gender: string;
   status: string;
   homeCell: number | null;
+  /** Filter from a church overview: members whose Home Cell belongs to it. */
+  church: number | null;
   department: number | null;
   group: number | null;
   fellowship: number | null;
@@ -78,6 +86,8 @@ type ListProps = Common & {
   dir: "asc" | "desc";
   regions: { id: number; name: string }[];
   homeCells: OptionRow[];
+  /** Name of the church behind the optional church filter, for its chip. */
+  churchName?: string | null;
   departments: DepartmentRow[];
   groups: OptionRow[];
   fellowships: OptionRow[];
@@ -91,7 +101,7 @@ type ListProps = Common & {
 function filterQs(f: Filters, page?: number): string {
   return qs({
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    home_cell: f.homeCell, church: f.church, department: f.department, group: f.group, fellowship: f.fellowship,
     age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
     page: page ?? null,
   });
@@ -99,7 +109,7 @@ function filterQs(f: Filters, page?: number): string {
 
 /** True when any list filter is narrowing the result set. */
 function hasFilters(f: Filters): boolean {
-  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing || f.school);
+  return Boolean(f.q.trim() || f.state || f.gender || f.status || f.homeCell || f.church || f.department || f.group || f.fellowship || f.ageGroup || f.familyGroup || f.missing || f.school);
 }
 
 /** Filter/pagination query plus the current sort, for header sort links. */
@@ -138,7 +148,7 @@ const LIST_COLS = (t: (k: string) => string) => [
 ];
 
 export function MembersListPage(props: ListProps) {
-  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, departments, groups, fellowships, lang, positionDefs, ageGroups } = props;
+  const { user, perms, flash, rows, total, page, pages, filters: f, sort, dir, regions, homeCells, churchName, departments, groups, fellowships, lang, positionDefs, ageGroups } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   // Korean uses the English data labels (region names etc.); only MM differs.
@@ -153,16 +163,42 @@ export function MembersListPage(props: ListProps) {
   const canImport = perms.has("members.import");
   const cols = LIST_COLS(t);
   const colLabel = (key: string) => cols.find((c) => c.key === key)?.label ?? "";
-  const roleLabels = (csv: string | null | undefined) =>
-    positionDefs ? positionLabelsForCsv(positionDefs, csv, L) : positionLabels(csv, L);
-  const roleBadges = (csv: string | null | undefined) => roleLabels(csv).map((label) => (
-    <span class="badge position">{label}</span>
-  ));
+  const roleEntries = (csv: string | null | undefined) =>
+    (csv ?? "").split(",").map((v) => v.trim()).filter(Boolean).map((code) => ({
+      code,
+      label: positionDefs ? positionLabelForCode(positionDefs, code, L) : positionLabel(code, L),
+    }));
+  /** Member-form tab that holds a position, so its chip opens the right pane. */
+  const POSITION_TAB: Record<string, string> = {
+    home_cell: "home", township: "supervision", cluster: "supervision",
+    region: "regional", department: "department", church: "church",
+  };
+  const positionHref = (memberId: number, code: string) => {
+    const def = positionDefs?.find((d) => d.code === code);
+    const scope = def?.scopeType ?? positionScope(code);
+    const tab = scope ? POSITION_TAB[scope] : null;
+    return `/members/${memberId}/position${tab ? `?tab=${tab}` : ""}`;
+  };
+  // The chip itself is the way in: clicking a member's position opens the same
+  // dialog on the tab that holds it, so no separate Change link is needed.
+  const roleBadges = (csv: string | null | undefined, edit?: { memberId: number }) =>
+    roleEntries(csv).map(({ code, label }) => edit ? (
+      <a
+        class="badge position position-edit-badge js-edit-modal"
+        href={positionHref(edit.memberId, code)}
+        data-modal-title={t("org.assignTitle")}
+        data-modal-size="md"
+        title={`${t("org.changePosition")}: ${label}`}
+        aria-label={`${t("org.changePosition")}: ${label}`}
+      >{label}</a>
+    ) : (
+      <span class="badge position">{label}</span>
+    ));
   const filtered = hasFilters(f);
   /** Current list query, used to build "remove this filter" links. */
   const activeParams = {
     q: f.q, state: f.state, gender: f.gender, status: f.status,
-    home_cell: f.homeCell, department: f.department, group: f.group, fellowship: f.fellowship,
+    home_cell: f.homeCell, church: f.church, department: f.department, group: f.group, fellowship: f.fellowship,
     age_group: f.ageGroup, family_group: f.familyGroup, missing: f.missing, school: f.school,
     sort: sort || null, dir: sort ? dir : null,
   };
@@ -185,6 +221,7 @@ export function MembersListPage(props: ListProps) {
     const cell = homeCells.find((o) => o.id === f.homeCell);
     if (cell) chips.push({ label: cell.label, href: withoutFilter("home_cell") });
   }
+  if (f.church) chips.push({ label: churchName ?? t("org.church"), href: withoutFilter("church") });
   if (f.department) {
     const department = departments.find((d) => d.id === f.department);
     if (department) chips.push({ label: departmentName(department, L), href: withoutFilter("department") });
@@ -241,11 +278,22 @@ export function MembersListPage(props: ListProps) {
         </div>
       </div>
 
-      <details class={chips.length > 0 ? "filter-box filter-toolbar-box has-filters" : "filter-box filter-toolbar-box"} open>
-      <summary>
-        <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
-              {chips.length > 0 && (                <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>                  {chips.map((c) => c.label).join(" · ")}                </span>              )}        <span class="chev" aria-hidden="true">▾</span>
-      </summary>
+      {/* data-remember: app.js keeps the fold the clerk chose at any width, so a
+          laptop can put the filter grid away and keep it away while paging. */}
+      <details
+        class={`filter-box filter-toolbar-box members-filter-box${chips.length > 0 ? " has-filters" : ""}`}
+        data-remember
+        open
+      >
+        <summary>
+          <span>{t("members.filters")}{chips.length > 0 && <span class="filter-count">{chips.length}</span>}</span>
+          {chips.length > 0 && (
+            <span class="filter-peek" title={chips.map((c) => c.label).join(" · ")}>
+              {chips.map((c) => c.label).join(" · ")}
+            </span>
+          )}
+          <span class="chev" aria-hidden="true">▾</span>
+        </summary>
       <form class="filter-toolbar members-filter" method="get" action="/members" data-auto-submit="1">
         <input type="search" name="q" value={f.q} placeholder={t("members.searchPlaceholder")}
           aria-label={t("members.search")} enterkeyhint="search" />
@@ -306,6 +354,7 @@ export function MembersListPage(props: ListProps) {
             <option value={String(o.id)} selected={f.fellowship === o.id}>{o.label}</option>
           ))}
         </select>
+        {f.church && <input type="hidden" name="church" value={String(f.church)} />}
         {f.familyGroup && <input type="hidden" name="family_group" value={String(f.familyGroup)} />}
         {f.missing && <input type="hidden" name="missing" value={f.missing} />}
         {sort && <input type="hidden" name="sort" value={sort} />}
@@ -406,11 +455,11 @@ export function MembersListPage(props: ListProps) {
                   {m.name_myanmar && m.name_english && <span class="muted small" style="margin-left:6px">{m.name_english}</span>}
                   {(m.positions || canUpdate) && (
                     <span class="member-role-inline">
-                      {roleBadges(m.positions)}
-                      {canUpdate && (
+                      {roleBadges(m.positions, canUpdate ? { memberId: m.id } : undefined)}
+                      {canUpdate && !m.positions && (
                         <a class="position-edit js-edit-modal" href={`/members/${m.id}/position`}
                           data-modal-title={t("org.assignTitle")} data-modal-size="md">
-                          {m.positions ? t("org.change") : t("org.assign")}
+                          {t("org.assign")}
                         </a>
                       )}
                     </span>
@@ -418,7 +467,7 @@ export function MembersListPage(props: ListProps) {
                 </td>
                 <td data-col="gender" data-label={colLabel("gender")}>{m.gender ? (G[m.gender] ?? m.gender) : ""}</td>
                 <td data-col="age" data-label={colLabel("age")}>{ageFromDate(m.date_of_birth) ?? ""}</td>
-                <td data-col="phone" data-label={colLabel("phone")}>{m.phone ?? ""}</td>
+                <td data-col="phone" data-label={colLabel("phone")}>{formatPhone(m.phone)}</td>
                 <td data-col="state" data-label={colLabel("state")}>{isEn && m.state_name_en ? m.state_name_en : m.state_name}</td>
                 <td data-col="township" data-label={colLabel("township")}>{m.township ?? ""}</td>
                 <td data-col="school" data-label={colLabel("school")} class="school-cell">
@@ -440,14 +489,16 @@ export function MembersListPage(props: ListProps) {
                 <td data-col="marital" data-label={colLabel("marital")}>{m.marital_status ? (M[m.marital_status] ?? m.marital_status) : ""}</td>
                 <td data-col="homeCell" data-label={colLabel("homeCell")}>{m.home_cell ?? ""}</td>
                 <td data-col="role" class="position-cell" data-label={colLabel("role")}>
-                  {m.positions ? roleBadges(m.positions) : <span class="muted small">—</span>}
-                  {canUpdate && (
+                  {m.positions
+                    ? roleBadges(m.positions, canUpdate ? { memberId: m.id } : undefined)
+                    : <span class="muted small">—</span>}
+                  {canUpdate && !m.positions && (
                     <a
                       class="position-edit js-edit-modal"
                       href={`/members/${m.id}/position`}
                       data-modal-title={t("org.assignTitle")}
-                      data-modal-size="sm"
-                    >{m.positions ? t("org.change") : t("org.assign")}</a>
+                      data-modal-size="md"
+                    >{t("org.assign")}</a>
                   )}
                 </td>
                 <td data-col="group" data-label={colLabel("group")}>{m.group_label ?? ""}</td>
@@ -478,22 +529,23 @@ export function MembersListPage(props: ListProps) {
         </table>
       </div>
 
-      {pages > 1 && (
-        <div class="actions" style="justify-content:center">
-          {page > 1 && <a class="btn secondary" href={`/members${filterQs(f, page - 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.prev")}</a>}
-          <span class="muted">{t("members.page")} {page} / {pages}</span>
-          {page < pages && <a class="btn secondary" href={`/members${filterQs(f, page + 1)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`}>{t("members.next")}</a>}
-        </div>
-      )}
+      <Pager page={page} pages={pages} lang={lang}
+        href={(n) => `/members${filterQs(f, n)}${sort && SORTABLE.has(sort) ? `&sort=${sort}&dir=${dir}` : ""}`} />
     </Layout>
   );
 }
 
 export type FormValues = Record<string, string>;
+
 type FormProps = Common & {
   values: FormValues;
   errors: string[];
   member: { id: number; photoUrl?: string } | null;
+  /** Photo already uploaded in this save attempt; kept when the form is
+   *  re-rendered, so a duplicate warning does not throw the image away. */
+  photoData?: string;
+  /** Possible duplicates found on the last save attempt. */
+  duplicates?: DuplicateCandidate[];
   regions: { id: number; name: string }[];
   options: Record<string, OptionRow[]>;
   departments: DepartmentRow[];
@@ -505,6 +557,8 @@ function opts(
   townshipLabelById?: Map<number, string>,
   /** Family Groups show their label only; the generated code is long/redundant. */
   labelOnly = false,
+  /** Home Cells: cluster id -> display name, read out under the field. */
+  clusterLabelById?: Map<number, string>,
 ) {
   return (
     <>
@@ -519,7 +573,9 @@ function opts(
         return (
           <option value={String(o.id)} selected={selected === String(o.id)}
             data-region={o.regionId === 0 ? "" : String(o.regionId)}
-            data-parent={parent}>{labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}</option>
+            data-parent={parent}
+            data-cluster={clusterLabelById && o.type === "home_cell" ? (clusterLabelById.get(o.id) ?? "") : undefined}>
+            {labelOnly ? optionLabel(o.code, o.label) : optionText(o.code, o.label)}</option>
         );
       })}
     </>
@@ -568,7 +624,7 @@ export function MemberFormPage(props: FormProps) {
 
 /** Bare form (no Layout) — used by the full page and by the ?modal=1 edit modal. */
 export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
-  const { values: v, errors, member, regions, options, departments, lang, modal } = props;
+  const { values: v, errors, member, regions, options, departments, lang, modal, photoData, duplicates = [] } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const isEn = L !== "mm";
@@ -577,12 +633,20 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
   const S = L === "mm" ? STATUSES : L === "kr" ? STATUSES_KR : STATUSES_EN;
   const action = member ? `/members/${member.id}` : "/members";
   const edit = member !== null;
-  const photoUrl = member?.photoUrl;
+  const photoUrl = photoData || member?.photoUrl;
   const initial = Array.from((v.name_myanmar || v.name_english || "?").trim())[0] ?? "?";
   const dob = v.date_of_birth || "";
   const townshipLabelById = new Map(
     (options.township ?? []).map((o) => [o.id, o.label] as const),
   );
+  // A cell belongs to at most one supervision cluster, so that cluster is not
+  // something to pick here — the form only states which one the cell is in.
+  const clusterLabelById = new Map(
+    (options.home_cell ?? [])
+      .filter((o) => o.clusterName || o.clusterNameEn)
+      .map((o) => [o.id, ((isEn ? o.clusterNameEn || o.clusterName : o.clusterName) ?? "")] as const),
+  );
+  const cellCluster = v.home_cell_id ? (clusterLabelById.get(Number(v.home_cell_id)) ?? "") : "";
   return (
     <>
       {errors.length > 0 && (
@@ -593,6 +657,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
       )}
       <form method="post" action={action} data-flash-ok="member-updated">
         {modal && <input type="hidden" name="from_modal" value="1" />}
+        <DuplicateWarning duplicates={duplicates} lang={lang} />
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="photo-field" data-photo-field data-initial={initial}
@@ -618,7 +683,7 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
               </div>
               <p class="hint">{t("form.photoHint")}</p>
               <p class="photo-status" data-photo-status role="status"></p>
-              <input type="hidden" name="photo_data" data-photo-data />
+              <input type="hidden" name="photo_data" data-photo-data value={photoData ?? ""} />
             </div>
           </div>
           <div class="form-grid">
@@ -712,7 +777,14 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
                 )}
               </select>
             </label>
-            <label class="field"><span class="lbl">{t("form.homeCell")}</span><select name="home_cell_id" data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById)}</select></label>
+            <label class="field">
+              <span class="lbl">{t("form.homeCell")} <span class="req">*</span></span>
+              <select name="home_cell_id" required data-region-filter="1" data-parent-filter="township">{opts(options.home_cell ?? [], v.home_cell_id ?? "", t("form.choose"), townshipLabelById, false, clusterLabelById)}</select>
+              {/* Read-only: the cluster follows from the cell, it is not a choice. */}
+              <span class="hint cluster-hint" data-cluster-hint="1" data-label={t("form.cluster")} hidden={!cellCluster}>
+                {cellCluster ? `${t("form.cluster")}: ${cellCluster}` : ""}
+              </span>
+            </label>
             <label class="field">
               <span class="lbl">{t("form.department")}</span>
               <select name="department_id">
@@ -737,6 +809,13 @@ export function MemberFormFragment(props: FormProps & { modal?: boolean }) {
           {modal
             ? <button class="btn secondary" type="button" data-close="1">{t("form.cancel")}</button>
             : <a class="btn secondary" href={edit ? `/members/${member!.id}` : "/members"}>{t("form.cancel")}</a>}
+          {/* Entering a batch of new members: save this one and come straight
+              back to an empty form instead of the new member's page. */}
+          {!modal && !edit && (
+            <button class="btn secondary" type="submit" name="intent" value="add_another" formnovalidate={false}>
+              {t("form.addAnother")}
+            </button>
+          )}
           <button class="btn" type="submit">{edit ? t("form.save") : t("form.add")}</button>
         </div>
       </form>
@@ -781,11 +860,13 @@ type PositionFormProps = {
   canManagePositions: boolean;
   canManageRegional: boolean;
   error?: string | null;
+  /** Tab to open first; a position chip opens the tab that holds it. */
+  initialTab?: string | null;
   lang?: Lang;
 };
 
 export function MemberPositionPage(props: Common & PositionFormProps) {
-  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional } = props;
+  const { user, perms, flash, lang, member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, initialTab } = props;
   const t = getDict(lang ?? "en");
   return (
     <Layout title={t("org.assignTitle")} lang={lang} user={user} perms={perms} active="/members" flash={flash ?? null}>
@@ -798,7 +879,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
           member={member} assignments={assignments} departments={departments}
           positionDefs={positionDefs} regionalChurches={regionalChurches} clusters={clusters}
           canManageDepartments={canManageDepartments} canManagePositions={canManagePositions}
-          canManageRegional={canManageRegional} lang={lang}
+          canManageRegional={canManageRegional} initialTab={initialTab} lang={lang}
         />
       </div>
     </Layout>
@@ -806,7 +887,7 @@ export function MemberPositionPage(props: Common & PositionFormProps) {
 }
 
 export function MemberPositionForm(props: PositionFormProps) {
-  const { member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, error, lang } = props;
+  const { member, assignments, departments, positionDefs, regionalChurches, clusters, canManageDepartments, canManagePositions, canManageRegional, error, initialTab, lang } = props;
   const L = lang ?? "en";
   const t = getDict(L);
   const initial = member.name.trim().charAt(0) || "?";
@@ -844,7 +925,7 @@ export function MemberPositionForm(props: PositionFormProps) {
     { key: "department", label: t("org.tabDepartment"), available: departmentDefs.length > 0 || departments.length > 0 },
     { key: "church", label: t("org.tabChurch"), available: churchDefs.length > 0 },
   ].filter((x) => x.available);
-  const firstTab = tabs[0]?.key ?? "home";
+  const firstTab = tabs.find((x) => x.key === initialTab)?.key ?? tabs[0]?.key ?? "home";
 
   const managePositions = (scope: string) => canManagePositions && (
     <p class="hint">
@@ -881,25 +962,33 @@ export function MemberPositionForm(props: PositionFormProps) {
           </div>
         </div>
       </div>
-      <p class="hint position-intro">{t("org.positionIntro")}</p>
       {error && <div class="flash err">{error}</div>}
       <form method="post" action={`/members/${member.id}/position`} data-flash-ok="member-position">
-        <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
-          {tabs.map((tab) => (
-            <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
-              data-tab-target={tab.key} aria-selected={tab.key === firstTab ? "true" : "false"}>
-              {tab.label}
-            </button>
-          ))}
+        {/* Keeps the pane the dialog was opened on when the save comes back with
+            a validation error. */}
+        <input type="hidden" name="tab" value={firstTab} />
+        <div class="position-tabs-row">
+          <div class="position-tabs" data-tabs role="tablist" aria-label={t("org.assignTitle")}>
+            {tabs.map((tab) => (
+              <button type="button" role="tab" class={`position-tab${tab.key === firstTab ? " active" : ""}`}
+                data-tab-target={tab.key} aria-selected={tab.key === firstTab ? "true" : "false"}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* The rule for the whole sheet sits behind an info dot beside the
+              area tabs: it applies to every area, so it needs no line of its
+              own above them. */}
+          <span class="field-tip" data-tip={t("org.positionIntro")}>
+            <button type="button" class="field-tip-btn" aria-label={t("org.positionIntro")}>i</button>
+          </span>
         </div>
 
         <div class="position-panes" data-tabs-body>
           <section class="position-section" data-tab-pane="home" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">1</span>
               <div>
                 <h3>{t("org.homeCellSection")}</h3>
-                {member.homeCellId && <p class="hint">{t("org.homeCell")}: <strong>{member.homeCell}</strong></p>}
               </div>
             </div>
             {!member.homeCellId ? (
@@ -921,7 +1010,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="supervision" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">2</span>
               <div>
                 <h3>{t("org.supervisionSection")}</h3>
                 <p class="hint">{t("org.supervisionSectionHint")}</p>
@@ -929,8 +1017,14 @@ export function MemberPositionForm(props: PositionFormProps) {
             </div>
             {clusters.length > 0 && clusterDefs.length > 0 && (
               <div class="position-subsection">
-                <h4>{t("org.clusterSection")}</h4>
-                <p class="hint">{t("org.clusterHint")}</p>
+                {/* One sentence of guidance behind an info dot, so the two
+                    selects start right under the heading. */}
+                <h4 class="position-subsection-title">
+                  {t("org.clusterSection")}
+                  <span class="field-tip" data-tip={t("org.clusterHint")}>
+                    <button type="button" class="field-tip-btn" aria-label={t("org.clusterHint")}>i</button>
+                  </span>
+                </h4>
                 <div class="form-grid">
                   <label class="field">
                     <span class="lbl">{t("org.clusterLabel")}</span>
@@ -976,7 +1070,6 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="regional" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">3</span>
               <div><h3>{t("org.regionalSection")}</h3></div>
             </div>
             {regionalDefs.length === 0 ? (
@@ -986,7 +1079,11 @@ export function MemberPositionForm(props: PositionFormProps) {
                 {canManageRegional && <p class="hint"><a href="/organization/regional-churches">{t("org.manageRegional")}</a></p>}
               </>
             ) : (
-              <div class="form-grid">
+              <>
+                {/* The region names the whole section, so it reads as one line
+                    above the field the way the township does on the supervision
+                    tab; sharing the grid row left it floating in a half-width
+                    column with an empty space underneath. */}
                 <p class="position-scope">
                   {t("org.tabRegional")}: <strong>{member.regionName ?? `#${assignments.regionId}`}</strong>
                 </p>
@@ -996,13 +1093,12 @@ export function MemberPositionForm(props: PositionFormProps) {
                     {positionOptions(regionalDefs, assignments.region)}
                   </select>
                 </label>
-              </div>
+              </>
             )}
           </section>
 
           <section class="position-section" data-tab-pane="department" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">4</span>
               <div><h3>{t("org.departmentSection")}</h3></div>
             </div>
             {departments.length === 0 ? (
@@ -1050,11 +1146,10 @@ export function MemberPositionForm(props: PositionFormProps) {
 
           <section class="position-section" data-tab-pane="church" role="tabpanel">
             <div class="position-section-head">
-              <span class="position-step" aria-hidden="true">5</span>
               <div><h3>{t("org.churchSection")}</h3></div>
             </div>
             {churchDefs.length === 0 ? managePositions("church") : (
-              <div class="form-grid">
+              <div class="form-grid" data-church-position>
                 <label class="field">
                   <span class="lbl">{t("org.church")}</span>
                   <select name="church_id">
@@ -1146,8 +1241,11 @@ export type MemberHistoryRow = {
   created_at: number;
 };
 
-export function MemberDetailPage(props: Common & { m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[]; enrolments?: EnrolmentRow[] }) {
-  const { user, perms, flash, m, lang, history = [], positionDefs, enrolments = [] } = props;
+export function MemberDetailPage(props: Common & {
+  m: MemberDetail; history?: MemberHistoryRow[]; positionDefs?: PositionDefRow[];
+  enrolments?: EnrolmentRow[]; audit?: ActivityRow[];
+}) {
+  const { user, perms, flash, m, lang, history = [], positionDefs, enrolments = [], audit = [] } = props;
   const t = getDict(lang ?? "en");
   const ACTION_LABELS: Record<string, { mm: string; en: string; ko: string; cls: string }> = {
     create: { mm: "ထည့်သွင်း", en: "Created", ko: "생성", cls: "active" },
@@ -1183,7 +1281,7 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
     {
       title: t("form.contact"),
       rows: [
-        [t("detail.phone"), m.phone ?? ""],
+        [t("detail.phone"), formatPhone(m.phone)],
         [t("detail.nrc"), m.nrc_number ?? ""],
         [t("detail.languages"), m.languages ?? ""],
         [t("detail.address"), m.address ?? ""],
@@ -1302,6 +1400,32 @@ export function MemberDetailPage(props: Common & { m: MemberDetail; history?: Me
           </div>
         )}
       </div>
+
+      {/* Last on the page: the member's own record comes first, the trail of
+          who changed it last. Same card as the household detail page. */}
+      {perms.has("audit.view") && (
+        <div class="card" style="margin-top:18px">
+          <div class="section-head">
+            <h2>{t("activity.recent")}</h2>
+            <a class="btn sm secondary"
+              href={`/admin/audit?entity=member&entity_id=${m.id}`}>{t("activity.all")}</a>
+          </div>
+          {audit.length === 0 ? (
+            <p class="muted small">{t("activity.empty")}</p>
+          ) : (
+            <ul class="activity-list">
+              {audit.map((r) => (
+                <li>
+                  <span class="activity-when">{auditStamp(r.at)}</span>
+                  <span class="activity-what">{auditActionLabel(t, r.action)}</span>
+                  {r.summary && <span class="activity-summary">{r.summary}</span>}
+                  <span class="activity-who">{r.username || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </Layout>
   );
 }
@@ -1315,6 +1439,8 @@ export type ImportReport = {
   errorCount: number;
   errors: { line: number; msg: string }[];
   newOptions: string[];
+  /** Valid rows that arrive without a Home Cell (import keeps them). */
+  noHomeCell: number;
   csvB64?: string;
 };
 
@@ -1377,6 +1503,13 @@ export function ImportPage(props: Common & { report: ImportReport | null; error:
             <p class="small muted" style="margin-top:10px">
               {t("import.newOptions")}{report.newOptions.join(", ")}
             </p>
+          )}
+          {report.noHomeCell > 0 && (
+            <div class="flash warn" style="margin-top:12px">
+              <strong>{t("import.noHomeCell")} {report.noHomeCell}</strong>
+              <p class="small">{t("import.homeCellNote")}</p>
+              <a class="btn sm secondary" href="/members?missing=home_cell">{t("import.homeCellFix")}</a>
+            </div>
           )}
 
           {!report.done && report.valid > 0 && report.csvB64 && (

@@ -75,6 +75,8 @@ body {
   font-family: "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Noto Sans KR", "Segoe UI", system-ui, sans-serif;
   font-size: 15px; line-height: 1.6;
 }
+/* Sticky rows must clear the site topbar (two rows on a phone). */
+:root { --sticky-top: 64px; }
 a { color: var(--link); }
 /* Manual theme toggle (topbar): moon icon while light, sun while dark —
    appearance driven purely by the effective theme so no extra JS state. */
@@ -131,10 +133,13 @@ a { color: var(--link); }
 .nav-admin .chev { font-size: 10px; line-height: 1; transition: transform .15s ease; }
 .nav-admin[open] .chev { transform: rotate(180deg); }
 .nav-admin .nav-menu {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 30;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
   min-width: 200px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   box-shadow: 0 14px 34px rgba(2, 8, 23, .25);
+  /* Fallback cap for the wide layout without JS; app.js measures the real
+     space below the trigger so the menu only scrolls when it must. */
+  max-height: calc(100dvh - 70px); overflow-y: auto; overscroll-behavior: contain;
 }
 .topbar nav .nav-menu a { color: var(--ink); opacity: 1; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.9; text-decoration: none; }
 .topbar nav .nav-menu a:hover { background: var(--chip-bg); color: var(--ink); }
@@ -237,7 +242,7 @@ tbody tr:hover { background: var(--row-hover); }
 .small { font-size: 13px; }
 .btn {
   display: inline-block; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
-  background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14.5px;
+  background: var(--brand); color: #fff; padding: 9px 16px; font-size: 14px;
   font-family: inherit; text-decoration: none;
   line-height: 1.35; min-height: 40px;
 }
@@ -634,7 +639,7 @@ th.bar-col { width: 42%; }
 .modal-body form > .actions { margin-top: 0; }
 .modal-body form > .actions:last-child {
   position: sticky; bottom: -18px; z-index: 1; margin-top: auto;
-  margin-left: -20px; margin-right: -20px; margin-bottom: -18px; padding: 12px 20px;
+  margin-left: -20px; margin-right: -20px; margin-bottom: -18px; padding: 12px 20px 16px;
   background: var(--card); border-top: 1px solid var(--line);
   justify-content: flex-end;
 }
@@ -687,6 +692,7 @@ th.bar-col { width: 42%; }
 }
 /* ---------- responsive: small laptop / tablet (≤900px) ---------- */
 @media (max-width: 900px) {
+  :root { --sticky-top: 112px; }
   .topbar { padding: 8px 12px; gap: 8px 10px; }
   .topbar .brand { font-size: 14.5px; min-width: 0; }
   .topbar .brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -837,6 +843,14 @@ th.bar-col { width: 42%; }
 }
 .topbar .who form .btn:hover { background: var(--btn2-hover); filter: none; }
 .topbar .langswitch a { min-height: 36px; display: inline-flex; align-items: center; }
+/* A phone cannot fit the theme button, three languages, the name and Sign Out
+   on one line; tighten the gaps and cut the name short rather than let the
+   topbar make the whole page scroll sideways. */
+@media (max-width: 560px) {
+  .topbar .who { gap: 6px; }
+  .topbar .who-link { max-width: 88px; padding: 4px; }
+  .topbar .langswitch a { padding: 0 5px; }
+}
 .topbar .who-link { display: inline-flex; align-items: center; min-height: 36px; }
 
 /* Between tablet and desktop the nav needs its own row; keeping it inline
@@ -876,8 +890,33 @@ th.bar-col { width: 42%; }
 
 /* ---------- collapsible filter panel (mobile) ---------- */
 .filter-box { margin-bottom: 14px; }
-.filter-box > summary { display: none; }
+/* Filter panel toggle. Phones fold every panel; the members list folds at every
+   width too (see .members-filter-box), so the same row opens and closes the grid
+   on a laptop. Panels that hide it here stay permanently open on wide screens. */
+.filter-box > summary {
+  display: none; align-items: center; justify-content: space-between; gap: 10px;
+  list-style: none; cursor: pointer; padding: 11px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  font-weight: 600; font-size: 14px; color: var(--ink);
+}
+.filter-box > summary::-webkit-details-marker { display: none; }
+.filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
+/* A closed panel that still narrows the list shows what is applied, so the
+   badge alone is not the only clue. */
+.filter-box.has-filters > summary { border-color: var(--brand); }
+.filter-peek {
+  display: none; margin-left: auto; min-width: 0; max-width: 58%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font-size: 12.5px; font-weight: 500;
+}
+.filter-box:not([open]) > summary .filter-peek { display: block; }
+.filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
+.filter-box[open] > summary .chev { transform: rotate(180deg); }
 .filter-box > form.filters { margin-bottom: 0; }
+.members-filter-box > summary { display: flex; }
+.members-filter-box[open] > form.members-filter {
+  border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
+}
 
 /* ---------- table: scroll affordance + sticky identity ---------- */
 .scroll-hint { display: none; }
@@ -913,25 +952,9 @@ th.bar-col { width: 42%; }
   #bulk-bar { bottom: 10px; width: calc(100% - 16px); padding: 10px 12px; gap: 8px; }
   #bulk-bar select { flex: 1 1 100%; }
   #bulk-bar .btn { flex: 1 1 100%; }
-  .filter-box > summary {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    list-style: none; cursor: pointer; padding: 11px 14px;
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    font-weight: 600; font-size: 14px; color: var(--ink);
-  }
-  .filter-box > summary::-webkit-details-marker { display: none; }
-  .filter-box > summary .chev { transition: transform .15s ease; color: var(--muted); }
-  /* A closed panel that still narrows the list shows what is applied, so the
-     badge alone is not the only clue. */
-  .filter-box.has-filters > summary { border-color: var(--brand); }
-  .filter-peek {
-    display: none; margin-left: auto; min-width: 0; max-width: 58%;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: var(--muted); font-size: 12.5px; font-weight: 500;
-  }
-  .filter-box:not([open]) > summary .filter-peek { display: block; }
-  .filter-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; }
-  .filter-box[open] > summary .chev { transform: rotate(180deg); }
+  /* Every panel gets the toggle on a phone (the other rules live at the base,
+     hidden on wide screens). */
+  .filter-box > summary { display: flex; }
   .filter-box > form.filters { border-top-left-radius: 0; border-top-right-radius: 0; }
   .filter-box > form.filters .actions { margin-top: 4px; }
   .who-link { max-width: 70px; }
@@ -1503,6 +1526,41 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .hh-avatar svg { width: 20px; height: 20px; display: block; }
 .hh-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Family photo on the household detail card. Every stored photo is a 500×500
+   square (the browser centre-crops before upload), so a square frame shows the
+   whole picture for a portrait, a group or a landscape shot alike; contain keeps
+   an unexpected shape uncropped inside the frame. */
+.hh-summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.hh-summary.has-photo { grid-template-columns: 216px minmax(0, 1fr); }
+.hh-photo {
+  display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain;
+  background: var(--chip-bg); border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.hh-photo-field .photo-preview { border-radius: var(--radius); }
+/* Household detail → the trail for this household (who changed what, when). */
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-list li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding: 8px 0; border-top: 1px dashed var(--line); font-size: 13px;
+}
+.activity-list li:first-child { border-top: 0; }
+.activity-when { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.activity-what { font-weight: 600; }
+.activity-summary { color: var(--muted); overflow-wrap: anywhere; }
+.activity-who { margin-left: auto; color: var(--muted); font-size: 12px; }
+/* A record id is a short number: give its filter less width than a search box. */
+.filters label.field.audit-id-filter { flex: 0 1 130px; min-width: 110px; max-width: 150px; }
+
+/* In a modal the picker has to earn its height: a smaller preview and no
+   paragraph of guidance, since the status line still reports the result. */
+.modal-body .hh-photo-field { gap: 12px; padding-bottom: 12px; margin-bottom: 12px; }
+.modal-body .hh-photo-field .photo-preview { width: 68px; height: 68px; font-size: 24px; }
+.modal-body .hh-photo-field .hint { display: none; }
+@media (max-width: 720px) {
+  .hh-summary.has-photo { grid-template-columns: 1fr; }
+  .hh-photo { max-width: 260px; margin: 0 auto; }
+}
 .hh-card-name {
   display: block; color: var(--ink); font-size: 16px; font-weight: 600;
   line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1570,7 +1628,8 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .hh-detail-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
 .hh-detail-grid .card { height: 100%; margin-bottom: 0; }
 .hh-panel h2 { margin-bottom: 12px; }
-.hh-members-panel { margin-top: 16px; }
+/* Same rhythm as every other card: the page gap, not a one-off 16px. */
+.hh-members-panel { margin-top: var(--card-gap); }
 .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .section-head h2 { display: flex; align-items: center; gap: 7px; margin: 0; }
 .hh-member-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1691,6 +1750,90 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .org-collapse-body { padding: 12px 2px 0; }
 .org-collapse-hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
 .org-main-church .org-collapse { margin-top: 16px; }
+/* All overview: summary cards stay compact and every number links to the detail
+   tab that owns it. */
+.org-all { display: grid; gap: 16px; }
+.org-all-main { padding: 20px; }
+.org-all-main-facts { display: flex; flex-wrap: wrap; gap: 7px 18px; align-items: baseline; font-size: 13px; }
+.org-all-main-facts b { color: var(--ink); font-size: 15px; }
+.org-all-main-lead { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; margin-top: 12px; }
+.org-all-main-person { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.org-all-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.org-all-panel { padding: 18px 20px; }
+.org-all-panel > .org-section-head { margin-bottom: 12px; }
+.org-all-panel > .btn { margin-top: 12px; }
+.org-all-list { display: grid; gap: 8px; }
+.org-all-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 8px 16px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--card);
+}
+.org-all-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.org-all-row-title { color: var(--link); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.org-all-row-title:hover { text-decoration: underline; }
+.org-all-row-team { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; }
+.org-all-row-team > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.org-all-coverage-total { color: var(--ink); font-size: 22px; font-weight: 700; }
+.org-all-coverage-list { gap: 7px; }
+.org-all-coverage-row {
+  display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(60px, 1fr) auto;
+  align-items: center; gap: 8px;
+}
+.org-all-coverage-name { min-width: 0; font-size: 12.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.org-all-coverage-none { margin: 8px 0 0; }
+/* Cells outside every church sit apart from the ranked churches, above the
+   note, with a dashed rule so the reader never reads it as another church. */
+.org-all-coverage-unassigned {
+  margin-top: 3px; padding-top: 9px; border-top: 1px dashed var(--line);
+}
+.org-all-coverage-unassigned .org-all-coverage-name { color: var(--muted); font-style: italic; }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .org-all-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.org-all-progress {
+  width: 100%; height: 7px; appearance: none; border: 0; border-radius: 999px;
+  overflow: hidden; background: var(--line); color: var(--brand);
+}
+.org-all-progress::-webkit-progress-bar { background: var(--line); border-radius: 999px; }
+.org-all-progress::-webkit-progress-value { background: var(--brand); border-radius: 999px; }
+.org-all-progress::-moz-progress-bar { background: var(--brand); border-radius: 999px; }
+.org-all-vacancy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.org-all-vacancy {
+  display: flex; flex-direction: column; gap: 3px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--ink); text-decoration: none;
+}
+.org-all-vacancy:hover { border-color: var(--brand); }
+.org-all-vacancy-n { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.org-all-links { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 900px) {
+  .org-all-grid { grid-template-columns: 1fr; }
+  .org-all-vacancy-grid { grid-template-columns: 1fr; }
+  .org-all-row { grid-template-columns: 1fr; }
+  .org-all-row-team { justify-content: flex-start; }
+}
+@media (max-width: 380px) {
+  .org-all-coverage-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .org-all-coverage-row .org-all-progress { grid-column: 1 / -1; grid-row: 2; }
+}
+/* Main Church sits under its region: keep the regional team visible above the
+   church chart instead of making the reader jump to Regions & Churches. */
+.org-main-region {
+  margin: 0 0 16px; padding: 11px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.org-main-region-head {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px;
+}
+.org-main-region-team {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 7px 14px;
+}
+.org-main-region-role { min-width: 0; }
+.org-main-region-role .org-mini-role { display: block; margin-bottom: 3px; }
+.org-main-region-holders { display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .org-main-cells .org-collapse-body { padding-bottom: 4px; }
 .org-main-township + .org-main-township { margin-top: 8px; }
 .org-region-groups { display: grid; gap: 16px; }
@@ -1708,18 +1851,64 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .org-region-role.org-vacant { background: var(--chip-muted-bg, transparent); }
 .org-region-holders { display: grid; gap: 6px; }
-.org-region-holder { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
-.org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
-.org-node-extra-person { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.region-holder-list { display: grid; gap: 7px; margin: 12px 0; }
-.region-holder-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius);
+.org-region-holder { display: flex; align-items: flex-start; gap: 7px; min-width: 0; }
+/* A name and its priority stack instead of sharing one narrow line: Burmese
+   glyphs are tall, and squeezing the two inline pushed the wrapped name down
+   onto the "Add leader" button under the card. */
+.org-person { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.5; }
+.org-person > a, .org-person > span { overflow-wrap: anywhere; }
+.org-person-meta { color: var(--muted); font-size: 13px; line-height: 1.45; }
+/* A dashed outline reads as "this slot is empty, add someone" instead of a
+   solid button that stretched the full card width and looked like a field. */
+/* A vacant slot that can take a leader is one dashed card you click: the empty
+   state is the action, so the card no longer holds a second dashed button.
+   A filled card gets a quiet text link at its foot instead. */
+.org-region-role-add {
+  justify-content: space-between; gap: 8px;
+  border: 1px dashed var(--line-strong);
+  color: var(--muted); text-decoration: none;
+  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
 }
-.region-holder-row form { margin: 0 0 0 auto; }
-.region-holder-priority { display: flex; align-items: center; gap: 6px; }
-.region-holder-priority-field { display: flex; align-items: center; gap: 4px; }
+.org-region-role-add:hover, .org-region-role-add:focus-visible {
+  border-color: var(--link); background: var(--chip-brand-bg); color: var(--link);
+}
+/* A tinted pill so an empty slot reads as something to press, not as a card
+   that failed to load its leader. */
+.org-region-add-label {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
+  align-self: flex-start; padding: 4px 10px; border-radius: 999px;
+  background: var(--chip-brand-bg); color: var(--link);
+  font-size: 12.5px; font-weight: 600; line-height: 1.4;
+}
+.org-region-role-add:hover .org-region-add-label { text-decoration: underline; }
+.org-region-add { margin-top: auto; padding-top: 6px; }
+.org-mini-person { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.org-mini-person a { overflow-wrap: anywhere; }
+.org-node-extra { display: grid; gap: 5px; margin: 4px 0 8px 18px; }
+.org-node-extra-person { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; line-height: 1.5; }
+.org-node-extra-person a { overflow-wrap: anywhere; }
+.region-holder-list { display: grid; gap: 8px; margin: 0; }
+.region-holder-empty { margin: 0; }
+.region-holder-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-2);
+  transition: border-color .15s ease;
+}
+.region-holder-row:hover { border-color: var(--line-strong); }
+.region-holder-name { flex: 1 1 110px; min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; }
+/* The controls keep their own width so they stay on one line; the name is what
+   shrinks (and the row wraps them below it only on a narrow dialog). */
+.region-holder-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+.region-holder-row form { margin: 0; flex: 0 0 auto; }
+/* .modal-body form stacks children in a column; here the stepper and its Save
+   are one control row that submits together. */
+.region-holder-row form.region-holder-priority {
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  flex-wrap: nowrap; min-height: 0;
+}
+.region-holder-row .btn.sm { height: 32px; min-height: 32px; padding: 0 12px; }
+.region-holder-priority-field .muted { font-size: 11.5px; }
 .org-dept-card { gap: 10px; }
 /* Position assignment modal: a compact identity summary followed by three
    clearly numbered role areas. */
@@ -1735,7 +1924,7 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 }
 .position-hero-main { flex: 1; min-width: 0; }
 .position-hero-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.position-hero-title h4 { margin: 0; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.position-hero-title h4 { margin: 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .position-hero-home { color: var(--muted); font-size: 12px; }
 .position-hero-home strong { color: var(--ink); font-weight: 600; }
 .position-hero-profile { color: var(--link); font-size: 12px; font-weight: 600; text-decoration: none; }
@@ -1747,19 +1936,13 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .position-hero-link:hover { text-decoration: underline; }
 .position-role-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .position-role-chips .badge { font-size: 11.5px; }
-.position-intro { margin: 0 0 12px; }
 .position-section {
   margin: 0 0 11px; padding: 12px 13px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--field-bg);
 }
 .position-section-head { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px; }
-.position-step {
-  width: 22px; height: 22px; flex: none; display: grid; place-items: center;
-  border-radius: 50%; background: var(--chip-brand-bg); color: var(--link);
-  font-size: 11.5px; font-weight: 700; line-height: 1;
-}
-.position-section h3 { margin: 1px 0 0; font-size: 14px; }
-.position-section-head .hint { margin: 2px 0 0; }
+.position-section h3 { margin: 1px 0 0; font-size: 13px; }
+.position-section-head .hint { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; }
 .position-section .field { margin-bottom: 0; }
 .position-section .form-grid { margin-top: 0; }
 .position-section select:disabled { opacity: .55; cursor: not-allowed; }
@@ -1808,14 +1991,6 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
   font-size: 11px; font-weight: 700; font-style: normal; line-height: 1; cursor: help;
 }
 .tip:hover, .tip:focus-visible { color: var(--ink); border-color: var(--ink); }
-/* The temporary password a reset hands over, with its copy button. */
-.pw-handover { margin: 0 0 4px; }
-.pw-copy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
-.pw-copy code {
-  flex: 1 1 auto; min-width: 0; padding: 9px 11px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--field-bg);
-  font-size: 14px; overflow-wrap: anywhere;
-}
 /* Account form: two short tabbed panes keep the sheet narrow and the Save bar
    in view; sections inside a pane keep a small gap of their own. */
 .user-form .form-section + .form-section { margin-top: 14px; }
@@ -1824,6 +1999,104 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
    sliver: let it and the panes keep their natural height and scroll the sheet. */
 .user-form > .position-tabs, .user-form > .modal-form-panes { flex: none; }
 .modal-form-pane .cluster-cell-groups { margin-top: 0; }
+/* Permissions pane: a read-only answer to "what may this account do,
+   project-wide?", so every permission is one dense row and the roles that
+   grant it are named behind it. A blank row reads as plainly as a granted one. */
+.perm-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; font-size: 12.5px; }
+.perm-summary-item { display: inline-flex; gap: 5px; min-width: 0; }
+.perm-summary-key { color: var(--muted); }
+.perm-summary-item strong { font-weight: 700; overflow-wrap: anywhere; }
+.perm-groups-compact { display: grid; gap: 10px; }
+.perm-list-rows { display: grid; gap: 2px; }
+.perm-row {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: baseline;
+  gap: 2px 8px; padding: 3px 7px; border-radius: var(--radius-sm);
+  font-size: 12.5px; line-height: 1.45;
+}
+.perm-row.is-on { background: var(--chip-brand-bg); }
+.perm-row.is-off { color: var(--muted); }
+.perm-mark { font-weight: 700; }
+.perm-row.is-on .perm-mark { color: var(--link); }
+.perm-name { overflow-wrap: anywhere; }
+.perm-code { font-size: 11px; color: var(--muted); }
+.perm-by { grid-column: 2 / -1; font-size: 11px; color: var(--muted); }
+.perm-row.is-off .perm-by { display: none; }
+@media (max-width: 640px) { .perm-code { display: none; } }
+/* The account sheet has short fields but four sections; inside the modal it
+   tightens its gaps, chips and hints so the Save bar stays in view on a laptop. */
+.modal-body .user-form.compact-form .modal-form-tabs { margin-bottom: 12px; }
+.modal-body .user-form.compact-form .form-section + .form-section { margin-top: 10px; }
+.modal-body .user-form.compact-form .form-section legend { margin-bottom: 6px; font-size: 12.5px; }
+.modal-body .user-form.compact-form .hint { margin: 3px 0 0; font-size: 11.5px; }
+.modal-body .user-form.compact-form .check-grid { gap: 6px; }
+.modal-body .user-form.compact-form .check-chip { padding: 5px 8px; gap: 6px; font-size: 12.5px; }
+/* The password field shares the Account grid row with Language. At half width an
+   input and the Generate button cannot share a line, so the input takes the row
+   and the strength meter sits beside Generate underneath it. */
+.modal-body .user-form .pw-field .pw-wrap { flex: 1 1 100%; }
+.modal-body .user-form .pw-field .pw-row { flex-wrap: wrap; }
+.modal-body .user-form .pw-field .pw-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
+.modal-body .user-form .pw-field .pw-actions .btn { width: auto; }
+.modal-body .user-form .pw-field .pw-strength-slot { flex: 1 1 auto; min-width: 0; }
+.modal-body .user-form .pw-field .pw-strength { margin-top: 0; }
+.modal-body .user-form .pw-field .pw-strength .pw-bars span { width: 16px; }
+/* A rule that belongs to a field label: an info dot whose text appears on hover
+   and on keyboard focus, so the rule stays reachable without a permanent line
+   of hint text pushing the sheet taller. */
+.lbl-row { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; min-width: 0; }
+.lbl-row .lbl { margin-bottom: 0; }
+.field-tip { position: relative; display: inline-flex; flex: none; }
+.field-tip-btn {
+  width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line-strong); background: var(--field-bg);
+  color: var(--muted); font: inherit; font-size: 10px; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; cursor: help;
+}
+.field-tip-btn:hover, .field-tip-btn:focus-visible { color: var(--ink); border-color: var(--link); }
+.field-tip::after {
+  /* Anchored to the icon's right edge so a bubble in the right-hand column grows
+     leftwards: centred, it would overflow the sheet and add a scrollbar. */
+  content: attr(data-tip); position: absolute; right: 0; left: auto; bottom: calc(100% + 6px);
+  z-index: 6; width: max-content; max-width: min(240px, 62vw); padding: 7px 9px;
+  border-radius: var(--radius-sm); background: var(--ink); color: var(--card);
+  font-size: 11.5px; font-weight: 500; line-height: 1.45; text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
+}
+.field-tip:hover::after, .field-tip:focus-within::after { opacity: 1; visibility: visible; }
+/* Collection-page intros ride in a hover/focus dot beside the heading instead of
+   a permanent subtitle line. From 1100px up the bubble opens to the right of
+   the dot into the empty header band, clear of the tab/action row underneath;
+   the heading anchors it so its hidden box can never widen the page. Narrower
+   layouts have no such band (the dot sits ~20px above the tab row), so there the
+   text becomes a header-width panel in the flow: it pushes the next row down
+   instead of covering it, and still cannot overflow sideways. */
+.page-head h1 { position: relative; }
+.page-tip { position: static; display: inline-flex; margin-left: 8px; vertical-align: 2px; }
+.page-tip-text {
+  position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+  z-index: 6; width: max-content; max-width: 340px; padding: 7px 9px;
+  border-radius: var(--radius-sm); background: var(--ink); color: var(--card);
+  font-size: 12px; font-weight: 500; line-height: 1.45; text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .12s ease;
+}
+.page-tip:hover .page-tip-text, .page-tip:focus-within .page-tip-text { opacity: 1; visibility: visible; }
+@media (max-width: 1099px) {
+  .page-tip { display: inline; }
+  .page-tip-text {
+    position: static; transform: none; display: none;
+    width: auto; max-width: none; margin: 8px 0 0; padding: 8px 10px;
+    opacity: 1; visibility: visible; pointer-events: auto; transition: none;
+  }
+  .page-tip:focus-within .page-tip-text { display: block; }
+}
+/* A dot in a field's label anchors its bubble to the field instead of to the
+   16px dot: a bubble sized against the dot runs off the sheet's left edge on a
+   phone, while a field-width panel fits the narrowest layout there is. */
+.pw-field { position: relative; }
+.pw-field .field-tip { position: static; }
+.pw-field .field-tip::after {
+  left: 0; right: 0; width: auto; max-width: none; bottom: calc(100% + 4px);
+}
 .pastor-picker { margin-top: 0; }
 .pastor-picker [data-search-input] { background: var(--card); }
 
@@ -1956,7 +2229,15 @@ table.list-tbl.ph-tbl { min-width: 0; }
 /* Modal sheets for the settings screens: body copy between forms, a quiet
    danger section that is not a sticky action bar, and inline error text. */
 .modal-note { margin: 2px 0 0; }
+/* A blocked delete keeps the greyed button and its reason on one row: the
+   explanation stays visible without adding a second band to the dialog. */
+.cluster-modal-foot .modal-delete-blocked { margin: 0; gap: 8px 12px; justify-content: flex-start; }
+.cluster-modal-foot .modal-delete-blocked .btn { flex: 0 0 auto; }
+.cluster-modal-foot .modal-delete-blocked .modal-note { margin: 0; flex: 1 1 200px; min-width: 0; }
 .modal-confirm { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* A remove prompt inserted under the holder row it belongs to: it spans the
+   list row instead of splitting the holder grid into an extra column. */
+.region-holder-list .modal-confirm { grid-column: 1 / -1; margin-top: 0; padding-top: 10px; }
 /* Confirm buttons line up with the form footers: Cancel left, action right. */
 .modal-confirm .actions, .modal-body > .actions { justify-content: flex-end; }
 /* Role editor: permissions grouped by area, two balanced columns from 700px so
@@ -2100,6 +2381,22 @@ table.list-tbl.ph-tbl { min-width: 0; }
 }
 
 .regional-attached { display: grid; gap: 6px; margin-top: 10px; }
+/* Home Cell list on a church card: a disclosure row that starts closed. */
+details.regional-attached { display: block; }
+.regional-attached > summary {
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; list-style: none;
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+}
+.regional-attached > summary::-webkit-details-marker { display: none; }
+.regional-attached > summary:hover { color: var(--link); }
+.regional-attached > summary .chev { color: var(--muted); font-size: 11px; transition: transform .15s ease; }
+.regional-attached[open] > summary .chev { transform: rotate(180deg); }
+.regional-attached-count {
+  padding: 1px 7px; border-radius: 999px; background: var(--chip-bg);
+  color: var(--muted); font-size: 11.5px; font-weight: 600;
+}
+.regional-attached-body { display: grid; gap: 6px; margin-top: 8px; }
 .regional-attached-empty { margin: 8px 0 0; }
 .regional-township-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 8px; font-size: 12.5px; }
 .regional-township-line .town { font-weight: 600; }
@@ -2163,11 +2460,26 @@ table.list-tbl.ph-tbl { min-width: 0; }
    grid of township columns, so a state with many cells scrolls inside its own
    panel instead of stretching the dialog. */
 .modal-body .cluster-main-form > .actions:last-child {
-  position: static; margin: 0; padding: 12px 0 0; border: 0;
+  /* A little air under the primary button: flush with the sheet's bottom edge
+     the Add button read as if it had been clipped by the dialog. */
+  position: static; margin: 0; padding: 12px 0 6px; border: 0;
   border-top: 1px dashed var(--line); background: none; justify-content: flex-end;
 }
 .modal-body .cluster-main-form { flex: 0 0 auto; gap: 14px; margin-bottom: 0; }
 .modal-body .cluster-main-form .form-grid { gap: 12px 16px; }
+/* Compact editors: New church, New department, New cluster and Add pastor are a
+   handful of short fields, so their dialogs open one step narrower than the
+   default sheet (data-modal-size="md") and the spacing is trimmed to keep the
+   whole form on screen. The primary button keeps the field height and gets a
+   steady width instead of hugging a three-letter label. */
+.modal-body .compact-form { gap: 12px; }
+.modal-body .compact-form .form-grid { gap: 10px 14px; }
+.modal-body .compact-form .field .lbl { margin-bottom: 3px; }
+.modal-body .compact-form > .actions:last-child { padding-top: 10px; }
+.modal-body .compact-form > .actions:last-child .btn:not(.secondary):not(.outline-danger) { min-width: 92px; }
+/* The form already closes its footer with one dashed divider, so the delete row
+   underneath must not draw a second one. */
+.modal-body .cluster-main-form + .cluster-modal-foot { border-top: 0; }
 .cluster-main-form .dept-toggle { width: fit-content; min-width: 190px; }
 .cluster-main-form .modal-form-panes { padding-top: 2px; }
 .cluster-main-form .cluster-cell-groups { box-shadow: inset 0 1px 2px rgba(2, 8, 23, .04); }
@@ -2213,7 +2525,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 
 /* ---------- supervision + regional cards on the organization page ---------- */
 .org-supervision { margin: 8px 0 4px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--field-bg); border: 1px dashed var(--line); }
-.org-supervision-title { display: block; margin-bottom: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+.org-supervision-title { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
 .org-supervision .org-mini-list { margin: 0; }
 .org-unassigned { margin-top: 4px; }
 
@@ -2291,7 +2603,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .dept-inactive { opacity: .75; }
 .dept-row .actions { margin-top: 12px; }
 /* ---------- organization chart ---------- */
-.org-chart { margin-bottom: var(--card-gap); padding: var(--card-pad-y) var(--card-pad-x) var(--space-6); overflow: hidden; }
+.org-chart { margin-bottom: var(--card-gap); padding: var(--card-pad-y) var(--card-pad-x) var(--space-6); overflow: hidden; overflow: clip; }
 
 /* Home Cell hierarchy: supervisor team, then cell leaders, grouped by state
    and by cluster (or township when a cell has no cluster). */
@@ -2305,7 +2617,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
 .org-flow-state + .org-flow-state { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--line); }
 .org-flow-state-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 5px 12px; margin-bottom: 16px; text-align: center; }
 .org-flow-state-name { padding: 5px 16px; border-radius: 999px; background: var(--chip-brand-bg); color: var(--link); font-weight: 700; font-size: 15px; }
-.org-flow-clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+.org-flow-clusters { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: var(--sticky-top); }
 /* Home Cell chooser inside a cluster: buttons on wide screens, a dropdown on
    phones, so only the chosen cell's structure is open at a time. */
 .hc-cells { display: grid; gap: 10px; padding-top: 14px; position: relative; }
@@ -2316,7 +2628,7 @@ table.list-tbl.ph-tbl { min-width: 0; }
   color: inherit; text-decoration: none; font-size: 13px;
 }
 .hc-cell-btn-name { font-weight: 600; color: var(--link); }
-.hc-cell-btn-meta { font-size: 11.5px; color: var(--muted); }
+.hc-cell-btn-meta { font-size: 12px; color: var(--muted); }
 .hc-cell-btn-fill .org-fill-track { width: 40px; height: 4px; }
 a.hc-cell-btn:hover { border-color: var(--brand); }
 a.hc-cell-btn.is-active { border-color: var(--brand); background: var(--chip-brand-bg); }
@@ -2332,14 +2644,21 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-fill-track { display: block; width: 52px; height: 5px; border-radius: 999px; background: var(--field-bg); overflow: hidden; }
 .org-fill-bar { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
 .org-fill-bar.is-full { background: var(--ok-ink); }
-.org-fill-text { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.org-fill-text { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .org-fill-text b { color: var(--ink); font-weight: 700; }
-.hc-cell-btn-fill { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.hc-cell-btn-fill { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font-size: 12px; }
 .hc-cell-btn-fill b { color: var(--ink); font-weight: 700; }
 .hc-cell-btn-fill-text { white-space: nowrap; }
 /* A vacant role row is the action: it opens the assign dialog for this cell. */
-.org-tree-action { color: inherit; text-decoration: none; cursor: pointer; }
+.org-tree-action { color: inherit; text-decoration: none; cursor: pointer; position: relative; padding-right: 30px; }
+.org-tree-action::after {
+  content: "→"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 13px; transition: transform .15s ease, color .15s ease;
+}
 .org-tree-action:hover { border-color: var(--link); background: var(--chip-brand-bg); }
+.org-tree-action:hover::after, .org-tree-action:focus-visible::after {
+  color: var(--link); transform: translateY(-50%) translateX(2px);
+}
 .org-tree-action:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .hc-cell-select-label { display: grid; gap: 4px; max-width: 340px; }
 .hc-cell-select-label select { width: 100%; }
@@ -2430,7 +2749,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: var(--row-alt, rgba(15,23,42,.025)); font-size: 12.5px; line-height: 1.45;
 }
-.org-tree-role .org-role-label { font-size: 10.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
+.org-tree-role .org-role-label { font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; }
 .org-tree-role a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .org-tree-role a:hover { color: var(--link); text-decoration: underline; }
 .org-tree-node.is-lead > .org-tree-role { border-color: var(--brand); background: var(--chip-brand-bg); }
@@ -2466,10 +2785,33 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-flow-cluster-name { margin: 2px 0 0; font-size: 15px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .org-flow-cluster-meta { display: flex; align-items: center; gap: 8px; flex: none; }
 .org-flow-chev { color: var(--muted); font-size: 12px; line-height: 1; transition: transform .15s ease; }
+/* On a phone the meta row (bar, counts, chevron) used to squeeze the cluster
+   name into a 56px column: give the name its own line and the meta the next. */
+@media (max-width: 420px) {
+  .org-flow-cluster-head { flex-wrap: wrap; position: relative; padding-right: 18px; }
+  .org-flow-cluster-title { flex: 1 1 100%; }
+  .org-flow-cluster-meta { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; row-gap: 4px; }
+  .org-flow-cluster-meta .muted { white-space: nowrap; }
+  /* Keep the chevron in the card corner instead of letting it wrap alone
+     below the role/cell counts on a narrow phone. */
+  .org-flow-chev { position: absolute; top: 8px; right: 2px; }
+}
 .org-flow-cluster[open] .org-flow-chev { transform: rotate(180deg); }
-/* An open cluster takes the whole row, so its supervisor and Home Cells read as
-   one structure instead of a narrow column with empty space beside it. */
-.org-flow-cluster[open] { grid-column: 1 / -1; }
+/* Clusters are a single-column accordion: every card has the full width, so
+   opening one never leaves a half-empty grid row beside it. */
+.org-flow-cluster[open] > summary {
+  position: sticky; top: var(--sticky-top); z-index: 4;
+  margin: -6px -6px 0; padding: 6px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.org-flow-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 4px 0 2px; padding: 2px 0;
+  color: var(--muted); font-size: 12.5px; font-weight: 600; text-decoration: none;
+}
+.org-flow-back:hover { color: var(--link); text-decoration: underline; }
 /* The card holding the chosen Home Cell keeps a brand edge, so it is obvious
    which cluster the open structure belongs to. */
 .org-flow-cluster.is-active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--chip-brand-bg); }
@@ -2490,23 +2832,30 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-flow-team .org-node { width: 168px; min-width: 140px; padding: 8px 5px; }
 .org-flow-team .org-node-lead { width: 190px; }
 @media (max-width: 760px) {
-  .org-flow-clusters { grid-template-columns: 1fr; }
   .org-flow-team .org-node { width: 190px; }
   .org-flow-team .org-node-lead { width: 205px; }
 }
 @media (max-width: 520px) {
   .org-flow-team { flex-wrap: wrap; justify-content: center; }
+  .org-flow-team > .org-branch { width: 100%; }
   .org-flow-team .org-node,
-  .org-flow-team .org-node-lead { width: 100%; max-width: 260px; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
+  .org-flow-team .org-node-lead { width: 100%; max-width: none; flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; }
   .org-flow-team .org-node .org-node-role { order: 1; }
   .org-flow-team .org-node .org-node-name { order: 2; margin-left: auto; text-align: right; }
+  .org-flow-team .org-node-name .muted { white-space: nowrap; }
   /* A wrapped row cannot draw one straight bus, so the stems go with it. */
   .org-flow-team::before, .org-flow-team > .org-branch::before, .org-flow-team > .org-branch::after {
     display: none;
   }
 }
+@media (max-width: 360px) {
+  /* The vacant avatar takes the width the role name needs on a small phone. */
+  .org-flow-team .org-node .org-avatar { display: none; }
+  .org-flow-team .org-node { padding: 8px 10px; }
+}
 .position-subsection { margin: 0 0 12px; padding: 10px 11px; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .position-subsection h4 { margin: 0 0 3px; font-size: 13px; }
+.position-subsection-title { display: flex; align-items: center; gap: 6px; }
 .position-subsection .form-grid { margin-top: 8px; }
 .page-head-actions { align-items: stretch; }
 .page-head-actions .btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
@@ -2585,7 +2934,7 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-node-action:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 .org-node-lead { width: 240px; }
 .org-node-role {
-  color: var(--muted); font-size: 10.5px; font-weight: 650; letter-spacing: .045em;
+  color: var(--muted); font-size: 12px; font-weight: 650; letter-spacing: .04em;
   line-height: 1.45; text-transform: uppercase;
 }
 .org-node-name {
@@ -2622,13 +2971,14 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .org-dept-title h3 { margin: 0 0 2px; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
 .org-dept-title h3 a { color: var(--ink); text-decoration: none; }
 .org-dept-title h3 a:hover { color: var(--link); text-decoration: underline; }
-.org-dept-lead { display: flex; flex-direction: column; gap: 2px; padding: 9px 0 0; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+.org-dept-lead { display: flex; flex-direction: column; gap: 3px; padding: 9px 0 0; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; line-height: 1.6; }
+.org-dept-lead .org-node-role { line-height: 1.4; }
 .org-dept-lead a { color: var(--ink); text-decoration: none; }
 .org-dept-lead a:hover { color: var(--link); text-decoration: underline; }
 .org-mini-list { display: grid; gap: 7px; }
 .org-mini { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 12.5px; }
 .org-mini > div { display: flex; flex-direction: column; min-width: 0; }
-.org-mini-role { color: var(--muted); font-size: 10.5px; line-height: 1.3; }
+.org-mini-role { color: var(--muted); font-size: 10.5px; line-height: 1.4; }
 .org-mini a { color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
 .org-mini a:hover { color: var(--link); text-decoration: underline; }
 .org-mini.org-vacant { opacity: .72; }
@@ -2755,12 +3105,66 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
   .dept-active { align-self: start; }
 }
 .member-role-inline { display: none; }
-@media (max-width: 760px) {
-  /* The member table scrolls sideways on phones; surface the role under the
-     name so assigning it never needs a horizontal swipe. */
+/* The member list needs about 1180px for every column. Below that the role was
+   pushed behind a horizontal swipe (and below 900px it was hidden outright),
+   which left tablet/laptop widths with no visible position at all. Until the
+   full table fits, the position chip moves under the member's name, so it is
+   always on screen and clickable. */
+@media (max-width: 1180px) {
+  .list-tbl :is(th, td)[data-col="role"] { display: none; }
   .member-role-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .member-role-inline .position-edit { margin-left: 0; }
 }
+/* The chip under the name repeats the Position column, so it follows the column
+   chooser: with Position switched off, the chip goes away too. */
+.members-tbl[data-inline-role="off"] .member-role-inline { display: none; }
+/* The position sheet has one layout at every height: the body scrolls as a
+   whole and the Save bar is pinned to its bottom edge. No extra padding is
+   reserved below the bar: the bar is the last item in the form's flow, so at
+   the end of the scroll the last field already sits above it, and easing the
+   field higher is what left an empty band under the bar. */
+/* The stack above the fields stays compact so that, even in a 500px-high
+   window, every tab shows its first field without scrolling: the sheet takes
+   almost the full height, the title bar loses its air, and the identity strip,
+   the hint and the tab bar tighten up. The role chips run on one line and
+   scroll sideways instead of wrapping to three, which was the tallest part. */
+.modal-card:has(.position-form) { max-height: calc(100dvh - 8px); }
+.modal-card:has(.position-form) .modal-head { padding: 5px 20px; }
+.modal-card:has(.position-form) .modal-head h3 { font-size: 16px; }
+.position-form .position-hero { padding: 7px 12px; margin-bottom: 6px; gap: 8px; }
+.position-form .position-role-chips {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-top: 4px; gap: 4px;
+  padding-right: 22px;
+}
+.position-form .position-role-chips .badge { white-space: nowrap; }
+/* A wide sheet has the height to spare, so there the chips wrap and every role
+   stays on screen; the sideways row is only for narrow sheets. */
+@media (min-width: 1200px) { .position-form .position-role-chips { flex-wrap: wrap; overflow-x: visible; padding-right: 0; } }
+/* A chip cut off at the right edge reads as a bug, so the row fades out where
+   more chips wait; app.js drops the fade once the row is scrolled to its end. */
+.position-form .position-role-chips.is-scrollable:not(.at-end) {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent);
+}
+.position-form .position-role-chips::-webkit-scrollbar { display: none; }
+/* The sheet's one-line rule lives behind an info dot beside the area tabs, so
+   it costs no line of its own above them. */
+.position-form .position-tabs-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.position-form .position-tabs-row .position-tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
+/* A dot in a heading opens one panel above the block it belongs to. Anchored to
+   the 16px dot the bubble grew sideways across the words it explains, and on a
+   phone it ran past the sheet's edge. */
+.position-form .field-tip { position: static; }
+.position-form .position-tabs-row,
+.position-form .position-subsection-title,
+.position-form .position-section-head { position: relative; }
+.position-form .field-tip::after { left: 0; right: 0; width: auto; max-width: none; }
+.position-form .position-tabs { margin-bottom: 5px; padding: 2px; }
+.position-form .position-tab { padding: 6px 10px; }
+.position-form .position-section { padding: 9px 11px; }
+.position-form .position-section-head { margin-bottom: 5px; }
+.position-form .position-notice { padding: 5px 8px; font-size: 11.5px; }
+.position-form .position-notice p { margin: 0 0 5px; }
 .position-cell { white-space: nowrap; }
 .position-cell .position-edit { margin-left: 4px; font-size: 12px; }
 /* Laptop widths squeeze this column, and a badge that broke its own name
@@ -2769,7 +3173,31 @@ a.hc-cell-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1
 .position-cell .badge { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .position-member { margin: 0 0 10px; font-size: 15px; }
 .position-form .actions { margin-top: 14px; }
+/* The position sheet's form sits inside .position-form, so the rule that drops
+   the body's bottom padding under a sticky bar (it only matches a form that is
+   a direct child of the body) never applied here: 22px of card colour stayed
+   below the Save bar and made the footer look twice its height. The bar is the
+   last item in the form's flow, so the body reserves no space under it at any
+   width: the old phone overhang only lined the bar up while the body scrolled,
+   and a sheet too short to scroll showed a strip of card colour beneath it. */
+.modal-body:has(> .position-form form > .actions:last-child) { padding-bottom: 0; }
+/* The sheet's form is nested, so the rule that clears the form's own bottom
+   margin under a sticky bar (it only matches a form that is a direct child of
+   the body) missed it: the margin pushed the wrapper past the bar and left a
+   strip of card colour under it once the body's padding was gone. */
+.modal-body .position-form > form { margin-bottom: 0; }
+/* The sheet tightens everything above the fields, so its Save bar is trimmed to
+   match: the Save button keeps its field height, the band around it loses the
+   extra air. */
+.modal-body .position-form form > .actions:last-child {
+  padding-top: 8px; padding-bottom: 8px; margin-bottom: 0; bottom: 0;
+}
 .badge.position { background: var(--chip-brand-bg); color: var(--link); }
+/* The role chip opens the position dialog itself, so it carries the link and
+   needs its own affordance instead of the removed Change text beside it. */
+.position-edit-badge { text-decoration: none; cursor: pointer; }
+.position-edit-badge:hover { box-shadow: inset 0 0 0 1px var(--link); }
+.position-edit-badge:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 @media (max-width: 760px) {
   .org-grid { grid-template-columns: 1fr; }
   .org-cell-row { grid-template-columns: 1fr auto; }
@@ -3043,22 +3471,27 @@ th { font-size: 13px; }
 .modal-head h3 { font-size: 19px; font-weight: 700; }
 .modal-body { padding: 22px 24px; }
 .modal-body form > .actions:last-child {
-  margin-left: -24px; margin-right: -24px; margin-bottom: -22px; padding: 14px 24px;
+  margin-left: -24px; margin-right: -24px; margin-bottom: 0; bottom: 0; padding: 14px 24px;
 }
+/* The bar sits on the card's bottom edge at every width. The -22px margins it
+   used on phones only lined up while the body scrolled, so a sheet shorter than
+   the viewport kept a strip of card colour under the bar; the body now reserves
+   no space under it and the bar's own bottom padding is the air the button
+   needs. Matched on any form that ends in the bar, not only one that is a
+   direct child: the position sheet wraps its form in .position-form. */
+.modal-body:has(form > .actions:last-child) { padding-bottom: 0; }
+.modal-body:has(form > .actions:last-child) form:has(> .actions:last-child) { margin-bottom: 0; }
+/* The compact editors (New church, New cluster) close with a plain row rather
+   than the sticky bar, so the padding-bottom removed above would leave their Add
+   button against the card's bottom edge at every width. */
+.modal-body .cluster-main-form > .actions:last-child { padding-bottom: 18px; }
 /* Desktop: a three-field form should not be mostly chrome. The header and the
-   sticky bar are trimmed, and the bar sits flush with the card's bottom edge
-   instead of leaving a strip of body padding under it. Phones keep the roomier
-   values above so the touch targets stay large. */
+   sticky bar are trimmed. Phones keep the roomier values above so the touch
+   targets stay large. */
 @media (min-width: 761px) {
   .modal-head { padding: 13px 24px; }
   .modal-head h3 { font-size: 17px; line-height: 1.3; }
-  .modal-body:has(> form > .actions:last-child) { padding-bottom: 0; }
-  /* The global form margin would otherwise leave a strip of card under the bar. */
-  .modal-body:has(> form > .actions:last-child) > form { margin-bottom: 0; }
-  .modal-body form > .actions:last-child {
-    margin-left: -24px; margin-right: -24px; margin-bottom: 0;
-    padding: 10px 24px; bottom: 0;
-  }
+  .modal-body form > .actions:last-child { padding: 10px 24px; }
 }
 .flash { border-radius: var(--radius); }
 .footer { padding: 30px 16px 38px; font-size: 12.5px; }
@@ -3081,9 +3514,10 @@ th { font-size: 13px; }
   .card { padding: 18px 18px; }
   .stat { padding: 18px 20px; min-height: 108px; }
   .stat .n { font-size: 31px; }
-  .modal-body form > .actions:last-child {
-    margin-left: -18px; margin-right: -18px; margin-bottom: -22px; padding: 13px 18px;
-  }
+  /* Match the body's real 22px/24px padding: the fixed 18px insets left a
+     strip of card colour down both sides of the phone save bar. The bar is
+     already flush at every width, so only the touch-sized padding changes. */
+  .modal-body form > .actions:last-child { padding: 13px 24px; }
 }
 /* ---------- label typography per language ----------
    Uppercase and letter-spacing are Latin-only devices: they destroy Myanmar
@@ -3118,16 +3552,227 @@ th { font-size: 13px; }
 .assign-hero .position-avatar { width: 30px; height: 30px; font-size: 14px; }
 .assign-hero-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1px 8px; min-width: 0; }
 .assign-hero-role { font-size: 13.5px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
-.assign-hero .position-hero-home { font-size: 11.5px; }
+/* The scope line sits beside the role, so it stays a size that the Myanmar
+   region names can still be shaped legibly at. */
+.assign-hero .position-hero-home { font-size: 13px; line-height: 1.6; }
 .assign-search { margin-bottom: 0; }
-label.field.assign-priority {
-  display: grid; grid-template-columns: max-content 96px; align-items: center;
-  gap: 2px 10px;
+
+/* The region sheet keeps a 520px column on desktop (the church dialog's 620px
+   is wider than these short, one-line controls need). Its body takes the height
+   left by the header, so the sticky action bar sits below the candidate list
+   instead of covering it while the dialog is still short. */
+.modal-card.sheet {
+  width: min(520px, 100%); height: min(640px, calc(100dvh - 40px));
+  /* The sticky footer paints to the card's edges, so without this the bottom
+     corners come out square over the sheet's radius. */
+  overflow: hidden;
 }
-.assign-priority .lbl { margin: 0; }
-.assign-priority .hint { grid-column: 1 / -1; margin: 0; font-size: 11.5px; }
+.modal-card.sheet .modal-body { flex: 1 1 auto; min-height: 0; }
+
+/* ---------- region add-leader sheet ----------
+   The post's scope and the priority rule sit in one tinted band instead of the
+   larger profile hero the church dialog carries; this dialog is about a team,
+   not one person. */
+.assign-info {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px; margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: linear-gradient(145deg, var(--chip-brand-bg), var(--surface));
+}
+.assign-info-icon {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 50%; background: var(--chip-brand-bg); color: var(--link);
+}
+.assign-info-icon svg { width: 16px; height: 16px; }
+.assign-info-body { min-width: 0; }
+.assign-info-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.assign-info-line strong { font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+.assign-info-line > span { color: var(--muted); font-size: 13px; }
+.assign-info-line > span strong { font-size: 13px; color: var(--ink); }
+.assign-info p { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+/* Latin-only micro-label: the per-language rule below drops the tracking for
+   Myanmar and Korean, where uppercase cannot help. */
+.assign-section-title {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 2px;
+  color: var(--muted); font-size: 11px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.assign-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 5px; border-radius: 999px;
+  background: var(--chip-bg); color: var(--muted);
+  font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+  letter-spacing: 0; text-transform: none;
+}
+/* The team card sits between the info band and the form, which have no gap of
+   their own, so it carries the spacing on both sides. */
+.modal-body > .region-holder-list { margin-bottom: 14px; }
+.assign-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.assign-dot.is-holder { background: var(--link); }
+
+/* Priority stepper: a label box, a bare number and two buttons in one 32px
+   control. The buttons drive the native input's stepUp()/stepDown(), so the
+   value still works with a keyboard, a spinner-free phone keypad and the form.
+   .priority-value is deliberately deep enough to beat the global input height. */
+.priority-stepper {
+  display: flex; align-items: stretch; height: 32px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--field-bg);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.priority-stepper:focus-within {
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--chip-brand-bg);
+}
+.priority-stepper-label {
+  display: flex; align-items: center; padding: 0 10px;
+  border-right: 1px solid var(--line); background: var(--surface-3);
+  color: var(--muted); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+}
+.priority-stepper-controls { display: flex; align-items: center; }
+.stepper-btn {
+  display: grid; place-items: center; width: 22px; height: 100%;
+  padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.stepper-btn:hover { background: var(--surface-2); color: var(--ink); }
+.stepper-btn:active { background: var(--line); }
+.stepper-btn svg { width: 11px; height: 11px; }
+.priority-stepper input.priority-value {
+  width: 30px; height: 100%; padding: 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none;
+  color: var(--ink); font-size: 13px; font-weight: 600; text-align: center;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield; -moz-appearance: textfield;
+}
+.priority-stepper input.priority-value::-webkit-outer-spin-button,
+.priority-stepper input.priority-value::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.priority-stepper input.priority-value:focus { outline: none; border: 0; box-shadow: none; }
+
+/* Candidate rows: a status dot and the church badge carry the same reading as
+   the current-team row. The radio stays in the DOM for selection and the
+   keyboard; only its chrome is hidden. */
+.assign-row:has(.assign-dot) input[type="radio"] {
+  position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}
+.assign-badge {
+  margin-left: auto; max-width: 45%; padding: 2px 7px; border-radius: 4px;
+  background: var(--chip-bg); color: var(--muted); font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.assign-row:has(input:checked) .assign-dot { background: var(--link); }
+
+.assign-footer-priority { display: inline-flex; align-items: center; gap: 6px; }
+.assign-footer-priority .field-tip::after { left: 0; right: auto; }
+@media (max-width: 640px) {
+  .assign-footer-priority .field-tip::after {
+    left: auto; right: 0; bottom: calc(100% + 6px); width: max-content; max-width: 240px;
+  }
+}
+/* Phones: the team card stacks so the priority, Save and Delete share one full
+   row, and the dialog becomes a bottom sheet. */
+@media (max-width: 480px) {
+  .modal:has(.modal-card.sheet) { align-items: flex-end; padding: 0; }
+  .modal-card.sheet {
+    width: 100%; max-width: 100%; height: auto;
+    max-height: calc(100dvh - 10px); border-radius: 14px 14px 0 0;
+  }
+  .region-holder-row { flex-direction: column; align-items: stretch; }
+  .region-holder-actions { width: 100%; margin-left: 0; }
+  .region-holder-actions form.region-holder-priority { flex: 1 1 auto; }
+  .region-holder-actions .priority-stepper { flex: 1 1 auto; }
+  .region-holder-actions .priority-stepper-controls { flex: 1; }
+  .region-holder-actions .priority-stepper input.priority-value { flex: 1; width: auto; }
+  .assign-actions.assign-actions { flex-direction: column; align-items: stretch; }
+  .assign-footer-priority, .assign-footer-priority .priority-stepper { width: 100%; }
+  .assign-footer-priority .priority-stepper-controls { flex: 1; }
+  .assign-footer-priority .priority-stepper input.priority-value { flex: 1; width: auto; }
+  .assign-actions-buttons { width: 100%; }
+  .assign-actions-buttons .btn { flex: 1; }
+  .region-holder-row .btn.sm { flex: 0 0 auto; }
+}
+/* Short windows: at 530px tall the sheet is 466px, the band and the spacing
+   push the candidate list under the sticky footer, and nothing of the list is
+   reachable without scrolling. The band drops its explanatory line, the row
+   padding and gaps tighten, and the sheet takes the window height so two to
+   three candidates stay above the footer. */
+@media (max-height: 640px) {
+  .modal-card.sheet .modal-head { padding: 8px 18px; }
+  .modal-card.sheet .modal-head h3 { font-size: 16px; }
+  .modal-card.sheet .modal-body { padding: 8px 14px 0; }
+  .modal-card.sheet .assign-info { padding: 6px 9px; margin-bottom: 6px; gap: 8px; }
+  .modal-card.sheet .assign-info p { display: none; }
+  .modal-card.sheet .assign-info-icon { width: 22px; height: 22px; }
+  .modal-card.sheet .assign-info-icon svg { width: 13px; height: 13px; }
+  .modal-card.sheet .assign-info-line strong { font-size: 12.5px; }
+  .modal-card.sheet .assign-section-title { margin: 0; font-size: 10.5px; }
+  .modal-card.sheet .region-holder-list { gap: 4px; margin-bottom: 6px; }
+  .modal-card.sheet .region-holder-row { padding: 5px 9px; }
+  .modal-card.sheet form.assign-form { gap: 6px; }
+  .modal-card.sheet .assign-search input { height: 32px; }
+  .modal-card.sheet .assign-hint { display: none; }
+  .modal-card.sheet .assign-list { min-height: 146px; padding: 6px; }
+  /* The sticky bar's negative margins are cut for the 20px body padding; the
+     compact padding here would leave a 6px overhang and a sideways scrollbar. */
+  .modal-card.sheet .modal-body form > .actions:last-child {
+    margin-left: -14px; margin-right: -14px; margin-bottom: 0; bottom: 0;
+    padding: 7px 14px;
+  }
+}
+/* The global 88dvh cap costs a short desktop window ~60px it needs for the
+   list; on a phone the sheet is bottom-anchored and sizes to its content. */
+@media (max-height: 640px) and (min-width: 481px) {
+  .modal:has(.modal-card.sheet) { padding: 8px; }
+  .modal-card.sheet { height: calc(100dvh - 16px); max-height: none; }
+}
+
+/* Light theme: --muted is tuned for the white page and falls to 4.1-4.4:1 on
+   the tinted band, the inset stepper label and the chips, which is under AA for
+   this small text; those labels take a darker slate instead. */
+:root[data-theme="light"] :is(
+  .assign-info p, .assign-info-line > span, .assign-section-title,
+  .assign-count, .priority-stepper-label, .assign-badge, .assign-hint
+) { color: #475569; }
+
+/* The priority of the person being added sits in the footer beside Save. The
+   current-team rows above already show each holder's own priority, so a second
+   full-width Priority field in the body read as the same control twice; the
+   rule that used to sit under it is now an info dot on the label. */
+.modal-body form > .actions.assign-actions { justify-content: space-between; }
+.assign-priority-inline { display: inline-flex; align-items: center; gap: 8px; }
+.assign-priority-inline .lbl-row { margin-bottom: 0; }
+/* Matches the compact Priority label inside each current-team row, so the two
+   priority controls no longer read as different sizes. */
+.assign-priority-inline .lbl { margin: 0; font-size: 12.5px; }
+.assign-priority-inline input[type="number"] {
+  width: 58px; height: 32px; padding: 0 4px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* The dot sits at the sheet's left edge in this footer, so its bubble grows
+   rightwards; the default right-anchored bubble ran off the sheet and was
+   clipped by the scrolling body. */
+.assign-priority-inline { position: relative; }
+.assign-priority-inline .field-tip::after { left: 0; right: auto; }
+/* On a phone the dot is far enough right that even a rightward bubble reaches
+   past the sheet and adds a horizontal scrollbar to the body. There the bubble
+   takes the width of the priority control instead of a fixed 240px. */
+@media (max-width: 640px) {
+  .assign-priority-inline .field-tip { position: static; }
+  .assign-priority-inline .field-tip::after {
+    left: 0; right: 0; width: auto; max-width: none; bottom: calc(100% + 6px);
+  }
+}
+.assign-actions-buttons { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+/* flex-shrink alone collapsed this to a 17px strip in the taller region
+   dialog, leaving the candidates invisible; the list keeps a usable height and
+   only then scrolls, with rows pinned to the top. */
 .assign-list {
-  display: grid; gap: 4px; max-height: 300px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 4px; flex: 1 1 auto; min-height: 120px; max-height: 300px;
+  align-content: start; overflow-y: auto; overscroll-behavior: contain;
+  /* Keep the scrollbar in its own gutter so it never covers a row's church
+     name, and only appears once the list actually scrolls. */
+  scrollbar-gutter: stable; scrollbar-width: thin;
   padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--surface-3);
 }
@@ -3135,16 +3780,28 @@ label.field.assign-priority {
   display: flex; align-items: center; gap: var(--space-3);
   padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-sm);
   background: var(--card); cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
 }
-.assign-row:hover { border-color: var(--line-strong); }
+.assign-row:hover { border-color: var(--line-strong); background: var(--surface-2); }
 .assign-row input { margin: 0; }
+/* The chosen candidate keeps the same highlight as the current holder, so the
+   list answers "who am I about to add?" before Save is pressed. */
+.assign-row:has(input:checked) { border-color: var(--link); background: var(--surface-2); }
+.assign-row:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: -2px; }
 .assign-row.is-current { border-color: var(--link); }
 .assign-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .assign-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.assign-meta { margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.assign-meta {
+  margin-left: auto; color: var(--muted); font-size: 12.5px; white-space: nowrap;
+  /* A long Myanmar church name gives way to the person's name instead of
+     widening the row. */
+  max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+}
 .assign-empty { padding: var(--space-4); text-align: center; color: var(--muted); }
 .assign-hint { margin: 0; color: var(--muted); font-size: 11.5px; }
-.assign-list-clear { margin-top: var(--space-2); }
+/* One "clear the post" row, so it must not inherit the candidate list's floor:
+   a 120px box holding a single option read as an empty panel. */
+.assign-list-clear { margin-top: var(--space-2); min-height: 0; }
 
 /* Nested roles in the Home Cell and Department charts: children hang off their
    parent on a connector rail, the same reading as the church tree — each child
@@ -3181,7 +3838,8 @@ label.field.assign-priority {
 :not(:lang(en)) :is(
   .org-node-role, .org-church-kicker, .org-supervision-title, .nav-menu-label,
   .pastor-section legend, .detail-item .k, .edit-change .k, .edit-pair .k,
-  .regional-candidate-group h4, .cluster-kicker, .cluster-cell-group h4
+  .regional-candidate-group h4, .cluster-kicker, .cluster-cell-group h4,
+  .assign-section-title, .priority-stepper-label
 ) { text-transform: none; letter-spacing: 0; }
 
 /* ---------- members list on a phone ----------
@@ -3248,6 +3906,36 @@ label.field.assign-priority {
 /* ---------- audit log ----------
    One row per change: when, who, what, device/IP, and the raw request behind
    it. On a phone each row becomes a labelled card. */
+/* The audit filters hold seven controls plus the actions. They sit on the same
+   card-and-grid pattern as the member filters: five even columns, the search
+   spanning two of them, and the buttons filling the tail of the second row, so
+   no field is narrower than its neighbours and no band of empty space is left. */
+.audit-filter {
+  display: grid; gap: 10px 12px; align-items: end;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 14px 16px; margin-bottom: 0;
+  background: var(--card); border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+.audit-filter > .field { flex: none; min-width: 0; max-width: none; margin: 0; }
+.audit-filter .field > input, .audit-filter .field > select {
+  width: 100%; max-width: none; height: 40px;
+}
+.audit-filter .audit-q { grid-column: span 2; }
+.audit-filter .actions {
+  grid-column: span 2; margin: 0; display: flex; align-items: center;
+  gap: 10px; justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .audit-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .audit-filter .audit-q, .audit-filter .actions { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .audit-filter { padding: 12px; }
+  /* The panel is collapsible behind its summary at this width, so it tucks
+     under the summary instead of rounding its own top corners. */
+  .filter-box[open] > form.audit-filter { border-top: 0; border-radius: 0 0 var(--radius) var(--radius); }
+}
 .audit-tbl td { vertical-align: top; }
 .audit-when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }
 .audit-user { font-weight: 600; white-space: nowrap; }
@@ -3257,6 +3945,9 @@ label.field.assign-priority {
   margin-left: 6px; padding: 1px 7px; border-radius: 999px;
   background: var(--chip-bg); color: var(--muted); font-size: 11.5px;
 }
+/* A record with a detail page: the chip is the way into it. */
+a.audit-entity.is-link { color: var(--link); text-decoration: none; }
+a.audit-entity.is-link:hover { background: var(--chip-brand-bg); text-decoration: underline; }
 .audit-summary { display: block; margin-top: 2px; }
 .audit-device { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .audit-ip { display: block; font-size: 11.5px; }
@@ -3442,18 +4133,35 @@ label.field.assign-priority {
    action follows the viewport instead of living at the very bottom. */
 .form-actions-sticky {
   position: sticky; bottom: 0; z-index: 6;
-  display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;
-  margin-top: 18px; padding: 12px 0 2px;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: flex-end;
+  margin-top: 18px; padding: 11px var(--card-pad-x);
   background: var(--card); border-top: 1px solid var(--hairline);
 }
+/* On a wide screen the buttons sat flush against the card edge, which the fields
+   above do not do. A phone has less room, so it gets a smaller inset and the
+   buttons lose some side padding to keep the row on one line. In the modal the
+   bar sets its own inset. */
+@media (max-width: 640px) {
+  .form-actions-sticky { padding-left: 12px; padding-right: 12px; }
+}
+/* The supervision cluster of the chosen Home Cell: read-only, so it reads as a
+   quiet line under the select rather than as another field. */
+.cluster-hint { margin-top: 2px; }
+.cluster-hint::before { content: "◦ "; opacity: .6; }
 /* Report form has three actions; when they wrap on a phone keep the rows
    right-aligned so the primary never sits alone on the left. */
 .report-form-actions { justify-content: flex-end; }
 @media (max-width: 640px) {
-  .form-actions-sticky { padding-bottom: max(2px, env(safe-area-inset-bottom)); }
+  .form-actions-sticky { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
   /* Size each button to its label: splitting the row 50/50 made the longer
-     primary wrap onto two or three lines. They only stack when they must. */
-  .form-actions-sticky .btn { flex: 1 1 auto; white-space: nowrap; }
+     primary wrap onto two or three lines. They only stack when they must, and a
+     button alone on the second row keeps its own width (a growing one would
+     stretch across the bar). */
+  .form-actions-sticky .btn {
+    flex: 0 1 auto; white-space: nowrap;
+    padding-left: 12px; padding-right: 12px;
+  }
 }
 
 /* ---------- member + admin lists: phone cards ---------- */
@@ -3497,7 +4205,9 @@ label.field.assign-priority {
     height: 24px; padding: 0; z-index: 1;
   }
   .members-tbl tbody td:first-child::before { display: none; }
-  .members-tbl tbody td[data-col="role"] { grid-column: 1 / -1; }
+  /* The card has room for the role again, so it gets its own row instead of
+     the compact chip beside the name. */
+  .members-tbl tbody td[data-col="role"] { display: block; grid-column: 1 / -1; }
   /* The cards stack, so phone and township fit again; on a phone those are the
      two fields people look a member up by. */
   .members-tbl tbody :is(td)[data-col="phone"],
@@ -3622,7 +4332,7 @@ select option { background: var(--surface-2); color: var(--ink); }
    far below the fold, so each card starts collapsed except the first. */
 .org-region-group {
   border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--card); overflow: hidden;
+  background: var(--card); overflow: hidden; overflow: clip;
 }
 .org-region-group > summary {
   display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px;
@@ -3631,6 +4341,12 @@ select option { background: var(--surface-2); color: var(--ink); }
 }
 .org-region-group > summary::-webkit-details-marker { display: none; }
 .org-region-group > summary:hover { background: var(--surface-2); }
+/* The open region's team and church cards are tall; keep its heading in view
+   below the site topbar while scrolling through them. */
+.org-region-group[open] > summary {
+  position: sticky; top: var(--sticky-top); z-index: 4;
+  border-bottom: 1px solid var(--line);
+}
 .org-region-group-head h3 { margin: 0; font-size: 16px; }
 .org-region-group-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
 .org-region-chev { color: var(--muted); font-size: 11px; transition: transform .15s ease; }
@@ -3692,16 +4408,8 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 @keyframes nav-progress-slide { 0% { transform: translateX(-45%); } 100% { transform: translateX(285%); } }
 @media (prefers-reduced-motion: reduce) { .nav-progress.is-on::before { animation: none; width: 100%; } }
 
-/* Hope School children report: one card per grade, the year totals above it. */
-.report-groups { display: grid; gap: var(--space-3); }
+/* Hope School children report: one table card, the totals above it. */
 .report-group { padding: 0; overflow: hidden; }
-.report-group-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px 12px; flex-wrap: wrap;
-  padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);
-}
-.report-group-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
-.report-group-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .report-table th {
   padding: 8px 12px; border-bottom: 1px solid var(--line);
@@ -3737,7 +4445,6 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
   .badge, .badge.active, .badge.inactive { background: none !important; border: 1px solid #999; color: #111 !important; }
   .pastor-tag { border: 1px solid #999; color: #111; background: none; }
   .report-group { border: 1px solid #ccc; }
-  .report-group-head { background: none; }
   a { color: #111; text-decoration: none; }
   .print-meta { margin: 0 0 10px; color: #333; font-size: 12px; }
 }
@@ -3787,4 +4494,39 @@ html.is-navigating, html.is-navigating body { cursor: progress; }
 
 /* Member list: the school in the latest recorded year, grade and year beneath. */
 .school-cell .school-meta { display: block; margin-top: 2px; }
+
+/* Temporary password shown once after an admin reset: monospaced, with a Copy
+   button beside it that wraps under the value on a narrow phone. */
+.temp-pw-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 8px; }
+@media (max-width: 420px) { .temp-pw-row .btn { flex: 1 1 100%; } }
+.temp-pw {
+  margin: 0; padding: 12px 14px; max-width: 32ch;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  background: var(--field-bg); font-size: 18px; line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .04em; overflow-wrap: anywhere; user-select: all;
+}
+/* The row action names what it does, so it never needs a hidden label. */
+.admin-tbl .row-reset-form .btn { white-space: nowrap; }
+
+/* Phones: the topbar controls and primary links should use the available width
+   instead of stacking into four tall rows. The signed-in name is deliberately
+   ellipsized rather than cut at an arbitrary character. */
+@media (max-width: 560px) {
+  .topbar { padding: 8px 10px; gap: 6px 8px; }
+  .topbar .brand img { width: 30px; height: 30px; }
+  .topbar .who { gap: 4px; margin-left: auto; }
+  .topbar .langswitch { font-size: 11px; padding: 2px; }
+  .topbar .langswitch a { padding: 2px 4px; min-height: 30px; }
+  .topbar .who-link {
+    display: block; flex: 0 0 auto; max-width: 82px; padding: 5px 2px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .topbar .who form .btn { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+  .topbar nav { row-gap: 1px; }
+  .topbar nav a, .topbar nav .nav-admin > summary { padding: 5px 7px; font-size: 12.5px; }
+}
+@media (max-width: 360px) {
+  .topbar .who-link { max-width: 56px; }
+}
 `; // end of stylesheet

@@ -77,6 +77,8 @@ const reportId = (title: string) => idOf("SELECT id FROM activity_reports WHERE 
 const familyId = (name: string) => idOf("SELECT id FROM families WHERE name = ?", name);
 const memberId = (name: string) => idOf("SELECT id FROM members WHERE name_english = ?", name);
 const churchId = (name: string) => idOf("SELECT id FROM regional_churches WHERE name = ?", name);
+const homeCellId = (label: string) =>
+  idOf("SELECT id FROM lookup_options WHERE type = 'home_cell' AND label = ?", label);
 const clusterId = (name: string) => idOf("SELECT id FROM supervision_clusters WHERE name = ?", name);
 
 beforeAll(async () => {
@@ -162,6 +164,14 @@ beforeAll(async () => {
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('In-Scope Cluster', 1)"),
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Out-of-Scope Cluster', 2)"),
     db.prepare("INSERT INTO supervision_clusters (name, region_id) VALUES ('Delete Me Cluster', 1)"),
+    // A role that never received the granular structures.* rows: options.manage
+    // alone still lets it manage structure (canManageStructure), so the account
+    // dialog has to show those permissions as granted, not denied.
+    db.prepare("INSERT INTO roles (id, name, description, is_system) VALUES (10, 'Legacy Options Manager', 'test', 0)"),
+    db.prepare("INSERT INTO role_permissions (role_id, permission) VALUES (10, 'options.manage')"),
+    db.prepare("INSERT INTO users (id, username, password_hash, active, must_change_password) VALUES (9, 'optionsmgr', 'x', 1, 0)"),
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (9, 10)"),
+    db.prepare("INSERT INTO user_state_assignments (user_id, region_id) VALUES (9, 1)"),
   ]);
   for (const id of [ADMIN_ID, SCOPED_ADMIN_ID, VIEWER_ID, ENTRY_ID, REVIEWER_ID, OTHER_AUTHOR_ID, RECORDS_ID, STRUCT_ID]) {
     sessions.set(id, await createSession(id));
@@ -237,6 +247,103 @@ describe("app-wide account and role settings", () => {
 
   it("still serves ordinary pages to the scoped manager", async () => {
     expect((await getAs("/members", SCOPED_ADMIN_ID)).status).toBe(200);
+  });
+
+  it("shows one account's allowed and missing permissions in its edit modal", async () => {
+    const res = await getAs("/admin/users/3/edit?modal=1", ADMIN_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    // The Viewer holds dashboard.view and members.view, nothing that writes.
+    expect(html).toContain('class="perm-row is-on" data-perm-row="members.view"');
+    expect(html).toContain('class="perm-row is-off" data-perm-row="members.create"');
+    expect(html).toContain('class="perm-row is-off" data-perm-row="users.manage"');
+    // The pane names the role that grants the permission, so a tick is traceable.
+    expect(html).toContain('data-perm-row="members.view"');
+    expect(html).toContain("Viewer");
+  });
+
+  it("reads options.manage as granting every structure permission", async () => {
+    const res = await getAs("/admin/users/9/edit?modal=1", ADMIN_ID);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    // The role holds options.manage only; canManageStructure still lets it edit
+    // structures, so the pane must not report those as denied.
+    expect(html).toContain('class="perm-row is-on" data-perm-row="options.manage"');
+    expect(html).toContain('class="perm-row is-on" data-perm-row="structures.create"');
+    expect(html).toContain('class="perm-row is-on" data-perm-row="structures.delete"');
+    expect(html).toContain("via options.manage");
+  });
+
+  it("keeps the password rule in a tooltip with the meter beside Generate", async () => {
+    const html = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    // The rule is available on the info dot instead of a permanent hint line.
+    expect(html).toContain('class="field-tip"');
+    expect(html).toContain("Leave blank to keep the current password");
+    // The Reset-password clause lives in the tooltip rather than repeating under
+    // Status, so the sheet explains it once.
+    expect(html).toContain("issued by Reset password");
+    expect(html).not.toContain("A new password set here");
+    expect(html).not.toContain('<span class="hint">Leave blank');
+    // app.js renders the strength meter into this slot, next to Generate.
+    expect(html).toContain("data-strength-slot");
+  });
+
+  it("only promises a forced password change while the new account requires it", async () => {
+    const create = await (await getAs("/admin/users/new", ADMIN_ID)).text();
+    // Two variants travel with the tooltip: app.js shows the forced-change one
+    // only while "Require password change on login" is ticked, the other when it
+    // is not, so an unticked box never claims a change will be forced.
+    expect(create).toContain("data-tip-on=");
+    expect(create).toContain("data-tip-off=");
+    expect(create).toMatch(/data-tip="[^"]*must be changed at the next sign-in/);
+    const edit = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    // A password set on an existing account always forces the change.
+    expect(edit).not.toContain("data-tip-on=");
+  });
+
+  it("states the forced password change once in the edit tooltip", async () => {
+    const html = await (await getAs("/admin/users/3/edit?modal=1", ADMIN_ID)).text();
+    const tip = html.match(/data-tip="([^"]*)"/)?.[1] ?? "";
+    const sentence = "must be changed at the next sign-in";
+    // The edit hint already ends with the rule; appending the new-account note
+    // too made the tooltip say it twice.
+    expect(tip).toContain(sentence);
+    expect(tip.split(sentence).length - 1).toBe(1);
+  });
+
+  it("keeps the forced-change promise out of the unticked new-account tooltip", async () => {
+    const html = await (await getAs("/admin/users/new", ADMIN_ID)).text();
+    const on = html.match(/data-tip-on="([^"]*)"/)?.[1] ?? "";
+    const off = html.match(/data-tip-off="([^"]*)"/)?.[1] ?? "";
+    const sentence = "must be changed at the next sign-in";
+    // app.js picks between the two wordings, so the unticked wording must not
+    // carry the promise at all.
+    expect(on).toContain(sentence);
+    expect(on.split(sentence).length - 1).toBe(1);
+    expect(off.length).toBeGreaterThan(0);
+    expect(off).not.toContain(sentence);
+  });
+
+  it("keeps custom role names editable and system role names locked", async () => {
+    const nameInput = (html: string) => html.match(/<input[^>]*name="name"[^>]*>/)?.[0] ?? "";
+    const custom = nameInput(await (await getAs("/admin/roles/10/edit?modal=1", ADMIN_ID)).text());
+    // readOnly={false} rendered as readOnly="false", which browsers still treat
+    // as a present, locking attribute, so no readonly attribute may appear here.
+    expect(custom).toContain('value="Legacy Options Manager"');
+    expect(custom).not.toMatch(/readonly/i);
+    const system = nameInput(await (await getAs("/admin/roles/1/edit?modal=1", ADMIN_ID)).text());
+    expect(system).toMatch(/readonly/i);
+  });
+
+  it("shows options.manage's structure rights on the roles list and editor", async () => {
+    const list = await (await getAs("/admin/roles", ADMIN_ID)).text();
+    // The list names the permissions the role can use through options.manage.
+    expect(list).toContain("via options.manage");
+    const modal = await (await getAs("/admin/roles/10/edit?modal=1", ADMIN_ID)).text();
+    // The editor ticks them but keeps them read-only, so saving does not write
+    // redundant explicit grants the role never had.
+    expect(modal).toMatch(/value="structures.create"[^>]*checked[^>]*disabled/);
+    expect(modal).toContain("via options.manage");
   });
 });
 
@@ -453,8 +560,10 @@ describe("member scope", () => {
 
   it("edits an in-scope member", async () => {
     const id = await memberId("In Member");
+    // Home Cell is required on the member form, so the edit carries one.
     const res = await postAs(`/members/${id}`, RECORDS_ID, {
       name_english: "In Member Renamed", region_id: "1", status: "active",
+      home_cell_id: String(await homeCellId("Scoped Cell A")),
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toContain("ok=member-updated");

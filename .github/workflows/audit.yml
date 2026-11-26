@@ -1,0 +1,66 @@
+name: Weekly dependency audit
+
+# deploy.yml only audits production dependencies, and only when a release is
+# pushed, so a dev-only advisory (the picomatch ReDoS pulled in through vitest,
+# for example) stays invisible until the next deploy. This workflow reports
+# every advisory once a week instead. It is a separate workflow from the deploy,
+# so it can never hold up a release.
+
+on:
+  schedule:
+    # Mondays 02:00 UTC.
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Report only: this job never fails, so a dev-only advisory cannot block
+      # or discourage anything. Production advisories are called out separately
+      # because those are the ones that ship in the Worker bundle.
+      - name: Report advisories (never fails)
+        run: |
+          set -o pipefail
+          all=$(npm audit --audit-level=low 2>&1 || true)
+          prod=$(npm audit --omit=dev --audit-level=low 2>&1 || true)
+          printf '%s\n' "$all"
+
+          {
+            echo "## Weekly dependency audit — $(date -u +%Y-%m-%d)"
+            echo ""
+            if printf '%s' "$prod" | grep -q 'found 0 vulnerabilities'; then
+              echo "- **Production dependencies:** clean"
+            else
+              echo "- **Production dependencies:** :warning: advisories found — these ship in the Worker, fix before the next deploy"
+            fi
+            echo ""
+            echo "<details><summary>Full report (production + dev)</summary>"
+            echo ""
+            echo '```'
+            printf '%s\n' "$all"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if printf '%s' "$all" | grep -q 'found 0 vulnerabilities'; then
+            echo "No advisories across production and dev dependencies."
+            exit 0
+          fi
+          echo "::warning::Dependency advisories reported — see the job summary."

@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { users, loginAttempts } from "../db/schema";
-import { hashPassword, parseIterations, verifyPassword } from "../auth";
+import { hashIterations, hashPassword, parseIterations, verifyPassword } from "../auth";
 import { checkPasswordPolicy } from "../password";
 import { logAudit } from "../audit";
 import { isHttpsRequest } from "../util";
@@ -157,6 +157,18 @@ publicAuthRoutes.post("/login", async (c) => {
   }
 
   await db.update(users).set({ failedAttempts: 0, lockedUntil: 0 }).where(eq(users.id, user.id));
+  // Upgrade the stored hash when PBKDF2_ITERATIONS has been raised since this
+  // account last chose a password. The password is already verified in memory,
+  // so this costs one more derivation on that account's first sign-in and no
+  // migration or forced reset is needed.
+  const targetIterations = parseIterations(c.env.PBKDF2_ITERATIONS);
+  const storedIterations = hashIterations(user.passwordHash);
+  if (storedIterations !== null && storedIterations < targetIterations) {
+    await db
+      .update(users)
+      .set({ passwordHash: await hashPassword(password, targetIterations) })
+      .where(eq(users.id, user.id));
+  }
   // A good sign-in clears this address's recent failures: an office shares one
   // public IP, so one person's typos must not lock everybody else out.
   await db.all(sql`DELETE FROM login_attempts WHERE ip = ${ip}`);

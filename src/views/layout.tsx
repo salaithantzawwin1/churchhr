@@ -1,6 +1,7 @@
 import type { Permission } from "../rbac";
 
 import { ASSET_V } from "../assets";
+import versionedAssets from "../versioned-assets.json";
 import type { SessionUser } from "../session";
 import { getDict, type Lang } from "../i18n";
 import { html } from "hono/html";
@@ -34,12 +35,14 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
     { href: "/organization", label: t("nav.organization"), perm: "members.view" },
     { href: "/reports", label: t("nav.reports"), perm: "reports.view" },
   ];
-  // People records sit under one "Members" heading: the list, households and
-  // the pastor directory (each gated by its own permission).
+  // People records sit under one "Members" heading: the list, households, the
+  // pastor directory and the Hope School report on both sets of children (each
+  // gated by its own permission).
   const MEMBER_NAV: { href: string; label: string; perm: Permission[] }[] = [
     { href: "/members", label: t("nav.members"), perm: ["members.view"] },
     { href: "/admin/households", label: t("nav.households"), perm: ["members.view"] },
     { href: "/organization/pastors", label: t("nav.pastors"), perm: ["pastors.view", "pastors.manage"] },
+    { href: "/organization/hope-school", label: t("org.childReportOpen"), perm: ["pastors.view", "pastors.manage", "members.view"] },
   ];
   /** allStatesOnly marks app-wide pages: the server refuses them to a
    *  state-limited account, so the navigation must not offer them either. */
@@ -78,16 +81,21 @@ export function Layout({ title, lang, user, perms, active, flash, bodyClass, foo
           {title} — {t("app.name")}
         </title>
         <link rel="icon" type="image/png" href="/logo.png" />
-        {/* Flowbite datepicker: bundled CSS first, so styles.css can theme it. */}
-        <link rel="stylesheet" href={`/vendor/flowbite-datepicker/datepicker.css?v=${ASSET_V}`} />
-        <link rel="stylesheet" href={`/styles.css?v=${ASSET_V}`} />
+        {/* Every cache-busted asset comes from src/versioned-assets.json, so the
+            link and the digest that versions it cannot drift apart. The list is
+            rendered in order: the bundled datepicker CSS first, so styles.css
+            can theme it. */}
+        {versionedAssets.stylesheets.map((asset) => (
+          <link rel="stylesheet" href={`${asset.url}?v=${ASSET_V}`} />
+        ))}
         <script>
           {/* Raw JS (no double quotes / &-entities) so Hono's HTML escaper cannot
               rewrite it — inside <script>, `&quot;` is a literal SyntaxError. */}
           {html`try{var t=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}`}
         </script>
-        <script src={`/vendor/flowbite-datepicker/Datepicker.umd.js?v=${ASSET_V}`} defer></script>
-        <script src={`/app.js?v=${ASSET_V}`} defer></script>
+        {versionedAssets.scripts.map((asset) => (
+          <script src={`${asset.url}?v=${ASSET_V}`} defer></script>
+        ))}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" />

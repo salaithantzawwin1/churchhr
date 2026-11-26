@@ -24,6 +24,7 @@ import {
  *
  *   columns
  *   - `members.photo` (0015) — BLOB profile photo
+ *   - `families.photo` (0048) — BLOB household family photo
  *   - `position_defs.parent_code` (0030) — code of the parent position
  *   - `position_defs.regional_church_id` (0034) — church that owns a church-scoped code
  */
@@ -236,6 +237,7 @@ export const families = sqliteTable("families", {
   regionId: integer("region_id")
     .notNull()
     .references(() => regions.id),
+  // families.photo (0048) is only touched through raw SQL, see the file header.
   notes: text("notes"),
   createdBy: integer("created_by").references(() => users.id),
   createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),

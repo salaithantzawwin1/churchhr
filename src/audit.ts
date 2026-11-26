@@ -97,7 +97,7 @@ export function classify(method: string, path: string): MutationInfo | null {
       if (!third) return { action: `${entity}.create`, entity, entityId: null };
       if (third === "new") return { action: `${entity}.create`, entity, entityId: null };
       if (id && fourth === "delete") return { action: `${entity}.delete`, entity, entityId: id };
-      if (id && (fourth === "reset" || fourth === "password")) return { action: `${entity}.password`, entity, entityId: id };
+      if (id && (fourth === "reset" || fourth === "password" || fourth === "reset-password")) return { action: `${entity}.password`, entity, entityId: id };
       if (id && !fourth) return { action: `${entity}.update`, entity, entityId: id };
       if (!id && third) return { action: `${entity}.update`, entity, entityId: null };
     }
@@ -135,6 +135,20 @@ export function classify(method: string, path: string): MutationInfo | null {
 
   return { action: `${root}.${m === "post" ? "update" : m}`, entity: root, entityId: num(second) };
 }
+
+/** What a route can add to the entry the middleware is about to write. A
+ *  household photo is saved by the ordinary edit form, so only the route knows
+ *  the save was a photo change; an id can be supplied when the URL hides it
+ *  (POST /admin/households/:id/add-member). */
+export type AuditNote = {
+  /** Dotted action key that replaces the classified one (household.photo). */
+  action?: string;
+  /** Entity for the override; defaults to the action's prefix. */
+  entity?: string;
+  entityId?: string | null;
+  /** Human detail shown next to the action (e.g. the record's name). */
+  summary?: string | null;
+};
 
 export type AuditEntry = {
   action: string;
@@ -183,18 +197,25 @@ export function auditMutations() {
     const location = c.res.headers.get("location") ?? "";
     if (c.res.status >= 400 || /[?&]err=/.test(location)) return;
     const info = classify(method, path);
-    if (!info) return;
+    const note = c.get("auditNote");
+    if (!info && !note?.action) return;
+    const action = note?.action ?? info!.action;
+    // Prefer the classified entity: the action prefix is not always the entity
+    // (login.success is a session, account.update is a user).
+    const entity = note?.entity ?? info?.entity ?? action.split(".")[0] ?? null;
     // Create routes redirect to the new record; keep its id in the entry so the
     // trail says which row was added, not just that something was.
-    let entityId = info.entityId;
+    let entityId = note?.entityId ?? info?.entityId ?? null;
     if (!entityId && location) {
       const created = /^\/(?:reports|members|organization\/pastors|admin\/households)\/(\d+)/.exec(location);
       if (created) entityId = created[1]!;
     }
     const user = c.get("user");
     await logAudit(getDb(c.env), {
-      ...info,
+      action,
+      entity,
       entityId,
+      summary: note?.summary ?? null,
       userId: user?.id ?? null,
       username: user?.username ?? null,
       status: c.res.status,

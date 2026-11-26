@@ -4,10 +4,13 @@ import type { OptionRow } from "../lookup";
 import { getDict, type Lang } from "../i18n";
 import type { EnrolmentSummary } from "../student-enrolments";
 import { CardViewToggle } from "./view-toggle";
+import { Pager } from "./pager";
 import { regionCascadeSelects } from "./hh-cascade";
-import { optionLabel, optionText, qs } from "../util";
+import { formatPhone, optionLabel, optionText, qs } from "../util";
 import { GENDERS, GENDERS_EN, GENDERS_KR, MARITAL_STATUSES, MARITAL_STATUSES_EN, MARITAL_STATUSES_KR, STATUSES, STATUSES_EN, STATUSES_KR } from "../enums";
 import { EditIcon, RemoveUserIcon, TrashIcon } from "./action-icons";
+import { DuplicateWarning, type DuplicateCandidate } from "./duplicate-warning";
+import { auditActionLabel, stamp as auditStamp, type ActivityRow } from "./audit";
 
 /** Household relationships: stored key -> label per UI language. */
 const RELATIONSHIPS: Record<string, { mm: string; en: string; ko: string }> = {
@@ -62,6 +65,7 @@ export type HeadCandidate = {
 export function HouseholdFormPage(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; members?: HeadCandidate[];
+  photoUrl?: string;
 }) {
   const { user, perms, lang } = props;
   const t = getDict(lang ?? "en");
@@ -79,8 +83,12 @@ export function HouseholdFormFragment(props: Common & {
   values: FormValues; errors: string[]; family: { id: number } | null;
   regions: { id: number; name: string }[]; modal?: boolean;
   options?: Record<string, OptionRow[]>; members?: HeadCandidate[];
+  /** Existing family photo, shown with the member-photo picker markup. */
+  photoUrl?: string;
 }) {
   const { values: v, errors, family, regions, modal } = props;
+  const photoUrl = props.photoUrl;
+  const initial = (v.name ?? "").trim().charAt(0) || "H";
   const t = getDict(props.lang ?? "en");
   const action = family ? `/admin/households/${family.id}` : "/admin/households";
   return (
@@ -93,6 +101,32 @@ export function HouseholdFormFragment(props: Common & {
         {modal && <input type="hidden" name="from_modal" value="1" />}
         <div class="card">
           <h2>{t("hh.cardHeading")}</h2>
+          <div class="photo-field hh-photo-field" data-photo-field data-initial={initial}
+            data-processing={t("form.photoProcessing")} data-ready={t("form.photoReady")}
+            data-error={t("form.photoError")}>
+            <div class="photo-preview">
+              <img data-photo-img src={photoUrl} alt="" hidden={!photoUrl} />
+              <span data-photo-fallback hidden={!!photoUrl}>{initial}</span>
+            </div>
+            <div class="photo-controls">
+              <span class="lbl">{t("hh.photo")}</span>
+              <div class="photo-actions">
+                <label class="btn sm secondary photo-pick">
+                  {t("form.photoChoose")}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input hidden />
+                </label>
+                {photoUrl && (
+                  <label class="muted small">
+                    <input type="checkbox" name="photo_remove" value="1" data-photo-remove />
+                    {t("form.photoRemove")}
+                  </label>
+                )}
+              </div>
+              <p class="hint">{t("form.photoHint")}</p>
+              <p class="photo-status" data-photo-status role="status"></p>
+              <input type="hidden" name="photo_data" data-photo-data />
+            </div>
+          </div>
           <div class="form-grid">
             {family === null && (
               <label class="field" style="grid-column:1/-1">
@@ -128,8 +162,11 @@ export function HouseholdFormFragment(props: Common & {
                 </div>
               </label>
             )}
-            <label class="field"><span class="lbl">{t("hh.name")} <span class="hint">{t("hh.nameHint")}</span></span>
-              <input type="text" name="name" required value={v.name ?? ""} /></label>
+            {/* The hint sits under the input: inside the label it wrapped to a
+                second line and pushed this column's input below its neighbour. */}
+            <label class="field"><span class="lbl">{t("hh.name")}</span>
+              <input type="text" name="name" required value={v.name ?? ""} />
+              <span class="field-hint">{t("hh.nameHint")}</span></label>
             {regionCascadeSelects({
               lang: props.lang ?? "en",
               regions,
@@ -146,7 +183,7 @@ export function HouseholdFormFragment(props: Common & {
             })}
             <p class="hint" style="grid-column:1/-1;margin:0">{t("hh.familyGroupAuto")}</p>
 
-            <label class="field"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
+            <label class="field" style="grid-column:1/-1"><span class="lbl">{t("hh.phone")}</span><input type="text" name="phone" value={v.phone ?? ""} /></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.address")}</span><textarea name="address">{v.address ?? ""}</textarea></label>
             <label class="field" style="grid-column:1/-1"><span class="lbl">{t("form.notes")}</span><textarea name="notes">{v.notes ?? ""}</textarea></label>
           </div>
@@ -166,6 +203,8 @@ export function HouseholdsListPage(props: Common & {
   rows: any[]; q: string; township?: string;
   townshipOptions?: { id: number; label: string }[];
   region?: number | null; regions?: { id: number; name: string }[];
+  /** Total households matching the filters, across every page. */
+  total?: number; page?: number | null; pages?: number;
 }) {
   const { user, perms, flash, rows, lang, q } = props;
   const t = getDict(lang ?? "en");
@@ -186,8 +225,11 @@ export function HouseholdsListPage(props: Common & {
     <Layout title={t("hh.pageTitle")} lang={lang} user={user} perms={perms} active="/admin/households" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("hh.pageHeading")}<span class="count-pill">{rows.length}</span></h1>
-          <p class="page-sub">{t("hh.listSub")}</p>
+          <h1>{t("hh.pageHeading")}<span class="count-pill">{props.total ?? rows.length}</span><span
+            class="page-tip">
+            <button type="button" class="field-tip-btn" aria-label={t("hh.listSub")}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{t("hh.listSub")}</span>
+          </span></h1>
         </div>
         <div class="actions hh-list-actions">
           <CardViewToggle lang={lang} viewKey="households" />
@@ -251,7 +293,11 @@ export function HouseholdsListPage(props: Common & {
             return (
               <article class="hh-card">
                 <div class="hh-card-head">
-                  <span class="hh-avatar" aria-hidden="true"><HouseGlyph /></span>
+                  <span class="hh-avatar" aria-hidden="true">
+                    {f.has_photo
+                      ? <img src={`/admin/households/${f.id}/photo`} alt="" loading="lazy" />
+                      : <HouseGlyph />}
+                  </span>
                   <div class="hh-card-title">
                     <a href={`/admin/households/${f.id}`} title={f.name}>{f.name}</a>
                     <span class="hh-card-meta">
@@ -291,12 +337,18 @@ export function HouseholdsListPage(props: Common & {
           })}
         </div>
       )}
+
+      <Pager page={props.page ?? 1} pages={props.pages ?? 1} lang={lang}
+        href={(n) => `/admin/households${qs({ q: q.trim() || null, township: props.township ?? null, region, page: n })}`} />
     </Layout>
   );
 }
 
-export function HouseholdDetailPage(props: Common & { family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[] }) {
-  const { user, perms, flash, family, members: mems, lang, enrolments = [] } = props;
+export function HouseholdDetailPage(props: Common & {
+  family: any; members: any[]; rows?: any[]; enrolments?: EnrolmentSummary[]; photoUrl?: string;
+  audit?: ActivityRow[];
+}) {
+  const { user, perms, flash, family, members: mems, lang, enrolments = [], audit = [] } = props;
   const eduByMember = new Map(enrolments.map((e) => [e.memberId, e] as const));
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
@@ -323,7 +375,7 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
         </div>
         <div class="actions hh-page-actions">
           {perms.has("members.update") && (
-            <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")} data-modal-size="md">{t("members.edit")}</a>
+            <a class="btn secondary js-edit-modal" href={`/admin/households/${family.id}/edit`} data-modal-title={t("hh.editTitle")}>{t("members.edit")}</a>
           )}
           {perms.has("members.delete") && (
             <form method="post" action={`/admin/households/${family.id}/delete`}
@@ -338,30 +390,37 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
       <div class="hh-detail-grid">
         <section class="card hh-panel">
           <h2>{t("hh.cardHeading")}</h2>
-          <div class="hh-facts">
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("hh.head")}</span>
-              <span class="hh-fact-value">
-                {headName
-                  ? (family.head_member_id ? <a href={`/members/${family.head_member_id}`}>{headName}</a> : headName)
-                  : "—"}
-              </span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("detail.state")}</span>
-              <span class="hh-fact-value">{stateName}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("hh.townshipLabel")}</span>
-              <span class="hh-fact-value">{family.township || "—"}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("form.homeCell")}</span>
-              <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
-            </div>
-            <div class="hh-fact">
-              <span class="hh-fact-label">{t("detail.familyGroup")}</span>
-              <span class="hh-fact-value">{optionLabel(family.family_group_code, family.family_group_label) || "—"}</span>
+          {/* The stored photo is a 500×500 square, so a square frame shows it
+              whole — a portrait, a group or a landscape shot alike. */}
+          <div class={props.photoUrl ? "hh-summary has-photo" : "hh-summary"}>
+            {props.photoUrl && (
+              <img class="hh-photo" src={props.photoUrl} alt={family.name} loading="lazy" />
+            )}
+            <div class="hh-facts">
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("hh.head")}</span>
+                <span class="hh-fact-value">
+                  {headName
+                    ? (family.head_member_id ? <a href={`/members/${family.head_member_id}`}>{headName}</a> : headName)
+                    : "—"}
+                </span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("detail.state")}</span>
+                <span class="hh-fact-value">{stateName}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("hh.townshipLabel")}</span>
+                <span class="hh-fact-value">{family.township || "—"}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("form.homeCell")}</span>
+                <span class="hh-fact-value">{family.home_cell_label || "—"}</span>
+              </div>
+              <div class="hh-fact">
+                <span class="hh-fact-label">{t("detail.familyGroup")}</span>
+                <span class="hh-fact-value">{optionLabel(family.family_group_code, family.family_group_label) || "—"}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -371,7 +430,9 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
           <div class="hh-facts">
             <div class="hh-fact wide">
               <span class="hh-fact-label">{t("detail.phone")}</span>
-              <span class="hh-fact-value">{family.phone ? <a href={`tel:${family.phone}`}>{family.phone}</a> : "—"}</span>
+              <span class="hh-fact-value">{family.phone
+                ? <a href={`tel:${family.phone.replace(/[^\d+]/g, "")}`}>{formatPhone(family.phone)}</a>
+                : "—"}</span>
             </div>
             <div class="hh-fact wide">
               <span class="hh-fact-label">{t("detail.address")}</span>
@@ -441,6 +502,33 @@ export function HouseholdDetailPage(props: Common & { family: any; members: any[
           </div>
         )}
       </section>
+
+      {/* Last, after the members: the trail is reference material, not the
+          household's day-to-day content. */}
+      {perms.has("audit.view") && (
+        <section class="card hh-panel hh-activity-panel">
+          <div class="section-head">
+            <h2>{t("activity.recent")}</h2>
+            {/* entity + id, not the name: two households can share a name. */}
+            <a class="btn sm secondary"
+              href={`/admin/audit?entity=household&entity_id=${family.id}`}>{t("activity.all")}</a>
+          </div>
+          {audit.length === 0 ? (
+            <p class="muted small" style="margin:0">{t("activity.empty")}</p>
+          ) : (
+            <ul class="activity-list">
+              {audit.map((r) => (
+                <li>
+                  <span class="activity-when">{auditStamp(r.at)}</span>
+                  <span class="activity-what">{auditActionLabel(t, r.action)}</span>
+                  {r.summary && <span class="activity-summary">{r.summary}</span>}
+                  <span class="activity-who">{r.username || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </Layout>
   );
 }
@@ -463,6 +551,13 @@ export function HouseholdSearchMemberPage(props: Common & {
           <a class="back-link" href={`/admin/households/${family.id}`}>{t("hh.toList")}</a>
           <h1>{t("hh.addExisting")}<span class="muted small"> · {family.name}</span></h1>
         </div>
+        {perms.has("members.create") && (
+          <div class="page-actions">
+            <a class="btn secondary" href={`/admin/households/${family.id}/add-member/new`}>
+              {t("members.addNew")}
+            </a>
+          </div>
+        )}
       </div>
 
       <div class="card">
@@ -516,7 +611,7 @@ export function HouseholdSearchMemberPage(props: Common & {
                     <div class="hh-pick-meta">
                       {secondary && secondary !== primary && <span>{secondary} · </span>}
                       {isEn && m.state_name_en ? m.state_name_en : m.state_name}
-                      {m.phone && <span> · {m.phone}</span>}
+                      {m.phone && <span> · {formatPhone(m.phone)}</span>}
                     </div>
                     <div style="margin-top:4px">
                       {m.family_id
@@ -549,8 +644,11 @@ export function HouseholdAddMemberPage(props: Common & {
   family: any; values: Record<string, string>; errors: string[]; relationship: string;
   options?: Record<string, OptionRow[]>;
   regions?: { id: number; name: string }[];
+  /** Possible duplicates found on the last save attempt, same rule as the
+   *  member form: a warning, not a block. */
+  duplicates?: DuplicateCandidate[];
 }) {
-  const { user, perms, family, values: v, errors, lang } = props;
+  const { user, perms, family, values: v, errors, lang, duplicates = [] } = props;
   const t = getDict(lang ?? "en");
   const L = lang ?? "en";
   const REL = relationshipOptions(lang);
@@ -571,6 +669,7 @@ export function HouseholdAddMemberPage(props: Common & {
           <ul class="err-list">{errors.map((e) => <li>{e}</li>)}</ul></div>
       )}
       <form method="post" action={`/admin/households/${family.id}/add-member`}>
+        <DuplicateWarning duplicates={duplicates} lang={lang} />
         <div class="card">
           <h2>{t("form.basic")}</h2>
           <div class="form-grid">
@@ -622,6 +721,9 @@ export function HouseholdAddMemberPage(props: Common & {
               townshipOpts: props.options?.township ?? [],
               homeCellId: v.home_cell_id ?? "",
               homeCellOpts: props.options?.home_cell ?? [],
+              // This form creates a member, so it needs a Home Cell like the
+              // member form does; the household's own cell is not required.
+              homeCellRequired: true,
               groupId: v.group_id ?? "",
               groupOpts: props.options?.group ?? [],
               familyGroupId: v.family_group_id ?? "",

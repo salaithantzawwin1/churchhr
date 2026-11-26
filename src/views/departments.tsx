@@ -4,6 +4,8 @@ import { countLabel, getDict, pluralLabel, type Lang } from "../i18n";
 import { defsForScope, positionDefLabel, positionLabelsForCsv, type PositionDefRow } from "../position-catalog";
 import { departmentName, type DepartmentRow } from "../departments";
 import { CardViewToggle } from "./view-toggle";
+import { Pager } from "./pager";
+import { qs } from "../util";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
@@ -117,7 +119,7 @@ export function DepartmentModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" class="dept-form"
+      <form method="post" class="dept-form compact-form"
         action={department ? `/organization/departments/${department.id}` : "/organization/departments"}
         data-modal-ajax>
         <div class="form-grid dept-fields">
@@ -348,6 +350,8 @@ export function DepartmentsPage(props: Common & {
   leaders: DepartmentLeaderRow[];
   /** Departments are church-wide, so only all-state managers may add or edit. */
   canManage: boolean;
+  /** 1-based page of the department cards. */
+  page?: number | null;
 }) {
   const { user, perms, flash, lang, departments, positionDefs, leaders, canManage } = props;
   const L = lang ?? "en";
@@ -359,6 +363,11 @@ export function DepartmentsPage(props: Common & {
     leaders.find((l) => l.departmentId === departmentId && l.position === code) ?? null;
   const filledRoles = (departmentId: number) =>
     roleDefs.filter((def) => departmentLeader(departmentId, def.code)).length;
+  /** Two dozen cards a page, matching the other collection lists. */
+  const perPage = 24;
+  const pages = Math.max(1, Math.ceil(departments.length / perPage));
+  const currentPage = Math.min(Math.max(1, props.page ?? 1), pages);
+  const shown = departments.slice((currentPage - 1) * perPage, currentPage * perPage);
 
   return (
     <Layout title={t("dept.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
@@ -371,7 +380,7 @@ export function DepartmentsPage(props: Common & {
           <CardViewToggle lang={lang} viewKey="departments" />
           {canManage && (
             <a class="btn js-add-modal" href="/organization/departments/new"
-              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+              data-modal-title={t("dept.addTitle")} data-modal-size="md">+ {t("dept.add")}</a>
           )}
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
         </div>
@@ -383,12 +392,12 @@ export function DepartmentsPage(props: Common & {
           <p class="muted">{t("dept.emptyBody")}</p>
           {canManage && (
             <a class="btn js-add-modal" href="/organization/departments/new"
-              data-modal-title={t("dept.addTitle")}>+ {t("dept.add")}</a>
+              data-modal-title={t("dept.addTitle")} data-modal-size="md">+ {t("dept.add")}</a>
           )}
         </div>
       ) : (
         <div class="hh-grid" data-view-grid>
-          {departments.map((d) => (
+          {shown.map((d) => (
             <article class={`hh-card dept-card-v2${d.active ? "" : " is-inactive"}`}>
               <div class="hh-card-head">
                 <span class="hh-avatar" aria-hidden="true"><DepartmentGlyph /></span>
@@ -436,13 +445,16 @@ export function DepartmentsPage(props: Common & {
                 <a class="btn sm secondary" href={`/organization/departments/${d.id}`}>{t("org.viewDepartment")}</a>
                 {canManage && (
                   <a class="btn sm secondary js-edit-modal" href={`/organization/departments/${d.id}/edit`}
-                    data-modal-title={t("dept.editTitle")}>{t("members.edit")}</a>
+                    data-modal-title={t("dept.editTitle")} data-modal-size="md">{t("members.edit")}</a>
                 )}
               </div>
             </article>
           ))}
         </div>
       )}
+
+      <Pager page={currentPage} pages={pages} lang={L}
+        href={(n) => `/organization/departments${qs({ page: n })}`} />
     </Layout>
   );
 }

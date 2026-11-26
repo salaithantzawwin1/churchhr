@@ -1,15 +1,31 @@
 name: Deploy to Cloudflare Workers
 
-# Every push to main typechecks, runs the Worker test suite (real workerd +
-# local D1 with the production migrations) and only then applies pending D1
-# migrations before deploying the Worker, so neither failing code nor code ahead
-# of the schema can ship. Cloudflare Workers Builds is also connected to main:
-# keep its build command applying migrations too, or disconnect it, so
-# production has a single migration-first deploy path.
+# GitHub Actions is the only production deploy path for this Worker. Every push
+# to main typechecks, runs the Worker test suite (real workerd + local D1 with
+# the production migrations), refuses moderate-or-worse advisories in the
+# production dependencies and only then applies pending D1 migrations before
+# deploying the Worker, so neither failing code nor code ahead of the schema can
+# ship. Because a migration cannot be rolled back, the live database is exported
+# and kept as a run artifact before the schema changes. Dev-only tooling advisories (vitest/vite transitive packages) do not
+# affect what the Worker ships, so they are not audited here.
+#
+# Cloudflare Workers Builds used to be connected to main as well and deployed the
+# same commit a second time with none of the gates above: on f5712de its
+# "Workers Builds: church-member-registry" check run finished after this job and
+# was the deployment left live. Keep that connection disconnected (Workers &
+# Pages -> church-member-registry -> Settings -> Builds -> Disconnect) so a push
+# cannot ship ungated code. If it is ever reconnected, move these gates and the
+# migrations into its build command instead of running two deploy paths.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  # Read check runs so the last step can tell whether Workers Builds also handled
+  # this commit.
+  checks: read
 
 concurrency:
   group: cloudflare-deploy
@@ -37,6 +53,59 @@ jobs:
       - name: Test (workerd + local D1)
         run: npm test
 
+      # Only production dependencies are audited: the Worker bundle ships those.
+      # Dev tooling advisories would otherwise block deploys for packages that
+      # never reach production.
+      - name: Audit production dependencies (moderate or worse fails the build)
+        run: npm audit --omit=dev --audit-level=moderate
+
+      # Dev-only advisories still need to be seen, so every dependency is audited
+      # too. This step never fails the job: it reports the findings to the run
+      # summary (and the log) without holding up the deploy.
+      - name: Report dependency advisories, dev included (non-blocking)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          report=$(npm audit --audit-level=low 2>&1 || true)
+          printf '%s\n' "$report"
+          if printf '%s' "$report" | grep -q 'found 0 vulnerabilities'; then
+            echo "No advisories across production and dev dependencies." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Dependency advisories (non-blocking)"
+            echo ""
+            echo "Reported for visibility only. Dev-only packages never reach the Worker"
+            echo "bundle, so these advisories do not fail this deploy."
+            echo ""
+            echo '```'
+            printf '%s\n' "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Migrations are irreversible. Export the live database first and keep the
+      # dump with the run, so a bad migration can at least be recovered by hand.
+      # A failed export stops the deploy instead of shipping unprotected.
+      - name: Prepare D1 backup directory
+        run: mkdir -p d1-backup
+
+      - name: Back up D1 before migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 export church-members-db --remote --output=d1-backup/pre-migration-${{ github.sha }}.sql
+
+      # The dump holds member records, so it stays in the private run artifact
+      # for a short window rather than in the repository.
+      - name: Keep the pre-migration backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-${{ github.sha }}
+          path: d1-backup/*.sql
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Apply D1 migrations (remote)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -51,22 +120,115 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
 
-      - name: Verify production health
+      # Post-deploy version check. The fields are compared as parsed JSON, not as
+      # substrings, so a stale deploy cannot pass because some number happens to
+      # contain the expected one ("1.28.13" inside "1.28.139").
+      - name: Post-deploy smoke check (live version, migration, db and sign-in match this build)
         run: |
           set -euo pipefail
+          base=https://www.mmgoodnewshr.online
           expected_version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/version.ts)
           expected_migration=$(basename "$(ls migrations/*.sql | sort | tail -n 1)")
           echo "Expecting version $expected_version and migration $expected_migration"
+          healthy=0
           for attempt in $(seq 1 12); do
-            body=$(curl -fsS --max-time 10 https://www.mmgoodnewshr.online/healthz || true)
+            body=$(curl -fsS --max-time 10 "$base/healthz" || true)
             echo "$body"
-            if printf '%s' "$body" | grep -q "\"version\":\"$expected_version\"" \
-              && printf '%s' "$body" | grep -q "\"migration\":\"$expected_migration\"" \
-              && printf '%s' "$body" | grep -q '"db":"ok"'; then
-              echo "Production health probe passed"
-              exit 0
+            # jq -e exits non-zero on a malformed payload or a field mismatch,
+            # so a half-read or stale /healthz just retries.
+            if printf '%s' "$body" | jq -e --arg version "$expected_version" --arg migration "$expected_migration" '.version == $version and .migration == $migration and .db == "ok"' >/dev/null; then
+              echo "healthz matches this build (attempt $attempt)"
+              healthy=1
+              break
             fi
             sleep 5
           done
-          echo "Production health probe failed: expected $expected_version / $expected_migration with db ok" >&2
-          exit 1
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::/healthz never reported version $expected_version, migration $expected_migration, db ok" >&2
+            exit 1
+          fi
+
+          # The sign-in page must render in every shipped language and keep the
+          # form the POST handler reads, or nobody can get in after a release.
+          for pair in mm:my en:en kr:ko; do
+            lang=${pair%%:*}
+            html_lang=${pair##*:}
+            page=$(curl -fsS --max-time 10 "$base/login?lang=$lang")
+            printf '%s' "$page" | grep -q "<html lang=\"$html_lang\"" || {
+              echo "/login?lang=$lang did not render lang=$html_lang" >&2; exit 1; }
+            printf '%s' "$page" | grep -q 'name="password"' || {
+              echo "/login?lang=$lang lost its password field" >&2; exit 1; }
+            echo "/login?lang=$lang ok"
+          done
+
+          # A signed-out visitor must be sent to the sign-in page rather than an
+          # error page, which proves auth still runs ahead of every page handler.
+          for path in / /organization /members /reports; do
+            result=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' "$base$path")
+            code=${result%% *}
+            location=${result#* }
+            if [ "$code" != 302 ] || [ "$location" != "$base/login" ]; then
+              echo "$path expected 302 to $base/login, got $code $location" >&2
+              exit 1
+            fi
+            echo "$path redirects to /login"
+          done
+
+      # Best effort only. Cloudflare Workers Builds once deployed main alongside
+      # this workflow with none of the gates above, which left its ungated deploy
+      # live. If it is ever reconnected, say so loudly instead of running a
+      # second deploy path quietly. This step never fails the job, and the check
+      # run can appear after this job has finished, so a quiet result is not
+      # proof the connection is gone.
+      - name: Warn if Cloudflare Workers Builds also handled this commit (non-blocking)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A failed lookup (rate limit, missing permission) must not turn this
+          # informational step red, so the response is captured and the parser
+          # reports what it got instead.
+          body=$(curl -fsS --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" || true)
+          printf '%s' "$body" | python3 -c '
+          import json, os, sys
+
+          try:
+              runs = json.load(sys.stdin).get("check_runs", [])
+          except (ValueError, AttributeError):
+              print("Could not read check runs for this commit; skipping the Workers Builds check.")
+              sys.exit(0)
+
+          sha = os.environ.get("GITHUB_SHA", "")
+          found = [
+              "%s [%s/%s]" % (r.get("name"), r.get("status"), r.get("conclusion") or "-")
+              for r in runs
+              if (r.get("app") or {}).get("slug") == "cloudflare-workers-and-pages"
+          ]
+          if not found:
+              print("No Cloudflare Workers Builds check run for %s at this point." % sha)
+              sys.exit(0)
+
+          print("::warning::Cloudflare Workers Builds is also handling this commit, so production has a second, ungated deploy path.")
+          report = "\n".join([
+              "### :warning: Cloudflare Workers Builds is deploying this commit too",
+              "",
+              "Check runs reported for `%s`:" % sha,
+              "",
+              "```",
+          ] + found + [
+              "```",
+              "",
+              "That path runs no typecheck, tests, audit or migrations, so disconnect it:",
+              "Workers & Pages -> church-member-registry -> Settings -> Builds -> Disconnect.",
+              "",
+          ])
+          print(report)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write(report + "\n")
+          '

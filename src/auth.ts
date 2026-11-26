@@ -58,6 +58,18 @@ export async function hashPassword(password: string, iterations: number = DEFAUL
   return `pbkdf2-sha256$${iterations}$${toB64(salt)}$${toB64(dk)}`;
 }
 
+/** Iteration count recorded in an existing hash, or null when the value is not
+ * a hash this module can read. Used to re-hash a verified password after the
+ * configured cost is raised, so old accounts upgrade on their next sign-in. */
+export function hashIterations(stored: string): number | null {
+  const parts = stored.split("$");
+  if (parts.length !== 4 || parts[0] !== "pbkdf2-sha256") return null;
+  const iterations = Number(parts[1]);
+  return Number.isInteger(iterations) && iterations >= 1_000 && iterations <= 10_000_000
+    ? iterations
+    : null;
+}
+
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2-sha256") return false;

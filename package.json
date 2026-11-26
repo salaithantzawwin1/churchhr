@@ -9,12 +9,13 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "assets:version": "node scripts/asset-version.mjs",
     "db:local": "wrangler d1 migrations apply church-members-db --local",
     "db:remote": "wrangler d1 migrations apply church-members-db --remote"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",
-    "hono": "^4.13.13"
+    "hono": "^4.13.19"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.2",

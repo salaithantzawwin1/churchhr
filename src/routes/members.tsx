@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { families, memberHistory } from "../db/schema";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
 import { lookupOptions, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
-import { ALL_STATES, abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
+import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, optionsOfType, type OptionRow } from "../lookup";
 import { buildCsv, headerIndex, parseCsv } from "../csv";
 import {
   getMemberPositions, isPositionForScope, positionLabel, positionTaken, setHomeCellPosition, setMemberPositions,
@@ -16,6 +16,7 @@ import { isDefinedForScope, isPastorPositionCode, loadPositionDefs, positionDefL
 import { recordPositionHistory } from "../position-history";
 import { loadRegionalChurches, loadSupervisionClusters } from "../org-units";
 import { loadDepartments } from "../departments";
+import { parsePhoto } from "../photo";
 
 /** from admin.tsx: multi/ints duplicated here to avoid cross-route imports. */
 function multi(v: unknown): string[] {
@@ -38,8 +39,10 @@ import {
 import { EnrolmentModal } from "../views/student-education";
 import {
   ImportPage, MemberDetailPage, MemberFormFragment, MemberFormPage, MemberPositionForm, MemberPositionPage, MembersListPage,
-  type Filters, type FormValues, type ImportReport, type MemberDetail,
+  type DuplicateCandidate, type Filters, type FormValues, type ImportReport, type MemberDetail,
 } from "../views/members";
+import { nameKey } from "../pastor-children";
+import { readMemberForm } from "../member-form";
 
 export const membersRoutes = new Hono<AppEnv>();
 
@@ -142,6 +145,7 @@ function parseFilters(q: Record<string, string | undefined>): Filters {
     gender: q.gender && q.gender in GENDERS ? q.gender : "",
     status: q.status && q.status in STATUSES ? q.status : "",
     homeCell: intParam(q.home_cell),
+    church: intParam(q.church),
     department: intParam(q.department),
     group: intParam(q.group),
     fellowship: intParam(q.fellowship),
@@ -171,6 +175,11 @@ function listCond(scope: Scope, f: Filters, age?: { min_age: number; max_age: nu
   if (f.gender) cond = sql`${cond} AND m.gender = ${f.gender}`;
   if (f.status) cond = sql`${cond} AND m.status = ${f.status}`;
   if (f.homeCell) cond = sql`${cond} AND m.home_cell_id = ${f.homeCell}`;
+  if (f.church) {
+    cond = sql`${cond} AND m.home_cell_id IN (
+      SELECT id FROM lookup_options
+      WHERE type = 'home_cell' AND active = 1 AND regional_church_id = ${f.church})`;
+  }
   if (f.department) cond = sql`${cond} AND m.department_id = ${f.department}`;
   if (f.group) cond = sql`${cond} AND m.group_id = ${f.group}`;
   if (f.familyGroup === "any") cond = sql`${cond} AND m.family_group_id IS NOT NULL`;
@@ -281,7 +290,12 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     LIMIT ${PER_PAGE} OFFSET ${offset}`);
 
   // Reference lists and the page rows are independent: one wait, not six.
-  const [rows, allRegions, allOptions, departments, positionDefs, ageGroups] = await Promise.all([
+  const churchNameP = f.church
+    ? db.all<{ name: string; name_en: string | null }>(
+      sql`SELECT name, name_en FROM regional_churches WHERE id = ${f.church} LIMIT 1`,
+    )
+    : Promise.resolve([] as { name: string; name_en: string | null }[]);
+  const [rows, allRegions, allOptions, departments, positionDefs, ageGroups, churchRows] = await Promise.all([
     rowsP,
     loadRegions(db),
     loadAllOptions(db),
@@ -291,7 +305,11 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
     db.all<{ id: number; name: string; min_age: number; max_age: number }>(
       sql`SELECT id, name, min_age, max_age FROM age_groups ORDER BY sort_order, min_age`,
     ),
+    churchNameP,
   ]);
+  const churchName = churchRows[0]
+    ? c.get("lang") === "mm" ? churchRows[0].name : churchRows[0].name_en ?? churchRows[0].name
+    : null;
   return c.html(
     <MembersListPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
@@ -300,6 +318,7 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
       dir={c.req.query("dir") === "desc" ? "desc" : "asc"}
       regions={scopedRegions(allRegions, scope, c.get("lang"))}
       homeCells={optionsOfType(allOptions, "home_cell")}
+      churchName={churchName}
       departments={departments}
       groups={optionsOfType(allOptions, "group")}
       fellowships={optionsOfType(allOptions, "fellowship_category")}
@@ -312,126 +331,67 @@ membersRoutes.get("/", requirePermission("members.view"), async (c) => {
 
 // ---------- shared form read/validate ----------
 
-const OPTION_FIELD: Record<string, string> = {
-  ethnicity_id: "ethnicity",
-  education_id: "education",
-  family_group_id: "family_group",
-  fellowship_category_id: "fellowship_category",
-  sector_id: "sector",
-  group_id: "group",
-  home_cell_id: "home_cell",
-};
+/** Members that look like the same person as `data`, for the soft warning
+ *  shown before a save. A name match uses the same key as the pastor-child
+ *  linker (spaces, dots and separators ignored), and phone / NRC / birth date
+ *  each count on their own so a clerk can see the existing record. */
+export async function findPossibleDuplicates(
+  db: DB,
+  data: Record<string, string | number | null>,
+  scope: Scope,
+  excludeId: number | null,
+): Promise<DuplicateCandidate[]> {
+  const keyMm = nameKey(String(data.name_myanmar ?? ""));
+  const keyEn = nameKey(String(data.name_english ?? ""));
+  const phone = String(data.phone ?? "").trim();
+  const nrc = String(data.nrc_number ?? "").toUpperCase().replace(/\s+/g, "");
+  const dob = String(data.date_of_birth ?? "");
 
-const FORM_KEYS = [
-  "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
-  "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
-  "family_group_id", "ethnicity_id", "education_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "department_id", "group_id", "fellowship_category_id", "sector_id",
-  "salvation_date", "status", "notes",
-] as const;
+  const conditions: SQL[] = [];
+  // Mirrors nameKey() in SQL: keep the two in sync.
+  const nameExpr = (col: string) => sql.raw(`LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${col},''),' ',''),'.',''),'-',''),'·',''),'''',''),'’',''))`);
+  if (keyMm) conditions.push(sql`${nameExpr("m.name_myanmar")} = ${keyMm}`);
+  if (keyEn) conditions.push(sql`${nameExpr("m.name_english")} = ${keyEn}`);
+  if (phone) conditions.push(sql`TRIM(COALESCE(m.phone, '')) = ${phone}`);
+  if (nrc) conditions.push(sql`UPPER(REPLACE(COALESCE(m.nrc_number, ''), ' ', '')) = ${nrc}`);
+  if (dob) conditions.push(sql`m.date_of_birth = ${dob}`);
+  if (conditions.length === 0) return [];
 
-type Validated = { values: FormValues; errors: string[]; data: Record<string, string | number | null> | null };
+  const rows = await db.all<{
+    id: number;
+    name: string | null;
+    nameEn: string | null;
+    dateOfBirth: string | null;
+    phone: string | null;
+    nrcNumber: string | null;
+    homeCell: string | null;
+  }>(sql`
+    SELECT m.id, m.name_myanmar AS name, m.name_english AS nameEn,
+           m.date_of_birth AS dateOfBirth, m.phone, m.nrc_number AS nrcNumber,
+           hc.label AS homeCell
+    FROM members m
+    LEFT JOIN lookup_options hc ON hc.id = m.home_cell_id
+    WHERE m.status != 'deleted' AND m.id != ${excludeId ?? 0} AND ${scopeCond(scope)}
+      AND (${sql.join(conditions, sql` OR `)})
+    ORDER BY m.id DESC
+    LIMIT 10`);
 
-function readAndValidate(body: Record<string, unknown>, scope: Scope, options: OptionRow[], departments: { id: number }[] = [], regions: { id: number }[] = []): Validated {
-  const v: FormValues = {};
-  for (const k of FORM_KEYS) v[k] = s(body[k]);
-  const errors: string[] = [];
-
-  if (!v.name_myanmar && !v.name_english) errors.push(msg("val.name"));
-
-  const regionId = asInt(v.region_id);
-  let regionOk = false;
-  if (regionId === null) errors.push(msg("val.state"));
-  // Scope-all may pick any state, but only one that still exists: an id from a
-  // hand-edited form reached the insert and failed its foreign key (HTTP 500).
-  else if (scope.scopeAll) regionOk = regions.length === 0 || regions.some((r) => r.id === regionId);
-  else regionOk = scope.stateIds.includes(regionId);
-  if (regionId !== null && !regionOk) errors.push(msg("val.scope"));
-
-  if (v.gender && !(v.gender in GENDERS)) errors.push(msg("val.gender"));
-  if (v.marital_status && !(v.marital_status in MARITAL_STATUSES)) errors.push(msg("val.marital"));
-  if (v.blood_type && !BLOOD_TYPES.includes(v.blood_type) &&
-      !findOption(options, "blood_type", v.blood_type, 0)) {
-    errors.push(msg("val.blood"));
-  }
-
-  let dob: string | null = "";
-  if (v.date_of_birth) {
-    dob = parseDateFlexible(v.date_of_birth);
-    if (dob === null) errors.push(msg("val.dob"));
-    else if (isFutureDate(dob)) errors.push(msg("val.dobFuture"));
-  }
-  let salvation: string | null = "";
-  if (v.salvation_date) {
-    salvation = parseDateFlexible(v.salvation_date);
-    if (salvation === null) errors.push(msg("val.salvation"));
-    else if (isFutureDate(salvation)) errors.push(msg("val.salvationFuture"));
-  }
-
-  let income: number | null = null;
-  if (v.income) {
-    const digits = v.income.replace(/[,\s]/g, "");
-    if (/^\d+$/.test(digits)) income = Number(digits);
-    else errors.push(msg("val.income"));
-  }
-
-  const status = v.status && v.status in STATUSES ? v.status : "active";
-
-  let departmentId: number | null = null;
-  if (v.department_id) {
-    departmentId = asInt(v.department_id);
-    if (departmentId === null || !departments.some((d) => d.id === departmentId)) {
-      errors.push(msg("val.department"));
-      departmentId = null;
-    }
-  }
-
-  const optionIds: Record<string, number | null> = {};
-  for (const [field, type] of Object.entries(OPTION_FIELD)) {
-    const raw = v[field];
-    if (!raw) { optionIds[field] = null; continue; }
-    const found = options.find((o) => o.type === type && o.id === asInt(raw));
-    // A state-scoped option from another state would silently attach the member
-    // to a structure the editor cannot see, so only accept the member's own
-    // state plus all-states (region 0) options.
-    if (found && found.regionId !== ALL_STATES && found.regionId !== regionId) {
-      errors.push(msg("val.option"));
-      optionIds[field] = null;
-      continue;
-    }
-    if (!found) errors.push(msg("val.option"));
-    optionIds[field] = found ? found.id : null;
-  }
-
-  if (errors.length > 0) return { values: v, errors, data: null };
-  return {
-    values: v,
-    errors,
-    data: {
-      name_myanmar: v.name_myanmar || null,
-      name_english: v.name_english || null,
-      gender: v.gender,
-      marital_status: v.marital_status,
-      date_of_birth: dob === "" ? null : dob,
-      blood_type: v.blood_type,
-      phone: v.phone || null,
-      nrc_number: v.nrc_number || null,
-      languages: v.languages || null,
-      address: v.address || null,
-      township: v.township || null,
-      father_name: v.father_name || null,
-      mother_name: v.mother_name || null,
-      job: v.job || null,
-      work_skills: v.work_skills || null,
-      income,
-      salvation_date: salvation === "" ? null : salvation,
-      status,
-      notes: v.notes || null,
-      region_id: regionId,
-      department_id: departmentId,
-      ...optionIds,
-    },
-  };
+  return rows.map((row) => {
+    const reasons: string[] = [];
+    if (keyMm && nameKey(row.name) === keyMm) reasons.push("dup.reasonName");
+    else if (keyEn && nameKey(row.nameEn) === keyEn) reasons.push("dup.reasonName");
+    if (phone && row.phone?.trim() === phone) reasons.push("dup.reasonPhone");
+    if (nrc && row.nrcNumber?.toUpperCase().replace(/\s+/g, "") === nrc) reasons.push("dup.reasonNrc");
+    if (dob && row.dateOfBirth === dob) reasons.push("dup.reasonDob");
+    return {
+      id: row.id,
+      name: row.name ?? row.nameEn ?? "",
+      dateOfBirth: row.dateOfBirth,
+      phone: row.phone,
+      homeCell: row.homeCell,
+      reasons,
+    };
+  });
 }
 
 function defaultValues(scope: Scope, allRegions: Region[]): FormValues {
@@ -620,6 +580,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
   let errorCount = 0;
   let duplicates = 0;
   let totalRows = 0;
+  let noHomeCell = 0;
   const validRows: ImportRow[] = [];
   const pending = new Map<string, { type: string; label: string }>();
 
@@ -753,6 +714,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       continue;
     }
     seen.add(key);
+    if (!optionLabels.home_cell) noHomeCell++;
     validRows.push({
       line,
       optionLabels,
@@ -797,6 +759,7 @@ async function analyzeImport(db: DB, csvText: string, scope: Scope, userId: numb
       errorCount,
       errors,
       newOptions: [...pending.values()].map((p) => `${p.type}: ${p.label}`),
+      noHomeCell,
     },
     validRows,
     pending,
@@ -1022,34 +985,6 @@ function inScope(row: { region_id: number; home_cell_id?: number | null }, scope
   return true;
 }
 
-/** Client-side canvas output is small; keep a hard cap on what reaches D1. */
-const MAX_PHOTO_BYTES = 400 * 1024;
-
-type PhotoInput = { bytes: Uint8Array | null; touched: boolean; error: string | null };
-
-/** Reads the hidden photo_data field produced by the browser resizer. */
-function parsePhoto(body: Record<string, unknown>): PhotoInput {
-  const remove = s(body.photo_remove) === "1";
-  if (remove) return { bytes: null, touched: true, error: null };
-  const raw = s(body.photo_data);
-  if (!raw) return { bytes: null, touched: false, error: null };
-  const match = /^data:image\/webp;base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
-  if (!match) return { bytes: null, touched: true, error: msg("photo.badType") };
-  let bytes: Uint8Array;
-  try {
-    const bin = atob(match[1]!.replace(/\s+/g, ""));
-    bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
-  } catch {
-    return { bytes: null, touched: true, error: msg("photo.badType") };
-  }
-  if (bytes.length > MAX_PHOTO_BYTES) return { bytes: null, touched: true, error: msg("photo.tooLarge") };
-  const webp = bytes.length >= 12 &&
-    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
-  if (!webp) return { bytes: null, touched: true, error: msg("photo.badType") };
-  return { bytes, touched: true, error: null };
-}
-
 async function savePhoto(db: DB, id: number, bytes: Uint8Array | null): Promise<void> {
   // D1 binds ArrayBuffer for BLOB values (a bare Uint8Array is not portable).
   const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
@@ -1164,10 +1099,15 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
-  const photo = parsePhoto(body);
+  const { values, errors, data } = readMemberForm(body, {
+    scope, options, departments, regions: allRegions, t: getDict(c.get("lang")),
+  });
+  const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
-  const render = (status: 400 | 200) =>
+  // Echo the resized upload back into the form so a re-render (validation or
+  // duplicate warning) does not drop the photo the clerk just chose.
+  const photoData = photo.error ? "" : s(body.photo_data);
+  const render = (status: 400 | 200, duplicates: DuplicateCandidate[] = []) =>
     c.html(
       fromModal
         ? <MemberFormFragment
@@ -1175,6 +1115,8 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
             options={formOptions(options)} departments={departments}
+            photoData={photoData}
+            duplicates={duplicates}
             lang={c.get("lang")} modal
           />
         : <MemberFormPage
@@ -1182,11 +1124,19 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
             errors={errors.map((e) => renderMsg(e, c.get("lang")))}
             member={null} regions={scopedRegions(allRegions, scope, c.get("lang"))}
             options={formOptions(options)} departments={departments}
+            photoData={photoData}
+            duplicates={duplicates}
             lang={c.get("lang")}
           />,
       status,
     );
   if (!data || photo.error) return render(400);
+  // Soft duplicate warning: the record is not blocked, only flagged until the
+  // clerk either opens the existing member or confirms this is someone else.
+  if (s(body.confirm_duplicate) !== "1") {
+    const duplicates = await findPossibleDuplicates(db, data, scope, null);
+    if (duplicates.length > 0) return render(200, duplicates);
+  }
   const id = await insertMember(db, data, c.get("user").id);
   if (photo.touched) await savePhoto(db, id, photo.bytes);
   await db.insert(memberHistory).values({
@@ -1194,6 +1144,8 @@ membersRoutes.post("/", requirePermission("members.create"), async (c) => {
     snapshotJson: JSON.stringify(data),
   });
   if (fromModal) return c.redirect(`/members/${id}?ok=member-created`, 303);
+  // "Save and add new" from the new-member page loops back to a blank form.
+  if (s(body.intent) === "add_another") return c.redirect("/members/new", 303);
   return c.redirect(`/members/${id}?ok=member-created`, 302);
 });
 
@@ -1207,7 +1159,7 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   if (!Number.isInteger(id) || id < 1) return notFound();
   // The member, their history and the position labels are independent reads:
   // one query window instead of three.
-  const [row, historyRows, positionDefs, enrolments] = await Promise.all([
+  const [row, historyRows, positionDefs, enrolments, auditRows] = await Promise.all([
     loadMemberDetail(db, id),
     db.all<{ id: number; action: string; created_at: number; actor_name: string }>(sql`
       SELECT h.id, h.action, h.created_at,
@@ -1218,12 +1170,21 @@ membersRoutes.get("/:id", requirePermission("members.view"), async (c) => {
       LIMIT 100`),
     loadPositionDefs(db),
     loadMemberEnrolments(db, id),
+    // The audit trail for this member, written by the request middleware. Only
+    // readers of the audit page see who changed the record.
+    c.get("perms").has("audit.view")
+      ? db.all<{ at: number; username: string | null; action: string; summary: string | null }>(sql`
+          SELECT at, username, action, summary FROM audit_log
+          WHERE entity = 'member' AND entity_id = ${String(id)}
+          ORDER BY at DESC, id DESC LIMIT 8`)
+      : Promise.resolve([] as { at: number; username: string | null; action: string; summary: string | null }[]),
   ]);
   if (!row || !inScope(row, scope)) return notFound();
   return c.html(
     <MemberDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))} m={row}
       history={historyRows as any} positionDefs={positionDefs} enrolments={enrolments} lang={c.get("lang")}
+      audit={auditRows}
     />,
   );
 });
@@ -1318,7 +1279,8 @@ membersRoutes.get("/:id/position", requirePermission("members.update"), async (c
     positionDefs: state.defs, regionalChurches: state.regionalChurches, clusters: state.clusters,
     canManageDepartments: c.get("perms").has("options.manage") && scope.scopeAll,
     canManagePositions: c.get("perms").has("options.manage") && scope.scopeAll,
-    canManageRegional: c.get("perms").has("options.manage"), lang: c.get("lang"),
+    canManageRegional: c.get("perms").has("options.manage"),
+    initialTab: c.req.query("tab") ?? null, lang: c.get("lang"),
   };
   if (c.req.query("modal") !== "1") {
     return c.html(
@@ -1392,7 +1354,7 @@ membersRoutes.post("/:id/position", requirePermission("members.update"), async (
       canManageDepartments={c.get("perms").has("options.manage") && scope.scopeAll}
       canManagePositions={c.get("perms").has("options.manage") && scope.scopeAll}
       canManageRegional={c.get("perms").has("options.manage")}
-      error={message} lang={c.get("lang")}
+      error={message} initialTab={s(body.tab) || null} lang={c.get("lang")}
     />,
     400,
   );
@@ -1678,24 +1640,37 @@ membersRoutes.post("/:id", requirePermission("members.update"), async (c) => {
   const options = await loadAllOptions(db);
   const departments = await loadDepartments(db, false);
   const allRegions = await loadRegions(db);
-  const { values, errors, data } = readAndValidate(body, scope, options, departments, allRegions);
-  const photo = parsePhoto(body);
+  const { values, errors, data } = readMemberForm(body, {
+    scope, options, departments, regions: allRegions, t: getDict(c.get("lang")),
+  });
+  const photo = parsePhoto(body, msg);
   if (photo.error) errors.push(photo.error);
-  if (!data || photo.error) {
-    const formProps = {
-      user: c.get("user"), perms: c.get("perms"), values,
-      errors: errors.map((e) => renderMsg(e, c.get("lang"))),
-      member: {
-        id,
-        photoUrl: existing.has_photo ? `/members/${id}/photo?v=${existing.updated_at}` : undefined,
-      },
-      regions: scopedRegions(allRegions, scope, c.get("lang")),
-      options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
-      departments,
-      lang: c.get("lang"),
-    };
-    if (fromModal) return c.html(<MemberFormFragment {...formProps} modal />, 400);
-    return c.html(<MemberFormPage {...formProps} />, 400);
+  const photoData = photo.error ? "" : s(body.photo_data);
+  const formProps = (duplicates: DuplicateCandidate[] = []) => ({
+    user: c.get("user"), perms: c.get("perms"), values,
+    errors: errors.map((e) => renderMsg(e, c.get("lang"))),
+    member: {
+      id,
+      photoUrl: existing.has_photo ? `/members/${id}/photo?v=${existing.updated_at}` : undefined,
+    },
+    regions: scopedRegions(allRegions, scope, c.get("lang")),
+    options: formOptions(options, (o) => o.type === "township" ? o.label === existing.township : o.id === (existing as any)[`${o.type}_id`]),
+    departments,
+    photoData,
+    duplicates,
+    lang: c.get("lang"),
+  });
+  const renderForm = (duplicates: DuplicateCandidate[] = [], status: 400 | 200 = 400) => {
+    const props = formProps(duplicates);
+    if (fromModal) return c.html(<MemberFormFragment {...props} modal />, status);
+    return c.html(<MemberFormPage {...props} />, status);
+  };
+  if (!data || photo.error) return renderForm();
+  // A rename or a new phone may point at an existing record; warn before the
+  // update unless the clerk already confirmed it is a different person.
+  if (s(body.confirm_duplicate) !== "1") {
+    const duplicates = await findPossibleDuplicates(db, data, scope, id);
+    if (duplicates.length > 0) return renderForm(duplicates, 200);
   }
   await db
     .update(members)

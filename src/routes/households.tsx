@@ -2,12 +2,16 @@ import { Hono } from "hono";
 import { and, eq, sql } from "drizzle-orm";
 import type { AppEnv } from "../env";
 import { getDb, type DB } from "../db/client";
+import { parsePhoto } from "../photo";
 import { families, lookupOptions, memberHistory, members, regions } from "../db/schema";
 import { requirePermission } from "../middleware";
 import { flashFromQuery } from "../flash";
 import { loadEnrolmentSummaries, type EnrolmentSummary } from "../student-enrolments";
 import { loadAllOptions, nextFamilyGroupCode, townshipOf, type OptionRow } from "../lookup";
-import { asInt, intParam, isFutureDate, normKey, parseDateFlexible, s } from "../util";
+import { asInt, intParam, normKey, s } from "../util";
+import { MEMBER_FORM_KEYS, readMemberForm } from "../member-form";
+import type { DuplicateCandidate } from "../views/members";
+import { findPossibleDuplicates } from "./members";
 import { getDict, type Lang } from "../i18n";
 import {
   HouseholdAddMemberPage, HouseholdFormFragment, HouseholdFormPage, HouseholdsListPage, HouseholdDetailPage,
@@ -17,11 +21,20 @@ import {
 
 export const householdsRoutes = new Hono<AppEnv>();
 
-type Scope = { scopeAll: boolean; stateIds: number[] };
+type Scope = { scopeAll: boolean; stateIds: number[]; homeCellIds: number[] };
 
-function scopeOf(c: { get: (k: "scopeAll" | "stateIds") => any }): Scope {
-  return { scopeAll: c.get("scopeAll"), stateIds: c.get("stateIds") };
+function scopeOf(c: { get: (k: "scopeAll" | "stateIds" | "homeCellIds") => any }): Scope {
+  return {
+    scopeAll: c.get("scopeAll"),
+    stateIds: c.get("stateIds"),
+    // Carried for the shared member duplicate lookup, which honours the
+    // account's Home Cell limit like the member list does.
+    homeCellIds: (c.get("homeCellIds") ?? []) as number[],
+  };
 }
+
+/** Household cards per page; the other collection lists page at the same size. */
+const PER_PAGE = 24;
 
 function scopeCondF(scope: Scope) {
   if (scope.scopeAll) return sql`1=1`;
@@ -34,6 +47,32 @@ const RELATIONSHIPS = [
   "brother", "sister", "grandchild", "other",
 ] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];
+
+async function savePhoto(db: DB, familyId: number, bytes: Uint8Array | null): Promise<void> {
+  // D1 binds ArrayBuffer for BLOB values (a bare Uint8Array is not portable).
+  const value = bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : null;
+  await db.run(sql`UPDATE families SET photo = ${value} WHERE id = ${familyId}`);
+}
+
+/** Small checksum for the photo ETag: families has no updated_at column, and
+ *  the browser re-encodes on every save, so the bytes are the validator. */
+function photoHash(bytes: Uint8Array): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i += 1) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+const photoUrlOf = (family: { id: number; has_photo?: number | boolean }) =>
+  family.has_photo ? `/admin/households/${family.id}/photo` : undefined;
+
+/** The household columns the routes read. The photo BLOB is deliberately left
+ *  out: pages only need has_photo, and /:id/photo serves the bytes. */
+const FAMILY_COLS = sql`f.id, f.name, f.head_member_id, f.address, f.township, f.phone,
+    f.home_cell_id, f.group_id, f.family_group_id, f.region_id, f.notes,
+    f.created_by, f.created_at, (f.photo IS NOT NULL) AS has_photo`;
 
 /** nrc-like helpers borrowed pattern from members.tsx; kept local to route. */
 async function loadRegions(db: DB) {
@@ -221,8 +260,14 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
   const townshipCond = township ? sql`AND f.township = ${township}` : sql``;
   const region = intParam(c.req.query("region"));
   const regionCond = region ? sql`AND f.region_id = ${region}` : sql``;
+  const where = sql`${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}`;
+  const countRows = await db.all<{ n: number }>(sql`SELECT COUNT(*) AS n FROM families f WHERE ${where}`);
+  const total = countRows[0]?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const page = Math.min(Math.max(1, intParam(c.req.query("page")) ?? 1), pages);
   const rowsP = db.all(sql`
     SELECT f.id, f.name, f.address, f.township, f.phone, f.created_at,
+           (f.photo IS NOT NULL) AS has_photo,
            r.name AS state_name, r.name_en AS state_name_en,
            head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
            head.phone AS head_phone,
@@ -236,9 +281,9 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
     LEFT JOIN lookup_options fg ON fg.id = COALESCE(f.family_group_id, head.family_group_id)
     LEFT JOIN (SELECT family_id, COUNT(*) AS cnt FROM members WHERE family_id IS NOT NULL GROUP BY family_id) hm
       ON hm.family_id = f.id
-    WHERE ${scopeCondF(scope)} ${q ? sql`AND (f.name LIKE ${like} OR f.address LIKE ${like} OR f.phone LIKE ${like})` : sql``} ${townshipCond} ${regionCond}
+    WHERE ${where}
     ORDER BY f.id DESC
-    LIMIT 200`);
+    LIMIT ${PER_PAGE} OFFSET ${(page - 1) * PER_PAGE}`);
   const lang = c.get("lang");
   // The list, the township filter options and the state filter options are
   // independent reads: one query window instead of three.
@@ -261,6 +306,7 @@ householdsRoutes.get("/", requirePermission("members.view"), async (c) => {
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), lang)}
       rows={rows} q={q} township={township} townshipOptions={townshipsInScope} lang={lang}
       region={region} regions={regionOptions}
+      total={total} page={page} pages={pages}
     />,
   );
 });
@@ -334,6 +380,8 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     }
   }
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const photo = parsePhoto(body, (k) => getDict(c.get("lang"))(k));
+  if (photo.error) errors.push(photo.error);
   const allOptions = await loadAllOptions(db);
   const headList = await headCandidates(db, scope, null);
   const render = (status: 400 | 200) => {
@@ -345,7 +393,7 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
-  if (!data) return render(400);
+  if (!data || photo.error) return render(400);
 
   // Optional existing member becomes the head and is attached to the new family.
   let head: any = null;
@@ -371,6 +419,8 @@ householdsRoutes.post("/", requirePermission("members.create"), async (c) => {
     })
     .returning({ id: families.id });
   const familyId = inserted[0]!.id;
+  if (photo.touched) await savePhoto(db, familyId, photo.bytes);
+  c.set("auditNote", { summary: data.name });
 
   if (head) {
     const now = Math.floor(Date.now() / 1000);
@@ -412,7 +462,7 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
   const [row] = await db.all(sql`
-    SELECT f.*, r.name AS state_name, r.name_en AS state_name_en,
+    SELECT ${FAMILY_COLS}, r.name AS state_name, r.name_en AS state_name_en,
       head.name_myanmar AS head_name_mm, head.name_english AS head_name_en,
       hc.label AS home_cell_label,
       fg.label AS family_group_label, fg.code AS family_group_code
@@ -426,13 +476,49 @@ householdsRoutes.get("/:id", requirePermission("members.view"), async (c) => {
   }
   const mems = await householdMembers(db, id);
   // One extra read so each child shows its current class and school.
-  const enrolments = await loadEnrolmentSummaries(db, mems.map((m: any) => Number(m.id)));
+  const [enrolments, auditRows] = await Promise.all([
+    loadEnrolmentSummaries(db, mems.map((m: any) => Number(m.id))),
+    // The trail for this household, written by the request middleware. Only
+    // readers of the audit page see who changed it.
+    c.get("perms").has("audit.view")
+      ? db.all<{ at: number; username: string | null; action: string; summary: string | null }>(sql`
+          SELECT at, username, action, summary FROM audit_log
+          WHERE entity = 'household' AND entity_id = ${String(id)}
+          ORDER BY at DESC, id DESC LIMIT 8`)
+      : Promise.resolve([] as { at: number; username: string | null; action: string; summary: string | null }[]),
+  ]);
   return c.html(
     <HouseholdDetailPage
       user={c.get("user")} perms={c.get("perms")} flash={flashFromQuery(c.req.query(), c.get("lang"))}
       family={row} members={mems} rows={[]} enrolments={enrolments} lang={c.get("lang")}
+      photoUrl={photoUrlOf(row)} audit={auditRows}
     />,
   );
+});
+
+// ---------- GET /admin/households/:id/photo ----------
+
+householdsRoutes.get("/:id/photo", requirePermission("members.view"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.notFound();
+  const rows = await db.all<{ photo: ArrayBuffer | number[] | null; region_id: number }>(sql`
+    SELECT photo, region_id FROM families WHERE id = ${id}`);
+  const row = rows[0];
+  if (!row?.photo || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) return c.notFound();
+  // D1 returns BLOBs as byte arrays through the driver; wrap them for Response.
+  const photo = Array.isArray(row.photo) ? Uint8Array.from(row.photo) : new Uint8Array(row.photo);
+  const etag = `W/"household-${id}-${photo.byteLength}-${photoHash(photo)}"`;
+  const headers: Record<string, string> = {
+    "Content-Type": "image/webp",
+    "Content-Length": String(photo.byteLength),
+    "Cache-Control": "private, no-cache",
+    "ETag": etag,
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (c.req.header("If-None-Match") === etag) return new Response(null, { status: 304, headers });
+  return new Response(photo, { headers });
 });
 
 // ---------- GET /admin/households/:id/edit ----------
@@ -445,7 +531,7 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   // The household row and both lookup lists are independent: one query window.
   const [rowRows, allRegions, allOptions] = await Promise.all([
     db.all(sql`
-      SELECT f.*, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
+      SELECT ${FAMILY_COLS}, head.home_cell_id AS head_home_cell_id, head.group_id AS head_group_id
       FROM families f LEFT JOIN members head ON head.id = f.head_member_id
       WHERE f.id = ${id}`),
     loadRegions(db),
@@ -466,7 +552,7 @@ householdsRoutes.get("/:id/edit", requirePermission("members.update"), async (c)
   const opts = {
     user: c.get("user"), perms: c.get("perms"), values, errors: [] as string[],
     family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-    options: hhFormOptions(allOptions),
+    options: hhFormOptions(allOptions), photoUrl: photoUrlOf(row),
   };
   if (c.req.query("modal") === "1") return c.html(<HouseholdFormFragment {...opts} modal />);
   return c.html(<HouseholdFormPage {...opts} />);
@@ -479,7 +565,7 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [row] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -487,17 +573,20 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   const allRegions = await loadRegions(db);
   const fromModal = s(body.from_modal) === "1";
   const { values, errors, data } = readAndValidate(body, scope, (k) => getDict(c.get("lang"))(k));
+  const td = (k: string) => getDict(c.get("lang"))(k);
+  const photo = parsePhoto(body, td);
+  if (photo.error) errors.push(photo.error);
   const allOptions = await loadAllOptions(db);
   const render = (status: 400 | 200) => {
     const opts = {
       user: c.get("user"), perms: c.get("perms"), values, errors,
       family: { id }, regions: scopedRegions(allRegions, scope, c.get("lang")), lang: c.get("lang"),
-      options: hhFormOptions(allOptions),
+      options: hhFormOptions(allOptions), photoUrl: photoUrlOf(row),
     };
     if (fromModal) return c.html(<HouseholdFormFragment {...opts} modal />, status);
     return c.html(<HouseholdFormPage {...opts} />, status);
   };
-  if (!data) return render(400);
+  if (!data || photo.error) return render(400);
   const placement = await householdPlacement(db, row);
   const homeCellId = data.home_cell_id ?? placement.homeCellId;
   const groupId = data.group_id ?? placement.groupId;
@@ -512,6 +601,12 @@ householdsRoutes.post("/:id", requirePermission("members.update"), async (c) => 
   await ensureHouseholdFamilyGroup(
     db, id, data.region_id, homeCellId, placement.familyGroupId, groupId, allOptions,
   );
+  if (photo.touched) await savePhoto(db, id, photo.bytes);
+  // The edit form saves the photo too, so the route says which kind of save
+  // this was; the trail keeps "household.photo" apart from "household.update".
+  c.set("auditNote", photo.touched
+    ? { action: "household.photo", summary: data.name }
+    : { summary: data.name });
   const next = `/admin/households/${id}?ok=hh.updated`;
   if (fromModal) return c.html(<></>, 201, { "X-Redirect-To": next });
   return c.redirect(next, 302);
@@ -524,10 +619,12 @@ householdsRoutes.post("/:id/delete", requirePermission("members.delete"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [row] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [row] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!row || !(scope.scopeAll || scope.stateIds.includes(row.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  // Read before the row goes: the trail names the household that was removed.
+  c.set("auditNote", { summary: row.name });
   await db.update(members).set({ householdId: null, relationship: "" }).where(eq(members.householdId, id));
   await db.delete(families).where(eq(families.id, id));
   return c.redirect("/admin/households?ok=hh.deleted", 302);
@@ -540,7 +637,7 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.*, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS}, r.name AS state_name FROM families f JOIN regions r ON r.id=f.region_id WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
@@ -580,6 +677,44 @@ householdsRoutes.get("/:id/add-member", requirePermission("members.create"), asy
   );
 });
 
+/** The new-member form. It was only reachable as the POST error page before,
+ *  so the quick-add form itself had no URL in the app; this is that URL. */
+householdsRoutes.get("/:id/add-member/new", requirePermission("members.create"), async (c) => {
+  const db = getDb(c.env);
+  const scope = scopeOf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
+  if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
+    return c.redirect("/admin/households?err=err-notfound", 302);
+  }
+  const lang = c.get("lang");
+  const [allOptions, allRegions, placement] = await Promise.all([
+    loadAllOptions(db), loadRegions(db), householdPlacement(db, family),
+  ]);
+  // Pre-fill what the household already decides so the required Home Cell is
+  // usually not a fresh choice for the clerk.
+  const cell = family.home_cell_id ?? placement.homeCellId;
+  const group = family.group_id ?? placement.groupId;
+  const values: Record<string, string> = {
+    region_id: String(family.region_id),
+    township: family.township ?? "",
+    address: family.address ?? "",
+    home_cell_id: cell ? String(cell) : "",
+    group_id: group ? String(group) : "",
+  };
+  return c.html(
+    <HouseholdAddMemberPage
+      user={c.get("user")} perms={c.get("perms")} family={family}
+      values={values} errors={[]}
+      relationship={family.head_member_id ? "spouse" : "head"}
+      options={hhFormOptions(allOptions)}
+      regions={scopedRegions(allRegions, scope, lang)}
+      lang={lang}
+    />,
+  );
+});
+
 /** Option lists shared by household forms (region cascade fields). */
 function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
   return {
@@ -591,13 +726,6 @@ function hhFormOptions(all: OptionRow[]): Record<string, OptionRow[]> {
   };
 }
 
-const MEMBER_FORM_KEYS = [
-  "name_myanmar", "name_english", "gender", "marital_status", "date_of_birth", "blood_type",
-  "phone", "nrc_number", "languages", "address", "father_name", "mother_name",
-  "ethnicity_id", "education_id", "family_group_id", "job", "work_skills", "income",
-  "region_id", "township", "home_cell_id", "group_id", "fellowship_category_id",
-  "salvation_date", "status", "notes", "relationship",
-] as const;
 
 householdsRoutes.post("/:id/add-member", requirePermission("members.create"), async (c) => {
   const db = getDb(c.env);
@@ -605,69 +733,69 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const lang = c.get("lang");
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  // Adding a member is a household change; the URL alone would be classified
+  // as an admin.* mutation instead.
+  c.set("auditNote", {
+    action: "household.update", entity: "household", entityId: String(id), summary: family.name,
+  });
   const body = await c.req.parseBody();
   const relationship = s(body.relationship);
   const rel = (RELATIONSHIPS as readonly string[]).includes(relationship) ? relationship : "other";
-  const values: Record<string, string> = {};
-  for (const k of MEMBER_FORM_KEYS) values[k] = s(body[k]);
-  values.address = values.address || family.address || "";
-  values.township = values.township || family.township || "";
-  values.region_id = values.region_id || String(family.region_id);
-  const errors: string[] = [];
-  const td = getDict(lang);
-  if (!values.name_myanmar && !values.name_english) errors.push(td("val.name"));
-  const regionId = asInt(values.region_id);
-  if (regionId === null || (!scope.scopeAll && !scope.stateIds.includes(regionId))) {
-    errors.push(td("val.state"));
-  }
-  // Same date rules as the full member form: normalise the input and refuse
-  // impossible or future dates instead of storing them verbatim.
-  let dateOfBirth: string | null = null;
-  if (values.date_of_birth) {
-    dateOfBirth = parseDateFlexible(values.date_of_birth);
-    if (!dateOfBirth) errors.push(td("val.dob"));
-    else if (isFutureDate(dateOfBirth)) errors.push(td("val.dobFuture"));
-  }
-  let salvationDate: string | null = null;
-  if (values.salvation_date) {
-    salvationDate = parseDateFlexible(values.salvation_date);
-    if (!salvationDate) errors.push(td("val.salvation"));
-    else if (isFutureDate(salvationDate)) errors.push(td("val.salvationFuture"));
-  }
-  if (errors.length > 0) {
-    const allOptions = await loadAllOptions(db);
-    const allRegions = await loadRegions(db);
-    return c.html(
+
+  // The household's state, address, Home Cell and Group fill the form where the
+  // clerk left them blank; after that the shared member validator applies the
+  // same rules as the member form (Home Cell required, state scope, enums and
+  // option ownership), so the two screens cannot drift apart.
+  const input: Record<string, unknown> = {};
+  for (const k of MEMBER_FORM_KEYS) input[k] = body[k];
+  input.address = input.address || family.address || "";
+  input.township = input.township || family.township || "";
+  input.region_id = input.region_id || String(family.region_id);
+  const allOptions = await loadAllOptions(db);
+  const allRegions = await loadRegions(db);
+  const placement = await householdPlacement(db, family);
+  const postedHome = asInt(s(body.home_cell_id));
+  const postedGroup = asInt(s(body.group_id));
+  const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
+  const groupId = family.group_id ?? placement.groupId ?? postedGroup;
+  if (!input.home_cell_id && homeCellId) input.home_cell_id = String(homeCellId);
+  if (!input.group_id && groupId) input.group_id = String(groupId);
+
+  const { values, errors, data } = readMemberForm(input, {
+    scope, options: allOptions, regions: allRegions, t: getDict(lang),
+  });
+  const render = (status: 400 | 200, duplicates: DuplicateCandidate[] = []) =>
+    c.html(
       <HouseholdAddMemberPage user={c.get("user")} perms={c.get("perms")} family={family}
         values={values} errors={errors} relationship={rel}
+        duplicates={duplicates}
         options={hhFormOptions(allOptions)}
         regions={scopedRegions(allRegions, scope, lang)}
-        lang={lang} />, 400,
+        lang={lang} />, status,
     );
+  if (!data) return render(400);
+  // Same soft duplicate warning as the member form: the likely duplicate is
+  // shown, and the clerk decides whether to save anyway. Adding a household
+  // member is a member save, so it must not skip the check.
+  if (s(body.confirm_duplicate) !== "1") {
+    const duplicates = await findPossibleDuplicates(db, data, scope, null);
+    if (duplicates.length > 0) return render(200, duplicates);
   }
 
   const now = Math.floor(Date.now() / 1000);
   const isHead = rel === "head";
 
-  // The household's Home Cell and Family Group win; a new head may seed them
-  // when the household was created before those columns existed.
-  const allOptions = await loadAllOptions(db);
-  const placement = await householdPlacement(db, family);
-  const postedHome = asInt(values.home_cell_id);
-  const postedGroup = asInt(values.group_id);
-  const homeCellId = family.home_cell_id ?? placement.homeCellId ?? postedHome;
-  const groupId = family.group_id ?? placement.groupId ?? postedGroup;
   let familyGroupId = family.family_group_id ?? placement.familyGroupId;
   if (!familyGroupId && homeCellId) {
     familyGroupId = await ensureHouseholdFamilyGroup(
       db, id, family.region_id, homeCellId, null, groupId, allOptions,
     );
   } else if (!familyGroupId && isHead) {
-    familyGroupId = asInt(values.family_group_id);
+    familyGroupId = data.family_group_id as number | null;
   }
   if (isHead && !family.home_cell_id && postedHome) {
     await db.update(families).set({ homeCellId: postedHome, groupId: postedGroup })
@@ -677,31 +805,33 @@ householdsRoutes.post("/:id/add-member", requirePermission("members.create"), as
   const inserted = await db
     .insert(members)
     .values({
-      nameMyanmar: values.name_myanmar || null,
-      nameEnglish: values.name_english || null,
-      gender: values.gender ?? "",
-      maritalStatus: values.marital_status ?? "",
-      dateOfBirth,
-      bloodType: values.blood_type ?? "",
-      phone: values.phone || null,
-      nrcNumber: values.nrc_number || null,
-      languages: values.languages || null,
-      address: values.address || null,
-      township: values.township || null,
-      fatherName: values.father_name || null,
-      motherName: values.mother_name || null,
-      ethnicityId: asInt(values.ethnicity_id),
-      educationId: asInt(values.education_id),
-      job: values.job || null,
-      workSkills: values.work_skills || null,
-      income: values.income ? Number(values.income.replace(/[,\s]/g, "")) || null : null,
-      salvationDate,
-      notes: values.notes || null,
-      status: values.status === "inactive" ? "inactive" : "active",
-      regionId: regionId!,
+      nameMyanmar: data.name_myanmar,
+      nameEnglish: data.name_english,
+      gender: data.gender,
+      maritalStatus: data.marital_status,
+      dateOfBirth: data.date_of_birth,
+      bloodType: data.blood_type,
+      phone: data.phone,
+      nrcNumber: data.nrc_number,
+      languages: data.languages,
+      address: data.address,
+      township: data.township,
+      fatherName: data.father_name,
+      motherName: data.mother_name,
+      ethnicityId: data.ethnicity_id,
+      educationId: data.education_id,
+      job: data.job,
+      workSkills: data.work_skills,
+      income: data.income,
+      salvationDate: data.salvation_date,
+      notes: data.notes,
+      status: data.status,
+      regionId: data.region_id as number,
       householdId: id,
       relationship: rel,
-      familyGroupId, groupId, homeCellId,
+      familyGroupId,
+      groupId: (data.group_id as number | null) ?? groupId,
+      homeCellId: (data.home_cell_id as number | null) ?? homeCellId,
       createdBy: c.get("user").id,
       updatedBy: c.get("user").id,
     } as any)
@@ -732,10 +862,11 @@ householdsRoutes.post("/:id/attach", requirePermission("members.update"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  c.set("auditNote", { summary: family.name });
   const body = await c.req.parseBody();
   const memberId = intParam(s(body.member_id));
   const rel = s(body.relationship);
@@ -804,10 +935,11 @@ householdsRoutes.post("/:id/detach", requirePermission("members.update"), async 
   const scope = scopeOf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id < 1) return c.redirect("/admin/households?err=err-notfound", 302);
-  const [family] = (await db.all(sql`SELECT f.* FROM families f WHERE f.id = ${id}`)) as any[];
+  const [family] = (await db.all(sql`SELECT ${FAMILY_COLS} FROM families f WHERE f.id = ${id}`)) as any[];
   if (!family || !(scope.scopeAll || scope.stateIds.includes(family.region_id))) {
     return c.redirect("/admin/households?err=err-notfound", 302);
   }
+  c.set("auditNote", { summary: family.name });
   const body = await c.req.parseBody();
   const memberId = intParam(s(body.member_id));
   if (!memberId) return c.redirect(`/admin/households/${id}?err=hh.noMember`, 302);

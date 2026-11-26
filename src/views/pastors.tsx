@@ -6,9 +6,10 @@ import {
   ministryTenure, type ChildLinkSuggestion, type PastorChildCount, type PastorChildRow,
 } from "../pastor-children";
 import { PastorChildrenCard } from "./pastor-children";
-import { todayInYangon } from "../util";
+import { formatPhone, qs, todayInYangon } from "../util";
 import type { PastorHistoryRow, PastorHistoryValues } from "../pastor-history";
 import { CardViewToggle } from "./view-toggle";
+import { Pager } from "./pager";
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 type ChurchOption = { id: number; name: string; regionId: number };
@@ -292,7 +293,7 @@ export function PastorModal(props: {
   return (
     <>
       {error && <div class="modal-error" role="alert">{error}</div>}
-      <form method="post" class="pastor-form"
+      <form method="post" class="pastor-form compact-form"
         action={pastor ? `/organization/pastors/${pastor.id}` : "/organization/pastors"}
         data-modal-ajax>
         <PastorFields
@@ -329,6 +330,8 @@ export function PastorsPage(props: Common & {
   q?: string;
   status?: "all" | "active" | "inactive";
   region?: number | null;
+  /** 1-based page of the filtered list; filters apply across every page. */
+  page?: number | null;
 }) {
   const { user, perms, flash, lang, pastors, regions } = props;
   const L = lang ?? "en";
@@ -348,23 +351,33 @@ export function PastorsPage(props: Common & {
   const counts = new Map((props.childCounts ?? []).map((c) => [c.pastorId, c] as const));
   const totalChildren = (props.childCounts ?? []).reduce((n, c) => n + Number(c.children), 0);
   const totalHope = (props.childCounts ?? []).reduce((n, c) => n + Number(c.hopeSchool), 0);
+  /** Two dozen cards keeps desktop rows full at three or four columns; the
+   *  filters still run over the whole scoped list, so page links carry them. */
+  const perPage = 24;
+  const pages = Math.max(1, Math.ceil(visible.length / perPage));
+  const currentPage = Math.min(Math.max(1, props.page ?? 1), pages);
+  const shown = visible.slice((currentPage - 1) * perPage, currentPage * perPage);
+  const pageHref = (n: number) =>
+    `/organization/pastors${qs({ q: q.trim() || null, status: status !== "all" ? status : null, region, page: n })}`;
 
   return (
     <Layout title={t("org.pastorsTitle")} lang={lang} user={user} perms={perms} active="/organization/pastors" flash={flash ?? null}>
       <div class="page-head">
         <div>
-          <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span></h1>
-          <p class="page-sub">{t("org.pastorsIntro")}</p>
+          <h1>{t("org.pastorsTitle")}<span class="count-pill">{visible.length}</span><span
+            class="page-tip">
+            <button type="button" class="field-tip-btn" aria-label={t("org.pastorsIntro")}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{t("org.pastorsIntro")}</span>
+          </span></h1>
         </div>
         <div class="page-head-actions">
           <CardViewToggle lang={lang} viewKey="pastors" />
           {canUpdate && (
             <a class="btn js-add-modal" href="/organization/pastors/new"
-              data-modal-title={t("org.addPastor")}>
+              data-modal-title={t("org.addPastor")} data-modal-size="md">
               + {t("org.addPastor")}
             </a>
           )}
-          <a class="btn secondary" href="/organization/hope-school">{t("org.childReportOpen")}</a>
           <a class="btn secondary" href="/organization">{t("dept.back")}</a>
         </div>
       </div>
@@ -401,7 +414,7 @@ export function PastorsPage(props: Common & {
         </div>
       ) : (
         <div class="hh-grid" data-view-grid>
-          {visible.map((pastor) => {
+          {shown.map((pastor) => {
             const photo = pastorPhotoUrl(pastor);
             const initial = Array.from((pastor.name || pastor.nameEn || "?").trim())[0] ?? "?";
             const state = L !== "mm" && pastor.stateNameEn ? pastor.stateNameEn : pastor.stateName;
@@ -441,7 +454,7 @@ export function PastorsPage(props: Common & {
                   </div>
                   <div class="hh-fact wide">
                     <span class="hh-fact-label">{t("detail.phone")}</span>
-                    <span class="hh-fact-value">{pastor.phone || pastor.email || "—"}</span>
+                    <span class="hh-fact-value">{formatPhone(pastor.phone) || pastor.email || "—"}</span>
                   </div>
                   {pastor.spousePastorId != null && (
                     <div class="hh-fact wide">
@@ -459,7 +472,7 @@ export function PastorsPage(props: Common & {
                   <a class="btn sm secondary" href={`/organization/pastors/${pastor.id}`}>{t("org.viewPastor")}</a>
                   {canUpdate && (
                     <a class="btn sm secondary js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-                      data-modal-title={t("org.editPastor")}>
+                      data-modal-title={t("org.editPastor")} data-modal-size="md">
                       {t("members.edit")}
                     </a>
                   )}
@@ -469,6 +482,8 @@ export function PastorsPage(props: Common & {
           })}
         </div>
       )}
+
+      <Pager page={currentPage} pages={pages} lang={lang} href={pageHref} />
     </Layout>
   );
 }
@@ -515,7 +530,7 @@ export function PastorDetailPage(props: Common & {
     [t("org.ordinationDate"), pastor.ordinationDate],
     [t("org.ministryStart"), pastor.ministryStartDate],
     [t("org.ministryYears"), tenureText],
-    [t("detail.phone"), pastor.phone],
+    [t("detail.phone"), formatPhone(pastor.phone)],
     [t("form.email"), pastor.email],
     [t("detail.address"), pastor.address],
     [t("detail.notes"), pastor.notes],
@@ -548,7 +563,7 @@ export function PastorDetailPage(props: Common & {
         <div class="page-head-actions pastor-actions">
           {canUpdate && (
             <a class="btn js-edit-modal" href={`/organization/pastors/${pastor.id}/edit`}
-              data-modal-title={t("org.editPastor")}>
+              data-modal-title={t("org.editPastor")} data-modal-size="md">
               {t("members.edit")}
             </a>
           )}

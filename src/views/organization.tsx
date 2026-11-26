@@ -69,6 +69,19 @@ export type OrgLeader = {
 
 type Common = { user: SessionUser; perms: Set<string>; flash?: Flash; lang?: Lang };
 
+/** Coverage rows for the All tab: churches that have Home Cells come first,
+ * weakest coverage at the top so gaps appear before the healthy churches.
+ * Churches without a single Home Cell have no percentage to compare, so they are
+ * counted instead of listed as a column of 0/0 bars. */
+export function splitCoverageRows<T extends { pct: number; total: number; name: string }>(
+  rows: T[],
+): { ranked: T[]; withoutCells: number } {
+  const ranked = rows
+    .filter((row) => row.total > 0)
+    .sort((a, b) => a.pct - b.pct || b.total - a.total || a.name.localeCompare(b.name));
+  return { ranked, withoutCells: rows.filter((row) => row.total === 0).length };
+}
+
 type TownshipGroup = { id: number | null; name: string; cells: OrgCell[] };
 type SupervisionGroup = {
   kind: "cluster" | "township"; id: number | null; name: string; cells: OrgCell[];
@@ -148,7 +161,16 @@ function supervisionGroups(cells: OrgCell[], clusters: SupervisionClusterRow[], 
     }
     group.cells.push(cell);
   }
-  return [...groups.values()];
+  // Cluster order comes from the cluster records, not from the order cells
+  // happen to arrive in: a cell query sorted by Home Cell name used to make
+  // the cards read 1, 3, 2. Townships without a cluster stay last by name.
+  return [...groups.values()].sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "cluster" ? -1 : 1;
+    if (a.cluster && b.cluster && a.cluster.sortOrder !== b.cluster.sortOrder) {
+      return a.cluster.sortOrder - b.cluster.sortOrder;
+    }
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
+  });
 }
 
 function initialOf(name: string | null | undefined): string {
@@ -251,7 +273,7 @@ function nestRoles(rows: PositionDefRow[], lead: PositionDefRow | null) {
 }
 
 export function OrganizationPage(props: Common & {
-  tab: "church" | "main" | "home-cells" | "regional" | "family-groups";
+  tab: "all" | "church" | "main" | "home-cells" | "regional" | "family-groups";
   cells: OrgCell[];
   familyGroups: OrgFamilyGroup[];
   /** Home Cell whose structure panel is open below the chart (query ?cell=). */
@@ -304,10 +326,11 @@ export function OrganizationPage(props: Common & {
   const scopedCells = churchScoped
     ? cells.filter((c) => c.regional_church_id === selectedChurch.id)
     : cells;
-  const scopedDepartments = churchScoped
-    ? departments.filter((d) => d.regional_church_id != null
-      ? d.regional_church_id === selectedChurch.id
-      : (d.church_ids ?? "").split(",").includes(String(selectedChurch.id)))
+  const departmentsForChurch = (churchId: number) => departments.filter((d) => d.regional_church_id != null
+    ? d.regional_church_id === churchId
+    : (d.church_ids ?? "").split(",").includes(String(churchId)));
+  const scopedDepartments = churchScoped && selectedChurch
+    ? departmentsForChurch(selectedChurch.id)
     : departments;
   const states = groupCells(scopedCells, clusters, L);
   // The Family Groups tab doubles as the reporting view, so it can be searched by
@@ -363,11 +386,22 @@ export function OrganizationPage(props: Common & {
       hasTeam: leaders.some((l) => l.scope_type === "region" && l.region_id === r.id),
     }))
     .filter((r) => r.churches.length > 0 || r.hasTeam);
-  const members = cells.reduce((sum, c) => sum + c.member_count, 0);
+  // The four summary tiles describe the tab in front of the user, not the whole
+  // registry: Main Church counts only that church, Church Structure counts the
+  // selected church, and a filtered Regions view counts that region.
+  const statsCells = tab === "main"
+    ? cells.filter((c) => mainChurches.some((church) => church.id === c.regional_church_id))
+    : tab === "church"
+      ? scopedCells
+      : tab === "regional" && region != null
+        ? cells.filter((c) => c.region_id === region)
+        : cells;
+  const members = statsCells.reduce((sum, c) => sum + c.member_count, 0);
   const leadCode = positionRows(positionDefs, "home_cell", L).lead?.code ?? "";
   const withLeader = leadCode
-    ? cells.filter((c) => leaderFor(leaders, "home_cell", leadCode, { scopeId: c.id })).length
+    ? statsCells.filter((c) => leaderFor(leaders, "home_cell", leadCode, { scopeId: c.id })).length
     : 0;
+
   const canEdit = perms.has("members.update");
   const canManageOptions = perms.has("options.manage");
   // Home Cell / Family Group management is reachable with the structure grant
@@ -518,10 +552,131 @@ export function OrganizationPage(props: Common & {
     );
   };
   const regionalRows = positionRows(positionDefs, "region", L);
+
+  // All-tab totals. Vacancies are calculated from the same position catalog the
+  // detail tabs use, so an overview can never disagree with the page it links to.
+  const allVacantChurchRoles = regionalChurches.reduce((sum, church) => {
+    const rows = positionRows(defsForChurch(positionDefs, church.id), "church", L);
+    return sum + rows.all.filter((def) =>
+      !leaderFor(leaders, "church", def.code, { regionalChurchId: church.id })).length;
+  }, 0);
+  const allVacantRegionRoles = regionGroups.reduce((sum, r) => sum
+    + regionalRows.all.filter((def) => !leaderFor(leaders, "region", def.code, { regionId: r.id })).length, 0);
+  const allVacantCellLeaders = cells.length - withLeader;
+  const allVacancyTotal = allVacantChurchRoles + allVacantRegionRoles + allVacantCellLeaders;
+  const allCoverage = cells.length ? Math.round((withLeader / cells.length) * 100) : 0;
+  const mainChurch = mainChurches[0] ?? null;
+  const mainChurchDefs = mainChurch ? defsForChurch(positionDefs, mainChurch.id) : positionDefs;
+  const mainChurchRows = positionRows(mainChurchDefs, "church", L);
+  const mainChurchLead = mainChurch && mainChurchRows.lead
+    ? leaderFor(leaders, "church", mainChurchRows.lead.code, { regionalChurchId: mainChurch.id })
+    : null;
+  const mainChurchCells = mainChurch
+    ? cells.filter((c) => c.regional_church_id === mainChurch.id)
+    : [];
+  const mainChurchMembers = mainChurchCells.reduce((sum, c) => sum + c.member_count, 0);
+  const mainRegion = mainChurch ? regions.find((r) => r.id === mainChurch.regionId) ?? null : null;
+
   const deptRows = positionRows(positionDefs, "department", L);
 
   const departmentRole = (departmentId: number, position: string) =>
     leaderFor(leaders, "department", position, { departmentId });
+
+  const renderDepartments = (depts: OrgDepartment[], churchScope: boolean, open = false) => (
+          <section class="org-departments">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.departments")}</h2>
+                <p class="muted small">{t("org.departmentsHint")}</p>
+              </div>
+              {canManageDepartments && (
+                <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
+              )}
+            </div>
+
+            {depts.length === 0 ? (
+              <div class="card org-empty org-empty-small">
+                <p class="muted">
+                  {churchScope ? t("org.noChurchDepartments") : t("org.noDepartments")}
+                </p>
+                {canManageDepartments && (
+                  <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
+                )}
+              </div>
+            ) : (
+              <details class="org-collapse" open={open}>
+                <summary class="org-collapse-summary">
+                  <span>{countLabel(t, "org.departmentsShort", depts.length)} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
+                  <span class="chev" aria-hidden="true">▾</span>
+                </summary>
+                <div class="org-collapse-body">
+              <div class="org-grid org-dept-grid">
+                {depts.map((d) => {
+                  const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
+                  // Department roles nest exactly like church roles.
+                  const deptForest = nestRoles(deptRows.all, deptRows.lead);
+                  const deptLeaves = [
+                    ...deptForest.roots.filter((r) => r.code !== deptRows.lead?.code),
+                    ...(deptForest.kids.get(deptRows.lead?.code ?? "") ?? []),
+                  ];
+                  const deptRoleBranch = (def: PositionDefRow) => {
+                    const leader = departmentRole(d.id, def.code);
+                    const children = deptForest.kids.get(def.code) ?? [];
+                    return (
+                      <div class="org-role-branch">
+                        <div class={`org-mini${leader ? "" : " org-vacant"}`}>
+                          <LeaderAvatar leader={leader} size="sm" />
+                          <div>
+                            <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                            <LeaderLink leader={leader} empty={t("org.vacant")} />
+                          </div>
+                        </div>
+                        {children.length > 0 && (
+                          <div class="org-role-kids">
+                            {children.map((child) => deptRoleBranch(child))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <article class="card org-dept-card">
+                      <div class="org-dept-head">
+                        <LeaderAvatar leader={head} size="md" />
+                        <div class="org-dept-title">
+                          <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
+                          <span class="muted small">
+                            {countLabel(t, "org.membersShort", d.member_count)}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="org-dept-lead">
+                        <span class="org-node-role">
+                          {deptRows.lead ? positionDefLabel(deptRows.lead, L) : t("org.departmentHead")}
+                        </span>
+                        <LeaderLink leader={head} empty={t("org.vacant")} />
+                      </div>
+                      <div class="org-mini-list">
+                        {deptLeaves.map((def) => deptRoleBranch(def))}
+                      </div>
+                      <div class="org-card-actions">
+                        <a class="org-card-link" href={`/organization/departments/${d.id}`}>
+                          {t("org.viewDepartment")} <span aria-hidden="true">→</span>
+                        </a>
+                        {canManageDepartments && (
+                          <a class="org-card-link" href="/organization/departments">{t("org.editStructure")}</a>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+                </div>
+              </details>
+            )}
+          </section>
+  );
+
   const homeRole = (cellId: number, position: string) =>
     leaderFor(leaders, "home_cell", position, { scopeId: cellId });
   const townshipRole = (townshipId: number | null, position: string) =>
@@ -530,6 +685,26 @@ export function OrganizationPage(props: Common & {
     clusterId == null ? null : leaderFor(leaders, "cluster", position, { supervisionClusterId: clusterId });
   const regionalTeam = (regionId: number, position: string) =>
     leadersFor(leaders, "region", position, { regionId });
+
+  const coverageRows = regionalChurches.map((church) => {
+    const churchCells = cells.filter((c) => c.regional_church_id === church.id);
+    const filled = leadCode ? churchCells.filter((c) => homeRole(c.id, leadCode)).length : 0;
+    return {
+      church,
+      name: regionalChurchName(church, L),
+      filled,
+      total: churchCells.length,
+      pct: churchCells.length ? Math.round((filled / churchCells.length) * 100) : 0,
+    };
+  });
+  const { ranked: coveredChurches, withoutCells: churchesWithoutCells } = splitCoverageRows(coverageRows);
+  // Cells with no Regional Church are in the headline total but belong to no
+  // church row, so they get their own line to keep the column sum honest.
+  const unassignedCells = cells.filter((c) => c.regional_church_id == null);
+  const unassignedFilled = leadCode ? unassignedCells.filter((c) => homeRole(c.id, leadCode)).length : 0;
+  const unassignedPct = unassignedCells.length
+    ? Math.round((unassignedFilled / unassignedCells.length) * 100)
+    : 0;
 
   // Home Cell tab: ?gap= narrows the chart to the cells that need attention.
   // The cell whose structure is open is always kept, so saving the last vacancy
@@ -613,15 +788,30 @@ export function OrganizationPage(props: Common & {
     );
   };
 
-  const renderPersonNode = (role: string, leader: OrgLeader | null, size: "lg" | "md" | "sm", lead = false) => (
-    <div class={`org-node${lead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`}>
-      <LeaderAvatar leader={leader} size={size} />
-      <span class="org-node-role">{role}</span>
-      <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
-    </div>
-  );
+  // A vacant supervision slot is actionable: it opens the vacancy report for its
+  // scope, which lists the same gap together with the way to fill it, so the
+  // tree is never a dead end. A filled slot keeps linking to the person.
+  const renderPersonNode = (role: string, leader: OrgLeader | null, size: "lg" | "md" | "sm", lead = false, vacantHref?: string) => {
+    const cls = `org-node${lead ? " org-node-lead" : ""}${leader ? "" : " org-node-vacant"}`;
+    const body = (
+      <>
+        <LeaderAvatar leader={leader} size={size} />
+        <span class="org-node-role">{role}</span>
+        <span class="org-node-name"><LeaderLink leader={leader} empty={t("org.vacant")} /></span>
+      </>
+    );
+    if (!leader && vacantHref) {
+      return (
+        <a class={`${cls} org-node-action`} href={vacantHref}
+          aria-label={`${t("org.assignLeader")} · ${role}`}>{body}</a>
+      );
+    }
+    return <div class={cls}>{body}</div>;
+  };
 
-  const renderSupervisionGroup = (group: SupervisionGroup) => {
+  // defaultOpen: the first cluster is drawn open, so the page shows the
+  // structure it is about instead of a row of collapsed cards.
+  const renderSupervisionGroup = (group: SupervisionGroup, defaultOpen = false, listId?: string) => {
     const defs = defsForScope(positionDefs, group.kind === "cluster" ? "cluster" : "township");
     const role = (position: string) => group.kind === "cluster"
       ? clusterRole(group.id, position)
@@ -640,9 +830,12 @@ export function OrganizationPage(props: Common & {
     const rolesPercent = rolesAll === 0 ? 0 : Math.round((rolesFilled / rolesAll) * 100);
     // Stable card identity: the client swaps this card after a save.
     const clusterKey = group.kind === "cluster" ? `cluster:${group.id}` : `township:${group.id ?? "none"}`;
+    // The vacancy report is scoped the same way the group is.
+    const vacantHref = `/organization/vacancies?scope=${group.kind === "cluster" ? "cluster" : "township"}`;
+    const isOpen = openCell != null || (defaultOpen && !selectedCellId);
     return (
       <details class={`org-flow-cluster${openCell ? " is-active" : ""}`}
-        open={openCell != null} data-cluster-key={clusterKey}>
+        open={isOpen} data-cluster-key={clusterKey}>
         <summary class="org-flow-cluster-head">
           <span class="org-flow-cluster-title">
             <span class="org-supervision-title">{group.kind === "cluster" ? t("org.clusterLabel") : t("org.townshipSupervision")}</span>
@@ -661,23 +854,28 @@ export function OrganizationPage(props: Common & {
           </span>
         </summary>
         <div class="org-flow-cluster-body">
+          {listId && (
+            <a class="org-flow-back" href={`#${listId}`}>
+              <span aria-hidden="true">↑</span> {t("org.backToClusters")}
+            </a>
+          )}
           {/* Pastor above the team, the team on its own bus. Drawn as branches
               so every role hangs off a visible connector instead of floating
               beside the others with no line between them. */}
           <div class="org-branch org-flow-tree">
             <div class="org-flow-pastor">
-              {renderPersonNode(t("org.clusterPastor"), pastor, "md", true)}
+              {renderPersonNode(t("org.clusterPastor"), pastor, "md", true, vacantHref)}
             </div>
             {(supervisor || assistants.length > 0) && (
               <div class="org-branch-kids org-flow-team">
                 {supervisor && (
                   <div class="org-branch">
-                    {renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true)}
+                    {renderPersonNode(positionDefLabel(supervisor, L), role(supervisor.code), "md", true, vacantHref)}
                   </div>
                 )}
                 {assistants.map((def) => (
                   <div class="org-branch">
-                    {renderPersonNode(positionDefLabel(def, L), role(def.code), "sm")}
+                    {renderPersonNode(positionDefLabel(def, L), role(def.code), "sm", false, vacantHref)}
                   </div>
                 ))}
               </div>
@@ -857,34 +1055,48 @@ export function OrganizationPage(props: Common & {
             {countLabel(t, "org.cells", state.cells.length)} · {countLabel(t, "org.membersShort", stateMembers)}
           </span>
         </div>
-        {[...churchGroups.values()].map((churchGroup) => (
-          <div class="org-church-block">
-            <div class="org-church-block-head">
-              <h3>{churchGroup.name}</h3>
-              <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
+        {[...churchGroups.values()].map((churchGroup, churchIndex) => {
+          const listId = `org-clusters-${state.id}-${churchGroup.key}`;
+          return (
+            <div class="org-church-block">
+              <div class="org-church-block-head">
+                <h3>{churchGroup.name}</h3>
+                <span class="muted small">{countLabel(t, "org.cells", churchGroup.cells.length)}</span>
+              </div>
+              <div class="org-flow-clusters" id={listId}>
+                {supervisionGroups(churchGroup.cells, clusters, L)
+                  .map((group, groupIndex) =>
+                    renderSupervisionGroup(group, churchIndex === 0 && groupIndex === 0, listId))}
+              </div>
             </div>
-            <div class="org-flow-clusters">
-              {supervisionGroups(churchGroup.cells, clusters, L).map(renderSupervisionGroup)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
     );
   };
+
+  /** The sentence each tab used to print as a subtitle now travels in the
+   *  heading's info dot, so the tabs start higher on the page. */
+  const pageIntro = tab === "main" ? t("org.mainIntro") : tab === "all" ? t("org.allIntro") : t("org.intro");
 
   return (
     <Layout title={t("org.title")} lang={lang} user={user} perms={perms} active="/organization" flash={flash ?? null}>
       <div class="page-head org-page-head">
         <div>
-          <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span></h1>
-          <p class="page-sub">{t("org.intro")}</p>
+          <h1>{t("org.title")}<span class="count-pill">{countLabel(t, "org.cells", cells.length)}</span><span
+            class="page-tip">
+            <button type="button" class="field-tip-btn" aria-label={pageIntro}>i</button>
+            <span class="page-tip-text" aria-hidden="true">{pageIntro}</span>
+          </span></h1>
         </div>
       </div>
 
       <div class="page-toolbar">
-        <div class="tabs tabs-wrap">
+        <nav class="tabs tabs-wrap" aria-label={t("nav.organization")}>
           <a class={`btn sm ${tab === "main" ? "" : "secondary"}`} href="/organization"
             aria-current={tab === "main" ? "page" : undefined}>{t("org.mainChurch")}</a>
+          <a class={`btn sm ${tab === "all" ? "" : "secondary"}`} href="/organization?tab=all"
+            aria-current={tab === "all" ? "page" : undefined}>{t("org.allTab")}</a>
           <a class={`btn sm ${tab === "church" ? "" : "secondary"}`} href="/organization?tab=church"
             aria-current={tab === "church" ? "page" : undefined}>{t("org.churchTab")}</a>
           <a class={`btn sm ${tab === "regional" ? "" : "secondary"}`} href="/organization?tab=regional"
@@ -893,17 +1105,188 @@ export function OrganizationPage(props: Common & {
             aria-current={tab === "home-cells" ? "page" : undefined}>{t("org.cellsTab")}</a>
           <a class={`btn sm ${tab === "family-groups" ? "" : "secondary"}`} href="/organization?tab=family-groups"
             aria-current={tab === "family-groups" ? "page" : undefined}>{t("org.fgTab")}</a>
+        </nav>
+      </div>
+
+      {tab === "all" ? (
+        <div class="stat-grid org-stats org-all-stats">
+          <div class="stat"><div class="n">{regions.length}</div><div class="t">{t("org.allRegions")}</div></div>
+          <div class="stat"><div class="n">{regionalChurches.length}</div><div class="t">{t("org.churchesTitle")}</div></div>
+          <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
+          <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
+          <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
+          <div class="stat"><div class="n">{allVacancyTotal}</div><div class="t">{t("org.allVacantRoles")}</div></div>
         </div>
-      </div>
+      ) : (
+        <div class="stat-grid org-stats">
+          <div class="stat"><div class="n">{statsCells.length}</div><div class="t">{t("org.cells")}</div></div>
+          <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
+          <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
+          <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
+        </div>
+      )}
 
-      <div class="stat-grid org-stats">
-        <div class="stat"><div class="n">{cells.length}</div><div class="t">{t("org.cells")}</div></div>
-        <div class="stat"><div class="n">{withLeader}</div><div class="t">{t("org.leadersAssigned")}</div></div>
-        <div class="stat"><div class="n">{members}</div><div class="t">{t("org.membersInCells")}</div></div>
-        <div class="stat"><div class="n">{unassignedMembers}</div><div class="t">{t("org.unassignedMembers")}</div></div>
-      </div>
+      {tab === "all" ? (
+        <div class="org-all">
+          <section class="card org-all-main">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.mainChurch")}</h2>
+                <p class="muted small">{mainChurch ? t("org.allMainHint") : t("org.allNoMainChurch")}</p>
+              </div>
+              {mainChurch && (
+                <a class="btn secondary sm" href="/organization?tab=main">{t("org.allOpenMain")}</a>
+              )}
+            </div>
+            {mainChurch && (
+              <div class="org-all-main-body">
+                <div class="org-all-main-facts">
+                  <span>
+                    <b>{regionalChurchName(mainChurch, L)}</b>
+                    {mainRegion && (
+                      <span class="muted">
+                        {" · "}{L !== "mm" && mainRegion.nameEn ? mainRegion.nameEn : mainRegion.name}
+                      </span>
+                    )}
+                  </span>
+                  <span><b>{mainChurchCells.length}</b> {pluralLabel(t, "org.cells", mainChurchCells.length)}</span>
+                  <span><b>{mainChurchMembers}</b> {pluralLabel(t, "org.membersShort", mainChurchMembers)}</span>
+                  <span><b>{departmentsForChurch(mainChurch.id).length}</b> {pluralLabel(t, "org.departmentsShort", departmentsForChurch(mainChurch.id).length)}</span>
+                </div>
+                {mainChurchRows.lead && (
+                  <div class="org-all-main-lead">
+                    <span class="org-mini-role">{positionDefLabel(mainChurchRows.lead, L)}</span>
+                    <span class="org-all-main-person">
+                      <LeaderAvatar leader={mainChurchLead} size="sm" />
+                      <LeaderLink leader={mainChurchLead} empty={t("org.vacant")} />
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
 
-      {tab === "church" ? (
+          <div class="org-all-grid">
+            <section class="card org-all-panel">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.allRegionalOversight")}</h2>
+                  <p class="muted small">{t("org.allRegionalOversightHint")}</p>
+                </div>
+                <a class="btn secondary sm" href="/organization?tab=regional">{t("org.regionalTab")}</a>
+              </div>
+              <div class="org-all-list">
+                {regionGroups.map((r) => {
+                  const rowCells = cells.filter((c) => c.region_id === r.id);
+                  const rowMembers = rowCells.reduce((sum, c) => sum + c.member_count, 0);
+                  const lead = regionalRows.lead ? regionalTeam(r.id, regionalRows.lead.code)[0] ?? null : null;
+                  return (
+                    <div class="org-all-row">
+                      <div class="org-all-row-main">
+                        <a class="org-all-row-title" href={`/organization?tab=regional&region=${r.id}`}>{r.name}</a>
+                        <span class="muted small">
+                          {countLabel(t, "org.churchesShort", r.churches.length)} · {countLabel(t, "org.cells", rowCells.length)} · {countLabel(t, "org.membersShort", rowMembers)}
+                        </span>
+                      </div>
+                      <div class="org-all-row-team">
+                        {lead && regionalRows.lead ? (
+                          <>
+                            <LeaderAvatar leader={lead} size="sm" />
+                            <span>
+                              <span class="org-mini-role">{positionDefLabel(regionalRows.lead, L)}</span>
+                              <LeaderLink leader={lead} empty={t("org.allNoRegionalLead")} />
+                            </span>
+                          </>
+                        ) : (
+                          <span class="muted small">{t("org.allNoRegionalLead")}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section class="card org-all-panel">
+              <div class="org-section-head">
+                <div>
+                  <h2>{t("org.allCoverage")}</h2>
+                  <p class="muted small">{t("org.allCoverageHint")}</p>
+                </div>
+                <span class="org-all-coverage-total">
+                  {withLeader} / {cells.length} {pluralLabel(t, "org.cells", cells.length)}
+                </span>
+              </div>
+              <progress class="org-all-progress" value={allCoverage} max={100}
+                aria-label={`${t("org.allCoverage")}: ${withLeader} / ${cells.length}`} />
+              <div class="org-all-list org-all-coverage-list">
+                {coveredChurches.map((row) => (
+                  <div class="org-all-coverage-row">
+                    <span class="org-all-coverage-name">{row.name}</span>
+                    <progress class="org-all-progress" value={row.pct} max={100} aria-label={`${row.name}: ${row.pct}%`} />
+                    <span class="muted small">{row.filled}/{row.total}</span>
+                  </div>
+                ))}
+                {unassignedCells.length > 0 && (
+                  <div class="org-all-coverage-row org-all-coverage-unassigned">
+                    <span class="org-all-coverage-name">{t("org.allCoverageUnassigned")}</span>
+                    <progress class="org-all-progress" value={unassignedPct} max={100}
+                      aria-label={`${t("org.allCoverageUnassigned")}: ${unassignedPct}%`} />
+                    <span class="muted small">{unassignedFilled}/{unassignedCells.length}</span>
+                  </div>
+                )}
+              </div>
+              {churchesWithoutCells > 0 && (
+                <p class="muted small org-all-coverage-none">
+                  {t("org.allCoverageNoCells").replace("{n}", String(churchesWithoutCells))}
+                </p>
+              )}
+              <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.allViewHomeCells")}</a>
+            </section>
+          </div>
+
+          <section class="card org-all-panel">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.allVacancySummary")}</h2>
+                <p class="muted small">{t("org.allVacancySummaryHint")}</p>
+              </div>
+            </div>
+            <div class="org-all-vacancy-grid">
+              <a class="org-all-vacancy" href="/organization?tab=church">
+                <span class="org-all-vacancy-n">{allVacantChurchRoles}</span>
+                <span>{t("org.allVacantChurchRoles")}</span>
+              </a>
+              <a class="org-all-vacancy" href="/organization?tab=regional">
+                <span class="org-all-vacancy-n">{allVacantRegionRoles}</span>
+                <span>{t("org.allVacantRegionRoles")}</span>
+              </a>
+              <a class="org-all-vacancy" href="/organization?tab=home-cells&gap=leader">
+                <span class="org-all-vacancy-n">{allVacantCellLeaders}</span>
+                <span>{t("org.allVacantCellLeaders")}</span>
+              </a>
+            </div>
+          </section>
+
+          <section class="card org-all-panel">
+            <div class="org-section-head">
+              <div>
+                <h2>{t("org.allQuickLinks")}</h2>
+                <p class="muted small">{t("org.allQuickLinksHint")}</p>
+              </div>
+            </div>
+            <div class="org-all-links">
+              <a class="btn secondary sm" href="/organization?tab=main">{t("org.mainChurch")}</a>
+              <a class="btn secondary sm" href="/organization?tab=church">{t("org.churchTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=regional">{t("org.regionalTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=home-cells">{t("org.cellsTab")}</a>
+              <a class="btn secondary sm" href="/organization?tab=family-groups">{t("org.fgTab")}</a>
+              <a class="btn secondary sm" href="/organization/departments">{t("org.departments")}</a>
+            </div>
+          </section>
+        </div>
+      ) : tab === "church" ? (
+
         <>
           <section class="card org-chart">
             <div class="org-section-head">
@@ -954,98 +1337,8 @@ export function OrganizationPage(props: Common & {
             ) : renderChurchChart(selectedChurch, "church")}
           </section>
 
-          <section class="org-departments">
-            <div class="org-section-head">
-              <div>
-                <h2>{t("org.departments")}</h2>
-                <p class="muted small">{t("org.departmentsHint")}</p>
-              </div>
-              {canManageDepartments && (
-                <a class="btn secondary sm" href="/organization/departments">{t("org.manageDepartments")}</a>
-              )}
-            </div>
+          {renderDepartments(scopedDepartments, churchScoped)}
 
-            {scopedDepartments.length === 0 ? (
-              <div class="card org-empty org-empty-small">
-                <p class="muted">
-                  {churchScoped ? t("org.noChurchDepartments") : t("org.noDepartments")}
-                </p>
-                {canManageDepartments && (
-                  <a class="btn secondary sm" href="/organization/departments">{t("org.addDepartment")}</a>
-                )}
-              </div>
-            ) : (
-              <details class="org-collapse">
-                <summary class="org-collapse-summary">
-                  <span>{countLabel(t, "org.departmentsShort", scopedDepartments.length)} <span class="org-collapse-hint">· {t("org.viewDetails")}</span></span>
-                  <span class="chev" aria-hidden="true">▾</span>
-                </summary>
-                <div class="org-collapse-body">
-              <div class="org-grid org-dept-grid">
-                {scopedDepartments.map((d) => {
-                  const head = departmentRole(d.id, deptRows.lead?.code ?? "department_head");
-                  // Department roles nest exactly like church roles.
-                  const deptForest = nestRoles(deptRows.all, deptRows.lead);
-                  const deptLeaves = [
-                    ...deptForest.roots.filter((r) => r.code !== deptRows.lead?.code),
-                    ...(deptForest.kids.get(deptRows.lead?.code ?? "") ?? []),
-                  ];
-                  const deptRoleBranch = (def: PositionDefRow) => {
-                    const leader = departmentRole(d.id, def.code);
-                    const children = deptForest.kids.get(def.code) ?? [];
-                    return (
-                      <div class="org-role-branch">
-                        <div class={`org-mini${leader ? "" : " org-vacant"}`}>
-                          <LeaderAvatar leader={leader} size="sm" />
-                          <div>
-                            <span class="org-mini-role">{positionDefLabel(def, L)}</span>
-                            <LeaderLink leader={leader} empty={t("org.vacant")} />
-                          </div>
-                        </div>
-                        {children.length > 0 && (
-                          <div class="org-role-kids">
-                            {children.map((child) => deptRoleBranch(child))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  };
-                  return (
-                    <article class="card org-dept-card">
-                      <div class="org-dept-head">
-                        <LeaderAvatar leader={head} size="md" />
-                        <div class="org-dept-title">
-                          <h3><a href={`/organization/departments/${d.id}`}>{departmentName(d, L)}</a></h3>
-                          <span class="muted small">
-                            {countLabel(t, "org.membersShort", d.member_count)}
-                          </span>
-                        </div>
-                      </div>
-                      <div class="org-dept-lead">
-                        <span class="org-node-role">
-                          {deptRows.lead ? positionDefLabel(deptRows.lead, L) : t("org.departmentHead")}
-                        </span>
-                        <LeaderLink leader={head} empty={t("org.vacant")} />
-                      </div>
-                      <div class="org-mini-list">
-                        {deptLeaves.map((def) => deptRoleBranch(def))}
-                      </div>
-                      <div class="org-card-actions">
-                        <a class="org-card-link" href={`/organization/departments/${d.id}`}>
-                          {t("org.viewDepartment")} <span aria-hidden="true">→</span>
-                        </a>
-                        {canManageDepartments && (
-                          <a class="org-card-link" href="/organization/departments">{t("org.editStructure")}</a>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-                </div>
-              </details>
-            )}
-          </section>
 
           {scopedCells.length === 0 ? (
             <div class="card org-empty">
@@ -1131,13 +1424,17 @@ export function OrganizationPage(props: Common & {
           <div class="card org-empty">
             <h2>{t("org.mainChurch")}</h2>
             <p class="muted">{t("org.mainChurchEmpty")}</p>
-            {canManageStructure && (
-              <a class="btn secondary" href="/organization/regional-churches">{t("org.addRegional")}</a>
+            {canManageStructure ? (
+              <a class="btn secondary" href="/organization/regional-churches">{t("org.manageRegional")}</a>
+            ) : (
+              <a class="btn secondary" href="/organization?tab=regional">{t("org.regionalTab")}</a>
             )}
           </div>
         ) : mainChurches.map((church) => {
           const churchCells = cells.filter((c) => c.regional_church_id === church.id);
           const churchMembers = churchCells.reduce((sum, c) => sum + c.member_count, 0);
+          const mainRegion = regions.find((r) => r.id === church.regionId) ?? null;
+          const regionHref = `/organization?tab=regional${mainRegion ? `&region=${mainRegion.id}` : ""}`;
           return (
             <section class="card org-chart org-main-church">
               <div class="org-section-head">
@@ -1148,6 +1445,7 @@ export function OrganizationPage(props: Common & {
                   </p>
                 </div>
                 <div class="org-section-actions">
+                  <a class="btn secondary sm" href={`/members?church=${church.id}`}>{t("org.viewAllMembers")}</a>
                   {canManagePositions && (
                     <a class="btn secondary sm" href="/organization/positions?scope=church">{t("org.managePositions")}</a>
                   )}
@@ -1156,7 +1454,41 @@ export function OrganizationPage(props: Common & {
                   )}
                 </div>
               </div>
+              {mainRegion && (
+                <div class="org-main-region">
+                  <div class="org-main-region-head">
+                    <span class="org-mini-role">{t("org.regionTeam")}</span>
+                    <a class="org-card-link" href={regionHref}>
+                      {L !== "mm" && mainRegion.nameEn ? mainRegion.nameEn : mainRegion.name}
+                      <span aria-hidden="true">→</span>
+                    </a>
+                  </div>
+                  <div class="org-main-region-team">
+                    {regionalRows.all.map((def) => {
+                      const team = regionalTeam(mainRegion.id, def.code);
+                      return (
+                        <div class="org-main-region-role">
+                          <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                          {team.length === 0 ? (
+                            <span class="muted small">{t("org.vacant")}</span>
+                          ) : (
+                            <span class="org-main-region-holders">
+                              {team.map((person) => (
+                                <span class="org-mini-person">
+                                  <LeaderAvatar leader={person} size="sm" />
+                                  <LeaderLink leader={person} empty={t("org.vacant")} />
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {renderChurchChart(church, "main")}
+              {renderDepartments(departmentsForChurch(church.id), true, true)}
               {churchCells.length > 0 && (
                 <details class="org-collapse org-main-cells">
                   <summary class="org-collapse-summary">
@@ -1255,6 +1587,23 @@ export function OrganizationPage(props: Common & {
                         <div class="org-region-team-grid">
                           {regionalRows.all.map((def) => {
                             const team = regionalTeam(group.id, def.code);
+                            const canAdd = canEdit && def.allowMultiple === 1;
+                            const addHref = `/organization/region-assign?region=${group.id}&position=${def.code}`;
+                            const addTitle = `${t("org.addHolder")} · ${positionDefLabel(def, L)}`;
+                            // A vacant slot that can take a leader is the action itself: the
+                            // whole card is the link, so nobody has to find a button inside
+                            // a mostly empty box.
+                            if (canAdd && team.length === 0) {
+                              return (
+                                <a class="org-region-role org-region-role-add js-add-modal" href={addHref}
+                                  data-modal-title={addTitle} data-modal-size="sheet">
+                                  <span class="org-mini-role">{positionDefLabel(def, L)}</span>
+                                  <span class="org-region-add-label">
+                                    <span aria-hidden="true">+</span>{t("org.addHolder")}
+                                  </span>
+                                </a>
+                              );
+                            }
                             return (
                               <div class={`org-region-role${team.length ? "" : " org-vacant"}`}>
                                 <span class="org-mini-role">{positionDefLabel(def, L)}</span>
@@ -1265,20 +1614,20 @@ export function OrganizationPage(props: Common & {
                                     {team.map((person) => (
                                       <div class="org-region-holder">
                                         <LeaderAvatar leader={person} size="sm" />
-                                        <div>
+                                        <div class="org-person">
                                           <LeaderLink leader={person} empty={t("org.vacant")} />
                                           {def.allowMultiple === 1 && (
-                                            <span class="muted small"> · {t("org.priority")} {person.priority}</span>
+                                            <span class="org-person-meta">{t("org.priority")} {person.priority}</span>
                                           )}
                                         </div>
                                       </div>
                                     ))}
                                   </div>
                                 )}
-                                {canEdit && def.allowMultiple === 1 && (
-                                  <a class="btn sm secondary js-add-modal" href={`/organization/region-assign?region=${group.id}&position=${def.code}`}
-                                    data-modal-title={`${t("org.addHolder")} · ${positionDefLabel(def, L)}`} data-modal-size="md">
-                                    + {t("org.addHolder")}
+                                {canAdd && team.length > 0 && (
+                                  <a class="org-card-link org-region-add js-add-modal" href={addHref}
+                                    data-modal-title={addTitle} data-modal-size="sheet">
+                                    <span aria-hidden="true">+</span> {t("org.addHolder")}
                                   </a>
                                 )}
                               </div>

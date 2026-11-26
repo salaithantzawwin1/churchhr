@@ -35,7 +35,10 @@
     try { labels = JSON.parse(raw); } catch (e) { labels = raw ? raw.split(",") : []; }
     meter.innerHTML = '<div class="pw-bars"><span></span><span></span><span></span><span></span></div>' +
       '<span class="pw-label"></span>';
-    wrap.appendChild(meter);
+    // A field may reserve a spot for the meter (the account form puts it beside
+    // Generate); otherwise it goes under the input as before.
+    var slot = wrap.querySelector("[data-strength-slot]");
+    (slot || wrap).appendChild(meter);
     var labelsEl = meter.querySelector(".pw-label");
     function update() {
       var r = scorePassword(input.value);
@@ -73,6 +76,18 @@
       menu.style.maxHeight = "";
       menu.style.overflowY = "";
     }
+    // Height, at every width: the wide layout is positioned by CSS but still
+    // needs to stop at the bottom of the window, and the exact space depends on
+    // where the summary sits (topbar height, zoom, wrapped rows).
+    function fit(d) {
+      if (!d.open) return;
+      var summary = d.querySelector("summary");
+      var menu = menuFor(d);
+      if (!summary || !menu) return;
+      var r = summary.getBoundingClientRect();
+      menu.style.maxHeight = Math.max(120, window.innerHeight - r.bottom - 18) + "px";
+      menu.style.overflowY = "auto";
+    }
     function position(d) {
       if (!narrow || !narrow.matches || !d.open) return;
       var summary = d.querySelector("summary");
@@ -87,14 +102,17 @@
       menu.style.right = "auto";
       menu.style.width = Math.round(width) + "px";
       menu.style.minWidth = "0";
-      menu.style.maxHeight = Math.max(120, window.innerHeight - r.bottom - 18) + "px";
-      menu.style.overflowY = "auto";
+      fit(d);
     }
 
     menus.forEach(function (d) {
       d.addEventListener("toggle", function () {
-        if (d.open) position(d);
-        else if (narrow && !narrow.matches) clearPosition(d);
+        if (d.open) {
+          position(d);
+          fit(d);
+        } else if (narrow && !narrow.matches) {
+          clearPosition(d);
+        }
       });
     });
     document.addEventListener("click", function (e) {
@@ -121,7 +139,12 @@
       if (narrow.addEventListener) narrow.addEventListener("change", onChange);
       else if (narrow.addListener) narrow.addListener(onChange);
     }
-    window.addEventListener("resize", function () { menus.forEach(position); });
+    window.addEventListener("resize", function () {
+      menus.forEach(function (d) {
+        position(d);
+        fit(d);
+      });
+    });
     window.addEventListener("scroll", function () {
       menus.forEach(function (d) { if (d.open) d.open = false; });
     }, { passive: true });
@@ -194,48 +217,53 @@
     if (toggle && toggle.getAttribute("aria-pressed") !== "true") toggle.click();
   });
 
-  // One-click password reset. The request asks for JSON so the temporary
-  // password can be shown once in the modal instead of a URL or a page that a
-  // refresh would re-post; without JS the same form renders it as a page.
-  document.addEventListener("submit", function (e) {
-    var form = e.target;
-    if (!form || !form.hasAttribute || !form.hasAttribute("data-reset-password")) return;
-    e.preventDefault();
-    if (form.getAttribute("data-busy")) return;
-    form.setAttribute("data-busy", "1");
-    var esc = function (s) {
-      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    };
-    fetch(form.getAttribute("action"), {
-      method: "POST", credentials: "same-origin",
-      headers: { "Accept": "application/json" },
-    })
-      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
-      .then(function (data) {
-        if (!data || !data.ok) throw new Error("reset");
-        form.removeAttribute("data-busy");
-        openModal(form.getAttribute("data-modal-title") || "", "sm");
-        bodyEl.innerHTML =
-          '<p class="muted small">' + esc(form.getAttribute("data-intro") || "") + "</p>" +
-          '<p class="pw-handover"><strong>' + esc(data.username) + "</strong></p>" +
-          '<div class="pw-copy"><code>' + esc(data.password) + "</code>" +
-          '<button type="button" class="btn sm secondary" data-copy="' + esc(data.password) + '">' +
-          esc(form.getAttribute("data-copy-label") || "Copy") + "</button></div>" +
-          '<div class="actions"><a class="btn" href="/admin/users">OK</a></div>';
-      })
-      .catch(function () { form.removeAttribute("data-busy"); form.submit(); });
-  });
-
-  // Copy buttons in a handover dialog.
+  // Copy a value the server shows only once (a temporary password) and say so
+  // on the button, so the admin knows the clipboard took it.
   document.addEventListener("click", function (e) {
-    var btn = e.target && e.target.closest ? e.target.closest("[data-copy]") : null;
+    var btn = e.target && e.target.closest ? e.target.closest("[data-copy-text]") : null;
     if (!btn) return;
     e.preventDefault();
-    var done = function () { btn.textContent = "✓"; };
+    var text = btn.getAttribute("data-copy-text") || "";
+    var done = btn.getAttribute("data-copy-done") || "Copied";
+    var label = btn.textContent;
+    var status = document.querySelector("[data-copy-status]");
+    var timer = null;
+    var feedback = function (message) {
+      btn.textContent = message;
+      if (status) status.textContent = message;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        btn.textContent = label;
+        if (status) status.textContent = "";
+      }, 2000);
+    };
+    // Older browsers (and non-secure origins) have no Clipboard API; a hidden
+    // textarea plus execCommand still copies on every platform the app targets.
+    var fallback = function () {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.top = "-1000px";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+      document.body.removeChild(area);
+      if (ok) return feedback(done);
+      // Still make it copyable by hand: select the value that is on screen.
+      var value = document.querySelector(".temp-pw");
+      if (value && window.getSelection && document.createRange) {
+        var range = document.createRange();
+        range.selectNodeContents(value);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      }
+    };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(btn.getAttribute("data-copy")).then(done, done);
+      navigator.clipboard.writeText(text).then(function () { feedback(done); }, fallback);
     } else {
-      done();
+      fallback();
     }
   });
 
@@ -367,6 +395,7 @@
       if (keepSelection && current && !matched) sel.value = "";
     });
     applyParentFilters(form, keepSelection);
+    syncClusterHints(form);
   }
 
   /** Narrow data-parent-filter selects by the currently visible parent selection,
@@ -393,6 +422,23 @@
         if (show && o.value === current) matched = true;
       });
       if (keepSelection && current && !matched) sel.value = "";
+    });
+    syncClusterHints(form);
+  }
+
+  /** A Home Cell belongs to at most one supervision cluster, and that cluster is
+   * not picked per member: the form shows it as read-only text under the field,
+   * taken from a data-cluster attribute on the chosen option. A cell without a
+   * cluster, or no cell at all, shows nothing. */
+  function syncClusterHints(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll("[data-cluster-hint]"), function (hint) {
+      var sel = hint.parentNode && hint.parentNode.querySelector('select[name="home_cell_id"]');
+      if (!sel) return;
+      var picked = sel.options[sel.selectedIndex];
+      var name = picked && picked.value ? picked.getAttribute("data-cluster") || "" : "";
+      var label = hint.getAttribute("data-label") || "";
+      hint.textContent = name ? label + ": " + name : "";
+      hint.hidden = !name;
     });
   }
 
@@ -427,6 +473,13 @@
     });
   }
   initRegionCascade(document);
+  syncClusterHints(document);
+  // The modal form is inserted after load, and a cell can be picked (or reset by
+  // the state cascade) at any time, so follow the change from the top.
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (el && el.tagName === "SELECT" && el.name === "home_cell_id") syncClusterHints(document);
+  });
 
   // Member-list scope (Home Cell) chips follow the State scope ticks: a cell is
   // only offered for the states this account may see. A cell that is already
@@ -465,6 +518,94 @@
     });
   }
   initCellStateScope(document);
+
+  // User modal: the Permissions pane is a preview of the ticked roles, so it
+  // follows the role chips instead of waiting for a save. Each chip carries the
+  // permissions of its role (data-role-perms); the pane lists every permission
+  // and marks the ones the union grants, naming the roles that grant them.
+  function applyUserPermPreview(form) {
+    var preview = form.querySelector("[data-perm-preview]");
+    if (!preview) return;
+    var byPerm = {};
+    var granted = 0;
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="roles"]'), function (b) {
+      if (!b.checked) return;
+      var roleName = b.getAttribute("data-role-name") || "";
+      (b.getAttribute("data-role-perms") || "").split(/\s+/).forEach(function (p) {
+        if (!p) return;
+        if (!byPerm[p]) { byPerm[p] = []; granted++; }
+        if (roleName && byPerm[p].indexOf(roleName) === -1) byPerm[p].push(roleName);
+      });
+    });
+    // options.manage implies every structures.* permission (canManageStructure),
+    // so those must read as granted, naming the role that carries options.manage.
+    var viaLabel = preview.getAttribute("data-perm-via") || "";
+    var implied = {};
+    var optionsRoles = byPerm["options.manage"] || [];
+    if (optionsRoles.length) {
+      Array.prototype.forEach.call(preview.querySelectorAll("[data-perm-row]"), function (row) {
+        var p = row.getAttribute("data-perm-row");
+        if (p.indexOf("structures.") === 0 && !byPerm[p]) implied[p] = optionsRoles;
+      });
+    }
+    Array.prototype.forEach.call(preview.querySelectorAll("[data-perm-row]"), function (row) {
+      var p = row.getAttribute("data-perm-row");
+      var names = byPerm[p] || [];
+      var through = implied[p] || [];
+      var on = names.length > 0 || through.length > 0;
+      row.classList.toggle("is-on", on);
+      row.classList.toggle("is-off", !on);
+      var mark = row.querySelector(".perm-mark");
+      if (mark) mark.textContent = on ? "✓" : "–";
+      var label = row.querySelector("[data-perm-by]");
+      if (label) {
+        label.textContent = names.length > 0 ? names.join(", ")
+          : through.length > 0 ? through.join(", ") + " · " + viaLabel : "";
+      }
+    });
+    var count = form.querySelector("[data-perm-count]");
+    if (count) {
+      count.textContent = (granted + Object.keys(implied).length)
+        + "/" + preview.querySelectorAll("[data-perm-row]").length;
+    }
+  }
+
+  // New account: the password tooltip only promises a forced change while
+  // "Require password change on login" is ticked, so it follows that box.
+  function initMustChangeTip(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("form[data-user-form]"), function (form) {
+      var box = form.querySelector('input[name="must_change"]');
+      var tip = form.querySelector(".field-tip[data-tip-on]");
+      if (!box || !tip || tip.getAttribute("data-tip-bound")) return;
+      tip.setAttribute("data-tip-bound", "1");
+      function apply() {
+        var text = box.checked ? tip.getAttribute("data-tip-on") : tip.getAttribute("data-tip-off");
+        if (!text) return;
+        tip.setAttribute("data-tip", text);
+        var btn = tip.querySelector(".field-tip-btn");
+        if (btn) {
+          btn.setAttribute("aria-label", text);
+          btn.setAttribute("title", text);
+        }
+      }
+      box.addEventListener("change", apply);
+      apply();
+    });
+  }
+  initMustChangeTip(document);
+
+  function initUserPermPreview(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("form[data-user-form]"), function (form) {
+      if (form.getAttribute("data-perm-init")) return;
+      form.setAttribute("data-perm-init", "1");
+      applyUserPermPreview(form);
+      form.addEventListener("change", function (e) {
+        var el = e.target;
+        if (el && el.name === "roles") applyUserPermPreview(form);
+      });
+    });
+  }
+  initUserPermPreview(document);
 
   // Household head picker: the native select stays as the no-JS fallback, but
   // when JS runs it becomes a type-to-search combobox. Picking a head copies
@@ -1103,6 +1244,10 @@
       Array.prototype.forEach.call(table.querySelectorAll("[data-col]"), function (cell) {
         cell.style.display = off[cell.getAttribute("data-col")] ? "none" : "";
       });
+      // On narrow screens the role is repeated as a chip under the member's
+      // name; it belongs to the same column, so switching Position off in the
+      // chooser must remove that chip as well.
+      table.setAttribute("data-inline-role", off.role ? "off" : "on");
       var st = {};
       Array.prototype.forEach.call(boxes, function (b) {
         st[b.getAttribute("data-col")] = b.checked;
@@ -1129,16 +1274,35 @@
 
   // Collapsible filter panels: open on desktop, collapsed on phones — unless a
   // filter is already narrowing the list, in which case the panel stays open so
-  // the chosen values remain visible. Once the user toggles one, resize only
-  // forces it open for wide viewports.
+  // the chosen values remain visible. A panel marked data-remember keeps the
+  // fold the user chose at every width, so a laptop can put the grid away too.
   (function initFilterBoxes() {
     var boxes = document.querySelectorAll("details.filter-box");
     if (!boxes.length) return;
     var mq = window.matchMedia("(max-width: 640px)");
+    var KEY = "filterPanelCollapsed";
     Array.prototype.forEach.call(boxes, function (d) {
-      if (mq.matches && !d.querySelector(".filter-count")) d.open = false;
+      var remember = d.hasAttribute("data-remember");
+      var saved = null;
+      if (remember) {
+        try { saved = window.localStorage.getItem(KEY); } catch (e) { /* private mode */ }
+      }
+      if (saved === "1") d.open = false;
+      else if (saved === "0") d.open = true;
+      else if (mq.matches && !d.querySelector(".filter-count")) d.open = false;
+      if (remember) {
+        // Setting open above fires toggle too, so the page's own default must
+        // not be stored as if the user had chosen it.
+        var quiet = true;
+        window.setTimeout(function () { quiet = false; }, 0);
+        d.addEventListener("toggle", function () {
+          if (quiet) return;
+          saved = d.open ? "0" : "1";
+          try { window.localStorage.setItem(KEY, saved); } catch (e) { /* ignore */ }
+        });
+      }
       mq.addEventListener("change", function () {
-        if (!mq.matches) d.open = true;
+        if (!mq.matches && saved !== "1") d.open = true;
       });
     });
   })();
@@ -1222,13 +1386,39 @@
   }
   initDepartmentPosition(document);
 
+  // A church-wide role belongs to one Regional Church, so its position select
+  // waits for a church: the server rejects a role that has no church to sit in.
+  function initChurchPosition(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-church-position]"), function (scope) {
+      if (scope.getAttribute("data-church-bound")) return;
+      scope.setAttribute("data-church-bound", "1");
+      var church = scope.querySelector('select[name="church_id"]');
+      var pos = scope.querySelector('select[name="church_position"]');
+      if (!church || !pos) return;
+      function sync(clear) {
+        var hasChurch = Boolean(church.value);
+        pos.disabled = !hasChurch;
+        if (!hasChurch && clear) pos.value = "";
+      }
+      church.addEventListener("change", function () { sync(true); });
+      // Not cleared on load: an existing role keeps its value until the user
+      // changes the church themselves.
+      sync(false);
+    });
+  }
+  initChurchPosition(document);
+
   // Tabbed forms (e.g. Assign position). Without JS every pane stays visible
   // and usable; this only hides the panes that are not selected.
   function initTabs(root) {
     Array.prototype.forEach.call(root.querySelectorAll("[data-tabs]"), function (bar) {
       if (bar.getAttribute("data-tabs-bound")) return;
       bar.setAttribute("data-tabs-bound", "1");
-      var wrap = bar.parentNode;
+      // The bar can sit in a row of its own (the position sheet keeps an info
+      // dot beside it), so panes are looked up from the form the bar belongs to
+      // rather than its immediate parent; without a form the parent still wraps
+      // both the bar and its panes.
+      var wrap = bar.closest("form") || bar.parentNode;
       var buttons = bar.querySelectorAll("[data-tab-target]");
       var panes = wrap.querySelectorAll("[data-tab-pane]");
       if (!buttons.length) return;
@@ -1259,6 +1449,46 @@
   }
   initTabs(document);
 
+  // The position dialog's identity strip keeps its role chips on one line and
+  // scrolls them sideways when the sheet is narrow. A fade on the right edge
+  // says there is more to see, and it goes away once the last chip is in view.
+  // A row belongs to one dialog opening, so the resize listener is shared by
+  // all of them and rows whose dialog is gone are dropped: one listener per
+  // row would pile up on the window every time the dialog opens.
+  var chipRows = [];
+  function updateChipRow(row) {
+    var hidden = row.scrollWidth - row.clientWidth > 2;
+    var left = row.scrollWidth - row.clientWidth - Math.ceil(row.scrollLeft);
+    row.classList.toggle("is-scrollable", hidden);
+    row.classList.toggle("at-end", hidden && left <= 2);
+  }
+  function refreshChipRows() {
+    chipRows = chipRows.filter(function (row) { return row.isConnected; });
+    chipRows.forEach(updateChipRow);
+  }
+  window.addEventListener("resize", refreshChipRows);
+  function initRoleChips(root) {
+    Array.prototype.forEach.call(root.querySelectorAll(".position-role-chips"), function (row) {
+      if (row.getAttribute("data-chips-bound")) return;
+      row.setAttribute("data-chips-bound", "1");
+      chipRows.push(row);
+      row.addEventListener("scroll", function () { updateChipRow(row); }, { passive: true });
+      updateChipRow(row);
+    });
+    refreshChipRows();
+  }
+  initRoleChips(document);
+
+  // A one-time password page is the response to a POST. Aim its history entry
+  // at the list, so refreshing reloads the list (a GET) instead of resubmitting
+  // the form and issuing a second password.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-reset-result]"), function (el) {
+    var target = el.getAttribute("data-reset-result");
+    if (!target || !window.history || !window.history.replaceState) return;
+    if (location.pathname + location.search === target) return;
+    try { window.history.replaceState(null, "", target); } catch (err) { /* keep the POST address */ }
+  });
+
   var modal = document.getElementById("app-modal");
   if (!modal) return;
   var card = modal.querySelector(".modal-card");
@@ -1273,6 +1503,9 @@
     titleEl.textContent = title || "";
     card.classList.toggle("sm", size === "sm");
     card.classList.toggle("md", size === "md");
+    // A sheet keeps its 520px column on desktop and sits on the bottom edge on
+    // a phone; the other sizes stay centred everywhere.
+    card.classList.toggle("sheet", size === "sheet");
     modal.hidden = false;
     document.body.style.overflow = "hidden";
   }
@@ -1317,6 +1550,19 @@
   modal.addEventListener("click", function (e) {
     var el = e.target;
     if (el && el.closest && el.closest("[data-close]")) closeModal();
+  });
+  // Priority steppers are rendered inside the modal body, so one delegated
+  // listener covers every sheet. The buttons step the native number input, so
+  // typing, arrow keys and form submission keep working unchanged.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest(".stepper-btn[data-step]") : null;
+    if (!btn) return;
+    var stepper = btn.closest(".priority-stepper");
+    var input = stepper ? stepper.querySelector('input[type="number"]') : null;
+    if (!input) return;
+    e.preventDefault();
+    if (Number(btn.getAttribute("data-step")) > 0) input.stepUp(); else input.stepDown();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   document.addEventListener("keydown", function (e) {
     if (modal.hidden) return;
@@ -1390,16 +1636,35 @@
       var now = new Date();
       return new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 6.5 * 3600000);
     }
+    // The visible area, which on a phone is smaller than the window while the
+    // soft keyboard is open; a calendar placed against innerHeight then sits
+    // behind the keyboard and looks dead.
+    function viewHeight() {
+      return (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    }
+    function viewTop() {
+      return (window.visualViewport && window.visualViewport.offsetTop) || 0;
+    }
     function place() {
       if (!dpPop || !dpInput) return;
       var rect = dpInput.getBoundingClientRect();
+      var width = dpPop.offsetWidth;
       var height = dpPop.offsetHeight;
-      var left = Math.max(8, Math.min(rect.left, window.innerWidth - dpPop.offsetWidth - 8));
+      var viewW = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+      var viewH = viewHeight();
+      var offsetTop = viewTop();
+      var left = Math.max(8, Math.min(rect.left, viewW - width - 8));
       var top = rect.bottom + 6;
-      // Flip above the field when there is no room below it.
-      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+      // Flip above the field when there is no room below it, then keep the
+      // calendar inside the visible area.
+      if (top + height > offsetTop + viewH - 8) {
+        top = Math.max(offsetTop + 8, Math.min(rect.top - height - 6, offsetTop + viewH - height - 8));
+      }
       dpPop.style.left = left + "px";
       dpPop.style.top = top + "px";
+      // A calendar taller than the space left (a small phone in landscape)
+      // scrolls inside itself instead of running off the screen.
+      dpPop.style.maxHeight = Math.max(200, viewH - 16) + "px";
     }
     function setValue(input, date) {
       input.value = date ? iso(date) : "";
@@ -1417,7 +1682,16 @@
     if (!initDatePickers.bound) {
       initDatePickers.bound = true;
       document.addEventListener("click", function (e) {
-        if (dpPop && !dpPop.contains(e.target) && e.target !== dpInput) closeDatePicker();
+        if (!dpPop) return;
+        if (e.target === dpInput) return;
+        // Picking a year or a month re-renders the calendar, which detaches the
+        // clicked cell before the event reaches the document: contains() would
+        // then report "outside" and close the calendar the moment a year is
+        // chosen. composedPath() is recorded at dispatch, so it still names the
+        // calendar the click started in.
+        var path = e.composedPath ? e.composedPath() : null;
+        if (path ? path.indexOf(dpPop) > -1 : dpPop.contains(e.target)) return;
+        closeDatePicker();
       });
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && dpPop) closeDatePicker();
@@ -1426,6 +1700,18 @@
       // The popover is placed against the viewport, so keep it attached to its
       // field while the page (or a dialog body) scrolls under it.
       window.addEventListener("scroll", function () { if (dpPop) place(); }, true);
+      // The soft keyboard opening, or a phone toolbar collapsing, resizes the
+      // visual viewport without a window resize on iOS.
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", function () { if (dpPop) place(); });
+        window.visualViewport.addEventListener("scroll", function () { if (dpPop) place(); });
+      }
+      // Web fonts and late images move the form under the calendar after it has
+      // been placed; settle it once the page has finished loading.
+      window.addEventListener("load", function () { if (dpPop) place(); });
+      if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+        document.fonts.ready.then(function () { if (dpPop) place(); });
+      }
     }
 
     // Text date fields carry data-datepicker: they keep the same ISO value the
@@ -1447,12 +1733,40 @@
         minDate: parseValue(input.getAttribute("min")),
       });
 
+      // setDate() re-renders the calendar and fires its own changeDate. While
+      // we are only syncing the calendar with the field's value that is not a
+      // user pick: treating it as one would rewrite the input and, on a
+      // data-auto-submit filter, submit the page the moment a field is opened.
+      var syncing = false;
+
       pop.addEventListener("changeDate", function (e) {
+        if (syncing) return;
         var date = e.detail && e.detail.date;
         if (!date) return;
         setValue(input, date);
         closeDatePicker();
       });
+
+      // A grey day belongs to the month before or after the one on screen.
+      // Tapping it means "that date", not "flip the calendar", so choose it
+      // directly; outside min/max the calendar keeps its own month flip.
+      pop.addEventListener("click", function (e) {
+        var cell = e.target && e.target.closest ? e.target.closest(".datepicker-cell.day") : null;
+        if (!cell || cell.classList.contains("disabled")) return;
+        var step = cell.classList.contains("next") ? 1 : cell.classList.contains("prev") ? -1 : 0;
+        if (!step) return;
+        var view = dp.picker && dp.picker.viewDate;
+        var day = parseInt(cell.textContent, 10);
+        if (!view || !day) return;
+        var date = new Date(view.getFullYear(), view.getMonth() + step, day);
+        var min = parseValue(input.getAttribute("min"));
+        var max = parseValue(input.getAttribute("max"));
+        if ((min && date < min) || (max && date > max)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setValue(input, date);
+        closeDatePicker();
+      }, true);
 
       function show() {
         dp.setOptions({
@@ -1460,8 +1774,11 @@
           minDate: parseValue(input.getAttribute("min")),
         });
         var current = parseValue(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
-        else dp.setDate({ clear: true, render: true, silent: true });
+        syncing = true;
+        try {
+          if (current) dp.setDate(current, { render: true });
+          else dp.setDate({ clear: true, render: true });
+        } finally { syncing = false; }
         // Set the open state after setDate: rendering the calendar can fire its
         // own changeDate, and closing must not leave a visible popover behind.
         if (dpPop && dpPop !== pop) dpPop.hidden = true;
@@ -1469,6 +1786,9 @@
         dpInput = input;
         pop.hidden = false;
         place();
+        // Re-place once the browser has reflowed anything that shifted while
+        // the calendar was being built (a hint line, a wrapped label).
+        window.setTimeout(function () { if (dpPop === pop) place(); }, 250);
       }
       input.addEventListener("focus", show);
       // Picking a date closes the calendar but leaves the field focused, so a
@@ -1477,7 +1797,9 @@
       input.addEventListener("input", function () {
         if (dpPop !== pop) return;
         var current = parseValue(input.value);
-        if (current) dp.setDate(current, { render: true, silent: true });
+        if (!current) return;
+        syncing = true;
+        try { dp.setDate(current, { render: true }); } finally { syncing = false; }
       });
 
       // Optional "Today" shortcut, for dates that usually mean now (a daily
@@ -1547,7 +1869,13 @@
       f.setAttribute("data-confirm-was-hidden", f.hidden ? "1" : "0");
       f.hidden = true;
       var box = confirmBox(text, yesLabel, "data-confirm-no", modal.getAttribute("data-cancel"));
-      bodyEl.appendChild(box);
+      // A row's own delete form sits in a list of holders: put the question
+      // straight under that row. Appending it to the end of the dialog left the
+      // question below the form footer, under buttons that do not answer it.
+      var row = f.closest(".region-holder-row");
+      if (row && row.parentNode && bodyEl.contains(row)) row.parentNode.insertBefore(box, row.nextSibling);
+      else bodyEl.appendChild(box);
+      if (box.scrollIntoView) box.scrollIntoView({ block: "nearest" });
       // Focus the safe choice, not the destructive one.
       var inlineNo = box.querySelector("[data-confirm-no]");
       if (inlineNo) inlineNo.focus();
@@ -1570,13 +1898,17 @@
     });
     initRegionCascade(bodyEl);
     initCellStateScope(bodyEl);
+    initMustChangeTip(bodyEl);
+    initUserPermPreview(bodyEl);
     initDatePickers(bodyEl);
     initHeadPicker(bodyEl);
     initSearchPicker(bodyEl);
     initListFilter(bodyEl);
     initAssignWarn(bodyEl);
     initDepartmentPosition(bodyEl);
+    initChurchPosition(bodyEl);
     initTabs(bodyEl);
+    initRoleChips(bodyEl);
     initPhotoInputs(bodyEl);
     initStrengthMeters(bodyEl);
   }
@@ -1888,15 +2220,55 @@
     }, 5000);
   })();
 
+  // Sticky section headings must clear the real topbar height: on a narrow
+  // phone the nav wraps to three rows, so a hardcoded offset hid the heading.
+  (function syncStickyTop() {
+    var topbar = document.querySelector(".topbar");
+    if (!topbar) return;
+    function update() {
+      var h = Math.ceil(topbar.getBoundingClientRect().height) + 2;
+      document.documentElement.style.setProperty("--sticky-top", h + "px");
+    }
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("load", update);
+  })();
+
   // Home Cell structure reads one cluster at a time: opening a card collapses the
-  // others, so two half-filled structures are never side by side. Capture phase,
-  // because `toggle` does not bubble and cards are replaced after a save.
+  // others, so two half-filled structures are never side by side. The cluster
+  // holding the chosen Home Cell is pinned open so the selection never loses its
+  // structure. Capture phase, because `toggle` does not bubble and cards are
+  // replaced after a save.
+  document.addEventListener("click", function (e) {
+    var summary = e.target && e.target.closest ? e.target.closest("summary") : null;
+    if (!summary) return;
+    var card = summary.parentElement;
+    if (card && card.classList.contains("org-flow-cluster") && card.classList.contains("is-active")) {
+      e.preventDefault();
+    }
+  }, true);
   document.addEventListener("toggle", function (e) {
     var el = e.target;
-    if (!el || el.tagName !== "DETAILS" || !el.open) return;
-    if (!el.classList || !el.classList.contains("org-flow-cluster")) return;
+    if (!el || el.tagName !== "DETAILS") return;
+    if (!el.classList) return;
+    // Regions & Churches behaves the same way, without a pinned card: one
+    // region open at a time keeps the long team and church lists readable.
+    if (el.classList.contains("org-region-group")) {
+      if (!el.open) return;
+      Array.prototype.forEach.call(document.querySelectorAll("details.org-region-group[open]"), function (other) {
+        if (other !== el) other.open = false;
+      });
+      return;
+    }
+    if (!el.classList.contains("org-flow-cluster")) return;
+    var pinned = el.classList.contains("is-active");
+    if (!el.open) {
+      // Clicking the chosen cluster's header must not hide its structure.
+      if (pinned) el.open = true;
+      return;
+    }
     Array.prototype.forEach.call(document.querySelectorAll("details.org-flow-cluster[open]"), function (other) {
-      if (other !== el) other.open = false;
+      if (other !== el && !other.classList.contains("is-active")) other.open = false;
     });
   }, true);
 

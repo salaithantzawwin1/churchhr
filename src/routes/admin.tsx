@@ -12,7 +12,7 @@ import { ForbiddenPage } from "../views/errors";
 import { flashFromQuery } from "../flash";
 import { hashPassword, parseIterations } from "../auth";
 import { destroyOtherSessions } from "../session";
-import { checkPasswordPolicy } from "../password";
+import { checkPasswordPolicy, generateTempPassword } from "../password";
 import { abbrevFromLabel, findOption, loadAllOptions, nextCodeCandidate, nextFamilyGroupCode, PARENT_TYPE, OPTION_RAW_COLUMN, isOptionType, isLabelOptionType, townshipOf, type OptionRow } from "../lookup";
 import { PERMISSIONS, SUPER_ADMIN_ROLE_ID, type Permission } from "../rbac";
 import { getDict, type Lang } from "../i18n";
@@ -20,7 +20,7 @@ import { addDays, parseDateFlexible, s, todayInYangon } from "../util";
 import { Layout } from "../views/layout";
 import {
   AddAgeGroupForm, AddOptionForm, AddRegionForm, AdminOptionsPage, AdminRolesPage, AdminUserEditPage, AdminUsersPage,
-  EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, UserFormFragment,
+  EditAgeGroupForm, EditOptionForm, EditRegionForm, RoleFormFragment, TempPasswordPage, UserFormFragment,
   type AdminRoleRow, type AdminUserRow, type OptionUsage,
 } from "../views/admin";
 import { TownshipCodesPage, type TownshipCodeRow } from "../views/township-codes";
@@ -510,57 +510,31 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   return c.redirect("/admin/users?ok=user-updated", 302);
 });
 
-/** A random password that satisfies the policy: 14 characters, one from each
- * class, in an unpredictable order. */
-function temporaryPassword(): string {
-  const groups = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*"];
-  const seed = new Uint32Array(16);
-  crypto.getRandomValues(seed);
-  const chars = groups.map((g, i) => g[seed[i]! % g.length]);
-  const all = groups.join("");
-  for (let i = chars.length; i < 14; i++) chars.push(all[seed[i]! % all.length]);
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = seed[i]! % (i + 1);
-    const swap = chars[i]!;
-    chars[i] = chars[j]!;
-    chars[j] = swap;
-  }
-  return chars.join("");
-}
-
+/** One-time temporary password for another account. The hash is stored and the
+ *  forced-change flag set, every live session of that account is dropped, and
+ *  the plain value is only ever written into this response — never into the
+ *  database, the audit trail, or the logs. */
 adminRoutes.post("/users/:id/reset-password", requirePermission("users.manage"), requireAllStates, async (c) => {
   const db = getDb(c.env);
-  const t = getDict(c.get("lang"));
   const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id < 1) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
-  if (id === c.get("user").id) return c.redirect(errRedirect("/admin/users", "adm.errSelfReset"), 302);
-  const [target] = await db.select({ id: users.id, username: users.username }).from(users)
-    .where(eq(users.id, id)).limit(1);
-  if (!target) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
-
-  const password = temporaryPassword();
-  const passwordHash = await hashPassword(password, parseIterations(c.env.PBKDF2_ITERATIONS));
+  if (!Number.isInteger(id) || id < 1 || id === c.get("user").id) {
+    return c.redirect(errRedirect("/admin/users", "adm.errResetSelf"), 302);
+  }
+  const target = await db.select({ id: users.id, username: users.username })
+    .from(users).where(eq(users.id, id)).limit(1);
+  if (!target[0]) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword, parseIterations(c.env.PBKDF2_ITERATIONS));
   await db.update(users).set({ passwordHash, mustChangePassword: 1 }).where(eq(users.id, id));
-  // The old password must stop working everywhere, so its sessions go too.
+  // A password the holder no longer knows must not keep any device signed in.
   await destroyOtherSessions(db, id, null);
   clearAccessCache();
-
-  const headers = { "cache-control": "no-store" };
-  if ((c.req.header("accept") ?? "").includes("application/json")) {
-    return c.json({ ok: true, username: target.username, password }, 200, headers);
-  }
+  c.header("Cache-Control", "no-store");
   return c.html(
-    <Layout title={t("adm.resetPasswordTitle")} lang={c.get("lang")} user={c.get("user")}
-      perms={c.get("perms")} active="/admin/users" flash={null}>
-      <div class="page-head"><h1>{t("adm.resetPasswordTitle")}</h1></div>
-      <div class="card" style="max-width:520px">
-        <p class="muted small">{t("adm.resetPasswordIntro")}</p>
-        <p><strong>{target.username}</strong></p>
-        <p class="pw-copy"><code>{password}</code></p>
-        <div class="actions"><a class="btn" href="/admin/users">{t("adm.usersTitle")}</a></div>
-      </div>
-    </Layout>,
-    200, headers,
+    <TempPasswordPage
+      user={c.get("user")} perms={c.get("perms")} flash={null}
+      username={target[0].username} tempPassword={tempPassword} lang={c.get("lang")}
+    />,
   );
 });
 
@@ -1618,6 +1592,10 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const search = (q.q ?? "").trim().slice(0, 80);
   const who = (q.user ?? "").trim().slice(0, 60);
   const group = /^[a-z_]{1,30}$/.test(q.action ?? "") ? q.action! : "";
+  // Entity + record id narrow the trail to one row's history: a household name
+  // is not unique, so searching by name alone can pull in unrelated entries.
+  const entity = /^[a-z_]{1,30}$/.test(q.entity ?? "") ? q.entity! : "";
+  const entityId = (q.entity_id ?? "").trim().slice(0, 20);
   // Default to the last 30 days: an unfiltered log is both slow to scan and
   // leaves the date fields empty on first visit.
   const today = todayInYangon();
@@ -1630,10 +1608,17 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const where = [sql`1=1`];
   if (who) where.push(sql`username = ${who}`);
   if (group) where.push(sql`action LIKE ${group + ".%"}`);
+  if (entity) where.push(sql`entity = ${entity}`);
+  if (entityId) where.push(sql`entity_id = ${entityId}`);
   if (search) {
-    const like = `%${search}%`;
-    where.push(sql`(username LIKE ${like} OR action LIKE ${like} OR path LIKE ${like}
-      OR summary LIKE ${like} OR entity_id LIKE ${like} OR device LIKE ${like} OR ip LIKE ${like})`);
+    // % and _ are LIKE wildcards, so a search for "100%" or "a_b" matches the
+    // characters typed instead of matching everything.
+    const escaped = search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const like = `%${escaped}%`;
+    where.push(sql`(username LIKE ${like} ESCAPE '\\' OR action LIKE ${like} ESCAPE '\\'
+      OR path LIKE ${like} ESCAPE '\\' OR summary LIKE ${like} ESCAPE '\\'
+      OR entity_id LIKE ${like} ESCAPE '\\' OR device LIKE ${like} ESCAPE '\\'
+      OR ip LIKE ${like} ESCAPE '\\')`);
   }
   if (fromTs) where.push(sql`at >= ${fromTs}`);
   if (toTs) where.push(sql`at <= ${toTs}`);
@@ -1658,6 +1643,8 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
   const groupRows = await db.all<{ g: string }>(sql`
     SELECT DISTINCT substr(action, 1, instr(action, '.') - 1) AS g
     FROM audit_log WHERE instr(action, '.') > 0 ORDER BY g`);
+  const entityRows = await db.all<{ e: string }>(sql`
+    SELECT DISTINCT entity AS e FROM audit_log WHERE entity IS NOT NULL ORDER BY entity`);
 
   return c.html(
     <AuditLogPage
@@ -1665,7 +1652,8 @@ adminRoutes.get("/audit", requirePermission("audit.view"), requireAllStates, asy
       rows={rows} total={total} page={page} pages={pages}
       users={userRows.map((r) => r.username)}
       actionGroups={groupRows.map((r) => r.g).filter(Boolean)}
-      filters={{ q: search, user: who, action: group, from, to }}
+      entities={entityRows.map((r) => r.e).filter(Boolean)}
+      filters={{ q: search, user: who, action: group, entity, entityId, from, to }}
     />,
   );
 });
