@@ -1795,6 +1795,27 @@ a.gap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px;
 .modal-form-panes { min-width: 0; }
 .modal-form-pane[hidden] { display: none; }
 .modal-form-pane .cluster-section-head { margin-bottom: 10px; }
+@media (max-width: 640px) {
+  /* The two tabs are the only way through the account sheet on a phone, so
+     give them a full-height target instead of the desktop 36px pill. */
+  .modal-form-tabs .position-tab { padding: 12px 10px; }
+}
+/* A legend-wide tooltip for rules that are read once. */
+.tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; margin-left: 7px; border-radius: 50%;
+  border: 1px solid var(--line-strong); color: var(--muted);
+  font-size: 11px; font-weight: 700; font-style: normal; line-height: 1; cursor: help;
+}
+.tip:hover, .tip:focus-visible { color: var(--ink); border-color: var(--ink); }
+/* The temporary password a reset hands over, with its copy button. */
+.pw-handover { margin: 0 0 4px; }
+.pw-copy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.pw-copy code {
+  flex: 1 1 auto; min-width: 0; padding: 9px 11px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--field-bg);
+  font-size: 14px; overflow-wrap: anywhere;
+}
 /* Account form: two short tabbed panes keep the sheet narrow and the Save bar
    in view; sections inside a pane keep a small gap of their own. */
 .user-form .form-section + .form-section { margin-top: 14px; }

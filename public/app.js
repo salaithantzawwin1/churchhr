@@ -194,6 +194,51 @@
     if (toggle && toggle.getAttribute("aria-pressed") !== "true") toggle.click();
   });
 
+  // One-click password reset. The request asks for JSON so the temporary
+  // password can be shown once in the modal instead of a URL or a page that a
+  // refresh would re-post; without JS the same form renders it as a page.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form || !form.hasAttribute || !form.hasAttribute("data-reset-password")) return;
+    e.preventDefault();
+    if (form.getAttribute("data-busy")) return;
+    form.setAttribute("data-busy", "1");
+    var esc = function (s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    };
+    fetch(form.getAttribute("action"), {
+      method: "POST", credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+    })
+      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) throw new Error("reset");
+        form.removeAttribute("data-busy");
+        openModal(form.getAttribute("data-modal-title") || "", "sm");
+        bodyEl.innerHTML =
+          '<p class="muted small">' + esc(form.getAttribute("data-intro") || "") + "</p>" +
+          '<p class="pw-handover"><strong>' + esc(data.username) + "</strong></p>" +
+          '<div class="pw-copy"><code>' + esc(data.password) + "</code>" +
+          '<button type="button" class="btn sm secondary" data-copy="' + esc(data.password) + '">' +
+          esc(form.getAttribute("data-copy-label") || "Copy") + "</button></div>" +
+          '<div class="actions"><a class="btn" href="/admin/users">OK</a></div>';
+      })
+      .catch(function () { form.removeAttribute("data-busy"); form.submit(); });
+  });
+
+  // Copy buttons in a handover dialog.
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest("[data-copy]") : null;
+    if (!btn) return;
+    e.preventDefault();
+    var done = function () { btn.textContent = "✓"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(btn.getAttribute("data-copy")).then(done, done);
+    } else {
+      done();
+    }
+  });
+
   // Members list bulk actions: checkboxes fill the hidden ids field and show
   // the floating bulk bar; the header checkbox toggles the page.
   (function initBulkBar() {

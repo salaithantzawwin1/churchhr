@@ -1,4 +1,5 @@
 import { CapsHint, PwToggle } from "./auth";
+import { KeyIcon } from "./action-icons";
 import { Layout } from "./layout";
 import type { Flash } from "./layout";
 import type { SessionUser } from "../session";
@@ -176,8 +177,12 @@ function userForm(v: {
         </div>
       </fieldset>
       <fieldset class="form-section">
-        <legend>{t("adm.homeCellScope")}</legend>
-        <p class="hint">{t("adm.homeCellScopeHint")}</p>
+        <legend>
+          {t("adm.homeCellScope")}
+          {/* The rule is long and read once: keep it in a tooltip. */}
+          <span class="tip" role="note" tabindex={0}
+            title={t("adm.homeCellScopeHint")} aria-label={t("adm.homeCellScopeHint")}>i</span>
+        </legend>
         <div class="check-grid" data-cell-scope>
           {props.homeCells.map((cell) => (
             <label class="check-chip" data-state={String(cell.regionId ?? 0)}>
@@ -269,9 +274,19 @@ export function AdminUsersPage(props: UsersProps) {
                 <td class="row-actions-cell" data-label="">
                   <div class="row-icon-actions">
                     {u.id !== user.id
-                      ? <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
-                           data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
-                           title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                      ? <>
+                          <a class="btn sm secondary icon-btn js-edit-modal" href={`/admin/users/${u.id}/edit`}
+                            data-modal-title={`${t("adm.editHeading")}: ${u.username}`} data-modal-size="md"
+                            title={t("members.edit")} aria-label={t("members.edit")}><EditIcon /></a>
+                          {/* One click issues a random password and shows it once. */}
+                          <form method="post" action={`/admin/users/${u.id}/reset-password`} data-reset-password
+                            data-modal-title={t("adm.resetPasswordTitle")}
+                            data-intro={t("adm.resetPasswordIntro")}
+                            data-copy-label={t("adm.resetPasswordCopy")}>
+                            <button class="btn sm secondary icon-btn" type="submit"
+                              title={t("adm.resetPassword")} aria-label={t("adm.resetPassword")}><KeyIcon /></button>
+                          </form>
+                        </>
                       : <span class="muted" title={t("adm.selfEdit")}>—</span>}
                   </div>
                 </td>

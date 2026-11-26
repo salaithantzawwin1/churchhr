@@ -510,6 +510,60 @@ adminRoutes.post("/users/:id", requirePermission("users.manage"), requireAllStat
   return c.redirect("/admin/users?ok=user-updated", 302);
 });
 
+/** A random password that satisfies the policy: 14 characters, one from each
+ * class, in an unpredictable order. */
+function temporaryPassword(): string {
+  const groups = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*"];
+  const seed = new Uint32Array(16);
+  crypto.getRandomValues(seed);
+  const chars = groups.map((g, i) => g[seed[i]! % g.length]);
+  const all = groups.join("");
+  for (let i = chars.length; i < 14; i++) chars.push(all[seed[i]! % all.length]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = seed[i]! % (i + 1);
+    const swap = chars[i]!;
+    chars[i] = chars[j]!;
+    chars[j] = swap;
+  }
+  return chars.join("");
+}
+
+adminRoutes.post("/users/:id/reset-password", requirePermission("users.manage"), requireAllStates, async (c) => {
+  const db = getDb(c.env);
+  const t = getDict(c.get("lang"));
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id < 1) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
+  if (id === c.get("user").id) return c.redirect(errRedirect("/admin/users", "adm.errSelfReset"), 302);
+  const [target] = await db.select({ id: users.id, username: users.username }).from(users)
+    .where(eq(users.id, id)).limit(1);
+  if (!target) return c.redirect(errRedirect("/admin/users", "adm.errNoAccount"), 302);
+
+  const password = temporaryPassword();
+  const passwordHash = await hashPassword(password, parseIterations(c.env.PBKDF2_ITERATIONS));
+  await db.update(users).set({ passwordHash, mustChangePassword: 1 }).where(eq(users.id, id));
+  // The old password must stop working everywhere, so its sessions go too.
+  await destroyOtherSessions(db, id, null);
+  clearAccessCache();
+
+  const headers = { "cache-control": "no-store" };
+  if ((c.req.header("accept") ?? "").includes("application/json")) {
+    return c.json({ ok: true, username: target.username, password }, 200, headers);
+  }
+  return c.html(
+    <Layout title={t("adm.resetPasswordTitle")} lang={c.get("lang")} user={c.get("user")}
+      perms={c.get("perms")} active="/admin/users" flash={null}>
+      <div class="page-head"><h1>{t("adm.resetPasswordTitle")}</h1></div>
+      <div class="card" style="max-width:520px">
+        <p class="muted small">{t("adm.resetPasswordIntro")}</p>
+        <p><strong>{target.username}</strong></p>
+        <p class="pw-copy"><code>{password}</code></p>
+        <div class="actions"><a class="btn" href="/admin/users">{t("adm.usersTitle")}</a></div>
+      </div>
+    </Layout>,
+    200, headers,
+  );
+});
+
 // ---------- Roles ----------
 
 function validPerms(vals: string[]): Permission[] {
